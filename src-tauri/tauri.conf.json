@@ -1,0 +1,69 @@
+﻿{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "llm-bills",
+  "version": "0.1.0",
+  "identifier": "com.zcati.llm-bills-app",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "widget",
+        "title": "llm-bills",
+        "url": "index.html",
+        "width": 280,
+        "height": 100,
+        "minWidth": 240,
+        "minHeight": 80,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": true,
+        "visible": true
+      },
+      {
+        "label": "settings",
+        "title": "llm-bills settings",
+        "url": "index.html#/settings",
+        "width": 540,
+        "height": 640,
+        "minWidth": 420,
+        "minHeight": 480,
+        "resizable": true,
+        "decorations": true,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "plugins": {
+    "log": {
+      "level": "info"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi", "nsis"],
+    "category": "Utility",
+    "shortDescription": "Floating LLM billing widget",
+    "longDescription": "A frameless always-on-top widget that surfaces LLM provider balance and plan quota at a glance.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}
