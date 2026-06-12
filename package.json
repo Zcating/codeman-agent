@@ -1,7 +1,7 @@
 {
   "name": "codeman-agent",
-  "version": "0.1.0",
-  "description": "Floating widget surfacing LLM billing state at a glance",
+  "version": "0.2.0",
+  "description": "Tray-resident desktop AI agent with billing tools (DeepSeek, MiniMax)",
   "type": "module",
   "scripts": {
     "start": "vite",
@@ -9,6 +9,9 @@
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "serve": "vite preview",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
     "tauri:dev": "npm run kill-port && tauri dev",
     "kill-port": "node scripts/kill-port.mjs 1420 1421"
   },
@@ -22,13 +25,23 @@
     "@tauri-apps/plugin-notification": "^2",
     "@tauri-apps/plugin-autostart": "^2",
     "@tauri-apps/plugin-log": "^2",
-    "@tauri-apps/plugin-window-state": "^2"
+    "@tauri-apps/plugin-window-state": "^2",
+    "effect": "^0.75.0",
+    "@effect/platform-browser": "^0.65.0",
+    "@mariozechner/pi-ai": "^0.0.0",
+    "@mariozechner/pi-agent": "^0.0.0"
   },
   "devDependencies": {
     "typescript": "~5.6.2",
     "vite": "^6.0.3",
     "vite-plugin-solid": "^2.11.0",
-    "@tauri-apps/cli": "^2"
+    "@tauri-apps/cli": "^2",
+    "vitest": "^2.1.0",
+    "@effect/vitest": "^0.25.0",
+    "@solidjs/testing-library": "^0.8.10",
+    "@testing-library/user-event": "^14.5.2",
+    "@testing-library/jest-dom": "^6.6.0",
+    "jsdom": "^25.0.0"
   },
   "packageManager": "pnpm@11.5.3"
 }
