@@ -1,51 +1,44 @@
-import { createSignal } from "solid-js";
-import logo from "./assets/logo.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+//! Root app. Picks the Widget or Settings view based on the URL hash
+//! and runs the shared stores once on mount.
+//!
+//! `tauri.conf.json` opens the settings window at `index.html#/settings`
+//! and the widget window at `index.html`, so a tiny hash router is all
+//! the chrome we need — no need for a heavier SPA router.
 
-function App() {
-  const [greetMsg, setGreetMsg] = createSignal("");
-  const [name, setName] = createSignal("");
+import { createSignal, onMount, Show } from "solid-js";
+import { Widget } from "./components/Widget";
+import { SettingsApp } from "./components/SettingsApp";
+import { startSnapshotStore } from "./stores/snapshot";
+import { loadSettings } from "./stores/settings";
+import { getActiveProvider } from "./lib/tauri";
+import { setActiveId } from "./stores/snapshot";
+import type { View } from "./lib/types";
+import "./styles/widget.css";
+import "./styles/settings.css";
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name: name() }));
-  }
-
-  return (
-    <main class="container">
-      <h1>Welcome to Tauri + Solid</h1>
-
-      <div class="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" class="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" class="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://solidjs.com" target="_blank">
-          <img src={logo} class="logo solid" alt="Solid logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and Solid logos to learn more.</p>
-
-      <form
-        class="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg()}</p>
-    </main>
-  );
+function currentView(): View {
+  return window.location.hash.startsWith("#/settings") ? "settings" : "widget";
 }
 
-export default App;
+export default function App() {
+  const [view, setView] = createSignal<View>(currentView());
+
+  onMount(() => {
+    void (async () => {
+      try {
+        const id = await getActiveProvider();
+        setActiveId(id);
+      } catch {
+        // ignore
+      }
+      await Promise.all([loadSettings(), startSnapshotStore()]);
+    })();
+    window.addEventListener("hashchange", () => setView(currentView()));
+  });
+
+  return (
+    <Show when={view() === "settings"} fallback={<Widget />}>
+      <SettingsApp />
+    </Show>
+  );
+}

@@ -11,7 +11,18 @@ use std::time::Duration;
 
 const STORE_FILE: &str = "settings.json";
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Last-known widget window position, persisted across launches.
+///
+/// `x` / `y` are top-left in virtual-screen pixels (the units the OS
+/// window manager uses). `None` means "no saved position yet" — the
+/// widget should fall back to the default top-right placement.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct WidgetPosition {
+    pub x: i32,
+    pub y: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Hotkeys {
     pub switch: String,
     pub toggle: String,
@@ -36,6 +47,8 @@ pub struct Settings {
     pub hotkeys: Hotkeys,
     pub start_at_login: bool,
     pub notifications_enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub widget_position: Option<WidgetPosition>,
 }
 
 impl Default for Settings {
@@ -49,6 +62,7 @@ impl Default for Settings {
             hotkeys: Hotkeys::default(),
             start_at_login: true,
             notifications_enabled: true,
+            widget_position: None,
         }
     }
 }
@@ -112,5 +126,48 @@ mod tests {
         let mut s = Settings::default();
         s.refresh_interval_secs = 1;
         assert_eq!(s.refresh_interval().as_secs(), Settings::MIN_REFRESH_SECS);
+    }
+
+    #[test]
+    fn widget_position_round_trips_via_serde() {
+        let pos = WidgetPosition { x: 123, y: -45 };
+        let json = serde_json::to_string(&pos).unwrap();
+        let back: WidgetPosition = serde_json::from_str(&json).unwrap();
+        assert_eq!(pos, back);
+    }
+
+    #[test]
+    fn settings_default_has_no_position() {
+        assert!(Settings::default().widget_position.is_none());
+    }
+
+    #[test]
+    fn settings_with_position_round_trip() {
+        let s = Settings {
+            widget_position: Some(WidgetPosition { x: 10, y: 20 }),
+            ..Settings::default()
+        };
+        let json = serde_json::to_string(&s).unwrap();
+        let back: Settings = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.widget_position, Some(WidgetPosition { x: 10, y: 20 }));
+    }
+
+    #[test]
+    fn settings_legacy_json_without_position_parses_as_none() {
+        // Older saved files (pre-window-position) have no
+        // `widget_position` key. We must tolerate that and default to
+        // `None` so a downgrade/upgrade doesn't break startup.
+        let legacy = r#"{
+            "active_provider_id": "deepseek",
+            "refresh_interval_secs": 60,
+            "stale_after_secs": 180,
+            "low_balance_threshold": 10.0,
+            "low_quota_threshold_pct": 20.0,
+            "hotkeys": { "switch": "Ctrl+Alt+B", "toggle": "Ctrl+Alt+H" },
+            "start_at_login": true,
+            "notifications_enabled": true
+        }"#;
+        let s: Settings = serde_json::from_str(legacy).unwrap();
+        assert!(s.widget_position.is_none());
     }
 }

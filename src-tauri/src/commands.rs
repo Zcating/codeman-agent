@@ -2,7 +2,7 @@
 //! `AppState` methods so the wiring stays centralized.
 
 use crate::secrets;
-use crate::settings::Settings;
+use crate::settings::{Settings, WidgetPosition};
 use crate::state::{AppState, ProviderDescriptor};
 use crate::types::{ProviderId, SnapshotEnvelope};
 use tauri::{AppHandle, Manager, State};
@@ -87,6 +87,24 @@ pub async fn latest_snapshot(
 }
 
 #[tauri::command]
+pub async fn get_widget_position(
+    state: State<'_, AppState>,
+) -> Result<Option<WidgetPosition>, String> {
+    Ok(state.get_widget_position())
+}
+
+#[tauri::command]
+pub async fn set_widget_position(
+    x: i32,
+    y: i32,
+    state: State<'_, AppState>,
+) -> Result<WidgetPosition, String> {
+    let pos = WidgetPosition { x, y };
+    state.set_widget_position(pos);
+    Ok(pos)
+}
+
+#[tauri::command]
 pub async fn show_settings_window(app: AppHandle) -> Result<(), String> {
     crate::tray::show_settings(&app);
     Ok(())
@@ -104,4 +122,3 @@ pub async fn show_widget_window(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]

@@ -30,11 +30,12 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
     // Build a heterogeneous slice via an explicit coercion to the trait
     // object so the array literal type-checks regardless of which menu
     // kinds are added.
+    let separator = MenuItem::with_id(app, "_sep", "", false, None::<&str>)?;
     let items: Vec<&dyn IsMenuItem<tauri::Wry>> = vec![
         &settings_item,
         &show_item,
         &hide_item,
-        &MenuItem::with_id(app, "_sep", "", false, None::<&str>)?,
+        &separator,
         &quit_item,
     ];
     let menu = Menu::with_items(app, &items)?;
@@ -46,7 +47,7 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
 
     TrayIconBuilder::with_id("main")
         .icon(icon)
-        .tooltip("llm-bills")
+        .tooltip("codeman-agent")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(move |app, event| handle_menu_event(app, event.id().as_ref()))

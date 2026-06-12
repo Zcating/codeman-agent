@@ -1,15 +1,16 @@
-﻿{
-  "name": "llm-bills-app",
+{
+  "name": "codeman-agent",
   "version": "0.1.0",
   "description": "Floating widget surfacing LLM billing state at a glance",
   "type": "module",
   "scripts": {
     "start": "vite",
-    "dev": "vite",
+    "dev": "npm run kill-port && vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "serve": "vite preview",
-    "tauri": "tauri"
+    "tauri:dev": "npm run kill-port && tauri dev",
+    "kill-port": "node scripts/kill-port.mjs 1420 1421"
   },
   "license": "MIT",
   "dependencies": {
@@ -28,5 +29,6 @@
     "vite": "^6.0.3",
     "vite-plugin-solid": "^2.11.0",
     "@tauri-apps/cli": "^2"
-  }
+  },
+  "packageManager": "pnpm@11.5.3"
 }

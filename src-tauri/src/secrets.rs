@@ -1,5 +1,5 @@
 ﻿//! Thin wrapper around the `keyring` crate that namespaces API keys
-//! under `llm-bills/<provider>/api_key` in Windows Credential Manager.
+//! under `codeman-agent/<provider>/api_key` in Windows Credential Manager.
 //!
 //! `Secret<String>` (see `types`) keeps the value out of logs; this
 //! module keeps it out of the settings JSON file.
@@ -9,7 +9,7 @@ use keyring::Entry;
 use log::{debug, warn};
 use thiserror::Error;
 
-const SERVICE: &str = "llm-bills";
+const SERVICE: &str = "codeman-agent";
 
 #[derive(Debug, Error)]
 pub enum SecretError {

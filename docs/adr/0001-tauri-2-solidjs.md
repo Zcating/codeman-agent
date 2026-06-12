@@ -2,11 +2,11 @@
 
 - Status: Accepted
 - Date: 2026-06-09
-- Scope: llm-bills v1 client stack
+- Scope: codeman-agent v1 client stack
 
 ## Context
 
-llm-bills ships as a single tiny always-on-top floating widget plus a
+codeman-agent ships as a single tiny always-on-top floating widget plus a
 modal settings window on Windows. The codebase needs to:
 
 1. Draw a small (~280x100) frameless window, drag it across monitors, and

@@ -44,6 +44,11 @@ export interface Hotkeys {
   toggle: string;
 }
 
+export interface WidgetPosition {
+  x: number;
+  y: number;
+}
+
 export interface Settings {
   active_provider_id: ProviderId;
   refresh_interval_secs: number;
@@ -53,6 +58,7 @@ export interface Settings {
   hotkeys: Hotkeys;
   start_at_login: boolean;
   notifications_enabled: boolean;
+  widget_position?: WidgetPosition | null;
 }
 
 export interface RefreshFailedPayload {

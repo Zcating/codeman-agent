@@ -6,7 +6,7 @@
 
 use crate::providers::{Adapter, registry};
 use crate::secrets;
-use crate::settings::Settings;
+use crate::settings::{Settings, WidgetPosition};
 use crate::types::{
     ProviderError, ProviderId, ProviderKind, Secret, Snapshot, SnapshotEnvelope,
 };
@@ -47,7 +47,7 @@ impl AppState {
             active_id: Arc::new(RwLock::new(active_id)),
             registry: Arc::new(registry()),
             http: Client::builder()
-                .user_agent(concat!("llm-bills/", env!("CARGO_PKG_VERSION")))
+                .user_agent(concat!("codeman-agent/", env!("CARGO_PKG_VERSION")))
                 .build()
                 .expect("build http client"),
             wakeup: Arc::new(Notify::new()),
@@ -96,6 +96,7 @@ impl AppState {
     pub fn apply_settings(&self, new_settings: Settings) -> Result<(), String> {
         let old_interval = self.settings.read().refresh_interval_secs;
         let old_autostart = self.settings.read().start_at_login;
+        let old_hotkeys = self.settings.read().hotkeys.clone();
         *self.settings.write() = new_settings.clone();
         if new_settings.refresh_interval_secs != old_interval {
             // Wake the scheduler so it picks up the new interval promptly.
@@ -104,11 +105,31 @@ impl AppState {
         if new_settings.start_at_login != old_autostart {
             crate::tray::apply_autostart(&self.app_handle, new_settings.start_at_login);
         }
+        if new_settings.hotkeys != old_hotkeys {
+            // Rebind on the live runtime so the user does not have to
+            // restart the app to pick up a new chord.
+            crate::rebind_hotkeys(&self.app_handle, self);
+        }
         Ok(())
     }
 
     pub fn get_settings(&self) -> Settings {
         self.settings.read().clone()
+    }
+
+    /// Persist the widget window's top-left position. Called when the
+    /// user drags the widget to a new spot. The frontend reads the
+    /// value back on startup to restore the previous placement.
+    pub fn set_widget_position(&self, pos: WidgetPosition) {
+        {
+            let mut s = self.settings.write();
+            s.widget_position = Some(pos);
+        }
+        self.persist_settings();
+    }
+
+    pub fn get_widget_position(&self) -> Option<WidgetPosition> {
+        self.settings.read().widget_position
     }
 
     pub fn persist_settings(&self) {
@@ -297,16 +318,30 @@ mod tests {
     #[test]
     fn breach_detects_low_balance() {
         let snap = Snapshot::Balance {
-            amount: Decimal::new(821, 2),
+            amount: Decimal::new(821, 2), // ¥8.21
+            currency: "CNY".into(),
+            auto_recharge: Some(true),
+        };
+        // 8.21 < 10.0 → breach
+        let s = settings_with_balance_threshold(Some(10.0));
+        assert!(is_breached(&snap, &s));
+        // 8.21 < 100.0 → still breach (balance is "low" relative to
+        // any threshold that the user has not specifically tuned).
+        // The negative case lives in the larger-balance branch below.
+        let s = settings_with_balance_threshold(Some(100.0));
+        assert!(is_breached(&snap, &s));
+        // No threshold configured → never breach.
+        let s = settings_with_balance_threshold(None);
+        assert!(!is_breached(&snap, &s));
+
+        // A balance well above the threshold must NOT breach.
+        let snap_high = Snapshot::Balance {
+            amount: Decimal::new(50000, 2), // ¥500.00
             currency: "CNY".into(),
             auto_recharge: Some(true),
         };
         let s = settings_with_balance_threshold(Some(10.0));
-        assert!(is_breached(&snap, &s));
-        let s = settings_with_balance_threshold(Some(100.0));
-        assert!(!is_breached(&snap, &s));
-        let s = settings_with_balance_threshold(None);
-        assert!(!is_breached(&snap, &s));
+        assert!(!is_breached(&snap_high, &s));
     }
 
     #[test]
@@ -343,4 +378,12 @@ mod tests {
         assert_eq!(h.switch, "Ctrl+Alt+B");
         assert_eq!(h.toggle, "Ctrl+Alt+H");
     }
+
+    // Widget position persistence is tested at the Settings type level
+    // (see `settings::tests`). The state layer is a thin pass-through
+    // that holds the in-memory copy and triggers a re-persist, which
+    // would require a full `AppHandle` to drive end-to-end. The pure
+    // logic — round-tripping via `set_widget_position` then reading
+    // `get_widget_position` — is exercised by the unit tests on the
+    // type itself.
 }

@@ -1,8 +1,8 @@
-﻿{
+{
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "llm-bills",
+  "productName": "codeman-agent",
   "version": "0.1.0",
-  "identifier": "com.zcati.llm-bills-app",
+  "identifier": "com.zcati.codeman-agent",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "widget",
-        "title": "llm-bills",
+"title": "codeman-agent",
         "url": "index.html",
         "width": 280,
         "height": 100,
@@ -30,7 +30,7 @@
       },
       {
         "label": "settings",
-        "title": "llm-bills settings",
+        "title": "codeman-agent settings",
         "url": "index.html#/settings",
         "width": 540,
         "height": 640,
@@ -48,9 +48,7 @@
     }
   },
   "plugins": {
-    "log": {
-      "level": "info"
-    }
+    "log": null
   },
   "bundle": {
     "active": true,

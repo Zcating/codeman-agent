@@ -14,11 +14,10 @@ import {
   showSettingsWindow,
 } from "../lib/tauri";
 import {
-  PROVIDER_LABEL,
   type ProviderId,
   nextProvider,
 } from "../lib/types";
-import { balanceOf, planQuotaOf } from "../lib/format";
+import { PROVIDER_LABEL, balanceOf, planQuotaOf } from "../lib/format";
 import { BalanceView } from "./BalanceView";
 import { PlanQuotaView } from "./PlanQuotaView";
 import { StaleBadge } from "./StaleBadge";

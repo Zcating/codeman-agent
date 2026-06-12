@@ -41,6 +41,12 @@ impl ProviderId {
     }
 }
 
+impl std::fmt::Display for ProviderId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// The two billing shapes we surface. See `CONTEXT.md` for the rationale
 /// for keeping these visually distinct on the widget.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

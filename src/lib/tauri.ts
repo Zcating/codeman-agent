@@ -11,6 +11,7 @@ import type {
   RefreshFailedPayload,
   Settings,
   SnapshotEnvelope,
+  WidgetPosition,
 } from "./types";
 
 export async function listProviders(): Promise<ProviderDescriptor[]> {
@@ -72,15 +73,23 @@ export async function showWidgetWindow(): Promise<void> {
   await invoke("show_widget_window");
 }
 
+export async function getWidgetPosition(): Promise<WidgetPosition | null> {
+  return invoke<WidgetPosition | null>("get_widget_position");
+}
+
+export async function setWidgetPosition(x: number, y: number): Promise<WidgetPosition> {
+  return invoke<WidgetPosition>("set_widget_position", { x, y });
+}
+
 type EventMap = {
   "snapshot-updated": SnapshotEnvelope;
   "refresh-failed": RefreshFailedPayload;
   "low-threshold-breached": LowThresholdBreachedPayload;
 };
 
-export async function onEvent<T extends keyof EventMap>(
-  event: T,
-  cb: (payload: EventMap[T]) => void,
+export async function onEvent<K extends keyof EventMap>(
+  event: K,
+  cb: (payload: EventMap[K]) => void,
 ): Promise<UnlistenFn> {
-  return listen<T>(event, (e) => cb(e.payload));
+  return listen<EventMap[K]>(event, (e) => cb(e.payload as EventMap[K]));
 }

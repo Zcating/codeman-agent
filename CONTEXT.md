@@ -1,4 +1,4 @@
-﻿# llm-bills — Project Context
+﻿# codeman-agent — Project Context
 
 A small floating widget that surfaces LLM billing state at a glance. This
 document pins the vocabulary used across the codebase so plan, code, and
@@ -62,7 +62,7 @@ interface Settings {
 ```
 
 API keys never live in this file. They live in Windows Credential Manager
-under `llm-bills/<provider_id>/api_key` via the `keyring` crate.
+under `codeman-agent/<provider_id>/api_key` via the `keyring` crate.
 
 ## Display contract
 
@@ -89,7 +89,7 @@ in the same commit that flips the default.
 
 ## Logging
 
-- Logs at `%LocalAppData%\llm-bills\logs\`, rotated daily, capped.
+- Logs at `%LocalAppData%\codeman-agent\logs\`, rotated daily, capped.
 - `log` + `tauri-plugin-log`; `info` default, `debug` via env var.
 - API key material is wrapped in `Secret<String>` which redacts in
   `Debug`/`Display`; log statements also avoid formatting the full secret.

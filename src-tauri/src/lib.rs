@@ -34,7 +34,9 @@ pub fn run() {
                     tauri_plugin_log::TargetKind::Stdout,
                 ))
                 .target(tauri_plugin_log::Target::new(
-                    tauri_plugin_log::TargetKind::LogDir,
+                    tauri_plugin_log::TargetKind::LogDir {
+                        file_name: Some("codeman-agent".to_string()),
+                    },
                 ))
                 .target(tauri_plugin_log::Target::new(
                     tauri_plugin_log::TargetKind::Webview,
@@ -53,6 +55,8 @@ pub fn run() {
             commands::has_api_key,
             commands::test_provider,
             commands::latest_snapshot,
+            commands::get_widget_position,
+            commands::set_widget_position,
             commands::show_settings_window,
             commands::hide_widget_window,
             commands::show_widget_window,
@@ -79,7 +83,7 @@ pub fn run() {
             });
 
             app.manage(state);
-            info!("llm-bills started");
+            info!("codeman-agent started");
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -118,4 +122,12 @@ fn register_hotkeys(handle: &tauri::AppHandle, state: &AppState) {
     }) {
         warn!("register toggle hotkey failed: {e}");
     }
+}
+
+/// Public entry point so `state.apply_settings` can re-bind hotkeys
+/// when the user rebinds a chord without restarting the app. Pulled out
+/// as a free function so the same code path runs on cold start and on
+/// `update_settings`.
+pub fn rebind_hotkeys(handle: &tauri::AppHandle, state: &AppState) {
+    register_hotkeys(handle, state);
 }

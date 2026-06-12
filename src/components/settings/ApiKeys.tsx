@@ -3,7 +3,8 @@
 
 import { createSignal, For } from "solid-js";
 import { hasApiKey, setApiKey } from "../../lib/tauri";
-import { PROVIDER_LABEL, type ProviderId } from "../../lib/types";
+import { type ProviderId } from "../../lib/types";
+import { PROVIDER_LABEL } from "../../lib/format";
 
 const PROVIDERS: ProviderId[] = ["deepseek", "minimax"];
 

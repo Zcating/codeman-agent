@@ -1,0 +1,233 @@
+/* Settings window styles. Lighter chrome than the widget; same
+   typography so the two windows feel like one app. */
+
+:root {
+  --settings-bg: #fafbfc;
+  --settings-fg: #1f2937;
+  --settings-muted: #6b7280;
+  --settings-accent: #2563eb;
+  --settings-border: #e5e7eb;
+  --settings-input-bg: #ffffff;
+  --settings-radius: 8px;
+  --settings-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter,
+    sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --settings-bg: #11141a;
+    --settings-fg: #f3f4f6;
+    --settings-muted: #9aa1ac;
+    --settings-accent: #7aa2f7;
+    --settings-border: #1f232b;
+    --settings-input-bg: #181b22;
+  }
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--settings-bg);
+  color: var(--settings-fg);
+  font-family: var(--settings-font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.settings-root {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  min-height: 100vh;
+}
+
+.settings-nav {
+  background: rgba(0, 0, 0, 0.02);
+  border-right: 1px solid var(--settings-border);
+  padding: 24px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .settings-nav {
+    background: rgba(255, 255, 255, 0.02);
+  }
+}
+
+.settings-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 8px;
+  letter-spacing: -0.01em;
+}
+
+.settings-nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-item {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font: inherit;
+  color: var(--settings-fg);
+  cursor: pointer;
+}
+
+.nav-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  .nav-item:hover {
+    background: rgba(255, 255, 255, 0.04);
+  }
+}
+
+.nav-item.is-active {
+  background: var(--settings-accent);
+  color: white;
+  font-weight: 500;
+}
+
+.settings-main {
+  padding: 24px 32px 64px;
+  max-width: 720px;
+  overflow: auto;
+}
+
+.first-launch {
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.3);
+  border-radius: var(--settings-radius);
+  padding: 12px 14px;
+  margin-bottom: 24px;
+  font-size: 13px;
+}
+
+.settings-section {
+  margin-bottom: 32px;
+}
+
+.settings-section header {
+  margin-bottom: 16px;
+}
+
+.settings-section h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  letter-spacing: -0.01em;
+}
+
+.settings-section header p {
+  margin: 0;
+  color: var(--settings-muted);
+  font-size: 13px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 8px 16px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.form-row-inline {
+  grid-template-columns: 1fr auto;
+}
+
+.form-row label {
+  color: var(--settings-fg);
+  font-size: 13px;
+}
+
+.form-row .hint {
+  grid-column: 2;
+  font-size: 12px;
+  color: var(--settings-muted);
+  margin: 0;
+}
+
+.form-row input[type="text"],
+.form-row input[type="number"],
+.form-row input[type="password"] {
+  background: var(--settings-input-bg);
+  border: 1px solid var(--settings-border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: var(--settings-fg);
+  font: inherit;
+  outline: none;
+  transition: border-color 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.form-row input[type="text"]:focus,
+.form-row input[type="number"]:focus,
+.form-row input[type="password"]:focus {
+  border-color: var(--settings-accent);
+}
+
+.form-row input.is-capturing {
+  border-color: var(--settings-accent);
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.key-input {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.key-input input {
+  flex: 1;
+}
+
+button {
+  background: var(--settings-input-bg);
+  border: 1px solid var(--settings-border);
+  color: var(--settings-fg);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--settings-accent);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--settings-accent);
+  border-color: var(--settings-accent);
+  color: white;
+}
+
+button.primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.form-status {
+  font-size: 12px;
+  color: var(--settings-muted);
+  margin-left: 8px;
+}
