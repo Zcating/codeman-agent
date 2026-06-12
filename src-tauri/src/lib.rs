@@ -6,6 +6,7 @@ mod hotkeys;
 mod providers;
 mod scheduler;
 mod secrets;
+mod secrets_llm;
 mod settings;
 mod state;
 mod tray;
@@ -100,27 +101,9 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-fn register_hotkeys(handle: &tauri::AppHandle, state: &AppState) {
+fn register_hotkeys(handle: &tauri::AppHandle, _state: &AppState) {
     if let Err(e) = hotkeys::unregister_all(handle) {
         warn!("unregister hotkeys failed: {e}");
-    }
-    let settings = state.get_settings();
-    let switch_state = state.clone();
-    if let Err(e) = hotkeys::register(handle, &settings.hotkeys.switch, move |app| {
-        let id = switch_state.get_active().next();
-        if let Err(e) = switch_state.set_active(id) {
-            warn!("hotkey switch failed: {e}");
-        }
-        let _ = app;
-    }) {
-        warn!("register switch hotkey failed: {e}");
-    }
-    let toggle_app = handle.clone();
-    if let Err(e) = hotkeys::register(handle, &settings.hotkeys.toggle, move |app| {
-        let _ = app;
-        tray::toggle_widget_visibility(&toggle_app);
-    }) {
-        warn!("register toggle hotkey failed: {e}");
     }
 }
 
