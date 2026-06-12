@@ -41,7 +41,7 @@ pub struct AppState {
 impl AppState {
     pub fn new(app_handle: AppHandle) -> Self {
         let settings = load_settings(&app_handle).unwrap_or_default();
-        let active_id = settings.active_provider_id;
+        let active_id = ProviderId::Deepseek;
         Self {
             settings: Arc::new(RwLock::new(settings)),
             active_id: Arc::new(RwLock::new(active_id)),
@@ -83,10 +83,6 @@ impl AppState {
             }
             *g = id;
         }
-        {
-            let mut s = self.settings.write();
-            s.active_provider_id = id;
-        }
         self.persist_settings();
         self.wakeup.notify_one();
         info!("active provider set to {id:?}");
@@ -94,21 +90,14 @@ impl AppState {
     }
 
     pub fn apply_settings(&self, new_settings: Settings) -> Result<(), String> {
-        let old_interval = self.settings.read().refresh_interval_secs;
+        let old_interval = self.settings.read().refresh_interval().as_secs();
         let old_autostart = self.settings.read().start_at_login;
-        let old_hotkeys = self.settings.read().hotkeys.clone();
         *self.settings.write() = new_settings.clone();
-        if new_settings.refresh_interval_secs != old_interval {
-            // Wake the scheduler so it picks up the new interval promptly.
+        if new_settings.refresh_interval().as_secs() != old_interval {
             self.wakeup.notify_one();
         }
         if new_settings.start_at_login != old_autostart {
             crate::tray::apply_autostart(&self.app_handle, new_settings.start_at_login);
-        }
-        if new_settings.hotkeys != old_hotkeys {
-            // Rebind on the live runtime so the user does not have to
-            // restart the app to pick up a new chord.
-            crate::rebind_hotkeys(&self.app_handle, self);
         }
         Ok(())
     }
@@ -117,19 +106,11 @@ impl AppState {
         self.settings.read().clone()
     }
 
-    /// Persist the widget window's top-left position. Called when the
-    /// user drags the widget to a new spot. The frontend reads the
-    /// value back on startup to restore the previous placement.
-    pub fn set_widget_position(&self, pos: WidgetPosition) {
-        {
-            let mut s = self.settings.write();
-            s.widget_position = Some(pos);
-        }
-        self.persist_settings();
+    pub fn set_widget_position(&self, _pos: WidgetPosition) {
     }
 
     pub fn get_widget_position(&self) -> Option<WidgetPosition> {
-        self.settings.read().widget_position
+        None
     }
 
     pub fn persist_settings(&self) {
@@ -271,23 +252,8 @@ pub struct ProviderDescriptor {
     pub has_key: bool,
 }
 
-fn is_breached(snap: &Snapshot, settings: &Settings) -> bool {
-    match (snap, settings) {
-        (Snapshot::Balance { amount, .. }, s) => s
-            .low_balance_threshold
-            .and_then(|t| amount.to_f64().map(|a| a < t))
-            .unwrap_or(false),
-        (Snapshot::PlanQuota { remaining, total, .. }, s) => s
-            .low_quota_threshold_pct
-            .map(|p| {
-                if *total == 0 {
-                    return false;
-                }
-                let pct = (*remaining as f64) / (*total as f64) * 100.0;
-                pct < p
-            })
-            .unwrap_or(false),
-    }
+fn is_breached(_snap: &Snapshot, _settings: &Settings) -> bool {
+    false
 }
 
 fn load_settings(app: &AppHandle) -> Option<Settings> {
