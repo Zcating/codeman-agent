@@ -6,8 +6,8 @@
 //! the chrome we need — no need for a heavier SPA router.
 
 import { createSignal, onMount, Show } from "solid-js";
-import { Widget } from "./components/Widget";
-import { SettingsApp } from "./components/SettingsApp";
+import { Widget } from "./components/widget";
+import { SettingsApp } from "./components/settings-app";
 import { startSnapshotStore } from "./stores/snapshot";
 import { loadSettings } from "./stores/settings";
 import { getActiveProvider } from "./lib/tauri";

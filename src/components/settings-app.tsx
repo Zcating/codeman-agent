@@ -4,11 +4,11 @@
 
 import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { listProviders } from "../lib/tauri";
-import { ApiKeys } from "./settings/ApiKeys";
-import { Intervals } from "./settings/Intervals";
-import { Thresholds } from "./settings/Thresholds";
-import { Hotkeys } from "./settings/Hotkeys";
-import { General } from "./settings/General";
+import { ApiKeys } from "./settings/api-keys";
+import { Intervals } from "./settings/intervals";
+import { Thresholds } from "./settings/thresholds";
+import { Hotkeys } from "./settings/hotkeys";
+import { General } from "./settings/general";
 import type { JSX } from "solid-js";
 
 interface Section {

@@ -45,7 +45,7 @@ pub trait Provider: Send + Sync {
 4. 在 `types.rs` 加 `ProviderId` 变体(同步更新 `ProviderId::ALL`、`as_str`、`label`、`next` 以及相关测试)。
 5. 在 TS 端镜像变体:改 `src/lib/types.ts` 的 `ProviderId` 联合和 `ALL_PROVIDERS` 数组。`nextProvider` 助手是两路硬编码,跟着改。
 6. 更新 `src/lib/format.ts` 里的 `PROVIDER_LABEL`。
-7. 只有当新厂商有专属设置项时才动 `SettingsApp.tsx` 的 `SECTIONS` 顺序。
+7. 只有当新厂商有专属设置项时才动 `settings-app.tsx` 的 `SECTIONS` 顺序。
 8. **同一笔 commit** 里在 `CONTEXT.md` 记录端点(并把默认占位 URL 翻过来)。v1 契约:经核验的端点和翻默认必须在同一个变更里。
 
 ## 测试
@@ -61,7 +61,7 @@ pub trait Provider: Send + Sync {
 
 - 新增结构字段 → 同步 TS 联合变体(`src/lib/types.ts`)。
 - 新增视图组件(如 `CustomView.tsx`)→ 在 `src/lib/format.ts` 加一个 `customOf` 助手,跟 `balanceOf` / `planQuotaOf` 同款。
-- 在 `src/components/Widget.tsx` 加 `Show` 分支。
+- 在 `src/components/widget.tsx` 加 `Show` 分支。
 
 ## 本目录硬性规则
 

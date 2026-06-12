@@ -18,10 +18,10 @@ import {
   nextProvider,
 } from "../lib/types";
 import { PROVIDER_LABEL, balanceOf, planQuotaOf } from "../lib/format";
-import { BalanceView } from "./BalanceView";
-import { PlanQuotaView } from "./PlanQuotaView";
-import { StaleBadge } from "./StaleBadge";
-import { Switcher } from "./Switcher";
+import { BalanceView } from "./balance-view";
+import { PlanQuotaView } from "./plan-quota-view";
+import { StaleBadge } from "./stale-badge";
+import { Switcher } from "./switcher";
 
 interface MenuItem {
   id: string;
