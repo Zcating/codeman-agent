@@ -1,11 +1,14 @@
 ﻿//! Tauri IPC commands. Each command is a thin wrapper around
 //! `AppState` methods so the wiring stays centralized.
 
+use crate::db::conversations;
+use crate::db::messages;
 use crate::secrets;
 use crate::settings::{Settings, WidgetPosition};
 use crate::state::{AppState, ProviderDescriptor};
-use crate::types::{ProviderId, SnapshotEnvelope};
+use crate::types::{AppError, ProviderId, SnapshotEnvelope};
 use tauri::{AppHandle, Manager, State};
+use uuid::Uuid;
 
 #[tauri::command]
 pub async fn list_providers(state: State<'_, AppState>) -> Result<Vec<ProviderDescriptor>, String> {
@@ -120,5 +123,112 @@ pub async fn hide_widget_window(app: AppHandle) -> Result<(), String> {
 pub async fn show_widget_window(app: AppHandle) -> Result<(), String> {
     crate::tray::show_widget(&app);
     Ok(())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Conversation / Message IPC (Task 12)
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn list_conversations(
+    pool: tauri::State<'_, sqlx::SqlitePool>,
+    include_archived: bool,
+) -> Result<Vec<conversations::Conversation>, AppError> {
+    Ok(conversations::list_conversations(pool.inner(), include_archived).await?)
+}
+
+#[tauri::command]
+pub async fn get_conversation(
+    pool: tauri::State<'_, sqlx::SqlitePool>,
+    id: String,
+) -> Result<conversations::Conversation, AppError> {
+    let uuid = Uuid::parse_str(&id).map_err(|e| AppError::InvalidConfig {
+        message: format!("bad uuid: {e}"),
+    })?;
+    conversations::get_conversation(pool.inner(), &uuid)
+        .await?
+        .ok_or_else(|| AppError::NotFound {
+            message: format!("conversation {id} not found"),
+        })
+}
+
+#[tauri::command]
+pub async fn create_conversation(
+    pool: tauri::State<'_, sqlx::SqlitePool>,
+    title: String,
+    system_prompt: Option<String>,
+) -> Result<conversations::Conversation, AppError> {
+    Ok(conversations::create_conversation(pool.inner(), &title, system_prompt.as_deref()).await?)
+}
+
+#[tauri::command]
+pub async fn archive_conversation(
+    pool: tauri::State<'_, sqlx::SqlitePool>,
+    id: String,
+) -> Result<(), AppError> {
+    let uuid = Uuid::parse_str(&id).map_err(|e| AppError::InvalidConfig {
+        message: format!("bad uuid: {e}"),
+    })?;
+    Ok(conversations::archive_conversation(pool.inner(), &uuid).await?)
+}
+
+#[tauri::command]
+pub async fn delete_conversation(
+    pool: tauri::State<'_, sqlx::SqlitePool>,
+    id: String,
+) -> Result<(), AppError> {
+    let uuid = Uuid::parse_str(&id).map_err(|e| AppError::InvalidConfig {
+        message: format!("bad uuid: {e}"),
+    })?;
+    Ok(conversations::hard_delete_conversation(pool.inner(), &uuid).await?)
+}
+
+#[tauri::command]
+pub async fn list_messages(
+    pool: tauri::State<'_, sqlx::SqlitePool>,
+    conversation_id: String,
+) -> Result<Vec<messages::Message>, AppError> {
+    let uuid = Uuid::parse_str(&conversation_id).map_err(|e| AppError::InvalidConfig {
+        message: format!("bad uuid: {e}"),
+    })?;
+    Ok(messages::list_messages(pool.inner(), &uuid).await?)
+}
+
+#[tauri::command]
+pub async fn append_message(
+    pool: tauri::State<'_, sqlx::SqlitePool>,
+    conversation_id: String,
+    role: String,
+    content: String,
+    tool_calls: Option<String>,
+    tool_results: Option<String>,
+    model: Option<String>,
+    input_tokens: Option<i64>,
+    output_tokens: Option<i64>,
+) -> Result<messages::Message, AppError> {
+    let uuid = Uuid::parse_str(&conversation_id).map_err(|e| AppError::InvalidConfig {
+        message: format!("bad uuid: {e}"),
+    })?;
+    Ok(messages::append_message(
+        pool.inner(),
+        uuid,
+        &role,
+        &content,
+        tool_calls.as_deref(),
+        tool_results.as_deref(),
+        model.as_deref(),
+        input_tokens,
+        output_tokens,
+    )
+    .await?)
+}
+
+#[tauri::command]
+pub async fn search_messages(
+    pool: tauri::State<'_, sqlx::SqlitePool>,
+    query: String,
+    limit: u32,
+) -> Result<Vec<messages::Message>, AppError> {
+    Ok(messages::search_messages(pool.inner(), &query, limit).await?)
 }
 

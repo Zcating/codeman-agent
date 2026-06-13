@@ -170,6 +170,27 @@ impl From<String> for Secret {
     }
 }
 
+/// Application-level errors for IPC commands. Typed `kind` enables
+/// the TS bridge to translate to typed errors without parsing strings.
+#[derive(Debug, thiserror::Error, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AppError {
+    #[error("not found: {message}")]
+    NotFound { message: String },
+    #[error("invalid config: {message}")]
+    InvalidConfig { message: String },
+    #[error("unauthorized: {message}")]
+    Unauthorized { message: String },
+    #[error("upstream error: {message}")]
+    Upstream { message: String },
+}
+
+impl From<sqlx::Error> for AppError {
+    fn from(e: sqlx::Error) -> Self {
+        AppError::Upstream { message: e.to_string() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
