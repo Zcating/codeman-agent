@@ -4,7 +4,8 @@
 //!   AgentRuntime.run(conversation, userMessage): Stream<RuntimeEvent>
 //!   AgentRuntime.cancel(): Effect<void>
 
-import { describe, it, expect, vi } from "@effect/vitest";
+import { it, expect } from "@effect/vitest";
+import { describe } from "vitest";
 import { Effect, Layer } from "effect";
 import { AgentRuntime, AgentRuntimeLive } from "./runtime";
 import { SettingsService, BillingService } from "../lib/tauri";
@@ -62,20 +63,6 @@ const testSettings: Settings = {
 };
 
 let agentAborted = false;
-const mockAgentInstance = {
-  appendMessage: vi.fn(),
-  prompt: vi.fn().mockResolvedValue(undefined),
-  subscribe: vi.fn(() => () => {}),
-  abort: vi.fn(() => {
-    agentAborted = true;
-  }),
-};
-
-vi.mock("@mariozechner/pi-agent", () => ({
-  Agent: vi.fn(() => mockAgentInstance),
-  ProviderTransport: vi.fn(() => ({})),
-  AgentTransport: {},
-}));
 
 const MockSettingsServiceLive = Layer.succeed(SettingsService, {
   getSettings: () => Effect.succeed(testSettings),

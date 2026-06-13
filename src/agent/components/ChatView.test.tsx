@@ -60,6 +60,10 @@ vi.mock("../runtime", () => ({
   RuntimeLayer: {},
 }));
 
+vi.mock("./Sidebar", () => ({
+  Sidebar: () => null,
+}));
+
 describe("ChatView", () => {
   afterEach(() => cleanup());
 

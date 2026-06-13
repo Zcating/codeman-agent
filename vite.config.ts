@@ -9,17 +9,22 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [solid()],
+  resolve: {
+    conditions: ["browser", "development"],
+    alias: [
+      { find: /^solid-js$/, replacement: resolve(__dirname, "node_modules/solid-js/dist/solid.js") },
+      { find: "solid-js/web", replacement: resolve(__dirname, "node_modules/solid-js/web/dist/web.js") },
+    ],
+  },
   test: {
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test-setup.ts"],
     passWithNoTests: true,
-    resolve: {
-      conditions: ["browser", "development"],
-      alias: [
-        { find: /^solid-js$/, replacement: resolve(__dirname, "node_modules/solid-js/dist/solid.js") },
-        { find: "solid-js/web", replacement: resolve(__dirname, "node_modules/solid-js/web/dist/web.js") },
-      ],
+    server: {
+      deps: {
+        inline: [/solid-js/, /@solidjs/],
+      },
     },
   },
 

@@ -6,7 +6,8 @@
 //!   SystemPromptService.getUserCanEdit(): Effect<boolean, AppError>
 //!   SystemPromptService.forConversation(conversation): Effect<string, AppError>
 
-import { describe, it, expect, beforeEach, vi } from "@effect/vitest";
+import { it, expect, beforeEach } from "@effect/vitest";
+import { describe } from "vitest";
 import { Effect, Layer } from "effect";
 import { SystemPromptService, SystemPromptServiceLive } from "./system_prompt";
 import { SettingsService } from "../../lib/tauri";
@@ -21,19 +22,6 @@ const mockImpl: {
   rejected: undefined,
   currentSettings: null as unknown as Settings,
 };
-
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: (name: string, args?: Record<string, unknown>) => {
-    if (mockImpl.rejected) return Promise.reject(mockImpl.rejected);
-    if (name === "get_settings") return Promise.resolve(mockImpl.currentSettings);
-    if (name === "update_settings") {
-      const patch = args?.patch as Partial<typeof mockImpl.currentSettings>;
-      mockImpl.currentSettings = { ...mockImpl.currentSettings, ...patch };
-      return Promise.resolve(mockImpl.currentSettings);
-    }
-    return Promise.resolve(mockImpl.resolved);
-  },
-}));
 
 const baseSettings: Settings = {
   llm_providers: [],

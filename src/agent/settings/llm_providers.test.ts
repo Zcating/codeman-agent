@@ -9,7 +9,8 @@
 //!   LLMProviderService.hasApiKey(id): Effect<boolean, AppError>
 //!   LLMProviderService.setActive(id): Effect<void, AppError>
 
-import { describe, it, expect, beforeEach, vi } from "@effect/vitest";
+import { it, expect, beforeEach } from "@effect/vitest";
+import { describe } from "vitest";
 import { Effect, Layer } from "effect";
 import { LLMProviderService, LLMProviderServiceLive } from "./llm_providers";
 import { SettingsService } from "../../lib/tauri";
@@ -24,14 +25,6 @@ const mockImpl: {
   rejected: undefined,
   calls: [],
 };
-
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: (name: string) => {
-    mockImpl.calls.push(name);
-    if (mockImpl.rejected) return Promise.reject(mockImpl.rejected);
-    return Promise.resolve(mockImpl.resolved);
-  },
-}));
 
 const providerA: LLMProvider = {
   id: "deepseek",

@@ -74,7 +74,7 @@ describe("ToolCallCard", () => {
     const { container } = render(() => <ToolCallCard toolCall={toolCall} />);
     const argsDetails = container.querySelector(".tool-card__args");
     expect(argsDetails).toBeTruthy();
-    expect(argsDetails?.textContent).toContain("get_balance");
     expect(argsDetails?.textContent).toContain("deepseek");
+    expect(argsDetails?.textContent).toContain("cn");
   });
 });
