@@ -9,7 +9,7 @@
 import { it, expect, beforeEach } from "@effect/vitest";
 import { describe } from "vitest";
 import { Effect, Layer } from "effect";
-import { SystemPromptService, SystemPromptServiceLive } from "./system_prompt";
+import { SystemPromptService, SystemPromptServiceLive } from "./system-prompt";
 import { SettingsService } from "../../lib/tauri";
 import type { Settings, Conversation } from "../../lib/types";
 

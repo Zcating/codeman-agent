@@ -5,7 +5,7 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
-import { ProviderCard } from "./ProviderCard";
+import { ProviderCard } from "./provider-card";
 import type { LLMProvider } from "../../lib/types";
 import { mockState } from "../../shared-mock-state";
 

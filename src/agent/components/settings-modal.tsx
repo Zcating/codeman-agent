@@ -2,7 +2,7 @@
 
 import { createSignal, Show, For } from "solid-js";
 import { Effect } from "effect";
-import { ProviderCard } from "./ProviderCard";
+import { ProviderCard } from "./provider-card";
 import { SettingsService, SettingsServiceLive } from "../../lib/tauri";
 import type { LLMProvider, Settings } from "../../lib/types";
 

@@ -32,7 +32,7 @@ vi.mock("./Sidebar", () => ({
   ),
 }));
 
-import { Sidebar } from "./Sidebar";
+import { Sidebar } from "./sidebar";
 
 describe("Sidebar", () => {
   afterEach(() => cleanup());

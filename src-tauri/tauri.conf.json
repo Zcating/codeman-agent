@@ -22,7 +22,7 @@
         "resizable": true,
         "maximizable": true,
         "minimizable": true,
-        "decorations": false,
+        "decorations": true,
         "alwaysOnTop": false,
         "skipTaskbar": true,
         "focus": true,

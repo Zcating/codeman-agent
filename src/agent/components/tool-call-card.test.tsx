@@ -5,7 +5,7 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
-import { ToolCallCard } from "./ToolCallCard";
+import { ToolCallCard } from "./tool-call-card";
 import type { ToolCall, ToolResult } from "../../lib/types";
 
 describe("ToolCallCard", () => {

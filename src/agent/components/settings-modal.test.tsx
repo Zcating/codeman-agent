@@ -5,7 +5,7 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
-import { SettingsModal } from "./SettingsModal";
+import { SettingsModal } from "./settings-modal";
 import { mockState } from "../../shared-mock-state";
 import type { Settings } from "../../lib/types";
 

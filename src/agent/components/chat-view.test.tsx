@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
-import { ChatView } from "./ChatView";
+import { ChatView } from "./chat-view";
 import type { Message } from "../../lib/types";
 
 const mockMessages: Message[] = [

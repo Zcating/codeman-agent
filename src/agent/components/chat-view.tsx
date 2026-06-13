@@ -5,8 +5,8 @@
 
 import { createSignal, createEffect, For, Show, onCleanup } from "solid-js";
 import { Effect, Exit, Stream } from "effect";
-import { MessageBubble } from "./MessageBubble";
-import { Sidebar } from "./Sidebar";
+import { MessageBubble } from "./message-bubble";
+import { Sidebar } from "./sidebar";
 import {
   messages$,
   loadMessages,

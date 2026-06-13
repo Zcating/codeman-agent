@@ -4,7 +4,7 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
-import { MessageBubble } from "./MessageBubble";
+import { MessageBubble } from "./message-bubble";
 import type { Message, ToolCall, ToolResult } from "../../lib/types";
 
 describe("MessageBubble", () => {
