@@ -4,8 +4,9 @@
  //!
  //! Effect signatures:
  //!   invoke<T>(name, args): Effect<T, AppError>
- //!   ConversationService.list(includeArchived): Effect<Conversation[], AppError>
- //!   (others stubbed for now, filled in by Tasks 14, 21)
+//!   ConversationService.list(includeArchived): Effect<Conversation[], AppError>
+//!   MessageService.list(conversationId): Effect<Message[], AppError>
+//!   (BillingService + SettingsService stubbed for now — Task 21)
 
  import { Effect, Context, Layer } from "effect";
  import { invoke as tauriInvoke } from "@tauri-apps/api/core";
@@ -61,18 +62,26 @@
 
  // ─── Live layers (stubbed: each service method fails with NotFound) ─
  // Filled in by Tasks 14 (Conversation/Message) and 21 (Settings).
- export const ConversationServiceLive = Layer.succeed(ConversationService, {
-   list: () => Effect.fail({ kind: "NotFound", message: "stub: not implemented yet" } as AppError),
-   get: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
-   create: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
-   archive: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
-   delete: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
- });
- export const MessageServiceLive = Layer.succeed(MessageService, {
-   list: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
-   append: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
-   search: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
- });
+export const ConversationServiceLive = Layer.succeed(ConversationService, {
+  list: (includeArchived) =>
+    invoke<Conversation[]>("list_conversations", { includeArchived }),
+  get: (id) =>
+    invoke<Conversation>("get_conversation", { id }),
+  create: (title, systemPrompt) =>
+    invoke<Conversation>("create_conversation", { title, systemPrompt: systemPrompt ?? null }),
+  archive: (id) =>
+    invoke<void>("archive_conversation", { id }),
+  delete: (id) =>
+    invoke<void>("delete_conversation", { id }),
+});
+export const MessageServiceLive = Layer.succeed(MessageService, {
+  list: (conversationId) =>
+    invoke<Message[]>("list_messages", { conversationId }),
+  append: (args) =>
+    invoke<Message>("append_message", args),
+  search: (query, limit) =>
+    invoke<Message[]>("search_messages", { query, limit }),
+});
  export const BillingServiceLive = Layer.succeed(BillingService, {
    listProviders: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
    getSnapshot: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
