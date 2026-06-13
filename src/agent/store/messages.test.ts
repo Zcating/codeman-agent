@@ -3,10 +3,10 @@
 //! Tests the Effect → Solid bridge functions (loadMessages,
 //! appendUserMessage) using a mock MessageService.
 
-import { describe, it, expect } from "@effect/vitest";
+import { describe, it, expect, beforeEach } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { MessageService } from "../../lib/tauri";
-import type { AppError, Message } from "../../lib/types";
+import type { Message } from "../../lib/types";
 
 const fixtureMsg: Message = {
   id: "msg-1",
@@ -34,7 +34,7 @@ const fixtureMsg2: Message = {
 };
 
 let listCalls: string[] = [];
-let appendCalls: Parameters<MessageService["append"]>[0][] = [];
+let appendCalls: { conversation_id: string; role: string; content: string }[] = [];
 let searchCalls: { query: string; limit: number }[] = [];
 
 const MockMessageServiceLive = Layer.succeed(MessageService, {

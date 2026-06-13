@@ -5,10 +5,10 @@
 //!   AgentRuntime.cancel(): Effect<void>
 
 import { describe, it, expect, vi } from "@effect/vitest";
-import { Effect, Layer, Stream, Ref } from "effect";
-import { AgentRuntime, AgentRuntimeLive, RuntimeDeps } from "./runtime";
-import { SettingsService, BillingService } from "../../lib/tauri";
-import type { Settings, LLMProvider, Conversation, Message } from "../../lib/types";
+import { Effect, Layer } from "effect";
+import { AgentRuntime, AgentRuntimeLive } from "./runtime";
+import { SettingsService, BillingService } from "../lib/tauri";
+import type { Settings, LLMProvider, Conversation, Message } from "../lib/types";
 
 const testConversation: Conversation = {
   id: "conv-1",

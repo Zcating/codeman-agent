@@ -65,11 +65,11 @@ describe("ProviderCard", () => {
     expect(container.querySelector(".provider-card__label")?.textContent).toBe("DeepSeek");
 
     // model input
-    const modelInput = container.querySelectorAll('input[type="text"]')[0];
+    const modelInput = container.querySelectorAll('input[type="text"]')[0] as HTMLInputElement | null;
     expect(modelInput?.value).toBe("deepseek-chat");
 
     // base_url input
-    const baseUrlInput = container.querySelectorAll('input[type="text"]')[1];
+    const baseUrlInput = container.querySelectorAll('input[type="text"]')[1] as HTMLInputElement | null;
     expect(baseUrlInput?.value).toBe("https://api.deepseek.com");
 
     // Set API key button

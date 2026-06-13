@@ -9,7 +9,7 @@
 //!   LLMProviderService.hasApiKey(id): Effect<boolean, AppError>
 //!   LLMProviderService.setActive(id): Effect<void, AppError>
 
-import { describe, it, expect, beforeEach } from "@effect/vitest";
+import { describe, it, expect, beforeEach, vi } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { LLMProviderService, LLMProviderServiceLive } from "./llm_providers";
 import { SettingsService } from "../../lib/tauri";

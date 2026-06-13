@@ -136,14 +136,6 @@ export type StreamCallbacks = {
   onError: (error: { message: string }) => void;
 };
 
-export type StreamCallbacks = {
-  onToken: (content: string) => void;
-  onToolCall: (toolCall: ToolCall) => void;
-  onToolResult: (toolCallId: string, result: unknown, error?: string) => void;
-  onDone: (message: Message) => void;
-  onError: (error: { message: string }) => void;
-};
-
 export async function runConversationStream(
   conversation: Conversation,
   userMessage: Message,

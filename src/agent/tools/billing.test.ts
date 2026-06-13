@@ -5,9 +5,7 @@
 
 import { describe, it, expect } from "@effect/vitest";
 import { Effect, Layer } from "effect";
-import { Type } from "@mariozechner/pi-ai";
-import { getBalance, getPlanQuota } from "./billing";
-import { BillingService, BillingServiceLive } from "../../lib/tauri";
+import { BillingService } from "../../lib/tauri";
 import type { AppError } from "../../lib/types";
 
 describe("billing tools — Effect service integration", () => {

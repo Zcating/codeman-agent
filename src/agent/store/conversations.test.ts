@@ -3,7 +3,7 @@
 //! Tests the Effect → Solid bridge functions (loadConversations,
 //! createConversation, selectConversation) using a mock ConversationService.
 
-import { describe, it, expect, vi } from "@effect/vitest";
+import { describe, it, expect, beforeEach } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { ConversationService } from "../../lib/tauri";
 import type { AppError, Conversation } from "../../lib/types";

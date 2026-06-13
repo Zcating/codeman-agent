@@ -6,7 +6,7 @@
 //!   SystemPromptService.getUserCanEdit(): Effect<boolean, AppError>
 //!   SystemPromptService.forConversation(conversation): Effect<string, AppError>
 
-import { describe, it, expect, beforeEach } from "@effect/vitest";
+import { describe, it, expect, beforeEach, vi } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { SystemPromptService, SystemPromptServiceLive } from "./system_prompt";
 import { SettingsService } from "../../lib/tauri";
