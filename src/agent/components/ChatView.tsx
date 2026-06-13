@@ -4,8 +4,6 @@
 //! and translates RuntimeEvents into bridge calls.
 
 import { createSignal, createEffect, For, Show, onCleanup } from "solid-js";
-import { Effect, Stream } from "effect";
-import { AgentRuntime, RuntimeLayer, type RuntimeEvent } from "../runtime";
 import { MessageBubble } from "./MessageBubble";
 import { Sidebar } from "./Sidebar";
 import {
@@ -20,6 +18,7 @@ import {
   appendStreamingAssistantMessage,
 } from "../store/messages";
 import { activeId$, conversations$ } from "../store/conversations";
+import { runAgent } from "../store/runtime";
 
 export function ChatView() {
   const [input, setInput] = createSignal("");
@@ -50,45 +49,9 @@ export function ChatView() {
     abortController?.abort();
   });
 
-  const handleEvent = async (event: RuntimeEvent): Promise<void> => {
-    switch (event.type) {
-      case "token": {
-        let msgId = streamingMessageId();
-        if (!msgId) {
-          // First token of a new assistant message — create a stub.
-          const convId = activeId$();
-          if (!convId) return;
-          msgId = crypto.randomUUID();
-          appendStreamingAssistantMessage(msgId, convId);
-          setStreamingMessageId(msgId);
-        }
-        appendAssistantMessageDelta(msgId, event.content);
-        break;
-      }
-      case "tool_call": {
-        const msgId = streamingMessageId();
-        if (msgId) {
-          appendToolCall(msgId, event.toolCall);
-        }
-        break;
-      }
-      case "tool_result": {
-        const msgId = streamingMessageId();
-        if (msgId) {
-          finalizeToolResult(msgId, event.toolCallId, event.result, event.error);
-        }
-        break;
-      }
-      case "done": {
-        finalizeAssistantMessage(event.message);
-        setStreamingMessageId(null);
-        break;
-      }
-      case "error": {
-        console.error("[ChatView] agent error:", event.error);
-        break;
-      }
-    }
+  const cancel = async () => {
+    abortController?.abort();
+    setRunning(false);
   };
 
   const send = async () => {
@@ -99,10 +62,8 @@ export function ChatView() {
     setRunning(true);
     abortController = new AbortController();
 
-    // 1. Append user message via the bridge.
     await appendUserMessage(text, convId);
 
-    // 2. Find the just-created user message for the agent.
     const conversation = conversations$().find((c) => c.id === convId);
     if (!conversation) {
       setRunning(false);
@@ -110,31 +71,39 @@ export function ChatView() {
     }
     const userMsg = messages$()[messages$().length - 1];
 
-    // 3. Build the effect that processes the stream event-by-event.
-    const processEvent = (evt: RuntimeEvent) =>
-      Effect.promise(() => handleEvent(evt));
-
-    const program = Effect.gen(function* () {
-      const runtime = yield* AgentRuntime;
-      yield* Stream.runForEach(
-        runtime.run(conversation, userMsg),
-        processEvent,
-      );
-    }).pipe(Effect.provide(RuntimeLayer));
-
     try {
-      await Effect.runPromise(program);
+      await runAgent(conversation, userMsg, {
+        onToken: (content) => {
+          let msgId = streamingMessageId();
+          if (!msgId) {
+            msgId = crypto.randomUUID();
+            appendStreamingAssistantMessage(msgId, convId);
+            setStreamingMessageId(msgId);
+          }
+          appendAssistantMessageDelta(msgId, content);
+        },
+        onToolCall: (toolCall) => {
+          const msgId = streamingMessageId();
+          if (msgId) appendToolCall(msgId, toolCall);
+        },
+        onToolResult: (toolCallId, result, error) => {
+          const msgId = streamingMessageId();
+          if (msgId) finalizeToolResult(msgId, toolCallId, result, error);
+        },
+        onDone: (message) => {
+          finalizeAssistantMessage(message);
+          setStreamingMessageId(null);
+        },
+        onError: (err) => {
+          console.error("[ChatView] agent error:", err);
+        },
+      });
     } catch (e) {
       console.error("[ChatView] run error:", e);
+    } finally {
+      setRunning(false);
+      setStreamingMessageId(null);
     }
-
-    setRunning(false);
-    setStreamingMessageId(null);
-  };
-
-  const cancel = () => {
-    abortController?.abort();
-    setRunning(false);
   };
 
   return (

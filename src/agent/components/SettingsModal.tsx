@@ -4,9 +4,12 @@
 //! Save persists; Clear all history lives in Advanced (with confirm).
 
 import { createSignal, Show, For } from "solid-js";
-import { Effect, Exit } from "effect";
 import { ProviderCard } from "./ProviderCard";
-import { SettingsService, SettingsServiceLive } from "../../lib/tauri";
+import {
+  getSettingsBridge,
+  updateSettingsBridge,
+  clearAllHistoryBridge,
+} from "../../lib/tauri";
 import type { LLMProvider, Settings } from "../../lib/types";
 
 type Tab = "llm" | "app" | "window" | "billing" | "advanced";
@@ -18,13 +21,11 @@ export function SettingsModal(props: { onClose: () => void }) {
 
   // Load settings + providers on mount.
   const init = async () => {
-    const settingsProg = Effect.gen(function* () {
-      const svc = yield* SettingsService;
-      return yield* svc.getSettings();
-    }).pipe(Effect.provide(SettingsServiceLive));
-    const settingsResult = await Effect.runPromiseExit(settingsProg);
-    if (Exit.isSuccess(settingsResult)) {
-      setDraft(settingsResult.value);
+    try {
+      const s = await getSettingsBridge();
+      setDraft(s);
+    } catch (e) {
+      console.error("[SettingsModal] load failed:", e);
     }
   };
   void init();
@@ -32,13 +33,11 @@ export function SettingsModal(props: { onClose: () => void }) {
   const save = async () => {
     const d = draft();
     if (!d) return;
-    const prog = Effect.gen(function* () {
-      const svc = yield* SettingsService;
-      return yield* svc.updateSettings(d);
-    }).pipe(Effect.provide(SettingsServiceLive));
-    const result = await Effect.runPromiseExit(prog);
-    if (Exit.isSuccess(result)) {
+    try {
+      await updateSettingsBridge(d);
       props.onClose();
+    } catch (e) {
+      console.error("[SettingsModal] save failed:", e);
     }
   };
 
@@ -69,14 +68,12 @@ export function SettingsModal(props: { onClose: () => void }) {
   };
 
   const clearHistory = async () => {
-    const prog = Effect.gen(function* () {
-      const svc = yield* SettingsService;
-      yield* svc.clearAllHistory();
-    }).pipe(Effect.provide(SettingsServiceLive));
-    const result = await Effect.runPromiseExit(prog);
-    if (Exit.isSuccess(result)) {
+    try {
+      await clearAllHistoryBridge();
       setConfirmClear(false);
       props.onClose();
+    } catch (e) {
+      console.error("[SettingsModal] clear failed:", e);
     }
   };
 

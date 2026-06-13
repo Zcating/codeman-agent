@@ -1,14 +1,10 @@
 //! ProviderCard — single LLM provider row in Settings → LLM tab.
 //!
-//! Consumes `LLMProviderService` from the Effect→Solid bridge.
-//! For V1, the bridge layer is `agent/settings/llm_providers` (the Effect
-//! service file). The UI calls it via `Effect.runPromise` on the result.
-//!
+//! Consumes bridge functions from agent/settings/llm_providers.
 //! Pure UI. No effect imports.
 
 import { createSignal, Show } from "solid-js";
-import { Effect, Exit } from "effect";
-import { LLMProviderService, LLMProviderServiceLive } from "../settings/llm_providers";
+import { setApiKeyForProvider, hasApiKeyForProvider } from "../settings/llm_providers";
 import type { LLMProvider } from "../../lib/types";
 
 export function ProviderCard(props: {
@@ -23,25 +19,18 @@ export function ProviderCard(props: {
 
   const saveApiKey = async () => {
     if (!apiKey()) return;
-    const program = Effect.gen(function* () {
-      const svc = yield* LLMProviderService;
-      yield* svc.setApiKey(props.provider.id, apiKey());
-    }).pipe(Effect.provide(LLMProviderServiceLive));
-    const result = await Effect.runPromiseExit(program);
-    if (Exit.isSuccess(result)) {
+    try {
+      await setApiKeyForProvider(props.provider.id, apiKey());
       setApiKey("");
       setEditing(false);
+    } catch (e) {
+      console.error("[ProviderCard] setApiKey failed:", e);
     }
   };
 
   const testConnection = async () => {
     setTestStatus("testing");
-    const hasKey = await Effect.runPromise(
-      Effect.gen(function* () {
-        const svc = yield* LLMProviderService;
-        return yield* svc.hasApiKey(props.provider.id);
-      }).pipe(Effect.provide(LLMProviderServiceLive))
-    );
+    const hasKey = await hasApiKeyForProvider(props.provider.id);
     if (!hasKey) {
       setTestStatus("fail");
       setTestMessage("Set API key first");
