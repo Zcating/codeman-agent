@@ -232,3 +232,49 @@ pub async fn search_messages(
     Ok(messages::search_messages(pool.inner(), &query, limit).await?)
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Billing Snapshot IPC (Task 13)
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn list_billing_providers(
+    state: State<'_, AppState>,
+) -> Result<Vec<ProviderDescriptor>, AppError> {
+    Ok(state.list_providers())
+}
+
+#[tauri::command]
+pub async fn has_billing_key(
+    provider: ProviderId,
+) -> Result<bool, AppError> {
+    Ok(secrets::has_api_key(provider))
+}
+
+#[tauri::command]
+pub async fn set_billing_key(
+    provider: ProviderId,
+    value: String,
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    if value.is_empty() {
+        secrets::delete_api_key(provider)
+            .map_err(|e| AppError::Unauthorized { message: e.to_string() })?;
+    } else {
+        secrets::set_api_key(provider, &value)
+            .map_err(|e| AppError::Unauthorized { message: e.to_string() })?;
+    }
+    state.wakeup.notify_one();
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_provider_snapshot(
+    state: State<'_, AppState>,
+    provider: ProviderId,
+) -> Result<SnapshotEnvelope, AppError> {
+    state
+        .fetch_provider(provider)
+        .await
+        .map_err(|e| AppError::Upstream { message: e.to_string() })
+}
+
