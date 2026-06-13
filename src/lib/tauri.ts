@@ -1,95 +1,87 @@
-﻿//! Typed wrappers around the Tauri IPC commands defined in
-//! `src-tauri/src/commands.rs`. Centralized here so the rest of the
-//! frontend imports `from "../lib/tauri"` and gets the right types.
+﻿//! Effect-TS IPC layer — every command goes through here.
+ //! Services are Effect.Context.Tag classes; UI imports from
+ //! `src/agent/store/*.ts` (the bridge), NEVER directly from here.
+ //!
+ //! Effect signatures:
+ //!   invoke<T>(name, args): Effect<T, AppError>
+ //!   ConversationService.list(includeArchived): Effect<Conversation[], AppError>
+ //!   (others stubbed for now, filled in by Tasks 14, 21)
 
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type {
-  LowThresholdBreachedPayload,
-  ProviderDescriptor,
-  ProviderId,
-  RefreshFailedPayload,
-  Settings,
-  SnapshotEnvelope,
-  WidgetPosition,
-} from "./types";
+ import { Effect, Context, Layer } from "effect";
+ import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+ import type { AppError, Conversation, Message, Settings, LLMProvider, BillingProviderMeta, Snapshot } from "./types";
 
-export async function listProviders(): Promise<ProviderDescriptor[]> {
-  return invoke<ProviderDescriptor[]>("list_providers");
-}
+ /** Raw Tauri invoke wrapped in Effect. */
+ export const invoke = <T>(name: string, args?: Record<string, unknown>): Effect.Effect<T, AppError> =>
+   Effect.tryPromise({
+     try: () => tauriInvoke<T>(name, args),
+     catch: (e) => ({ kind: "Unknown" as const, message: String(e) }),
+   });
 
-export async function getActiveProvider(): Promise<ProviderId> {
-  return invoke<ProviderId>("get_active_provider");
-}
+ // ─── Service tags ──────────────────────────────────────────
+ export class ConversationService extends Context.Tag("ConversationService")<
+   ConversationService,
+   {
+     readonly list: (includeArchived: boolean) => Effect.Effect<Conversation[], AppError>;
+     readonly get: (id: string) => Effect.Effect<Conversation, AppError>;
+     readonly create: (title: string, systemPrompt?: string) => Effect.Effect<Conversation, AppError>;
+     readonly archive: (id: string) => Effect.Effect<void, AppError>;
+     readonly delete: (id: string) => Effect.Effect<void, AppError>;
+   }
+ >() {}
 
-export async function setActiveProvider(id: ProviderId): Promise<void> {
-  await invoke("set_active_provider", { id });
-}
+ export class MessageService extends Context.Tag("MessageService")<
+   MessageService,
+   {
+     readonly list: (conversationId: string) => Effect.Effect<Message[], AppError>;
+     readonly append: (args: { conversation_id: string; role: string; content: string; tool_calls?: string; tool_results?: string; model?: string; input_tokens?: number; output_tokens?: number }) => Effect.Effect<Message, AppError>;
+     readonly search: (query: string, limit: number) => Effect.Effect<Message[], AppError>;
+   }
+ >() {}
 
-export async function forceRefresh(): Promise<void> {
-  await invoke("force_refresh");
-}
+ export class BillingService extends Context.Tag("BillingService")<
+   BillingService,
+   {
+     readonly listProviders: () => Effect.Effect<BillingProviderMeta[], AppError>;
+     readonly getSnapshot: (providerId: string) => Effect.Effect<Snapshot, AppError>;
+     readonly hasKey: (providerId: string) => Effect.Effect<boolean, AppError>;
+     readonly setKey: (providerId: string, key: string) => Effect.Effect<void, AppError>;
+   }
+ >() {}
 
-export async function getSettings(): Promise<Settings> {
-  return invoke<Settings>("get_settings");
-}
+ export class SettingsService extends Context.Tag("SettingsService")<
+   SettingsService,
+   {
+     readonly getSettings: () => Effect.Effect<Settings, AppError>;
+     readonly updateSettings: (patch: unknown) => Effect.Effect<Settings, AppError>;
+     readonly clearAllHistory: () => Effect.Effect<void, AppError>;
+     readonly getActiveLlmProvider: () => Effect.Effect<LLMProvider | null, AppError>;
+   }
+ >() {}
 
-export async function updateSettings(newSettings: Settings): Promise<Settings> {
-  return invoke<Settings>("update_settings", { newSettings });
-}
-
-export async function setApiKey(
-  provider: ProviderId,
-  value: string,
-): Promise<boolean> {
-  return invoke<boolean>("set_api_key", { provider, value });
-}
-
-export async function hasApiKey(provider: ProviderId): Promise<boolean> {
-  return invoke<boolean>("has_api_key", { provider });
-}
-
-export async function testProvider(
-  provider: ProviderId,
-): Promise<SnapshotEnvelope> {
-  return invoke<SnapshotEnvelope>("test_provider", { provider });
-}
-
-export async function latestSnapshot(
-  provider: ProviderId,
-): Promise<SnapshotEnvelope | null> {
-  return invoke<SnapshotEnvelope | null>("latest_snapshot", { provider });
-}
-
-export async function showSettingsWindow(): Promise<void> {
-  await invoke("show_settings_window");
-}
-
-export async function hideWidgetWindow(): Promise<void> {
-  await invoke("hide_widget_window");
-}
-
-export async function showWidgetWindow(): Promise<void> {
-  await invoke("show_widget_window");
-}
-
-export async function getWidgetPosition(): Promise<WidgetPosition | null> {
-  return invoke<WidgetPosition | null>("get_widget_position");
-}
-
-export async function setWidgetPosition(x: number, y: number): Promise<WidgetPosition> {
-  return invoke<WidgetPosition>("set_widget_position", { x, y });
-}
-
-type EventMap = {
-  "snapshot-updated": SnapshotEnvelope;
-  "refresh-failed": RefreshFailedPayload;
-  "low-threshold-breached": LowThresholdBreachedPayload;
-};
-
-export async function onEvent<K extends keyof EventMap>(
-  event: K,
-  cb: (payload: EventMap[K]) => void,
-): Promise<UnlistenFn> {
-  return listen<EventMap[K]>(event, (e) => cb(e.payload as EventMap[K]));
-}
+ // ─── Live layers (stubbed: each service method fails with NotFound) ─
+ // Filled in by Tasks 14 (Conversation/Message) and 21 (Settings).
+ export const ConversationServiceLive = Layer.succeed(ConversationService, {
+   list: () => Effect.fail({ kind: "NotFound", message: "stub: not implemented yet" } as AppError),
+   get: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+   create: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+   archive: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+   delete: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+ });
+ export const MessageServiceLive = Layer.succeed(MessageService, {
+   list: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+   append: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+   search: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+ });
+ export const BillingServiceLive = Layer.succeed(BillingService, {
+   listProviders: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+   getSnapshot: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+   hasKey: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+   setKey: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+ });
+ export const SettingsServiceLive = Layer.succeed(SettingsService, {
+   getSettings: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+   updateSettings: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+   clearAllHistory: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+   getActiveLlmProvider: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+ });
