@@ -226,7 +226,13 @@ mod tests {
     #[test]
     fn settings_refresh_interval_floors() {
         let mut s = Settings::default();
-        s.refresh_interval_secs = 0;
+        // Insert a provider with 0 refresh interval; Settings floors it.
+        s.billing_providers.push(crate::settings::BillingProviderConfig {
+            id: "test".into(),
+            enabled: true,
+            refresh_interval_secs: 0,
+            api_key_ref: None,
+        });
         assert!(s.refresh_interval() >= Duration::from_secs(5));
     }
 }

@@ -2,6 +2,7 @@
 //! IPC commands into the Tauri runtime.
 
 mod commands;
+mod db;
 mod hotkeys;
 mod providers;
 mod scheduler;
