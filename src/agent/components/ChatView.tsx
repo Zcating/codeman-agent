@@ -124,23 +124,24 @@ export function ChatView() {
   };
 
   return (
-    <main class="chat-view">
+    <main class="flex h-full h-screen w-full bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
       <Sidebar />
-      <section class="chat-view__main">
-        <div class="chat-view__messages">
+      <section class="flex-1 flex flex-col overflow-hidden">
+        <div class="flex-1 overflow-y-auto p-4 space-y-3">
           <For each={messages$()}>
             {(m) => <MessageBubble message={m} />}
           </For>
           <div ref={messagesEndRef} />
         </div>
         <form
-          class="chat-view__input"
+          class="flex gap-2 p-3 border-t border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
           onSubmit={(e) => {
             e.preventDefault();
             void send();
           }}
         >
           <textarea
+            class="flex-1 p-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 placeholder:text-zinc-400 resize-none outline-none disabled:opacity-60"
             rows={3}
             value={input()}
             onInput={(e) => setInput(e.currentTarget.value)}
@@ -150,99 +151,17 @@ export function ChatView() {
           <Show
             when={!running()}
             fallback={
-              <button type="button" onClick={cancel}>
+              <button type="button" onClick={cancel} class="px-4 py-2 rounded-md font-medium bg-red-500 hover:bg-red-600 active:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed">
                 Cancel
               </button>
             }
           >
-            <button type="submit" disabled={!input().trim()}>
+            <button type="submit" disabled={!input().trim()} class="px-4 py-2 rounded-md font-medium bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed">
               Send
             </button>
           </Show>
         </form>
       </section>
-      <style>{`
-        .chat-view {
-          display: flex;
-          height: 100vh;
-          background: #0f0f23;
-          font-family: "Courier New", Courier, monospace;
-          color: #e0e0e0;
-        }
-        .chat-view__main {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-        }
-        .chat-view__messages {
-          flex: 1;
-          overflow-y: auto;
-          padding: 16px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-        .chat-view__messages::-webkit-scrollbar {
-          width: 6px;
-        }
-        .chat-view__messages::-webkit-scrollbar-track {
-          background: #0f0f23;
-        }
-        .chat-view__messages::-webkit-scrollbar-thumb {
-          background: #16213e;
-          border-radius: 2px;
-        }
-        .chat-view__input {
-          display: flex;
-          gap: 8px;
-          padding: 12px 16px;
-          border-top: 2px solid #16213e;
-          background: #1a1a2e;
-        }
-        .chat-view__input textarea {
-          flex: 1;
-          padding: 8px 12px;
-          background: #0f0f23;
-          border: 2px solid #16213e;
-          border-radius: 2px;
-          color: #e0e0e0;
-          font-family: inherit;
-          font-size: 13px;
-          resize: none;
-          outline: none;
-        }
-        .chat-view__input textarea:focus {
-          border-color: #4a4ae0;
-        }
-        .chat-view__input textarea::placeholder {
-          color: #666;
-        }
-        .chat-view__input textarea:disabled {
-          opacity: 0.6;
-        }
-        .chat-view__input button {
-          padding: 8px 20px;
-          background: #4a4ae0;
-          border: 2px solid #6a6af0;
-          border-radius: 2px;
-          color: #fff;
-          font-family: inherit;
-          font-size: 13px;
-          cursor: pointer;
-          transition: background 0.1s;
-        }
-        .chat-view__input button:hover:not(:disabled) {
-          background: #6a6af0;
-        }
-        .chat-view__input button:active:not(:disabled) {
-          background: #3a3ad0;
-        }
-        .chat-view__input button:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-      `}</style>
     </main>
   );
 }
