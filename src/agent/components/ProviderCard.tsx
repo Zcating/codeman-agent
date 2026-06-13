@@ -54,46 +54,49 @@ export function ProviderCard(props: {
   };
 
   return (
-    <div class="provider-card">
-      <div class="provider-card__header">
-        <label class="provider-card__enabled">
+    <div class="p-4 border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 space-y-3 mb-3 shadow-sm">
+      <div class="flex items-center justify-between mb-2 gap-2">
+        <label class="flex items-center gap-2 cursor-pointer">
           <input
             type="checkbox"
             checked={props.provider.enabled}
             onChange={(e) => props.onChange({ ...props.provider, enabled: e.currentTarget.checked })}
+            class="rounded text-primary-500 focus:ring-primary-500 w-4 h-4"
           />
-          <span class="provider-card__label">{props.provider.label}</span>
+          <span class="text-base font-medium text-zinc-900 dark:text-zinc-100">{props.provider.label}</span>
         </label>
-        <code class="provider-card__id">{props.provider.id}</code>
+        <code class="text-xs text-zinc-500 dark:text-zinc-400 font-mono bg-zinc-100 dark:bg-zinc-900 px-2 py-0.5 rounded">{props.provider.id}</code>
       </div>
       <Show when={props.provider.default_model !== undefined || editing()}>
-        <div class="provider-card__row">
-          <label>Model</label>
+        <div class="flex items-center gap-2">
+          <label class="w-32 text-sm text-zinc-600 dark:text-zinc-400 flex-shrink-0">Model</label>
           <input
             type="text"
             value={props.provider.default_model ?? ""}
             placeholder="e.g. gpt-4o / claude-3-5-sonnet"
             onInput={(e) => props.onChange({ ...props.provider, default_model: e.currentTarget.value })}
+            class="flex-1 p-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none"
           />
         </div>
       </Show>
       <Show when={props.provider.base_url !== undefined || editing()}>
-        <div class="provider-card__row">
-          <label>Base URL (OpenAI-compat only)</label>
+        <div class="flex items-center gap-2">
+          <label class="w-32 text-sm text-zinc-600 dark:text-zinc-400 flex-shrink-0">Base URL (OpenAI-compat only)</label>
           <input
             type="text"
             value={props.provider.base_url ?? ""}
             placeholder="https://api.openai.com/v1"
             onInput={(e) => props.onChange({ ...props.provider, base_url: e.currentTarget.value })}
+            class="flex-1 p-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none"
           />
         </div>
       </Show>
-      <div class="provider-card__row">
-        <label>API Key</label>
+      <div class="flex items-center gap-2">
+        <label class="w-32 text-sm text-zinc-600 dark:text-zinc-400 flex-shrink-0">API Key</label>
         <Show
           when={editing()}
           fallback={
-            <button type="button" onClick={() => setEditing(true)}>
+            <button type="button" onClick={() => setEditing(true)} class="px-3 py-1.5 text-sm border border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors">
               Set API key…
             </button>
           }
@@ -104,30 +107,30 @@ export function ProviderCard(props: {
             value={apiKey()}
             onInput={(e) => setApiKey(e.currentTarget.value)}
             placeholder="sk-…"
+            class="flex-1 p-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none"
           />
-          <button type="button" onClick={() => void saveApiKey()} disabled={!apiKey()}>
+          <button type="button" onClick={() => void saveApiKey()} disabled={!apiKey()} class="px-3 py-1.5 text-sm bg-primary-500 text-white rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
             Save
           </button>
-          <button type="button" onClick={() => { setEditing(false); setApiKey(""); }}>
+          <button type="button" onClick={() => { setEditing(false); setApiKey(""); }} class="px-3 py-1.5 text-sm border border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors">
             Cancel
           </button>
         </Show>
       </div>
-      <div class="provider-card__actions">
-        <button type="button" onClick={() => void testConnection()}>
+      <div class="flex gap-2 mt-3 items-center flex-wrap">
+        <button type="button" onClick={() => void testConnection()} class="px-3 py-1.5 text-sm bg-primary-500 text-white rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
           Test
         </button>
         <Show when={testStatus() !== "idle"}>
-          <span classList={{
-            "provider-card__test-status": true,
-            "provider-card__test-status--ok": testStatus() === "ok",
-            "provider-card__test-status--fail": testStatus() === "fail",
-            "provider-card__test-status--testing": testStatus() === "testing",
-          }}>
+          <span class={`ml-2 text-sm font-medium ${
+            testStatus() === "ok" ? "text-green-600 dark:text-green-400" :
+            testStatus() === "fail" ? "text-red-600 dark:text-red-400" :
+            "text-zinc-500 dark:text-zinc-400"
+          }`}>
             {testStatus() === "testing" ? "Testing…" : testMessage()}
           </span>
         </Show>
-        <button type="button" class="provider-card__delete" onClick={() => props.onDelete()}>
+        <button type="button" onClick={() => props.onDelete()} class="ml-auto text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:underline transition-colors">
           Delete
         </button>
       </div>

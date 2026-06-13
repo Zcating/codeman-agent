@@ -40,7 +40,8 @@ describe("ProviderCard", () => {
     expect(checkbox).toBeTruthy();
 
     // label span
-    expect(container.querySelector(".provider-card__label")?.textContent).toBe("DeepSeek");
+    const labelSpan = Array.from(container.querySelectorAll('span')).find(s => s.textContent === "DeepSeek");
+    expect(labelSpan?.textContent).toBe("DeepSeek");
 
     // model input
     const modelInput = container.querySelectorAll('input[type="text"]')[0] as HTMLInputElement | null;
@@ -59,7 +60,7 @@ describe("ProviderCard", () => {
     expect(testBtn?.textContent).toBe("Test");
 
     // Delete button
-    const deleteBtn = container.querySelector(".provider-card__delete");
+    const deleteBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === "Delete");
     expect(deleteBtn?.textContent).toBe("Delete");
   });
 
@@ -98,8 +99,8 @@ describe("ProviderCard", () => {
     const testBtn = container.querySelectorAll("button")[1];
     await user.click(testBtn!);
 
-    // Since hasApiKey returns false, test should show fail
-    const status = container.querySelector(".provider-card__test-status--fail");
+    // Status span shows the fail message
+    const status = Array.from(container.querySelectorAll('span')).find(s => s.textContent === "Set API key first");
     expect(status?.textContent).toBe("Set API key first");
   });
 });
