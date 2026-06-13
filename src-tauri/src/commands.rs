@@ -4,6 +4,7 @@
 use crate::db::conversations;
 use crate::db::messages;
 use crate::secrets;
+use crate::secrets_llm;
 use crate::settings::{Settings, WidgetPosition};
 use crate::state::{AppState, ProviderDescriptor};
 use crate::types::{AppError, ProviderId, SnapshotEnvelope};
@@ -276,5 +277,48 @@ pub async fn get_provider_snapshot(
         .fetch_provider(provider)
         .await
         .map_err(|e| AppError::Upstream { message: e.to_string() })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Settings + LLM Key IPC (Tasks 22 / 31)
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn clear_all_history(
+    pool: tauri::State<'_, sqlx::SqlitePool>,
+) -> Result<(), AppError> {
+    let mut tx = pool.begin().await.map_err(AppError::from)?;
+    sqlx::query("DELETE FROM messages_fts")
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+    sqlx::query("DELETE FROM messages")
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+    sqlx::query("DELETE FROM conversations")
+        .execute(&mut *tx)
+        .await
+        .map_err(AppError::from)?;
+    tx.commit().await.map_err(AppError::from)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn set_llm_key(
+    app: tauri::AppHandle,
+    provider_id: String,
+    key: String,
+) -> Result<(), AppError> {
+    secrets_llm::set_llm_key(&app, &provider_id, &key)
+        .map_err(|e| AppError::Unauthorized { message: e })
+}
+
+#[tauri::command]
+pub async fn has_llm_key(
+    app: tauri::AppHandle,
+    provider_id: String,
+) -> Result<bool, AppError> {
+    Ok(secrets_llm::has_llm_key(&app, &provider_id))
 }
 
