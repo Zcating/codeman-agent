@@ -76,6 +76,13 @@ pub fn run() {
                 warn!("tray install failed: {e}");
             }
 
+            // Launch-time: hide widget window if start_minimized
+            if state.get_settings().start_minimized {
+                if let Some(w) = app.get_webview_window("widget") {
+                    let _ = w.hide();
+                }
+            }
+
             // Register hotkeys from the current settings.
             register_hotkeys(&handle, &state);
 
@@ -96,6 +103,20 @@ pub fn run() {
                     // so the widget keeps running.
                     api.prevent_close();
                     let _ = window.hide();
+                } else if window.label() == "widget" {
+                    // Widget close behavior: hide_to_tray vs quit
+                    let app = window.app_handle();
+                    let state = app.state::<AppState>();
+                    let settings = state.get_settings();
+                    match settings.close_behavior {
+                        crate::settings::CloseBehavior::HideToTray => {
+                            api.prevent_close();
+                            let _ = window.hide();
+                        }
+                        crate::settings::CloseBehavior::Quit => {
+                            // Allow close - do not prevent. App will exit.
+                        }
+                    }
                 }
             }
         })

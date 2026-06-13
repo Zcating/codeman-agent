@@ -135,7 +135,7 @@ impl Default for WindowSettings {
             remember_position: true,
             remember_size: true,
             default_size: Size::default(),
-            min_size: Size { width: 400, height: 300 },
+            min_size: Size { width: 600, height: 400 },
         }
     }
 }
