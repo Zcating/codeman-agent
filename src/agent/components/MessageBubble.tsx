@@ -27,24 +27,30 @@ function renderMarkdown(s: string): string {
 export function MessageBubble(props: { message: Message }) {
   const role = () => props.message.role;
   return (
-    <div classList={{
-      "bubble": true,
-      "bubble--user": role() === "user",
-      "bubble--assistant": role() === "assistant",
-      "bubble--tool": role() === "tool",
-      "bubble--system": role() === "system",
-    }}>
+    <div
+      class={`mb-3 flex w-full ${
+        role() === "user"
+          ? "justify-end"
+          : "justify-start"
+      }`}
+    >
       <Show when={role() === "user"}>
-        <div class="bubble__content" innerHTML={escapeHtml(props.message.content)} />
+        <div
+          class="max-w-prose p-3 rounded-lg leading-relaxed break-words bg-primary-500 text-white"
+          innerHTML={escapeHtml(props.message.content)}
+        />
       </Show>
       <Show when={role() === "assistant"}>
-        <div class="bubble__content" innerHTML={renderMarkdown(props.message.content)} />
+        <div
+          class="max-w-prose p-3 rounded-lg leading-relaxed break-words bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700"
+          innerHTML={renderMarkdown(props.message.content)}
+        />
         <Show when={props.message.tool_calls && props.message.tool_calls.length > 0}>
-          <details class="bubble__tool-calls">
+          <details class="mt-2 text-sm border-t border-zinc-200 dark:border-zinc-700 pt-2">
             <summary>Tool calls ({props.message.tool_calls!.length})</summary>
             <For each={props.message.tool_calls!}>
               {(tc: ToolCall) => (
-                <pre class="bubble__tool-call">
+                <pre class="mt-1 p-2 bg-zinc-50 dark:bg-zinc-900 rounded font-mono text-xs overflow-x-auto whitespace-pre-wrap">
                   {tc.name}({JSON.stringify(tc.args, null, 2)})
                 </pre>
               )}
@@ -53,13 +59,13 @@ export function MessageBubble(props: { message: Message }) {
         </Show>
       </Show>
       <Show when={role() === "tool"}>
-        <details class="bubble__tool-result">
+        <details class="mt-2 text-sm border-t border-zinc-200 dark:border-zinc-700 pt-2">
           <summary>Tool result</summary>
-          <pre>{JSON.stringify(props.message.content, null, 2)}</pre>
+          <pre class="mt-1 p-2 bg-zinc-50 dark:bg-zinc-900 rounded font-mono text-xs overflow-x-auto whitespace-pre-wrap">{JSON.stringify(props.message.content, null, 2)}</pre>
           <Show when={props.message.tool_results && props.message.tool_results.length > 0}>
             <For each={props.message.tool_results!}>
               {(tr: ToolResult) => (
-                <div class="bubble__tool-result-item">
+                <div class={`mt-1 text-xs ${tr.error ? "text-red-700 dark:text-red-400" : "text-green-700 dark:text-green-400"}`}>
                   <code>{tr.tool_call_id}</code>: {tr.error ? "❌" : "✓"}{" "}
                   <code>{JSON.stringify(tr.result)}</code>
                 </div>
@@ -69,10 +75,12 @@ export function MessageBubble(props: { message: Message }) {
         </details>
       </Show>
       <Show when={role() === "system"}>
-        <div class="bubble__system">{props.message.content}</div>
+        <div class="max-w-prose p-3 rounded-lg leading-relaxed break-words bg-amber-50 dark:bg-amber-900/20 text-amber-900 dark:text-amber-200 italic border border-amber-200 dark:border-amber-800">
+          {props.message.content}
+        </div>
       </Show>
       <Show when={props.message.model}>
-        <div class="bubble__meta">{props.message.model}</div>
+        <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{props.message.model}</div>
       </Show>
     </div>
   );

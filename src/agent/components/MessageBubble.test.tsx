@@ -24,7 +24,7 @@ describe("MessageBubble", () => {
       created_at: 1710000000,
     };
     const { container } = render(() => <MessageBubble message={msg} />);
-    const bubble = container.querySelector(".bubble--user");
+    const bubble = container.querySelector(".justify-end");
     expect(bubble).toBeTruthy();
     // The content should be escaped (no raw <script> tag)
     expect(bubble?.innerHTML).not.toContain("<script>");
@@ -45,7 +45,7 @@ describe("MessageBubble", () => {
       created_at: 1710000001,
     };
     const { container } = render(() => <MessageBubble message={msg} />);
-    const bubble = container.querySelector(".bubble--assistant");
+    const bubble = container.querySelector(".justify-start");
     expect(bubble).toBeTruthy();
     // marked parses **text** into <strong>
     const strong = bubble?.querySelector("strong");
@@ -69,7 +69,7 @@ describe("MessageBubble", () => {
       created_at: 1710000002,
     };
     const { container } = render(() => <MessageBubble message={msg} />);
-    const bubble = container.querySelector(".bubble--tool");
+    const bubble = container.querySelector(".justify-start");
     expect(bubble).toBeTruthy();
     // Shows "Tool result" summary
     const summary = bubble?.querySelector("summary");
@@ -92,7 +92,7 @@ describe("MessageBubble", () => {
       created_at: 1710000003,
     };
     const { container } = render(() => <MessageBubble message={msg} />);
-    const bubble = container.querySelector(".bubble--system");
+    const bubble = container.querySelector(".justify-start");
     expect(bubble).toBeTruthy();
     expect(bubble?.textContent).toContain("You are a helpful assistant.");
   });
@@ -114,7 +114,7 @@ describe("MessageBubble", () => {
       created_at: 1710000004,
     };
     const { container } = render(() => <MessageBubble message={msg} />);
-    const details = container.querySelector(".bubble__tool-calls");
+    const details = container.querySelector("details");
     expect(details).toBeTruthy();
     const summary = details?.querySelector("summary");
     expect(summary?.textContent).toContain("Tool calls (1)");
