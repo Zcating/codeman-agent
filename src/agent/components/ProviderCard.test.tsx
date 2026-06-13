@@ -1,11 +1,13 @@
 //! ProviderCard component tests.
 //!
-//! Mocked: llm_providers bridge functions.
+//! Mocked: LLMProviderService Effect service via direct import.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
+import { Effect, Layer } from "effect";
 import { ProviderCard } from "./ProviderCard";
+import { LLMProviderService } from "../settings/llm_providers";
 import type { LLMProvider } from "../../lib/types";
 
 const mockProvider: LLMProvider = {
@@ -17,9 +19,29 @@ const mockProvider: LLMProvider = {
   api_key_ref: "llm_providers/deepseek/api_key",
 };
 
+const MockLLMProviderServiceLive = Layer.succeed(LLMProviderService, {
+  list: () => Effect.succeed([]),
+  add: () => Effect.succeed(undefined),
+  update: () => Effect.succeed(undefined),
+  remove: () => Effect.succeed(undefined),
+  setApiKey: () => Effect.succeed(undefined),
+  hasApiKey: () => Effect.succeed(false),
+  setActive: () => Effect.succeed(undefined),
+});
+
 vi.mock("../settings/llm_providers", () => ({
-  setApiKeyForProvider: vi.fn().mockResolvedValue(undefined),
-  hasApiKeyForProvider: vi.fn().mockResolvedValue(false),
+  LLMProviderService: {
+    of: vi.fn(() => ({
+      list: () => Effect.succeed([]),
+      add: () => Effect.succeed(undefined),
+      update: () => Effect.succeed(undefined),
+      remove: () => Effect.succeed(undefined),
+      setApiKey: () => Effect.succeed(undefined),
+      hasApiKey: () => Effect.succeed(false),
+      setActive: () => Effect.succeed(undefined),
+    })),
+  },
+  LLMProviderServiceLive: MockLLMProviderServiceLive,
 }));
 
 describe("ProviderCard", () => {

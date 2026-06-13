@@ -1,6 +1,6 @@
 //! ChatView component tests.
 //!
-//! Mocked: conversations store, messages store, runtime bridge (runAgent).
+//! Mocked: conversations store, messages store, runtime services.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
@@ -55,9 +55,9 @@ vi.mock("../store/messages", () => ({
   appendStreamingAssistantMessage: vi.fn(),
 }));
 
-vi.mock("../store/runtime", () => ({
-  runAgent: vi.fn(),
-  cancelAgent: vi.fn(),
+vi.mock("../runtime", () => ({
+  AgentRuntime: { of: vi.fn() },
+  RuntimeLayer: {},
 }));
 
 describe("ChatView", () => {

@@ -1,10 +1,8 @@
 //! ProviderCard — single LLM provider row in Settings → LLM tab.
-//!
-//! Consumes bridge functions from agent/settings/llm_providers.
-//! Pure UI. No effect imports.
 
 import { createSignal, Show } from "solid-js";
-import { setApiKeyForProvider, hasApiKeyForProvider } from "../settings/llm_providers";
+import { Effect } from "effect";
+import { LLMProviderService, LLMProviderServiceLive } from "../settings/llm_providers";
 import type { LLMProvider } from "../../lib/types";
 
 export function ProviderCard(props: {
@@ -20,7 +18,11 @@ export function ProviderCard(props: {
   const saveApiKey = async () => {
     if (!apiKey()) return;
     try {
-      await setApiKeyForProvider(props.provider.id, apiKey());
+      const program = Effect.gen(function* () {
+        const svc = yield* LLMProviderService;
+        yield* svc.setApiKey(props.provider.id, apiKey());
+      }).pipe(Effect.provide(LLMProviderServiceLive));
+      await Effect.runPromise(program);
       setApiKey("");
       setEditing(false);
     } catch (e) {
@@ -30,16 +32,24 @@ export function ProviderCard(props: {
 
   const testConnection = async () => {
     setTestStatus("testing");
-    const hasKey = await hasApiKeyForProvider(props.provider.id);
-    if (!hasKey) {
+    try {
+      const program = Effect.gen(function* () {
+        const svc = yield* LLMProviderService;
+        return yield* svc.hasApiKey(props.provider.id);
+      }).pipe(Effect.provide(LLMProviderServiceLive));
+      const hasKey = await Effect.runPromise(program);
+      if (!hasKey) {
+        setTestStatus("fail");
+        setTestMessage("Set API key first");
+        return;
+      }
+      setTestStatus("ok");
+      setTestMessage("API key configured");
+    } catch (e) {
+      console.error("[ProviderCard] hasApiKey failed:", e);
       setTestStatus("fail");
-      setTestMessage("Set API key first");
-      return;
+      setTestMessage("Error checking API key");
     }
-    // For V1, "test" = check that an API key is set. A real test would
-    // make a minimal completion call to the provider.
-    setTestStatus("ok");
-    setTestMessage("API key configured");
   };
 
   return (

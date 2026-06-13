@@ -1,9 +1,10 @@
 //! ChatView — message list + input + stream subscription.
 //!
 //! The centerpiece of the agent UI. Subscribes to AgentRuntime.run()
-//! and translates RuntimeEvents into bridge calls.
+//! and translates RuntimeEvents into UI updates.
 
 import { createSignal, createEffect, For, Show, onCleanup } from "solid-js";
+import { Effect, Exit, Stream } from "effect";
 import { MessageBubble } from "./MessageBubble";
 import { Sidebar } from "./Sidebar";
 import {
@@ -18,7 +19,7 @@ import {
   appendStreamingAssistantMessage,
 } from "../store/messages";
 import { activeId$, conversations$ } from "../store/conversations";
-import { runAgent } from "../store/runtime";
+import { AgentRuntime, RuntimeLayer } from "../runtime";
 
 export function ChatView() {
   const [input, setInput] = createSignal("");
@@ -72,32 +73,48 @@ export function ChatView() {
     const userMsg = messages$()[messages$().length - 1];
 
     try {
-      await runAgent(conversation, userMsg, {
-        onToken: (content) => {
-          let msgId = streamingMessageId();
-          if (!msgId) {
-            msgId = crypto.randomUUID();
-            appendStreamingAssistantMessage(msgId, convId);
-            setStreamingMessageId(msgId);
+      const program = Effect.gen(function* () {
+        const runtime = yield* AgentRuntime;
+        yield* Stream.runForEach(runtime.run(conversation, userMsg), (evt) => {
+          switch (evt.type) {
+            case "token": {
+              let msgId = streamingMessageId();
+              if (!msgId) {
+                msgId = crypto.randomUUID();
+                appendStreamingAssistantMessage(msgId, convId);
+                setStreamingMessageId(msgId);
+              }
+              appendAssistantMessageDelta(msgId, evt.content);
+              break;
+            }
+            case "tool_call": {
+              const msgId = streamingMessageId();
+              if (msgId) appendToolCall(msgId, evt.toolCall);
+              break;
+            }
+            case "tool_result": {
+              const msgId = streamingMessageId();
+              if (msgId) finalizeToolResult(msgId, evt.toolCallId, evt.result, evt.error);
+              break;
+            }
+            case "done": {
+              finalizeAssistantMessage(evt.message);
+              setStreamingMessageId(null);
+              break;
+            }
+            case "error": {
+              console.error("[ChatView] agent error:", evt.error);
+              break;
+            }
           }
-          appendAssistantMessageDelta(msgId, content);
-        },
-        onToolCall: (toolCall) => {
-          const msgId = streamingMessageId();
-          if (msgId) appendToolCall(msgId, toolCall);
-        },
-        onToolResult: (toolCallId, result, error) => {
-          const msgId = streamingMessageId();
-          if (msgId) finalizeToolResult(msgId, toolCallId, result, error);
-        },
-        onDone: (message) => {
-          finalizeAssistantMessage(message);
-          setStreamingMessageId(null);
-        },
-        onError: (err) => {
-          console.error("[ChatView] agent error:", err);
-        },
-      });
+          return Effect.succeed(undefined);
+        });
+      }).pipe(Effect.provide(RuntimeLayer));
+
+      const result = await Effect.runPromiseExit(program);
+      if (!Exit.isSuccess(result)) {
+        console.error("[ChatView] run error:", String(result.cause));
+      }
     } catch (e) {
       console.error("[ChatView] run error:", e);
     } finally {

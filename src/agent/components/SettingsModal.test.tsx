@@ -1,11 +1,13 @@
 //! SettingsModal component tests.
 //!
-//! Mocked: tauri bridge functions.
+//! Mocked: SettingsService Effect service.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
+import { Effect, Layer } from "effect";
 import { SettingsModal } from "./SettingsModal";
+import { SettingsService } from "../../lib/tauri";
 import type { Settings } from "../../lib/types";
 
 const mockSettings: Settings = {
@@ -37,10 +39,23 @@ const mockSettings: Settings = {
   conversations: { auto_archive_after_days: 30, max_history: 1000 },
 };
 
+const MockSettingsServiceLive = Layer.succeed(SettingsService, {
+  getSettings: () => Effect.succeed(mockSettings),
+  updateSettings: () => Effect.succeed(mockSettings),
+  clearAllHistory: () => Effect.succeed(undefined),
+  getActiveLlmProvider: () => Effect.succeed(null),
+});
+
 vi.mock("../../lib/tauri", () => ({
-  getSettingsBridge: vi.fn().mockResolvedValue(mockSettings),
-  updateSettingsBridge: vi.fn().mockResolvedValue(mockSettings),
-  clearAllHistoryBridge: vi.fn().mockResolvedValue(undefined),
+  SettingsService: {
+    of: vi.fn(() => ({
+      getSettings: () => Effect.succeed(mockSettings),
+      updateSettings: () => Effect.succeed(mockSettings),
+      clearAllHistory: () => Effect.succeed(undefined),
+      getActiveLlmProvider: () => Effect.succeed(null),
+    })),
+  },
+  SettingsServiceLive: MockSettingsServiceLive,
 }));
 
 // We also need to mock the ProviderCard since it uses Effect

@@ -1,15 +1,9 @@
 //! SettingsModal — tabbed settings dialog.
-//!
-//! Tabs: LLM / App / Window / Billing / Advanced.
-//! Save persists; Clear all history lives in Advanced (with confirm).
 
 import { createSignal, Show, For } from "solid-js";
+import { Effect } from "effect";
 import { ProviderCard } from "./ProviderCard";
-import {
-  getSettingsBridge,
-  updateSettingsBridge,
-  clearAllHistoryBridge,
-} from "../../lib/tauri";
+import { SettingsService, SettingsServiceLive } from "../../lib/tauri";
 import type { LLMProvider, Settings } from "../../lib/types";
 
 type Tab = "llm" | "app" | "window" | "billing" | "advanced";
@@ -22,7 +16,11 @@ export function SettingsModal(props: { onClose: () => void }) {
   // Load settings + providers on mount.
   const init = async () => {
     try {
-      const s = await getSettingsBridge();
+      const program = Effect.gen(function* () {
+        const svc = yield* SettingsService;
+        return yield* svc.getSettings();
+      }).pipe(Effect.provide(SettingsServiceLive));
+      const s = await Effect.runPromise(program);
       setDraft(s);
     } catch (e) {
       console.error("[SettingsModal] load failed:", e);
@@ -34,7 +32,11 @@ export function SettingsModal(props: { onClose: () => void }) {
     const d = draft();
     if (!d) return;
     try {
-      await updateSettingsBridge(d);
+      const program = Effect.gen(function* () {
+        const svc = yield* SettingsService;
+        yield* svc.updateSettings(d);
+      }).pipe(Effect.provide(SettingsServiceLive));
+      await Effect.runPromise(program);
       props.onClose();
     } catch (e) {
       console.error("[SettingsModal] save failed:", e);
@@ -69,7 +71,11 @@ export function SettingsModal(props: { onClose: () => void }) {
 
   const clearHistory = async () => {
     try {
-      await clearAllHistoryBridge();
+      const program = Effect.gen(function* () {
+        const svc = yield* SettingsService;
+        yield* svc.clearAllHistory();
+      }).pipe(Effect.provide(SettingsServiceLive));
+      await Effect.runPromise(program);
       setConfirmClear(false);
       props.onClose();
     } catch (e) {
