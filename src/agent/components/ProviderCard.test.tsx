@@ -2,11 +2,12 @@
 //!
 //! Mocked: LLMProviderService Effect service via direct import.
 
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
 import { ProviderCard } from "./ProviderCard";
 import type { LLMProvider } from "../../lib/types";
+import { mockState } from "../../shared-mock-state";
 
 const mockProvider: LLMProvider = {
   id: "deepseek",
@@ -18,6 +19,10 @@ const mockProvider: LLMProvider = {
 };
 
 describe("ProviderCard", () => {
+  beforeEach(() => {
+    mockState.resolved = false;
+  });
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();

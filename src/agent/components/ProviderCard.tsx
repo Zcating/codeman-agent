@@ -3,6 +3,7 @@
 import { createSignal, Show } from "solid-js";
 import { Effect } from "effect";
 import { LLMProviderService, LLMProviderServiceLive } from "../settings/llm_providers";
+import { SettingsServiceLive } from "../../lib/tauri";
 import type { LLMProvider } from "../../lib/types";
 
 export function ProviderCard(props: {
@@ -21,7 +22,7 @@ export function ProviderCard(props: {
       const program = Effect.gen(function* () {
         const svc = yield* LLMProviderService;
         yield* svc.setApiKey(props.provider.id, apiKey());
-      }).pipe(Effect.provide(LLMProviderServiceLive));
+      }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(SettingsServiceLive));
       await Effect.runPromise(program);
       setApiKey("");
       setEditing(false);
@@ -36,7 +37,7 @@ export function ProviderCard(props: {
       const program = Effect.gen(function* () {
         const svc = yield* LLMProviderService;
         return yield* svc.hasApiKey(props.provider.id);
-      }).pipe(Effect.provide(LLMProviderServiceLive));
+      }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(SettingsServiceLive));
       const hasKey = await Effect.runPromise(program);
       if (!hasKey) {
         setTestStatus("fail");

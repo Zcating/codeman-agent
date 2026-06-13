@@ -15,6 +15,7 @@ import { Effect, Layer } from "effect";
 import { LLMProviderService, LLMProviderServiceLive } from "./llm_providers";
 import { SettingsService } from "../../lib/tauri";
 import type { Settings, LLMProvider } from "../../lib/types";
+import { mockState } from "../../shared-mock-state";
 
 const mockImpl: {
   resolved: unknown;
@@ -98,6 +99,9 @@ describe("LLMProviderService", () => {
     mockImpl.resolved = undefined;
     mockImpl.calls = [];
     mockImpl.rejected = undefined;
+    mockState.resolved = undefined;
+    mockState.calls = [];
+    mockState.rejected = undefined;
   });
 
   it.effect("list returns all providers", () =>
@@ -156,17 +160,17 @@ describe("LLMProviderService", () => {
 
   it.effect("hasApiKey delegates to mocked invoke (deepseek has key)", () =>
     Effect.gen(function* () {
-      mockImpl.resolved = true;
+      mockState.resolved = true;
       const svc = yield* LLMProviderService;
       const result = yield* svc.hasApiKey("deepseek");
       expect(result).toBe(true);
-      expect(mockImpl.calls).toContain("has_llm_key");
+      expect(mockState.calls).toContain("has_llm_key");
     }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive))
   );
 
   it.effect("hasApiKey delegates to mocked invoke (unknown has no key)", () =>
     Effect.gen(function* () {
-      mockImpl.resolved = false;
+      mockState.resolved = false;
       const svc = yield* LLMProviderService;
       const result = yield* svc.hasApiKey("unknown");
       expect(result).toBe(false);

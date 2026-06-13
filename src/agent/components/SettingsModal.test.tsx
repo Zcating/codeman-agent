@@ -2,12 +2,47 @@
 //!
 //! Mocked: SettingsService Effect service.
 
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
 import { SettingsModal } from "./SettingsModal";
+import { mockState } from "../../shared-mock-state";
+import type { Settings } from "../../lib/types";
+
+const mockSettings: Settings = {
+  llm_providers: [
+    {
+      id: "deepseek",
+      label: "DeepSeek",
+      enabled: true,
+      default_model: "deepseek-chat",
+      base_url: "https://api.deepseek.com",
+      api_key_ref: "llm_providers/deepseek/api_key",
+    },
+  ],
+  default_llm_provider_id: "deepseek",
+  user_language: "en",
+  theme: "dark",
+  start_at_login: false,
+  start_minimized: false,
+  close_behavior: "hide_to_tray",
+  window: {
+    remember_position: true,
+    remember_size: true,
+    default_size: { width: 800, height: 600 },
+    min_size: { width: 600, height: 400 },
+  },
+  system_prompt: { default: "You are a helpful assistant.", user_can_edit: true },
+  hotkeys: { toggle_window: "Ctrl+Shift+Space", new_conversation: "Ctrl+Shift+N", open_settings: "Ctrl+Shift+," },
+  billing_providers: [],
+  conversations: { auto_archive_after_days: 30, max_history: 1000 },
+};
 
 describe("SettingsModal", () => {
+  beforeEach(() => {
+    mockState.resolved = mockSettings;
+  });
+
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -36,7 +71,7 @@ describe("SettingsModal", () => {
     const advancedTab = container.querySelectorAll(".settings-modal__tab")[4]; // "Advanced" tab
     await user.click(advancedTab);
     expect(advancedTab.classList.contains("settings-modal__tab--active")).toBe(true);
-    const clearBtn = container.querySelector("button");
+    const clearBtn = container.querySelector(".settings-modal__body button");
     expect(clearBtn?.textContent).toContain("Clear all history");
   });
 });

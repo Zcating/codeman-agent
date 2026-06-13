@@ -10,7 +10,7 @@
 //!   3. Empty string (or some hardcoded fallback)
 
 import { Effect, Context, Layer } from "effect";
-import { SettingsService, SettingsServiceLive } from "../../lib/tauri";
+import { SettingsService } from "../../lib/tauri";
 import type { AppError, Conversation } from "../../lib/types";
 
 export class SystemPromptService extends Context.Tag("SystemPromptService")<
@@ -23,35 +23,38 @@ export class SystemPromptService extends Context.Tag("SystemPromptService")<
   }
 >() {}
 
-export const SystemPromptServiceLive = Layer.succeed(SystemPromptService, {
-  getDefault: () =>
-    Effect.gen(function* () {
-      const svc = yield* SettingsService;
-      const settings = yield* svc.getSettings();
-      return settings.system_prompt.default;
-    }).pipe(Effect.provide(SettingsServiceLive)),
+export const SystemPromptServiceLive = Layer.effect(
+  SystemPromptService,
+  Effect.gen(function* () {
+    const svc = yield* SettingsService;
 
-  updateDefault: (newDefault) =>
-    Effect.gen(function* () {
-      const svc = yield* SettingsService;
-      const current = yield* svc.getSettings();
-      yield* svc.updateSettings({
-        system_prompt: { ...current.system_prompt, default: newDefault },
-      });
-    }).pipe(Effect.provide(SettingsServiceLive)),
+    return {
+      getDefault: () =>
+        Effect.gen(function* () {
+          const settings = yield* svc.getSettings();
+          return settings.system_prompt.default;
+        }),
 
-  getUserCanEdit: () =>
-    Effect.gen(function* () {
-      const svc = yield* SettingsService;
-      const settings = yield* svc.getSettings();
-      return settings.system_prompt.user_can_edit;
-    }).pipe(Effect.provide(SettingsServiceLive)),
+      updateDefault: (newDefault) =>
+        Effect.gen(function* () {
+          const current = yield* svc.getSettings();
+          yield* svc.updateSettings({
+            system_prompt: { ...current.system_prompt, default: newDefault },
+          });
+        }),
 
-  forConversation: (conversation) =>
-    Effect.gen(function* () {
-      if (conversation.system_prompt) return conversation.system_prompt;
-      const svc = yield* SettingsService;
-      const settings = yield* svc.getSettings();
-      return settings.system_prompt.default;
-    }).pipe(Effect.provide(SettingsServiceLive)),
-});
+      getUserCanEdit: () =>
+        Effect.gen(function* () {
+          const settings = yield* svc.getSettings();
+          return settings.system_prompt.user_can_edit;
+        }),
+
+      forConversation: (conversation) =>
+        Effect.gen(function* () {
+          if (conversation.system_prompt) return conversation.system_prompt;
+          const settings = yield* svc.getSettings();
+          return settings.system_prompt.default;
+        }),
+    };
+  }),
+);
