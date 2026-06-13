@@ -92,6 +92,22 @@ stay aligned.
   `stale_after_seconds`; the legacy "stale badge" semantics is
   preserved for tool results that get cached.
 
+### Styling
+
+- **Utility Class** — Tailwind v4 utility-first CSS class
+  (e.g. `flex h-screen bg-zinc-50`). V1's sole visual layer; every
+  component's appearance is expressed in utility classes. _Avoid_:
+  BEM class, atomic CSS, scoped CSS.
+- **Theme** — the three-state visual mode
+  (`light` / `dark` / `system`) the user picks in Settings; switched
+  via `<html class="dark">` (no `prefers-color-scheme` media query —
+  `system` mode reads it via a Solid effect in `agent/store/theme.ts`).
+  _Avoid_: color scheme, appearance, mode.
+- **Style Token** — semantic names defined in the `@theme` block
+  (e.g. `primary-500`, `zinc-900`) that components reference instead
+  of raw hex. _Avoid_: design token (overloaded with Material / Apple
+  / IBM vocab), CSS variable (implementation detail).
+
 ## Domain shape
 
 ```

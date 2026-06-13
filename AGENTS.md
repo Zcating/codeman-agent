@@ -69,6 +69,7 @@ codeman-agent/
 | 0003 | Effect-TS 逻辑层 | 逻辑层用 Effect-TS；**UI 层不导入 `effect`**；测试用 `@effect/vitest` |
 | 0004 | SQLite FTS5 持久化 | 对话 / 消息存 SQLite；全文搜索走 FTS5 虚表 |
 | 0005 | 托盘形态 + 无热键 | V1 取消全局热键；托盘是用户唯一常驻入口 |
+| 0006 | Tailwind v4 utility-only 样式层 | V1 视觉层用 Tailwind v4 utility；BEM class 禁用；token 在 `@theme`；主题三态走 `<html class="dark">` |
 
 > **新决策**先写 ADR 再动代码。`docs/adr/` 用 `NNNN-kebab-title.md` 命名；格式见 `.agents/skills/grill-with-docs/ADR-FORMAT.md`。
 
