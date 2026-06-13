@@ -24,12 +24,13 @@
 //! - `search_messages` – FTS5 MATCH query
 
 use chrono::{DateTime, TimeZone, Utc};
+use serde::Serialize;
 use sqlx::{Row, SqlitePool};
 use sqlx::sqlite::SqliteRow;
 use uuid::Uuid;
 
 /// A message row as stored in SQLite.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Message {
     pub id: Uuid,
     pub conversation_id: Uuid,

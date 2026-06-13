@@ -3,6 +3,7 @@
 
 mod commands;
 mod db;
+mod events;
 mod hotkeys;
 mod providers;
 mod scheduler;
