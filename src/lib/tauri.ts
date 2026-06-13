@@ -89,8 +89,16 @@ export const MessageServiceLive = Layer.succeed(MessageService, {
    setKey: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
  });
  export const SettingsServiceLive = Layer.succeed(SettingsService, {
-   getSettings: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
-   updateSettings: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
-   clearAllHistory: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
-   getActiveLlmProvider: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+   getSettings: () => invoke<Settings>("get_settings"),
+   updateSettings: (patch) => invoke<Settings>("update_settings", { patch }),
+   clearAllHistory: () => invoke<void>("clear_all_history"),
+   getActiveLlmProvider: () =>
+     Effect.gen(function* () {
+       const settings = yield* invoke<Settings>("get_settings");
+       const id = settings.default_llm_provider_id;
+       if (!id) return yield* Effect.succeed(null);
+       return yield* Effect.succeed(
+         settings.llm_providers.find((p) => p.id === id && p.enabled) ?? null
+       );
+     }),
  });
