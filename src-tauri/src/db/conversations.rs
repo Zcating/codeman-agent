@@ -4,13 +4,14 @@
 //! chrono DateTime<Utc> is used in the Rust API.
 
 use chrono::{DateTime, TimeZone, Utc};
+use serde::Serialize;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
 /// A conversation row matching the D1 schema.
 ///
 /// `id` is stored as a UUID string in SQLite TEXT.
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone, sqlx::FromRow, Serialize)]
 pub struct Conversation {
     pub id: String,
     pub title: String,

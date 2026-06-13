@@ -48,6 +48,7 @@ pub fn run() {
         )
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
+            // V0 / pre-existing
             commands::list_providers,
             commands::get_active_provider,
             commands::set_active_provider,
@@ -63,17 +64,43 @@ pub fn run() {
             commands::show_settings_window,
             commands::hide_widget_window,
             commands::show_widget_window,
+            // T12: conversations
+            commands::list_conversations,
+            commands::get_conversation,
+            commands::create_conversation,
+            commands::archive_conversation,
+            commands::delete_conversation,
+            // T12: messages
+            commands::list_messages,
+            commands::append_message,
+            commands::search_messages,
+            // T13: billing
+            commands::get_provider_snapshot,
+            commands::list_billing_providers,
+            commands::has_billing_key,
+            commands::set_billing_key,
+            // T22: settings + secrets_llm
+            commands::clear_all_history,
+            commands::set_llm_key,
+            commands::has_llm_key,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
+
+            // Initialize DB pool and manage it for IPC commands (T11)
+            let pool = tokio::runtime::Runtime::new()
+                .unwrap()
+                .block_on(db::connect(&handle))?;
+            app.manage(pool);
+
             let state = AppState::new(handle.clone());
 
             // Apply the persisted start-at-login setting.
             tray::apply_autostart(&handle, state.get_settings().start_at_login);
 
-            // Install the tray icon + menu.
-            if let Err(e) = tray::install(&handle) {
-                warn!("tray install failed: {e}");
+            // Build tray icon + menu (T29/T31)
+            if let Err(e) = tray::build_tray(&handle) {
+                warn!("tray build failed: {e}");
             }
 
             // Launch-time: hide widget window if start_minimized
