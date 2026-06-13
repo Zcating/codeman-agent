@@ -50,16 +50,17 @@ describe("SettingsModal", () => {
 
   it("LLM tab is the default", () => {
     const { container } = render(() => <SettingsModal onClose={vi.fn()} />);
-    const llmTab = container.querySelector(".settings-modal__tab--active");
+    const llmTab = container.querySelector("button.bg-primary-500");
     expect(llmTab?.textContent).toBe("LLM");
   });
 
   it("clicking another tab switches content", async () => {
     const user = userEvent.setup();
     const { container } = render(() => <SettingsModal onClose={vi.fn()} />);
-    const appTab = container.querySelectorAll(".settings-modal__tab")[1]; // "App" tab
+    const tabs = container.querySelectorAll("nav button");
+    const appTab = tabs[1]; // "App" tab
     await user.click(appTab);
-    expect(appTab.classList.contains("settings-modal__tab--active")).toBe(true);
+    expect(appTab.classList.contains("bg-primary-500")).toBe(true);
     // App tab content should show start_at_login checkbox
     const checkbox = container.querySelector('input[type="checkbox"]');
     expect(checkbox).toBeTruthy();
@@ -68,10 +69,16 @@ describe("SettingsModal", () => {
   it("shows advanced tab with clear history button", async () => {
     const user = userEvent.setup();
     const { container } = render(() => <SettingsModal onClose={vi.fn()} />);
-    const advancedTab = container.querySelectorAll(".settings-modal__tab")[4]; // "Advanced" tab
+    const tabs = container.querySelectorAll("nav button");
+    const advancedTab = tabs[4]; // "Advanced" tab
     await user.click(advancedTab);
-    expect(advancedTab.classList.contains("settings-modal__tab--active")).toBe(true);
-    const clearBtn = container.querySelector(".settings-modal__body button");
-    expect(clearBtn?.textContent).toContain("Clear all history");
+    expect(advancedTab.classList.contains("bg-primary-500")).toBe(true);
+    // Look for the clear history button within the advanced section (Privacy h3)
+    const privacyHeading = container.querySelector("h3");
+    expect(privacyHeading?.textContent).toBe("Privacy");
+    // The Clear all history button is in the body section, find by text content
+    const allButtons = container.querySelectorAll("button");
+    const clearBtn = Array.from(allButtons).find((btn) => btn.textContent?.includes("Clear all history"));
+    expect(clearBtn).toBeTruthy();
   });
 });
