@@ -46,7 +46,7 @@ export function ToolCallCard(props: {
           {props.toolCall.id}
         </code>
       </div>
-      <details class="tool-card__args" open={status() === "error"}>
+      <details class="text-sm border-t border-zinc-200 dark:border-zinc-700 pt-2 mt-2" open={status() === "error"}>
         <summary class="cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 font-medium select-none py-1">
           Arguments
         </summary>
@@ -55,7 +55,7 @@ export function ToolCallCard(props: {
         </pre>
       </details>
       <Show when={props.result}>
-        <details class="tool-card__result" open>
+        <details class="text-sm border-t border-zinc-200 dark:border-zinc-700 pt-2 mt-2" open>
           <summary class="cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 font-medium select-none py-1">
             Result
           </summary>

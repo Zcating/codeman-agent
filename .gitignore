@@ -44,3 +44,4 @@ coverage/
 .opencode/
 .omo/
 .agents/
+vite.config.ts.timestamp-*.mjs

@@ -66,10 +66,11 @@ export function Sidebar() {
         <For each={filtered()} fallback={<li class="p-3 text-sm text-zinc-500 text-center italic">No conversations</li>}>
           {(c) => (
             <li
-              classList={{
-                "p-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-700 cursor-pointer transition-colors flex flex-col": true,
-                "bg-primary-500 text-white hover:bg-primary-600": c.id === activeId$(),
-              }}
+              class={`p-2 rounded-md cursor-pointer transition-colors flex flex-col ${
+                c.id === activeId$()
+                  ? "bg-primary-500 text-white hover:bg-primary-600"
+                  : "hover:bg-zinc-100 dark:hover:bg-zinc-700"
+              }`}
               onClick={() => selectConversation(c.id)}
               onContextMenu={(e) => {
                 e.preventDefault();

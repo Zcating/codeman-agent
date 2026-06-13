@@ -69,7 +69,8 @@ describe("ChatView", () => {
 
   it("renders message list from messages$", () => {
     const { container } = render(() => <ChatView />);
-    const bubbles = container.querySelectorAll(".bubble");
+    // MessageBubble outer wrapper has class `mb-3 flex w-full` (Tailwind utilities)
+    const bubbles = container.querySelectorAll("div.mb-3");
     expect(bubbles.length).toBe(2);
   });
 
