@@ -105,3 +105,23 @@ export function finalizeToolResult(
 export function clearMessages(): void {
   setMessages([]);
 }
+
+// Insert a streaming assistant message stub (local-only, no IPC).
+export function appendStreamingAssistantMessage(
+  messageId: string,
+  conversationId: string,
+): void {
+  const stub: Message = {
+    id: messageId,
+    conversation_id: conversationId,
+    role: "assistant",
+    content: "",
+    tool_calls: null,
+    tool_results: null,
+    model: null,
+    input_tokens: null,
+    output_tokens: null,
+    created_at: Date.now(),
+  };
+  setMessages([...messages(), stub]);
+}
