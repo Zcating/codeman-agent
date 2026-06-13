@@ -1,301 +1,160 @@
-# codeman-agent — Agent 知识库
+# codeman-agent — 项目知识库
+
+> **AI Agent 协作入口**。读 `CONTEXT.md` 拿词汇表，读 ADR 拿决策，读子目录 `AGENTS.md` 拿硬性规则。
 
 **生成时间:** 2026-06-13
-**技术栈:** Tauri 2 (Rust) · Solid.js · TypeScript · Vite · pnpm 11 ·
-Effect-TS · pi-mono · SQLite (FTS5) · vitest
-**目标平台:** 仅 Windows (V1)。跨平台 Tauri 移植可行,但不在范围内。
+**Commit:** `8fe8db7`
+**分支:** `master`
 
-## 项目定位
+## 项目一句话
 
-一个常驻系统托盘的桌面 AI agent(tray icon 像素风,无边框),点击
-tray 唤起主窗口(800×600 / 600×400),通用 LLM 聊天 + 计费 tools
-(DeepSeek 余额 / MiniMax 套餐配额)。V1 是**鼠标驱动**——零热键;
-`tauri-plugin-global-shortcut` 留在依赖里给 V2 用。
+Windows 桌面 AI Agent，常驻系统托盘；主窗口是 LLM 对话 (`ChatView`)，设置窗口走 `#/settings` 路由，**V1 内置 2 个 billing 工具**（DeepSeek 余额、MiniMax 套餐余量）。
 
-> 项目词汇见 `CONTEXT.md`(权威词汇表),技术选型决策见
-> `docs/adr/0001..0005`。本文件是**操作层**——目录地图、命令、
-> 项目专属规则,不重复上述文档。
+## 核心栈
+
+| 层 | 选型 | 版本 |
+|---|---|---|
+| 桌面壳 | Tauri 2 (Rust) | `2.x` |
+| UI | Solid.js + TypeScript | `solid-js ^1.9.3` / `tsc ~5.6.2` |
+| 构建 | Vite + vite-plugin-solid | `^6.0.3` |
+| 逻辑层 (TS) | **Effect-TS** + `@effect/platform-browser` | `effect ^3.0.0` |
+| Agent 运行时 | **pi-mono** (`@mariozechner/pi-ai` + `pi-agent`) | `latest` |
+| 持久化 | SQLite + sqlx 0.8 + **FTS5** 全文搜索 | `sqlx 0.8` |
+| 密钥 | Windows Credential Manager via `keyring` crate | `keyring 3` (windows-native) |
+| 包管理 | pnpm | `11.5.3` |
+
+**包管理器强制用 pnpm**（`pnpm-lock.yaml` 存在）。不要混用 npm / yarn。
 
 ## 目录布局
 
 ```
-.
-├── src/                       # Solid.js 前端(详见 src/AGENTS.md)
-│   └── agent/                 # pi-mono 集成层
-│       ├── runtime.ts         # AgentRuntime 单例(包 pi-agent)
-│       ├── tools/             # tool 定义(@tool 调 invoke)
-│       │   └── billing.ts     # get_balance / get_plan_quota
-│       ├── settings/          # LLM provider / system prompt 管理
-│       ├── store/             # Solid store(SQlite-backed,经 IPC)
-│       │   ├── conversations.ts
-│       │   ├── messages.ts
-│       │   └── search.ts
-│       └── components/        # UI 组件(Solid)
-│           ├── Sidebar.tsx
-│           ├── ChatView.tsx
-│           ├── MessageBubble.tsx
-│           ├── ToolCallCard.tsx
-│           ├── SettingsModal.tsx
-│           └── ProviderCard.tsx
-│   ├── test-setup.ts          # vitest 启动文件(@testing-library/jest-dom)
-│   ├── lib/
-│   │   ├── tauri.ts           # IPC 包装(Effect 化)
-│   │   └── types.ts           # 镜像 src-tauri/src/types.rs
-│   ├── App.tsx
-│   └── index.tsx
-├── src-tauri/                 # Rust 后端(详见 src-tauri/AGENTS.md)
+codeman-agent/
+├── CONTEXT.md                 # 词汇表（必读）+ 域模型 + 设置 schema
+├── README.md                  # Tauri+Solid 模板说明（不维护）
+├── docs/adr/                  # 5 个 ADR（架构决策的权威来源）
+│
+├── src/                       # 前端（Solid.js + TS）
+│   ├── index.tsx              # Solid 渲染入口（挂载 <ChatView>）
+│   ├── lib/                   # 唯一允许 import @tauri-apps/api 的层
+│   └── agent/                 # Effect-TS 逻辑层 + UI 组件（详见 src/agent/AGENTS.md）
+│
+├── src-tauri/                 # 后端（Rust + Tauri 2，详见 src-tauri/AGENTS.md）
+│   ├── Cargo.toml             # edition 2021, MSRV 1.77
+│   ├── tauri.conf.json        # 两窗口：widget (无边框) + settings
+│   ├── capabilities/default.json  # 共享 ACL
 │   └── src/
-│       ├── providers/         # 计费 adapter(沿用)
-│       ├── secrets.rs         # 计费 API key(沿用)
-│       ├── secrets_llm.rs     # LLM API key 路径(走 Tauri store)
-│       ├── settings.rs        # 25+ 字段 Settings
-│       ├── scheduler.rs       # 计费轮询(沿用)
-│       ├── db/                # SQLite
-│       │   ├── mod.rs
-│       │   ├── schema.sql
-│       │   ├── migrations/    # 编号 migration 文件
-│       │   ├── conversations.rs
-│       │   └── messages.rs
-│       ├── commands.rs        # 沿用 + ~14 个新命令
-│       ├── events.rs          # 沿用 + agent 事件
-│       └── lib.rs
-├── docs/
-│   └── adr/                   # 架构决策记录(0001..0005)
-├── scripts/                   # Node 侧开发脚本(kill-port)
-├── public/                    # 原样打包的静态资源
-├── index.html                 # Vite 入口
-├── vite.config.ts             # 内联 vitest 配置(test.environment=jsdom)
-├── vitest.config.ts           # 不存在(vitest 配置全部内联到 vite.config.ts)
-├── package.json
-├── tsconfig.json
-├── pnpm-workspace.yaml        # 仍为占位文件,不要往里加包
-└── CONTEXT.md                 # 词汇表(权威)
+│       ├── lib.rs             # crate 根：插件注册、IPC handler 表、setup
+│       ├── commands.rs        # 27 个 #[tauri::command]
+│       ├── state.rs           # AppState（parking_lot::RwLock + Arc）
+│       ├── scheduler.rs       # 唯一异步轮询循环
+│       ├── providers/         # 计费厂商适配器（详见子目录 AGENTS.md）
+│       └── db/                # SQLite + FTS5（详见子目录 AGENTS.md）
+│
+├── scripts/                   # 1 个 dev helper: kill-port.mjs
+├── __mocks__/@tauri-apps/api/ # vitest 的 Tauri IPC mock
+├── public/                    # 静态资源（含 3 个托盘 .ico）
+├── dist/                      # Vite 构建产物（gitignore）
+├── docs/adr/                  # 5 个架构决策
+├── .agents/                   # 本地 agent skills（grill-with-docs）
+├── .opencode/                 # opencode 配置
+└── .omo/                      # 工作区：plans, evidence, notepads
 ```
 
-## 常用命令
+## ADR 索引（架构决策权威）
+
+| 编号 | 标题 | 决策要点 |
+|---|---|---|
+| 0001 | Tauri 2 + Solid.js | 选定 Tauri 2 + Solid；Windows-only；MSI/NSIS 打包 |
+| 0002 | pi-mono agent 运行时 | LLM 循环用 `@mariozechner/pi-agent`（V8 之前的旧包名 `@mariozechner/pi-mono` 已被替换） |
+| 0003 | Effect-TS 逻辑层 | 逻辑层用 Effect-TS；**UI 层不导入 `effect`**；测试用 `@effect/vitest` |
+| 0004 | SQLite FTS5 持久化 | 对话 / 消息存 SQLite；全文搜索走 FTS5 虚表 |
+| 0005 | 托盘形态 + 无热键 | V1 取消全局热键；托盘是用户唯一常驻入口 |
+
+> **新决策**先写 ADR 再动代码。`docs/adr/` 用 `NNNN-kebab-title.md` 命名；格式见 `.agents/skills/grill-with-docs/ADR-FORMAT.md`。
+
+## 关键概念（与 CONTEXT.md 同步）
+
+- **Agent** = 产品本身。**避免**：widget / app / client。
+- **Conversation** = 用户拥有的持久聊天线程（线性，无分支）。
+- **Message** = 一轮 `user` / `assistant` / `tool` / `system`。
+- **Tool** = LLM 可调用的类型化函数（V1: `get_balance`, `get_plan_quota`）。
+- **Snapshot** = 计费状态的时点视图：`Balance { amount, currency, auto_recharge }` | `PlanQuota { remaining, total, expires_at?, daily_avg? }`。
+- **LLM Provider** ≠ **Billing Provider**。前者是 LLM 服务（OpenAI / Anthropic / 自建 OpenAI 兼容），后者是计费源（DeepSeek / MiniMax）。**不要混用**。
+- **Runtime** = Effect-TS 包装 pi-mono agent loop（`src/agent/runtime.ts`）。
+- **Bridge** = Effect → Solid signal 翻译器（`src/agent/store/*.ts`）。
+- **Secret** = Rust 的 `Secret<String>` newtype；Debug/Display 都打印 `***`，**`expose()` 只在 `Provider::fetch` 内部调用**。
+- **Stale** = Snapshot 超过 `stale_after_seconds`；旧"stale badge"语义在 tool result 缓存中保留。
+
+完整词汇表 + Settings 25 字段 schema → **`CONTEXT.md`**。
+
+## 查阅指南
+
+| 我要… | 看哪里 |
+|---|---|
+| 理解领域模型 | `CONTEXT.md`（先读这个） |
+| 知道为什么用 X 不用 Y | `docs/adr/000N-*.md` |
+| 新增 / 修改 Tauri 命令 | `src-tauri/src/commands.rs` + `src-tauri/src/lib.rs` invoke_handler 表 + `src/lib/tauri.ts` TS 镜像 |
+| 新增 / 修改设置项 | `src-tauri/src/settings.rs` 的 `Settings` + `sanitized()` + `Default`；TS 镜像在 `src/lib/types.ts` |
+| 看 IPC 桥接 | `src/lib/tauri.ts`（Service Tag + Live Layer） + `src/agent/store/*.ts`（桥接层） |
+| 看 Agent 循环 | `src/agent/runtime.ts`（Effect Stream 包装 pi-agent） |
+| 看前端组件 | `src/agent/components/*.tsx`（5 个 + 各自的 `.test.tsx`） |
+| 看厂商适配器 | `src-tauri/src/providers/<id>.rs`（详见子目录 AGENTS.md） |
+| 看持久化 / 搜索 | `src-tauri/src/db/`（详见子目录 AGENTS.md） |
+| 写测试 | Frontend: `src/**/*.test.{ts,tsx}`，用 vitest + @effect/vitest + jsdom；Backend: `src-tauri/src/**/*.rs` 内的 `#[cfg(test)]`，wiremock 走 HTTP |
+
+## 反模式（项目级，禁止）
+
+- **从 `src-tauri` 之外读 Tauri store 或 keyring**。Rust 是 IPC 权威；TS 永远走 `src/lib/tauri.ts` 的 `invoke`。
+- **在 `src/agent/components/` 里 `import { Effect }` 或 `import { invoke }`**。UI 是 Solid 信号的纯消费者，逻辑层封装在 `src/agent/store/`。
+- **在 `src/lib/tauri.ts` 之外调 `invoke(...)`**。契约会漂。
+- **直接读 `tauri-plugin-store`**。始终 `await getSettings()`，让 store mirror 到 Solid signal。
+- **用 `as any` 绕过 `noUnusedLocals` / `strictNullChecks`**。去修类型。
+- **React 的 `useState`**。Solid 等价物是 `createSignal` 和 store。`noUnusedLocals` 抓不到，但读者会。
+- **Rust 端 `eprintln!` / `println!`**。统一 `log::{info, warn, error}`（写到 `%LocalAppData%\codeman-agent\logs\`）。
+- **Rust 端 `std::sync::Mutex`**。用 `parking_lot::RwLock`（`state.rs` 项目约定）。
+- **绕过 `Settings::sanitized()` 写设置**。会让 0 秒轮询间隔打满调度器。
+- **第二个轮询循环**。`scheduler.rs` 是唯一的；`wakeup: Notify` 通道集中唤醒。
+- **直接 return `reqwest::Error`**。它会格式化 URL 泄漏端点形状。用 `ProviderError::Upstream(format!("{status}: {body}"))`，只带 body。
+- **在 `providers/minimax.rs::PLACEHOLDER_ENDPOINT` 之外硬编码占位 URL**。契约：默认 URL + 可覆盖 + 未升级前返回结构化错误。
+- **在托盘 Quit 处理器之外调 `app.exit(0)`**。`prevent_close` 窗口处理器依赖 App 存活。
+- **在 MiniMax 占位 URL 升级前**接受 `MiniMax 余额` / `MiniMax 用量` 在生产对话里被调用——runtime 端工具定义允许，但 `Provider::fetch` 会返回 `ProviderError::EndpointNotConfigured`，**对话里出现这个错误属于预期，不是 bug**。
+
+## 命令
 
 ```bash
-# 仅前端
-pnpm dev          # vite dev,端口 1420
-pnpm typecheck    # tsc --noEmit
-pnpm build        # vite build → dist/
-pnpm test         # vitest --run(单次)
-pnpm test:watch   # vitest(开发时)
+# 安装
+pnpm install
 
-# 整包
-pnpm tauri dev    # 构建前端 + 运行 Rust 壳
-pnpm tauri build  # 产出 MSI/NSIS 安装包
+# 启动 dev（Vite HMR + Tauri 自动重启）
+pnpm tauri:dev         # 自动调 scripts/kill-port.mjs 1420 1421
+
+# 构建
+pnpm build             # 前端产物到 dist/
+pnpm tauri build       # 出 MSI + NSIS 安装包
+
+# 测试
+pnpm test              # 前端 vitest（jsdom）
+cd src-tauri && cargo test  # 后端（带 wiremock 集成测试）
+
+# 类型检查
+pnpm typecheck         # tsc --noEmit
 ```
 
-`predev` / `pretauri` 跑 `scripts/kill-port.mjs 1420 1421`,端口冲突
-是硬错误。`vite.config.ts` 的 `test` 块内联 vitest 配置,jsdom 环境,
-启动文件 `src/test-setup.ts` 引入 `@testing-library/jest-dom`。
+## 子目录知识库
 
-## IPC 契约(总览)
+| 路径 | 状态 | 重点 |
+|---|---|---|
+| `./src/AGENTS.md` | **重写** | 前端硬规则、UI/桥接边界、文件命名 |
+| `./src/agent/AGENTS.md` | **新建** | Effect-TS 逻辑层、Runtime、Tools、Settings 子层 |
+| `./src-tauri/AGENTS.md` | **重写** | Rust 硬规则、AppState、调度器、能力清单 |
+| `./src-tauri/src/db/AGENTS.md` | **新建** | SQLite schema、迁移、FTS5 搜索实现 |
+| `./src-tauri/src/providers/AGENTS.md` | **更新** | Provider trait 契约、新增厂商流程、测试模式 |
 
-- 所有命令定义在 `src-tauri/src/commands.rs`,经 `src/lib/tauri.ts`
-  包装为 Effect-TS 服务。**新增命令必须同时改这两处。**
-- 向前端推送的事件:
-  - 既有(沿用):`snapshot-updated` → `SnapshotEnvelope`,
-    `refresh-failed` → `{ provider, error }`,
-    `low-threshold-breached` → `{ provider, snapshot }`
-  - 新增(agent):`agent-state-changed` → `{ state: "idle" |
-    "thinking" | "error", error? }`、
-    `message-appended` → `{ conversation_id, message }`、
-    `tool-call-started` → `{ message_id, tool_call }`、
-    `tool-call-finished` → `{ message_id, tool_call_id,
-    result, error? }`
-- 线上字段一律 **snake_case**(Rust serde 决定),TS 里也用
-  snake_case。`src/lib/types.ts` 是 `src-tauri/src/types.rs` 的镜像,
-  任何漂移都视作 bug。
+## 注意事项（踩过的坑）
 
-## 硬性规则(项目专属)
-
-### Secrets
-
-- **两套 secrets,两套 namespace,不混。**
-  - **Billing API key**:`codeman-agent/<provider>/api_key` 存
-    Windows Credential Manager(走 `keyring` crate),Rust 私有,
-    前端只接 `has_key: boolean`。
-  - **LLM API key**:`llm_providers/<id>/api_key` 存 Tauri store,
-    webview 可读,**不进 keyring**。威胁模型:LLM key 只能烧
-    token,不能转账,降一级防护合理。
-- **`Secret<String>` 对日志不可见。** Rust 侧 `Debug` / `Display`
-  打印 `Secret(***)`。TS 侧 Effect service 内部亦不得 `console.log`
-  明文 key,只允许 `console.log({ api_key_ref: '...' })`。**只有
-  adapter 层可以调用 `.expose()` / 拿明文。**
-
-### Effect-TS 边界(逻辑层用,UI 消费)
-
-- **逻辑层**:`src/agent/runtime.ts`、`src/agent/tools/*.ts`、
-  `src/agent/store/*.ts`、`src/lib/tauri.ts` **必须**用
-  Effect-TS。`Effect<A, E, R>` 包同步操作,`Stream<A, E, R>`
-  包流式(token 输出、tool 进度)。Effect service 通过 layers
-  注入依赖。
-- **桥接层**:`src/agent/store/*.ts` 是 Effect → Solid 的桥。
-  用 `Effect.runPromise` / `Stream.runForEach` 订阅,把结果写
-  进 Solid signal。**桥接层是 UI 与 Effect 的唯一接触面。**
-- **UI 层**:`src/agent/components/`、`src/agent/settings/` 的
-  渲染部分 **不得** `import 'effect'`,只读 Solid signal /
-  store / `createMemo`。任何在组件里 `import { Effect, Stream
-  ... }` 的 PR 必拒。
-- **平台包**:只用 `@effect/platform-browser`。**禁止**引入
-  `@effect/platform-node`——webview 跑不了 Node,引入即崩溃。
-
-### 桥接层契约
-
-- 桥接层输出的 Solid signal 必须是**纯数据**(plain values 或
-  普通对象),不允许是 `Effect` / `Stream` 实例。错误以
-  `Error` 或判别联合(写明 type)落地,不暴露 Effect 的 `_tag`。
-- Effect service 的 typed error 在桥接层被翻译;UI 看到的
-  `error` 字段是 `string`(用户可读)或 `{ kind: 'X', ... }`
-  判别联合。
-
-### Settings
-
-- **V1 字段共 9 大类 / 25+ 字段**,完整 schema 见
-  `CONTEXT.md` 的 "Settings (V1 shape)" 节。
-- **写入前必须 sanitized**。`Settings::sanitized()` 钳值:`refresh_interval_secs`
-  ≥ 5、`low_quota_threshold_pct` ∈ [0, 100]、
-  `low_balance_threshold` ≥ 0、`auto_archive_after_days` ≥ 1、
-  `max_history` ≥ 10。所有接受用户输入的写路径(`commands::update_settings`)
-  必须先调它。
-- **API key 不进 `settings.json`**。LLM key 走 Tauri store,billing
-  key 走 keyring,settings 里只存 `api_key_ref` 路径。
-- **Settings 通过 `tauri-plugin-store` 持久化**(沿用 V0)。
-- **V1 不迁移 V0 `settings.json`**。首次启动视为新装,旧
-  JSON 被忽略(V0 → V1 是产品重定义,不是升级)。
-
-### Hotkeys
-
-- **V1 零热键**。`tauri-plugin-global-shortcut` 留在
-  `Cargo.toml` / `package.json` 里,代码不调用。**不要清理
-  这个"未使用"的依赖**——V2 要用。
-- **V1 Settings 里 `hotkeys` 字段保留**,标 `deprecated`,
-  UI 上展示为只读,V1 不可改。
-- V2 计划加 3 个全局热键(toggle_window / new_conversation /
-  open_settings)+ 恢复应用内固定热键(Enter / Shift+Enter /
-  Ctrl+F)。
-
-### SQLite
-
-- **schema 走 `src-tauri/src/db/schema.sql` + 编号 migration
-  文件**,启动时跑未执行的 migration。**不要直接改
-  `schema.sql`**——它是 V1 初始快照,后续修改一律走 migration。
-- **ON DELETE CASCADE**:`messages.conversation_id` 删 conversation
-  自动级联删 messages,不要在 TS 端手工清。
-- **软删**:UI 触发"删除对话"只 set `archived_at`,**不**真
-  删。后台每日任务扫 `archived_at < now - auto_archive_after_days`,
-  真删。
-- **历史容量**:`max_history` (默认 1000) 限制非归档对话
-  数;超过时最老的非归档对话自动归档;归档数超过 1500
-  硬删最老的归档。
-- **`messages_fts` 是 FTS5 虚拟表**,`content='messages'` 镜像
-  自 `messages.content`。**修改 `messages` 必须同步更新
-  FTS**(用 trigger 或在 Rust 写事务里同时操作两张表)。
-- **旧 V0 `settings.json` 不迁移到 SQLite**——V0 没有任何
-  数据需要保留。
-
-### 测试(vitest)
-
-- **TS 用 vitest**,配置**内联**到 `vite.config.ts` 的 `test`
-  块,**不**另开 `vitest.config.ts`。环境 `jsdom`,globals `true`,
-  `setupFiles: ['./src/test-setup.ts']`。
-- 测试文件位置:`<source>.test.ts` **同目录**,跟 Rust inline
-  test 风格一致。例:`src/agent/tools/billing.ts` →
-  `src/agent/tools/billing.test.ts`。
-- **测试范围**(V1):
-  - ✅ tool 定义(Zod schema + handler 逻辑)
-  - ✅ Effect service(layer 注入 + 错误路径,`@effect/vitest`)
-  - ✅ IPC bridge(`invoke()` → Effect typed error 翻译)
-  - ✅ SQLite CRUD + search(Rust 端用 `#[cfg(test)]`,
-    TS 端用 mock layer)
-  - ✅ settings sanitized(钳值)
-  - ✅ utils / pure fn
-  - ✅ **Solid 组件**(`@solidjs/testing-library` + jsdom)——
-    Sidebar / ChatView / MessageBubble / ToolCallCard /
-    SettingsModal / ProviderCard
-  - ❌ pi-mono 自身(不测第三方)
-  - ❌ 端到端流式输出(留 V2)
-- **不引 `@solidjs/router` 之外的额外测试库**;@testing-library
-  套件保持精简(user-event + jest-dom + solidjs)。
-- **Rust 测试**(沿用 V0):`#[cfg(test)] mod tests` 内联,
-  `scheduler.rs` 用 `FakeProvider`,`*Adapter` 用 `wiremock`。
-
-### IPC 错误传播
-
-- Rust 命令返回 `Result<T, AppError>`,`AppError` 实现
-  `serde::Serialize`,错误 `kind` 是字符串判别(`"NotFound"`
-  / `"Unauthorized"` / `"Network"` / `"InvalidConfig"` 等)。
-- TS 端 `lib/tauri.ts` 把 `Result` 翻成
-  `Effect.tryPromise({ catch: e => new AppError(e) })`,
-  让 typed error 一路传到 Effect service。
-
-## 约定
-
-- Rust 文件以 `//!` 模块文档注释开头,一句话点明职责。
-- TypeScript 文件同样以 `//!` 开头。Effect service 文件头
-  必须写明:暴露的 `Effect<A, E, R>` 签名 / `Stream<A, E, R>`
-  签名,以及它依赖的 layer。
-- 新增命令:**同时**改 `src-tauri/src/commands.rs` 和
-  `src/lib/tauri.ts`。
-- 新增 LLM 工具:**同时**改 `src/agent/tools/*.ts`(Zod schema
-  + handler)和 `src-tauri/src/commands.rs`(IPC 命令) +
-  `src-tauri/src/providers/*`(adapter 已有就复用)。
-- 前端**不直接 import Rust 类型**——只引用 `src/lib/types.ts`
-  里的 TS 形状。TS 文件就是线缆契约。
-- 桥接层文件(`src/agent/store/*.ts`)的**唯一**职责是
-  Effect → Solid 翻译,不持有业务逻辑。业务逻辑在 Effect
-  service 里。
-
-## 反模式(明确禁止)
-
-- 用 `format!("{secret:?}")` 之类把 `secrets::*` 的值写进日志。
-- 用 `String` 表示金额/数量值。货币用 `rust_decimal::Decimal`,
-  配额计数用 `u64`,百分比这种**派生值**才用 `f64`。
-- 用 `setState` 满天飞。共享状态必须走 `src/agent/store/*.ts`
-  的 Solid store,组件用 `createMemo` / signal getter 读。
-- 前端代码直接调 `adapter.fetch`。必须经过 Tauri 命令
-  (`test_provider` / `force_refresh` / 新的 conversation
-  / message 命令)。
-- 给 `Snapshot` 加字段而不同时更新 Rust 枚举**和** TS
-  联合变体。`kind` 上的判别联合是前端唯一依赖的结构化类型。
-- 跳过 `Provider` trait(`src-tauri/src/providers/mod.rs`)
-  直接写新厂商。
-- **在 Solid 组件 / UI 文件里 `import 'effect'`**。任何 PR
-  触发这条必拒(见"Effect-TS 边界"硬性规则)。
-- **在 Effect service 里直接读写 Solid signal**。signal 只
-  在桥接层更新。
-- **把 `Result<T, E>` 的 `E` 设计成 `string`**。Rust 端必须
-  是 typed `AppError`,TS 端必须翻译成 typed error,UI 层
-  看到的是判别联合或 Error 子类。
-- **在 TS 端直接 `new sql.Database(...)` / 直接打开 SQLite**。
-  所有 DB 操作走 Rust IPC。
-- **修改 `src-tauri/src/db/schema.sql` 而不写 migration**。
-- **跳过 `db/mod.rs` 跑 migration 的启动 hook** 而手工建表。
-- **"清理" `tauri-plugin-global-shortcut` 这个"未使用"依赖**。
-  V2 要用。
-
-## 已知坑
-
-- **MiniMax 端点待定。** Adapter 带占位 URL,返回
-  `ProviderError::EndpointNotConfigured` 直到 `CONTEXT.md` 文
-  档化了经核验的 URL 并翻转为默认。
-- `pnpm-workspace.yaml` 当前是占位文件,**不是**真正的
-  workspace。**不要往里加包。**
-- `tauri.conf.json` 里 `CSP` 设为 `null`——开发期便利,不
-  是基线。新建窗口不要照抄。
-- `Cargo.toml` 把 `rust_decimal` / `chrono` / `reqwest` /
-  `sqlx` 锁在带特定 features 的版本。升版时审视 features。
-- **V0 的 `settings.json` 不迁移到 V1**——V0 → V1 是产品
-  重定义,不是升级。V1 首次启动视为新装。
-- **pi-mono 在 webview 里跑**,无 Node API。pi-mono 内部任
-  何 `import 'fs'` / `import 'node:path'` 走不通,需要
-  Tauri IPC 替身。检查 pi-mono 用法时确认无 Node-only
-  依赖。
-- **Effect Stream 在 vitest 里需要 `@effect/vitest` 提供的
-  `TestClock` / mock layers**,不要用 `vi.useFakeTimers()`
-  试图套 Effect——两者不兼容。
-- **`@testing-library/jest-dom` 的 matcher 在 Solid 测试
-  里仍然可用**(`toBeInTheDocument` 等),但要确认 setup
-  文件在 `vite.config.ts` 的 `setupFiles` 里被引用。
+- `src/index.tsx` 6 行，**没有** `app.tsx`。早期版本有过 hash 路由的 `app.tsx`，已废弃；当前 `ChatView` 自己处理 `#/settings`。
+- 现有 `src/AGENTS.md` 描述的是**旧 widget 时代结构**（`src/components/widget.tsx`、`src/stores/snapshot.ts`、`lib/format.ts`），全部不存在或已迁到 `src/agent/`。**不要照搬**。
+- `Cargo.lock` 由 pnpm 之外的 `cargo` 生成；改完 Rust 依赖后**手动**跑 `cargo build` 同步。
+- 现有 ADR-0001 仍提"280x100 浮窗"，但 `tauri.conf.json` 实际是 `800×600` widget 窗口装 `ChatView`、`540×640` 装 Settings。**新决策**走 ADR-0005 + `tauri.conf.json`。
+- pi-mono 已弃用，包名迁移到 `@mariozechner/pi-ai` + `@mariozechner/pi-agent`（`src/agent/runtime.ts` 注释里有版本错位说明）。
+- 运行时日志：`%LocalAppData%\codeman-agent\logs\codeman-agent.log`（`tauri-plugin-log`），要 `debug` 级走 `RUST_LOG=debug`。

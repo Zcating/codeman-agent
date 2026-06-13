@@ -2,13 +2,15 @@
 
 每个计费源作为独立 `Provider` 实现存在。trait 是 async 的,这样调度器能把 `Arc<dyn Provider>` 放进 registry,切换厂商时不必重建 HTTP 客户端。
 
+> **V1 任务上下文**：T13（billing 工具）让前端可经 IPC 调本目录的 `fetch`——前端 `BillingService.getSnapshot(providerId)` → `commands::get_provider_snapshot` → `state::fetch_provider` → **当前激活** provider 的 `fetch`。`registry()` 里的所有 provider 都暴露为可查询目标（**非激活**厂商在 IPC 路径里也允许调用，但只返回缓存）。
+
 ## 目录布局
 
 ```
 providers/
 ├── mod.rs         # Provider trait + Adapter 类型别名 + registry()
 ├── deepseek.rs    # Balance 厂商(优先选 CNY 的聚合器)
-└── minimax.rs     # PlanQuota 厂商(占位 URL,端点 TBD)
+└── minimax.rs     # PlanQuota 厂商(占位 URL,端点 TBD——升级前 fetch 返回 EndpointNotConfigured)
 ```
 
 ## Trait 契约
@@ -35,7 +37,9 @@ pub trait Provider: Send + Sync {
 - JSON / 解析失败映射成 `ProviderError::InvalidResponse(String)`。
 - 永远不要对 `secret` 本身或任何从它派生的字符串用 `log::info!` / `log::debug!`。`Secret` 类型的 `Debug` 已经替换过了。
 
-`fetch` 只被调度器对**当前激活**的厂商调用。非激活厂商的 `fetch` 绝不能被调用——见 `scheduler.rs` 里的 `only_active_provider_is_polled` 测试。
+`fetch` 在两条路径上被调用：
+1. **调度器轮询**（`scheduler.rs`）——只对**当前激活**的厂商调。非激活厂商保持冷态，见 `only_active_provider_is_polled` 测试。
+2. **T13 IPC 显式查询**（`commands::get_provider_snapshot`）——前端 `BillingService.getSnapshot(providerId)` 直接调任意 provider 的 `fetch`，不依赖激活状态；走的是单次 fetch，不入轮询。
 
 ## 新增厂商流程
 
@@ -57,11 +61,11 @@ pub trait Provider: Send + Sync {
 
 ## Snapshot 变体
 
-`Snapshot` 是带 tag 的 enum(`#[serde(tag = "kind", rename_all = "snake_case")]`)。每个变体用各自的模板渲染(见 `src/components/`),**不要**合并——Balance 和 PlanQuota 信息密度不同。加第三个变体的步骤:
+`Snapshot` 是带 tag 的 enum(`#[serde(tag = "kind", rename_all = "snake_case")]`)。每个变体用各自的模板渲染(见 `src/agent/components/`),**不要**合并——Balance 和 PlanQuota 信息密度不同。加第三个变体的步骤:
 
-- 新增结构字段 → 同步 TS 联合变体(`src/lib/types.ts`)。
-- 新增视图组件(如 `CustomView.tsx`)→ 在 `src/lib/format.ts` 加一个 `customOf` 助手,跟 `balanceOf` / `planQuotaOf` 同款。
-- 在 `src/components/widget.tsx` 加 `Show` 分支。
+- 新增结构字段 → 同步 TS 联合变体(`src/lib/types.ts` 的 `Snapshot` 联合)。
+- 新增视图组件(如 `<CustomCard>.tsx`)→ 放 `src/agent/components/`，被 `ProviderCard` 或 `ToolCallCard` 复用。
+- 在 `src/agent/components/ProviderCard.tsx` 加 `Show` 分支（按 `kind` 判别）。
 
 ## 本目录硬性规则
 
@@ -69,3 +73,4 @@ pub trait Provider: Send + Sync {
 - 适配器的 `Default` impl 必须廉价:不允许 I/O,不允许构造 reqwest `Client`。
 - 给 `state.rs` 里的 `ProviderDescriptor` 加字段**必须**同步 TS 形状——前端靠它渲染厂商切换器。
 - `registry()` 顺序属于公开契约(决定循环方向)。重排 = UI 变更。如果要改,在函数的 doc 注释里说清楚。
+- **新增/删除 provider 必动 `lib.rs::invoke_handler!`**（T13 命令 `list_billing_providers` / `get_provider_snapshot` 间接依赖 registry）和 `src/lib/tauri.ts` 的 `BillingService` 定义。**两边同步提交**。
