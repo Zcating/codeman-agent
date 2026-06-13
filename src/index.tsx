@@ -1,5 +1,6 @@
 /* @refresh reload */
 import { render } from "solid-js/web";
-import App from "./app";
+import { ChatView } from "./agent/components/ChatView";
 
-render(() => <App />, document.getElementById("root") as HTMLElement);
+const root = document.getElementById("root");
+if (root) render(() => <ChatView />, root);

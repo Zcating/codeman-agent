@@ -1,8 +1,8 @@
 //! Effect → Solid bridge for messages (with stream integration point).
 //!
-//! Effect dependencies (consumed via layers, NEVER re-exported):
-//! - MessageService (Effect.Context.Tag from src/lib/tauri.ts)
-//!
+//! Bridge functions return Promises, never Effect, so Solid components
+//! stay effect-free per AGENTS.md.
+//
 //! UI surface (consumed by Solid components):
 //! - messages$: Accessor<Message[]>
 //! - loadMessages(conversationId: string): Promise<void>
@@ -12,11 +12,13 @@
 //! - appendToolCall(messageId: string, toolCall: ToolCall): void
 //! - finalizeToolResult(messageId: string, toolCallId: string, result: unknown, error?: string): void
 //! - clearMessages(): void
+//! - runConversationStream(conversation, userMessage, callbacks): Promise<void>
 
 import { createSignal, type Accessor } from "solid-js";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Stream } from "effect";
 import { MessageService, MessageServiceLive } from "../../lib/tauri";
-import type { Message, ToolCall, ToolResult } from "../../lib/types";
+import { AgentRuntime, RuntimeLayer, type RuntimeEvent } from "../runtime";
+import type { Message, ToolCall, ToolResult, Conversation } from "../../lib/types";
 
 // The runtime layer for the MessageService.
 const MessageLayer = MessageServiceLive;
@@ -124,4 +126,57 @@ export function appendStreamingAssistantMessage(
     created_at: Date.now(),
   };
   setMessages([...messages(), stub]);
+}
+
+export type StreamCallbacks = {
+  onToken: (content: string) => void;
+  onToolCall: (toolCall: ToolCall) => void;
+  onToolResult: (toolCallId: string, result: unknown, error?: string) => void;
+  onDone: (message: Message) => void;
+  onError: (error: { message: string }) => void;
+};
+
+export type StreamCallbacks = {
+  onToken: (content: string) => void;
+  onToolCall: (toolCall: ToolCall) => void;
+  onToolResult: (toolCallId: string, result: unknown, error?: string) => void;
+  onDone: (message: Message) => void;
+  onError: (error: { message: string }) => void;
+};
+
+export async function runConversationStream(
+  conversation: Conversation,
+  userMessage: Message,
+  callbacks: StreamCallbacks,
+): Promise<void> {
+  const processEvent = (evt: RuntimeEvent) =>
+    Effect.promise(async () => {
+      switch (evt.type) {
+        case "token":
+          callbacks.onToken(evt.content);
+          break;
+        case "tool_call":
+          callbacks.onToolCall(evt.toolCall);
+          break;
+        case "tool_result":
+          callbacks.onToolResult(evt.toolCallId, evt.result, evt.error);
+          break;
+        case "done":
+          callbacks.onDone(evt.message);
+          break;
+        case "error":
+          callbacks.onError(evt.error);
+          break;
+      }
+    });
+
+  const program = Effect.gen(function* () {
+    const runtime = yield* AgentRuntime;
+    yield* Stream.runForEach(
+      runtime.run(conversation, userMessage),
+      processEvent,
+    );
+  }).pipe(Effect.provide(RuntimeLayer));
+
+  await Effect.runPromise(program);
 }

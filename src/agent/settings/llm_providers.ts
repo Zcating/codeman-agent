@@ -69,3 +69,21 @@ export const LLMProviderServiceLive = Layer.succeed(LLMProviderService, {
       yield* svc.updateSettings({ default_llm_provider_id: id });
     }).pipe(Effect.provide(SettingsServiceLive)),
 });
+
+// ─── Bridge functions (Promise-based, for Solid UI) ───────────────────────────
+
+export async function setApiKeyForProvider(id: string, key: string): Promise<void> {
+  const program = Effect.gen(function* () {
+    const svc = yield* LLMProviderService;
+    yield* svc.setApiKey(id, key);
+  }).pipe(Effect.provide(LLMProviderServiceLive));
+  await Effect.runPromise(program);
+}
+
+export async function hasApiKeyForProvider(id: string): Promise<boolean> {
+  const program = Effect.gen(function* () {
+    const svc = yield* LLMProviderService;
+    return yield* svc.hasApiKey(id);
+  }).pipe(Effect.provide(LLMProviderServiceLive));
+  return Effect.runPromise(program);
+}

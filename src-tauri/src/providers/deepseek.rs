@@ -24,11 +24,25 @@ use serde::Deserialize;
 
 const ENDPOINT: &str = "https://api.deepseek.com/user/balance";
 
-pub struct DeepSeekAdapter;
+pub struct DeepSeekAdapter {
+    endpoint: String,
+}
 
 impl DeepSeekAdapter {
     pub fn new() -> Self {
-        Self
+        Self {
+            endpoint: ENDPOINT.to_string(),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
+        self.endpoint = endpoint.into();
+        self
+    }
+
+    fn endpoint(&self) -> &str {
+        &self.endpoint
     }
 }
 
@@ -62,7 +76,7 @@ impl Provider for DeepSeekAdapter {
         }
 
         let resp = client
-            .get(ENDPOINT)
+            .get(self.endpoint())
             .bearer_auth(secret.expose())
             .send()
             .await?;
@@ -72,7 +86,10 @@ impl Provider for DeepSeekAdapter {
             return Err(ProviderError::Upstream(format!("{status}: {body}")));
         }
 
-        let payload: DeepSeekBalance = resp.json().await?;
+        let payload: DeepSeekBalance = resp
+            .json()
+            .await
+            .map_err(|e| ProviderError::InvalidResponse(format!("json parse: {e}")))?;
         let entry = pick_balance_entry(&payload.balance_infos).ok_or_else(|| {
             ProviderError::InvalidResponse("no balance_infos entries".into())
         })?;
@@ -167,27 +184,62 @@ mod tests {
             .mount(&server)
             .await;
 
-        let client = Client::new();
-        let adapter = DeepSeekAdapter::new();
-        // We override the endpoint to point at the mock via reqwest's
-        // `base_url`-less client by rewriting the URL inside the adapter
-        // call. The trait doesn't expose that, so for this test we drive
-        // the parsing path directly.
-        let raw: DeepSeekBalance = reqwest::Client::new()
-            .get(format!("{}{}", server.uri(), "/user/balance"))
-            .bearer_auth("sk-test")
-            .send()
-            .await
-            .unwrap()
-            .json()
+        let adapter = DeepSeekAdapter::new()
+            .with_endpoint(format!("{}{}", server.uri(), "/user/balance"));
+        let snapshot = adapter
+            .fetch(&Client::new(), &Secret::new("sk-test"))
             .await
             .unwrap();
-        let entry = pick_balance_entry(&raw.balance_infos).unwrap();
-        let amount: Decimal = entry.balance.parse().unwrap();
-        assert_eq!(amount, Decimal::new(8742, 2));
-        assert_eq!(entry.currency, "CNY");
-        assert_eq!(entry.auto_recharge, Some(true));
-        let _ = (&adapter as &dyn Provider).id();
+        match snapshot {
+            Snapshot::Balance {
+                amount,
+                currency,
+                auto_recharge,
+            } => {
+                assert_eq!(amount, Decimal::new(8742, 2));
+                assert_eq!(currency, "CNY");
+                assert_eq!(auto_recharge, Some(true));
+            }
+            _ => panic!("expected balance snapshot"),
+        }
+    }
+
+    #[tokio::test]
+    async fn fetch_returns_upstream_error_on_non_2xx() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/user/balance"))
+            .and(bearer_token("sk-test"))
+            .respond_with(ResponseTemplate::new(401).set_body_json(json!({
+                "error": "unauthorized"
+            })))
+            .mount(&server)
+            .await;
+
+        let adapter = DeepSeekAdapter::new()
+            .with_endpoint(format!("{}{}", server.uri(), "/user/balance"));
+        let result = adapter
+            .fetch(&Client::new(), &Secret::new("sk-test"))
+            .await;
+        assert!(matches!(result, Err(ProviderError::Upstream(_))));
+    }
+
+    #[tokio::test]
+    async fn fetch_returns_invalid_response_on_malformed_json() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/user/balance"))
+            .and(bearer_token("sk-test"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("not json"))
+            .mount(&server)
+            .await;
+
+        let adapter = DeepSeekAdapter::new()
+            .with_endpoint(format!("{}{}", server.uri(), "/user/balance"));
+        let result = adapter
+            .fetch(&Client::new(), &Secret::new("sk-test"))
+            .await;
+        assert!(matches!(result, Err(ProviderError::InvalidResponse(_))));
     }
 
     #[tokio::test]

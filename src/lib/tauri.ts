@@ -102,3 +102,29 @@ export const MessageServiceLive = Layer.succeed(MessageService, {
        );
      }),
  });
+
+ // ─── Bridge functions (Promise-based, for Solid UI) ──────────────────────────
+
+ export async function getSettingsBridge(): Promise<Settings> {
+   const program = Effect.gen(function* () {
+     const svc = yield* SettingsService;
+     return yield* svc.getSettings();
+   }).pipe(Effect.provide(SettingsServiceLive));
+   return Effect.runPromise(program);
+ }
+
+ export async function updateSettingsBridge(patch: Partial<Settings>): Promise<Settings> {
+   const program = Effect.gen(function* () {
+     const svc = yield* SettingsService;
+     return yield* svc.updateSettings(patch);
+   }).pipe(Effect.provide(SettingsServiceLive));
+   return Effect.runPromise(program);
+ }
+
+ export async function clearAllHistoryBridge(): Promise<void> {
+   const program = Effect.gen(function* () {
+     const svc = yield* SettingsService;
+     yield* svc.clearAllHistory();
+   }).pipe(Effect.provide(SettingsServiceLive));
+   await Effect.runPromise(program);
+ }

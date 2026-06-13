@@ -86,7 +86,10 @@ impl Provider for MiniMaxAdapter {
             return Err(ProviderError::Upstream(format!("{status}: {body}")));
         }
 
-        let payload: MiniMaxQuota = resp.json().await?;
+        let payload: MiniMaxQuota = resp
+            .json()
+            .await
+            .map_err(|e| ProviderError::InvalidResponse(format!("json parse: {e}")))?;
         if payload.total == 0 {
             return Err(ProviderError::InvalidResponse(
                 "total quota must be > 0".into(),
@@ -193,6 +196,44 @@ mod tests {
                 "remaining": 0,
                 "total": 0
             })))
+            .mount(&server)
+            .await;
+
+        let adapter = MiniMaxAdapter::new()
+            .with_endpoint(format!("{}{}", server.uri(), "/quota"));
+        let result = adapter
+            .fetch(&Client::new(), &Secret::new("tok"))
+            .await;
+        assert!(matches!(result, Err(ProviderError::InvalidResponse(_))));
+    }
+
+    #[tokio::test]
+    async fn fetch_returns_upstream_error_on_non_2xx() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/quota"))
+            .and(bearer_token("tok"))
+            .respond_with(ResponseTemplate::new(403).set_body_json(json!({
+                "error": "forbidden"
+            })))
+            .mount(&server)
+            .await;
+
+        let adapter = MiniMaxAdapter::new()
+            .with_endpoint(format!("{}{}", server.uri(), "/quota"));
+        let result = adapter
+            .fetch(&Client::new(), &Secret::new("tok"))
+            .await;
+        assert!(matches!(result, Err(ProviderError::Upstream(_))));
+    }
+
+    #[tokio::test]
+    async fn fetch_returns_invalid_response_on_malformed_json() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/quota"))
+            .and(bearer_token("tok"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("not json at all"))
             .mount(&server)
             .await;
 

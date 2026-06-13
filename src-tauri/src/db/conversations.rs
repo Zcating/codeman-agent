@@ -61,6 +61,7 @@ pub async fn create_conversation(
         r#"
         INSERT INTO conversations (id, title, system_prompt, created_at, updated_at, archived_at)
         VALUES ($1, $2, $3, $4, $5, NULL)
+        RETURNING *
         "#,
     )
     .bind(&id)
@@ -210,5 +211,77 @@ mod tests {
 
         let active = list_conversations(&pool, false).await.expect("list active succeeds");
         assert!(active.is_empty());
+    }
+
+    #[tokio::test]
+    async fn update_title() {
+        let pool = make_pool().await;
+        let created = create_conversation(&pool, "Original Title", None)
+            .await
+            .expect("create succeeds");
+        let id = created.id();
+
+        update_conversation_title(&pool, &id, "New Title")
+            .await
+            .expect("update succeeds");
+
+        let fetched = get_conversation(&pool, &id)
+            .await
+            .expect("get succeeds")
+            .expect("conversation found");
+        assert_eq!(fetched.title, "New Title");
+    }
+
+    #[tokio::test]
+    async fn hard_delete_cascades_to_messages() {
+        let pool = make_pool().await;
+
+        // Create a conversation and a message
+        let conv = create_conversation(&pool, "To Delete", None)
+            .await
+            .expect("create conv");
+        let conv_id = conv.id();
+
+        // Manually insert a message to verify cascade delete.
+        let msg_id = Uuid::new_v4().to_string();
+        let now = Utc::now().timestamp();
+        sqlx::query(
+            "INSERT INTO messages (id,conversation_id,role,content,created_at) VALUES (?,?,?,?,?)",
+        )
+        .bind(&msg_id)
+        .bind(conv_id.to_string())
+        .bind("user")
+        .bind("hello world")
+        .bind(now)
+        .execute(&pool)
+        .await
+        .expect("insert message");
+
+        // Verify message exists
+        let before = sqlx::query("SELECT id FROM messages WHERE id = ?")
+            .bind(&msg_id)
+            .fetch_optional(&pool)
+            .await
+            .expect("check message");
+        assert!(before.is_some(), "message should exist before delete");
+
+        // Hard-delete the conversation
+        hard_delete_conversation(&pool, &conv_id)
+            .await
+            .expect("hard delete succeeds");
+
+        // Verify conversation is gone
+        let conv_after = get_conversation(&pool, &conv_id)
+            .await
+            .expect("get conv after delete");
+        assert!(conv_after.is_none(), "conversation should be deleted");
+
+        // Verify message was cascade-deleted
+        let msg_after = sqlx::query("SELECT id FROM messages WHERE id = ?")
+            .bind(&msg_id)
+            .fetch_optional(&pool)
+            .await
+            .expect("check message after delete");
+        assert!(msg_after.is_none(), "message should be cascade-deleted with conversation");
     }
 }

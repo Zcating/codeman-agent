@@ -370,9 +370,30 @@ mod tests {
     }
 
     #[test]
-    fn sanitized_clamps_auto_archive() {
+    fn sanitized_clamps_refresh_interval_secs() {
+        let mut s = Settings::default();
+        s.billing_providers.push(BillingProviderConfig {
+            id: "deepseek".into(),
+            enabled: true,
+            refresh_interval_secs: 1,
+            api_key_ref: None,
+        });
+        let s = s.sanitized();
+        assert_eq!(s.billing_providers[0].refresh_interval_secs, 5);
+    }
+
+    #[test]
+    fn sanitized_clamps_auto_archive_after_days() {
         let mut s = Settings::default();
         s.conversations.auto_archive_after_days = 0;
+        let s = s.sanitized();
+        assert_eq!(s.conversations.auto_archive_after_days, 1);
+    }
+
+    #[test]
+    fn sanitized_clamps_auto_archive_after_days_boundary() {
+        let mut s = Settings::default();
+        s.conversations.auto_archive_after_days = 1;
         let s = s.sanitized();
         assert_eq!(s.conversations.auto_archive_after_days, 1);
     }
@@ -383,6 +404,31 @@ mod tests {
         s.conversations.max_history = 5;
         let s = s.sanitized();
         assert_eq!(s.conversations.max_history, 10);
+    }
+
+    #[test]
+    fn sanitized_clamps_max_history_boundary() {
+        let mut s = Settings::default();
+        s.conversations.max_history = 10;
+        let s = s.sanitized();
+        assert_eq!(s.conversations.max_history, 10);
+    }
+
+    #[test]
+    fn sanitized_passes_through_valid_settings() {
+        let mut s = Settings::default();
+        s.billing_providers.push(BillingProviderConfig {
+            id: "deepseek".into(),
+            enabled: true,
+            refresh_interval_secs: 60,
+            api_key_ref: None,
+        });
+        s.conversations.auto_archive_after_days = 30;
+        s.conversations.max_history = 1000;
+        let s = s.sanitized();
+        assert_eq!(s.billing_providers[0].refresh_interval_secs, 60);
+        assert_eq!(s.conversations.auto_archive_after_days, 30);
+        assert_eq!(s.conversations.max_history, 1000);
     }
 
     #[test]

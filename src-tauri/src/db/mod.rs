@@ -46,4 +46,16 @@ mod tests {
             .expect("list_conversations should succeed on migrated DB");
         assert!(list.is_empty(), "expected empty vec, got {list:?}");
     }
+
+    #[tokio::test]
+    async fn running_migrations_twice_is_idempotent() {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        init(&pool).await.expect("first init succeeds");
+        init(&pool).await.expect("second init should also succeed");
+        // Verify the DB is still usable after double init
+        let list = super::conversations::list_conversations(&pool, false)
+            .await
+            .expect("list_conversations should still work after double init");
+        assert!(list.is_empty());
+    }
 }

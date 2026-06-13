@@ -79,3 +79,8 @@ pub fn delete_llm_key(app: &AppHandle, provider_id: &str) -> Result<(), String> 
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    // Integration test deferred to V2 — requires Tauri runtime compatibility.
+}

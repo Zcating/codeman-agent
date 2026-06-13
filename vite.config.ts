@@ -1,6 +1,7 @@
 /// <reference types="vitest" />
 import { defineConfig } from "vite";
 import solid from "vite-plugin-solid";
+import { resolve } from "path";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -13,6 +14,13 @@ export default defineConfig(async () => ({
     globals: true,
     setupFiles: ["./src/test-setup.ts"],
     passWithNoTests: true,
+    resolve: {
+      conditions: ["browser", "development"],
+      alias: [
+        { find: /^solid-js$/, replacement: resolve(__dirname, "node_modules/solid-js/dist/solid.js") },
+        { find: "solid-js/web", replacement: resolve(__dirname, "node_modules/solid-js/web/dist/web.js") },
+      ],
+    },
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

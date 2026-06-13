@@ -205,12 +205,15 @@ pub async fn delete_message(pool: &SqlitePool, id: &Uuid) -> Result<(), sqlx::Er
 }
 
 /// Full-text search across message content using FTS5 MATCH.
-/// Returns an empty vec when no results are found.
+/// Returns an empty vec when no results are found or when query is empty.
 pub async fn search_messages(
     pool: &SqlitePool,
     query: &str,
     limit: u32,
 ) -> Result<Vec<Message>, sqlx::Error> {
+    if query.is_empty() {
+        return Ok(Vec::new());
+    }
     let rows = sqlx::query(
         r#"
         SELECT m.id, m.conversation_id, m.role, m.content,
@@ -383,5 +386,90 @@ mod tests {
         // After delete, FTS5 search should return nothing
         let after = search_messages(&pool, "password", 10).await.unwrap();
         assert!(after.is_empty(), "deleted message should not appear in FTS5 results");
+    }
+
+    #[tokio::test]
+    async fn search_is_case_insensitive() {
+        let pool = fresh_pool().await;
+        let conv_id = Uuid::new_v4();
+
+        sqlx::query("INSERT INTO conversations (id,title,created_at,updated_at) VALUES (?,?,?,?)")
+            .bind(conv_id.to_string())
+            .bind("case test")
+            .bind(Utc::now().timestamp())
+            .bind(Utc::now().timestamp())
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        append_message(
+            &pool, conv_id, "user", "HELLO WORLD", None, None, None, None, None,
+        )
+        .await
+        .unwrap();
+
+        let lower = search_messages(&pool, "hello", 10).await.unwrap();
+        assert_eq!(lower.len(), 1, "lowercase query should match uppercase content");
+
+        let upper = search_messages(&pool, "HELLO", 10).await.unwrap();
+        assert_eq!(upper.len(), 1, "uppercase query should match uppercase content");
+    }
+
+    #[tokio::test]
+    async fn search_with_empty_query_returns_empty() {
+        let pool = fresh_pool().await;
+        let conv_id = Uuid::new_v4();
+
+        sqlx::query("INSERT INTO conversations (id,title,created_at,updated_at) VALUES (?,?,?,?)")
+            .bind(conv_id.to_string())
+            .bind("empty query test")
+            .bind(Utc::now().timestamp())
+            .bind(Utc::now().timestamp())
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        append_message(
+            &pool, conv_id, "user", "some content", None, None, None, None, None,
+        )
+        .await
+        .unwrap();
+
+        let results = search_messages(&pool, "", 10).await.unwrap();
+        assert!(results.is_empty(), "empty query should return no results");
+    }
+
+    #[tokio::test]
+    async fn search_respects_limit() {
+        let pool = fresh_pool().await;
+        let conv_id = Uuid::new_v4();
+
+        sqlx::query("INSERT INTO conversations (id,title,created_at,updated_at) VALUES (?,?,?,?)")
+            .bind(conv_id.to_string())
+            .bind("limit test")
+            .bind(Utc::now().timestamp())
+            .bind(Utc::now().timestamp())
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        for i in 0..5 {
+            append_message(
+                &pool,
+                conv_id,
+                "user",
+                &format!("message number {}", i),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        }
+
+        let results = search_messages(&pool, "message", 3).await.unwrap();
+        assert_eq!(results.len(), 3, "search should respect limit");
     }
 }
