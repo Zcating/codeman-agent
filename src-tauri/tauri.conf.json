@@ -23,7 +23,7 @@
         "maximizable": true,
         "minimizable": true,
         "decorations": false,
-        "alwaysOnTop": true,
+        "alwaysOnTop": false,
         "skipTaskbar": true,
         "focus": true,
         "visible": true
