@@ -1,22 +1,21 @@
-﻿//! Crate root. Wires plugins, state, scheduler, tray, hotkeys, and
+﻿//! Crate root. Wires plugins, state, scheduler, and
 //! IPC commands into the Tauri runtime.
 
 mod commands;
 mod db;
 mod events;
-mod hotkeys;
 mod providers;
 mod scheduler;
 mod secrets;
 mod secrets_llm;
 mod settings;
 mod state;
-mod tray;
 mod types;
 
 use crate::scheduler::Scheduler;
 use crate::state::AppState;
 use log::{info, warn};
+use tauri::menu::{Menu, MenuItem};
 use tauri::Manager;
 use tauri_plugin_autostart::MacosLauncher;
 
@@ -25,7 +24,6 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
@@ -59,11 +57,6 @@ pub fn run() {
             commands::has_api_key,
             commands::test_provider,
             commands::latest_snapshot,
-            commands::get_widget_position,
-            commands::set_widget_position,
-            commands::show_settings_window,
-            commands::hide_widget_window,
-            commands::show_widget_window,
             // T12: conversations
             commands::list_conversations,
             commands::get_conversation,
@@ -96,22 +89,19 @@ pub fn run() {
             let state = AppState::new(handle.clone());
 
             // Apply the persisted start-at-login setting.
-            tray::apply_autostart(&handle, state.get_settings().start_at_login);
+            apply_autostart(&handle, state.get_settings().start_at_login);
 
-            // Build tray icon + menu (T29/T31)
-            if let Err(e) = tray::build_tray(&handle) {
-                warn!("tray build failed: {e}");
-            }
+            // Build the native menu (File → Quit).
+            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, Some("CmdOrCtrl+Q"))?;
+            let file_menu = Menu::with_items(app, &[&quit_item])?;
+            app.set_menu(file_menu)?;
 
-            // Launch-time: hide widget window if start_minimized
-            if state.get_settings().start_minimized {
-                if let Some(w) = app.get_webview_window("widget") {
-                    let _ = w.hide();
+            // Handle menu events.
+            app.on_menu_event(move |app, event| {
+                if event.id().as_ref() == "quit" {
+                    app.exit(0);
                 }
-            }
-
-            // Register hotkeys from the current settings.
-            register_hotkeys(&handle, &state);
+            });
 
             // Spawn the scheduler loop.
             let scheduler_state = state.clone();
@@ -125,25 +115,9 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if window.label() == "settings" {
-                    // Hide the settings window instead of exiting the app
-                    // so the widget keeps running.
+                if window.label() == "main" {
                     api.prevent_close();
-                    let _ = window.hide();
-                } else if window.label() == "widget" {
-                    // Widget close behavior: hide_to_tray vs quit
-                    let app = window.app_handle();
-                    let state = app.state::<AppState>();
-                    let settings = state.get_settings();
-                    match settings.close_behavior {
-                        crate::settings::CloseBehavior::HideToTray => {
-                            api.prevent_close();
-                            let _ = window.hide();
-                        }
-                        crate::settings::CloseBehavior::Quit => {
-                            // Allow close - do not prevent. App will exit.
-                        }
-                    }
+                    let _ = window.minimize();
                 }
             }
         })
@@ -151,16 +125,24 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-fn register_hotkeys(handle: &tauri::AppHandle, _state: &AppState) {
-    if let Err(e) = hotkeys::unregister_all(handle) {
-        warn!("unregister hotkeys failed: {e}");
+#[cfg(desktop)]
+fn apply_autostart(app: &tauri::AppHandle, enable: bool) {
+    use tauri_plugin_autostart::ManagerExt;
+    let manager = app.autolaunch();
+    let result = if enable {
+        manager.enable()
+    } else {
+        manager.disable()
+    };
+    if let Err(e) = result {
+        warn!("autostart toggle failed: {e}");
+    } else {
+        info!("autostart set to {enable}");
     }
 }
 
-/// Public entry point so `state.apply_settings` can re-bind hotkeys
-/// when the user rebinds a chord without restarting the app. Pulled out
-/// as a free function so the same code path runs on cold start and on
-/// `update_settings`.
-pub fn rebind_hotkeys(handle: &tauri::AppHandle, state: &AppState) {
-    register_hotkeys(handle, state);
+#[cfg(not(desktop))]
+fn apply_autostart(_app: &tauri::AppHandle, _enable: bool) {
+    // Autostart is a desktop-only concern; the autostart plugin itself
+    // is no-op on mobile.
 }

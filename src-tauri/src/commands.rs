@@ -5,10 +5,10 @@ use crate::db::conversations;
 use crate::db::messages;
 use crate::secrets;
 use crate::secrets_llm;
-use crate::settings::{Settings, WidgetPosition};
+use crate::settings::Settings;
 use crate::state::{AppState, ProviderDescriptor};
 use crate::types::{AppError, ProviderId, SnapshotEnvelope};
-use tauri::{AppHandle, Manager, State};
+use tauri::State;
 use uuid::Uuid;
 
 #[tauri::command]
@@ -88,42 +88,6 @@ pub async fn latest_snapshot(
     state: State<'_, AppState>,
 ) -> Result<Option<SnapshotEnvelope>, String> {
     Ok(state.latest_snapshot(provider))
-}
-
-#[tauri::command]
-pub async fn get_widget_position(
-    state: State<'_, AppState>,
-) -> Result<Option<WidgetPosition>, String> {
-    Ok(state.get_widget_position())
-}
-
-#[tauri::command]
-pub async fn set_widget_position(
-    x: i32,
-    y: i32,
-    state: State<'_, AppState>,
-) -> Result<WidgetPosition, String> {
-    let pos = WidgetPosition { x, y };
-    state.set_widget_position(pos);
-    Ok(pos)
-}
-
-#[tauri::command]
-pub async fn show_settings_window(app: AppHandle) -> Result<(), String> {
-    crate::tray::show_settings(&app);
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn hide_widget_window(app: AppHandle) -> Result<(), String> {
-    crate::tray::hide_widget(&app);
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn show_widget_window(app: AppHandle) -> Result<(), String> {
-    crate::tray::show_widget(&app);
-    Ok(())
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

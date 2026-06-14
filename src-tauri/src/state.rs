@@ -1,4 +1,4 @@
-﻿//! Application state shared across the scheduler, commands, and tray.
+﻿//! Application state shared across the scheduler, commands.
 //!
 //! `AppState` is `Clone` (all fields are `Arc` / `parking_lot` guards) so
 //! it can be moved into a background task and read by Tauri commands
@@ -6,7 +6,7 @@
 
 use crate::providers::{Adapter, registry};
 use crate::secrets;
-use crate::settings::{Settings, WidgetPosition};
+use crate::settings::Settings;
 use crate::types::{
     ProviderError, ProviderId, ProviderKind, Secret, Snapshot, SnapshotEnvelope,
 };
@@ -14,7 +14,6 @@ use chrono::Utc;
 use log::{error, info, warn};
 use parking_lot::RwLock;
 use reqwest::Client;
-use rust_decimal::prelude::ToPrimitive;
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -91,26 +90,15 @@ impl AppState {
 
     pub fn apply_settings(&self, new_settings: Settings) -> Result<(), String> {
         let old_interval = self.settings.read().refresh_interval().as_secs();
-        let old_autostart = self.settings.read().start_at_login;
         *self.settings.write() = new_settings.clone();
         if new_settings.refresh_interval().as_secs() != old_interval {
             self.wakeup.notify_one();
-        }
-        if new_settings.start_at_login != old_autostart {
-            crate::tray::apply_autostart(&self.app_handle, new_settings.start_at_login);
         }
         Ok(())
     }
 
     pub fn get_settings(&self) -> Settings {
         self.settings.read().clone()
-    }
-
-    pub fn set_widget_position(&self, _pos: WidgetPosition) {
-    }
-
-    pub fn get_widget_position(&self) -> Option<WidgetPosition> {
-        None
     }
 
     pub fn persist_settings(&self) {
