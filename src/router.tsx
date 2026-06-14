@@ -8,8 +8,8 @@
 //! SPA fallback handles deep linking natively.
 
 import { createRouter, createRoute, createRootRoute, Outlet } from "@tanstack/solid-router";
-import { ChatLayout } from "./routes/index";
-import { SettingsPage } from "./routes/settings";
+import { ChatLayout } from "./features/chat/routes/index";
+import { SettingsPage } from "./features/settings/routes/settings";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
