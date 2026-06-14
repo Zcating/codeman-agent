@@ -1,6 +1,6 @@
 # src/ — 前端 (Solid.js + TypeScript)
 
-Vite 单页应用，渲染到两个 Tauri 窗口。**不引入路由库**——`ChatView` 监听 URL hash（`#/settings`）在主视图和设置模态间切换。两个窗口共享同一份 Vite bundle，由 `tauri.conf.json` 的 `url` 字段决定起始路由。
+Vite 单页应用，渲染到单个 Tauri main 窗口。路由走 TanStack Router（`/` = chat，`/settings` = 设置）。不需要 hash 监听。
 
 V1 是 Tauri 2 + Solid chat agent，**不是 V0 280x100 浮窗**。视觉层走 Tailwind v4 utility（ADR-0006），逻辑层走 Effect-TS（ADR-0003）。
 
@@ -71,7 +71,8 @@ src/
 
 ## 模式
 
-- **Hash 路由由 `ChatView` 处理。** `window.location.hash === "#/settings"` 决定渲染 `<SettingsModal>` 还是主聊天。加新视图 = 在 `ChatView.tsx` 加一个 `<Show>` 分支，**不要**引入路由库。
+- **TanStack Router 处理路由。** 路由文件在 `src/routes/`, `index.tsx` mount `<RouterProvider>`, `__root.tsx` 提供根布局, 跳设置用 `<A href="/settings">`。`ChatView` 不再监听 hash。
+- **main 窗口 = 唯一 webview。** Tauri 配置单 `main` 窗口 (800×600, 起步), 不用 hash 路由, 用 browser history (`createBrowserHistory`)。
 - **Effect → Solid 桥接。** 逻辑层返回 `Effect.Effect<T, AppError>` / `Stream.Stream<T, E>`，桥接层在 store 里 `Effect.runPromiseExit()` 后写入 `createSignal`，UI 读 `Accessor`。
 - **服务对象通过 `Context.Tag` 注入。** `ConversationService` / `MessageService` / `BillingService` / `SettingsService` 在 `lib/tauri.ts` 定义 Tag + Live Layer；测试用 `Layer.succeed` 提供 mock。
 - **错误上抛是 `AppError` 判别联合。** UI 不 catch Effect-typed error；桥接层用 `Exit.isSuccess` 过滤，失败的 Effect 转成空数据 / 错误 toast。

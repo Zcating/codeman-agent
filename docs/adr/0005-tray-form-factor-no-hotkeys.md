@@ -1,6 +1,6 @@
 # ADR 0005 — Tray + summoned window, no hotkeys in V1
 
-- Status: Accepted
+- Status: Superseded by ADR-0007 (2026-06-13)
 - Date: 2026-06-13
 - Scope: codeman-agent V1 form factor
 - Supersedes: implicit V0 form factor (280×100 always-on-top

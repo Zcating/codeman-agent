@@ -1,10 +1,9 @@
 ﻿# codeman-agent — Project Context
 
-A desktop AI agent that lives in the system tray, summoned by
-clicking the tray icon. Built on Tauri 2 (Rust) + Solid.js +
-Effect-TS, with pi-mono as the agent runtime. V1 ships a general
-LLM chat agent plus two billing tools (DeepSeek, MiniMax). This
-document pins the vocabulary so plan, code, and commit messages
+A standalone Windows desktop AI agent built on Tauri 2 (Rust) +
+Solid.js + Effect-TS, with pi-mono as the agent runtime. V1 ships
+a general LLM chat agent plus two billing tools (DeepSeek, MiniMax).
+This document pins the vocabulary so plan, code, and commit messages
 stay aligned.
 
 ## Glossary
@@ -12,7 +11,7 @@ stay aligned.
 ### Domain
 
 - **Agent** — the product. A general-purpose LLM-powered assistant
-  the user summons to ask questions or invoke tools. Replaces the
+  running in a standalone Windows desktop window. Replaces the
   old "widget" framing entirely. _Avoid_: widget, app, client.
 - **Conversation** — a persistent chat thread owned by the user.
   Linear sequence of messages; V1 has no branching.
@@ -81,13 +80,12 @@ stay aligned.
 ### Settings & state
 
 - **Settings** — JSON document persisted via `tauri-plugin-store`
-  in the OS app-data directory. Holds ~25 fields across 9
-  categories. **No API keys** (those live in Tauri store or
+in the OS app-data directory. Holds ~22 fields across 9
+categories. **No API keys** (those live in Tauri store or
   keyring, split by namespace).
-- **Hotkeys** — deprecated in V1. The field exists for forward
-  compatibility with V2; not editable in the V1 UI. The
-  `tauri-plugin-global-shortcut` plugin stays in dependencies
-  for V2.
+- **Hotkeys** (removed in V1.5): V1 had no hotkeys; V1.5 ships
+  with zero global hotkeys. `tauri-plugin-global-shortcut` is
+  no longer a dependency.
 - **Stale** — a `Snapshot` older than the billing provider's
   `stale_after_seconds`; the legacy "stale badge" semantics is
   preserved for tool results that get cached.
