@@ -9,11 +9,8 @@ export interface Settings {
   user_language: "zh" | "en" | "auto";
   theme: "light" | "dark" | "system";
   start_at_login: boolean;
-  start_minimized: boolean;
-  close_behavior: "hide_to_tray" | "quit";
   window: WindowSettings;
   system_prompt: SystemPromptSettings;
-  hotkeys: HotkeySettings; // deprecated V1; reserved for V2
   billing_providers: BillingProviderConfig[];
   conversations: ConversationSettings;
 }
@@ -34,11 +31,6 @@ export interface WindowSettings {
 export interface SystemPromptSettings {
   default: string;
   user_can_edit: boolean;
-}
-export interface HotkeySettings {
-  toggle_window: string;
-  new_conversation: string;
-  open_settings: string;
 }
 export interface BillingProviderConfig {
   id: "deepseek" | "minimax";

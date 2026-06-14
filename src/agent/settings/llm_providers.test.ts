@@ -50,8 +50,6 @@ let settingsState: Settings = {
   user_language: "en",
   theme: "dark",
   start_at_login: false,
-  start_minimized: false,
-  close_behavior: "hide_to_tray",
   window: {
     remember_position: false,
     remember_size: false,
@@ -59,7 +57,6 @@ let settingsState: Settings = {
     min_size: { width: 400, height: 300 },
   },
   system_prompt: { default: "You are a helpful assistant.", user_can_edit: true },
-  hotkeys: { toggle_window: "", new_conversation: "", open_settings: "" },
   billing_providers: [],
   conversations: { auto_archive_after_days: 30, max_history: 1000 },
 };
@@ -83,8 +80,6 @@ describe("LLMProviderService", () => {
       user_language: "en",
       theme: "dark",
       start_at_login: false,
-      start_minimized: false,
-      close_behavior: "hide_to_tray",
       window: {
         remember_position: false,
         remember_size: false,
@@ -92,7 +87,6 @@ describe("LLMProviderService", () => {
         min_size: { width: 400, height: 300 },
       },
       system_prompt: { default: "You are a helpful assistant.", user_can_edit: true },
-      hotkeys: { toggle_window: "", new_conversation: "", open_settings: "" },
       billing_providers: [],
       conversations: { auto_archive_after_days: 30, max_history: 1000 },
     };

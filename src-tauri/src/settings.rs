@@ -14,16 +14,6 @@ const STORE_FILE: &str = "settings.json";
 // Helper types
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Last-known widget window position, persisted across launches.
-///
-/// `x` / `y` are top-left in virtual-screen pixels.  `None` means "no saved
-/// position yet" — the widget falls back to the default placement.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct WidgetPosition {
-    pub x: i32,
-    pub y: i32,
-}
-
 /// Pixel dimensions for a window.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Size {
@@ -71,20 +61,6 @@ pub enum Theme {
 impl Default for Theme {
     fn default() -> Self {
         Theme::System
-    }
-}
-
-/// Behaviour when the user closes the main window.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CloseBehavior {
-    HideToTray,
-    Quit,
-}
-
-impl Default for CloseBehavior {
-    fn default() -> Self {
-        CloseBehavior::HideToTray
     }
 }
 
@@ -156,29 +132,6 @@ impl Default for SystemPromptSettings {
     }
 }
 
-/// V1 zero-hotkeys; reserved for V2.
-/// Marked deprecated so it shows clearly in IDE tooltips.
-#[deprecated(
-    since = "1.0.0",
-    note = "V1 ships with no hotkeys; this struct is reserved for V2 global-shortcut support"
-)]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct HotkeySettings {
-    pub toggle_window: String,
-    pub new_conversation: String,
-    pub open_settings: String,
-}
-
-impl Default for HotkeySettings {
-    fn default() -> Self {
-        Self {
-            toggle_window: String::new(),
-            new_conversation: String::new(),
-            open_settings: String::new(),
-        }
-    }
-}
-
 /// A single billing provider configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BillingProviderConfig {
@@ -242,8 +195,6 @@ pub struct Settings {
 
     // C. App lifecycle
     pub start_at_login: bool,
-    pub start_minimized: bool,
-    pub close_behavior: CloseBehavior,
 
     // D. Window
     pub window: WindowSettings,
@@ -251,18 +202,10 @@ pub struct Settings {
     // E. System prompt
     pub system_prompt: SystemPromptSettings,
 
-    // F. Hotkeys (deprecated – V1 zero-hotkeys; reserved for V2)
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[deprecated(
-        since = "1.0.0",
-        note = "V1 ships with no hotkeys; reserved for V2 global-shortcut support"
-    )]
-    pub hotkeys: Option<HotkeySettings>,
-
-    // G. Billing providers
+    // F. Billing providers
     pub billing_providers: Vec<BillingProviderConfig>,
 
-    // H. Conversations
+    // G. Conversations
     pub conversations: ConversationSettings,
 }
 
@@ -274,11 +217,8 @@ impl Default for Settings {
             user_language: UserLanguage::default(),
             theme: Theme::default(),
             start_at_login: true,
-            start_minimized: false,
-            close_behavior: CloseBehavior::default(),
             window: WindowSettings::default(),
             system_prompt: SystemPromptSettings::default(),
-            hotkeys: None,
             billing_providers: Vec::new(),
             conversations: ConversationSettings::default(),
         }
@@ -350,8 +290,6 @@ mod tests {
         assert_eq!(s.user_language, UserLanguage::Auto);
         assert_eq!(s.theme, Theme::System);
         assert!(s.start_at_login);
-        assert!(!s.start_minimized);
-        assert_eq!(s.close_behavior, CloseBehavior::HideToTray);
         assert_eq!(s.conversations.auto_archive_after_days, 30);
         assert_eq!(s.conversations.max_history, 1000);
     }
@@ -446,14 +384,11 @@ mod tests {
             user_language: UserLanguage::En,
             theme: Theme::Dark,
             start_at_login: false,
-            start_minimized: true,
-            close_behavior: CloseBehavior::Quit,
             window: WindowSettings::default(),
             system_prompt: SystemPromptSettings {
                 default: "You are a helpful assistant.".into(),
                 user_can_edit: true,
             },
-            hotkeys: None,
             billing_providers: vec![BillingProviderConfig {
                 id: "deepseek".into(),
                 enabled: true,

@@ -15,8 +15,6 @@ vi.mock("../../lib/tauri", () => ({
     user_language: "en",
     theme: mockTheme,
     start_at_login: false,
-    start_minimized: false,
-    close_behavior: "hide_to_tray",
     window: {
       remember_position: false,
       remember_size: false,
@@ -24,7 +22,6 @@ vi.mock("../../lib/tauri", () => ({
       min_size: { width: 400, height: 300 },
     },
     system_prompt: { default: "", user_can_edit: true },
-    hotkeys: { toggle_window: "", new_conversation: "", open_settings: "" },
     billing_providers: [],
     conversations: { auto_archive_after_days: 30, max_history: 1000 },
   }),
