@@ -6,7 +6,6 @@
 import { createSignal, createEffect, For, Show, onCleanup } from "solid-js";
 import { Effect, Exit, Stream } from "effect";
 import { MessageBubble } from "./message-bubble";
-import { Sidebar } from "./sidebar";
 import {
   messages$,
   loadMessages,
@@ -124,44 +123,41 @@ export function ChatView() {
   };
 
   return (
-    <main class="flex h-full h-screen w-full bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
-      <Sidebar />
-      <section class="flex-1 flex flex-col overflow-hidden">
-        <div class="flex-1 overflow-y-auto p-4 space-y-3">
-          <For each={messages$()}>
-            {(m) => <MessageBubble message={m} />}
-          </For>
-          <div ref={messagesEndRef} />
-        </div>
-        <form
-          class="flex gap-2 p-3 border-t border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void send();
-          }}
-        >
-          <textarea
-            class="flex-1 p-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 placeholder:text-zinc-400 resize-none outline-none disabled:opacity-60"
-            rows={3}
-            value={input()}
-            onInput={(e) => setInput(e.currentTarget.value)}
-            placeholder="Type a message…"
-            disabled={running()}
-          />
-          <Show
-            when={!running()}
-            fallback={
-              <button type="button" onClick={cancel} class="px-4 py-2 rounded-md font-medium bg-red-500 hover:bg-red-600 active:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed">
-                Cancel
-              </button>
-            }
-          >
-            <button type="submit" disabled={!input().trim()} class="px-4 py-2 rounded-md font-medium bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed">
-              Send
+    <>
+      <div class="flex-1 overflow-y-auto p-4 space-y-3">
+        <For each={messages$()}>
+          {(m) => <MessageBubble message={m} />}
+        </For>
+        <div ref={messagesEndRef} />
+      </div>
+      <form
+        class="flex gap-2 p-3 border-t border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void send();
+        }}
+      >
+        <textarea
+          class="flex-1 p-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 placeholder:text-zinc-400 resize-none outline-none disabled:opacity-60"
+          rows={3}
+          value={input()}
+          onInput={(e) => setInput(e.currentTarget.value)}
+          placeholder="Type a message…"
+          disabled={running()}
+        />
+        <Show
+          when={!running()}
+          fallback={
+            <button type="button" onClick={cancel} class="px-4 py-2 rounded-md font-medium bg-red-500 hover:bg-red-600 active:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed">
+              Cancel
             </button>
-          </Show>
-        </form>
-      </section>
-    </main>
+          }
+        >
+          <button type="submit" disabled={!input().trim()} class="px-4 py-2 rounded-md font-medium bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed">
+            Send
+          </button>
+        </Show>
+      </form>
+    </>
   );
 }
