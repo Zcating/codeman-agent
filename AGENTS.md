@@ -63,8 +63,9 @@ codeman-agent/
 │           └── AGENTS.md
 │
 ├── src-tauri/                     # Rust 后端（详见 src-tauri/AGENTS.md）
-├── docs/adr/                      # 8 个 ADR（见下方索引）
+├── docs/adr/                      # 9 个 ADR（见下方索引）
 ├── __mocks__/                     # 仓库根的 vitest auto-mock（@tauri-apps/api/core.ts）
+├── docs/                          # 治理文档（translation-rules 等）
 └── .agents/                       # 本地 agent skills
 ```
 
@@ -80,23 +81,24 @@ codeman-agent/
 | 0006 | Tailwind v4 utility-only 样式层 | 所有视觉走 Tailwind v4 utility；BEM/`<style>` 块禁用；token 在 `@theme` |
 | 0007 | 完整原生窗口应用 + TanStack Router | 单 main 窗口；删托盘/独立 settings 窗口；in-app 路由用 TanStack Router（code-based） |
 | **0008** | **Feature-Sliced 前端分层 + shadcn 风格 UI 原子** | **本期新加**：src/ 改成 features/{chat,settings,billing}/ + shared/{ui,lib,types,state,assets,mocks}/；引入 cva + clsx + tailwind-merge + lucide-solid 5 原子；排除 Radix/Kobalte |
+| **0009** | **开发者语言中文化策略（V1.6+）** | **本期新加**：注释 + 治理文档 + 测试描述走中文；identifier / UI 字符串 / 库专名保持英文；5 路并行翻译 + `docs/translation-rules.md` 操作手册 + `CONTRIBUTING.md` glossary 增补门槛；`CONTEXT.md` 新增 § Localization |
 
 > **新决策**先写 ADR 再动代码。`docs/adr/` 用 `NNNN-kebab-title.md` 命名；格式见 `.agents/skills/grill-with-docs/ADR-FORMAT.md`。
 
 ## 关键概念
 
-- **Agent** = 产品本身 = 独立 Windows 桌面应用。
-- **Conversation** = 用户拥有的持久聊天线程（线性，无分支）。
-- **Message** = 一轮 `user` / `assistant` / `tool` / `system`。
-- **Tool** = LLM 可调用的类型化函数（V1: `get_balance`, `get_plan_quota`）。
-- **Snapshot** = 计费状态的时点视图：`Balance { amount, currency, auto_recharge }` | `PlanQuota { remaining, total, expires_at?, daily_avg? }`。
-- **Feature** = 业务域（chat / settings / billing）。每个 feature 自带 components + store + subsystems + routes。
-- **Shared** = 跨 feature 共享（ui 原子 / IPC 入口 / 跨域类型 / 跨域状态 / 静态资源）。
-- **Runtime** = Effect-TS 包装 pi-mono agent loop（`src/features/chat/runtime.ts`）。
-- **Bridge** = Effect → Solid signal 翻译器（`src/features/chat/store/*.ts`）。
+- **Agent (代理)** = 产品本身 = 独立 Windows 桌面应用。
+- **Conversation (会话)** = 用户拥有的持久聊天线程（线性，无分支）。
+- **Message (消息)** = 一轮 `user` / `assistant` / `tool` / `system`。
+- **Tool (工具)** = LLM 可调用的类型化函数（V1: `get_balance`, `get_plan_quota`）。
+- **Snapshot (快照)** = 计费状态的时点视图：`Balance { amount, currency, auto_recharge }` | `PlanQuota { remaining, total, expires_at?, daily_avg? }`。
+- **Feature (功能)** = 业务域（chat / settings / billing）。每个 feature 自带 components + store + subsystems + routes。
+- **Shared (共享)** = 跨 feature 共享（ui 原子 / IPC 入口 / 跨域类型 / 跨域状态 / 静态资源）。
+- **Runtime (运行时)** = Effect-TS 包装 pi-mono agent loop（`src/features/chat/runtime.ts`）。
+- **Bridge (桥接层)** = Effect → Solid signal 翻译器（`src/features/chat/store/*.ts`）。
 - **cn** = `clsx + tailwind-merge` 组合工具（`src/shared/lib/cn.ts`）。
 - **Secret** = Rust 的 `Secret<String>` newtype；Debug/Display 都打印 `***`。
-- **Stale** = Snapshot 超过 `stale_after_seconds`。
+- **Stale (过期)** = Snapshot 超过 `stale_after_seconds`。
 
 完整词汇表 + Settings 19 字段 schema → **`CONTEXT.md`**。
 
@@ -175,7 +177,7 @@ pnpm e2e               # Playwright + 真 Tauri 端到端 (本地)
 
 ## E2E 测试
 
-V1 起引入 e2e 层,跑在 **真 webview + 真 Rust 后端** 上,不 mock IPC。WebView2 通过 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` 暴露 CDP,Playwright 用 `connectOverCDP` 连接,跳过 tauri-driver 的 W3C 协议翻译。
+V1 起引入 E2E 层，跑在 **真 webview + 真 Rust 后端** 上，不 mock IPC。WebView2 通过 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` 暴露 CDP，Playwright 用 `connectOverCDP` 连接，跳过 tauri-driver 的 W3C 协议翻译。
 
 ### 目录布局
 
@@ -197,18 +199,18 @@ codeman-agent/
 ### 跑通前置 (一次性)
 
 ```bash
-cargo install tauri-driver --locked   # 二进制,与 src-tauri 共用 Rust 工具链
+cargo install tauri-driver --locked   # 二进制，与 src-tauri 共用 Rust 工具链
 npx playwright install msedge          # Edge WebDriver (Tauri WebView2 内核)
-# WebView2 Runtime: Win11 自带,Win10 需 https://developer.microsoft.com/microsoft-edge/webview2/
+# WebView2 Runtime: Win11 自带，Win10 需 https://developer.microsoft.com/microsoft-edge/webview2/
 pnpm add -D @playwright/test @types/node  # 项目 devDeps
 ```
 
-> **可选预热 (省 5 min)**: 首次 `pnpm e2e` 会先编译 Rust 5+ min,Rust 日志挤占 stdout 会让 Playwright 真实输出被截。跑一次 `cd src-tauri && cargo build` 预热 debug profile,后续 `pnpm e2e` 直接命中缓存,30-60s 跑完。
+> **Rust 预热已自动集成**: `e2e/global-setup.ts` 启动 `tauri:dev` 之前会先 `cd src-tauri && cargo build`（默认带 `RUSTFLAGS=-A dead_code` 静默 pre-existing warnings），把 5+ min 的首次编译从测试阶段挪到 setup 阶段。缓存命中 <1s，完全无感。
 
 ### 跑测试
 
 ```bash
-pnpm e2e               # 全跑 (~30-60s,首次 5+ min 见上方预热说明)
+pnpm e2e               # 全跑 (~30-60s 测试阶段；首次含 5+ min 编译，在 setup 阶段)
 pnpm e2e:headed        # 有头模式看 UI
 pnpm e2e:debug         # Playwright Inspector
 pnpm e2e:report        # 看上一次 HTML 报告
@@ -218,32 +220,32 @@ pnpm e2e:report        # 看上一次 HTML 报告
 
 | # | 场景 | 断言 |
 |---|---|---|
-| 01 | 启动 + chat 布局 | `<aside>` / `<textarea>` / Settings link 全可见,0 console error |
+| 01 | 启动 + chat 布局 | `<aside>` / `<textarea>` / Settings link 全可见，0 console error |
 | 02 | 配 LLM API key | UI Save → IPC `has_llm_key` 返回 true → 重载 input 不反射已存值 |
 | 03 | 聊天调 billing 工具 | user bubble 写入 + assistant 开始 streaming OR Cancel 出现 (LLM 可失败) |
 | 04 | 主题 light/dark/system | `update_settings.theme` → `<html class>` 在 5s poll 内切换 |
 
-### 反模式 (e2e 特有)
+### 反模式 (E2E 特有)
 
-- **不要在 e2e spec 里 mock IPC** — 这一层的价值是真后端,真数据库,真 keyring。Vitest + `__mocks__` 是单元测试的领域。
-- **不要并行跑** — Tauri 是单实例,多 worker 会撞同一个 window/Rust state。`workers: 1` 是硬约束。
-- **不要用真实 LLM key 跑 e2e** — 慢、不确定、贵。spec 03 只验 chat loop 活着,不验响应内容。
-- **不要断言 console.warn** — `console.error` 才算 canary 失败;warning 太嘈杂。
-- **不要在 e2e 写 BEM class** — ADR-0006;断言走 utility class (跟 vitest 一致)。
-- **不要在 e2e 测 Tailwind 样式细节** — 验 `classList.contains("dark")` 这种语义状态,不验 computed style。
-- **不要在 e2e 用 vitest 的 `vi.mock`** — Playwright 走自己的 fixture 体系 (`getTauriPage` / `invoke`)。
-- **不要直接 `taskkill /IM tauri.exe` 在 spec 里** — 那是 `global-teardown` 的职责,失败时一票否决。
+- **不要在 E2E spec 里 mock IPC** — 这一层的价值是真后端，真数据库，真 keyring。Vitest + `__mocks__` 是单元测试的领域。
+- **不要并行跑** — Tauri 是单实例，多 worker 会撞同一个 window/Rust state。`workers: 1` 是硬约束。
+- **不要用真实 LLM key 跑 E2E** — 慢、不确定、贵。spec 03 只验 chat loop 活着，不验响应内容。
+- **不要断言 console.warn** — `console.error` 才算 canary 失败；warning 太嘈杂。
+- **不要在 E2E 写 BEM class** — ADR-0006；断言走 utility class（跟 vitest 一致）。
+- **不要在 E2E 测 Tailwind 样式细节** — 验 `classList.contains("dark")` 这种语义状态，不验 computed style。
+- **不要在 E2E 用 vitest 的 `vi.mock`** — Playwright 走自己的 fixture 体系（`getTauriPage` / `invoke`）。
+- **不要直接 `taskkill /IM tauri.exe` 在 spec 里** — 那是 `global-teardown` 的职责，失败时一票否决。
 
-### 何时新增 e2e spec
+### 何时新增 E2E spec
 
-- 引入新的 IPC 命令 → 加一个"调用 + 断言" 的 spec (跟 02 一样)
-- 改路由 → 加一个"导航 + URL 匹配" 的 spec (跟 01 一样)
+- 引入新的 IPC 命令 → 加一个"调用 + 断言" 的 spec（跟 02 一样）
+- 改路由 → 加一个"导航 + URL 匹配" 的 spec（跟 01 一样）
 - 改主题/外观语义 → 加到 04 或新开 "ui-state" describe
-- 加新 Tauri 插件 → 单独 spec,不要塞进现有 4 个
+- 加新 Tauri 插件 → 单独 spec，不要塞进现有 4 个
 
 ### CI 留待后续
 
-用户已确认 V1 e2e **不进 CI**。后续接入时要装:WebView2 Runtime + `tauri-driver` + `@playwright/test` + Edge WebDriver;跑在 Windows runner;`tauri build` 产物比 `tauri dev` 稳定但慢 2x,看情况选。
+用户已确认 V1 E2E **不进 CI**。后续接入时要装：WebView2 Runtime + `tauri-driver` + `@playwright/test` + Edge WebDriver；跑在 Windows runner；`tauri build` 产物比 `tauri dev` 稳定但慢 2x，看情况选。
 
 ## 子目录知识库表
 
