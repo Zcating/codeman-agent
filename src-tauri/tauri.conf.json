@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "label": "widget",
+        "label": "main",
         "title": "codeman-agent",
         "url": "index.html",
         "width": 800,
@@ -24,23 +24,9 @@
         "minimizable": true,
         "decorations": true,
         "alwaysOnTop": false,
-        "skipTaskbar": true,
+        "skipTaskbar": false,
         "focus": true,
         "visible": true
-      },
-      {
-        "label": "settings",
-        "title": "codeman-agent settings",
-        "url": "index.html#/settings",
-        "width": 540,
-        "height": 640,
-        "minWidth": 420,
-        "minHeight": 480,
-        "resizable": true,
-        "decorations": true,
-        "alwaysOnTop": false,
-        "skipTaskbar": false,
-        "visible": false
       }
     ],
     "security": {
