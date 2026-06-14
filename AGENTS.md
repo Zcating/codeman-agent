@@ -169,7 +169,79 @@ pnpm tauri build       # 出 MSI + NSIS 安装包
 pnpm test              # 前端 vitest (jsdom)
 cd src-tauri && cargo test  # 后端（带 wiremock 集成测试）
 pnpm typecheck         # tsc --noEmit
+pnpm typecheck:e2e     # tsc --noEmit -p tsconfig.e2e.json
+pnpm e2e               # Playwright + 真 Tauri 端到端 (本地)
 ```
+
+## E2E 测试
+
+V1 起引入 e2e 层,跑在 **真 webview + 真 Rust 后端** 上,不 mock IPC。WebView2 通过 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` 暴露 CDP,Playwright 用 `connectOverCDP` 连接,跳过 tauri-driver 的 W3C 协议翻译。
+
+### 目录布局
+
+```
+codeman-agent/
+├── playwright.config.ts           # baseURL=1420, workers=1, retain-on-failure trace
+├── tsconfig.e2e.json              # extends tsconfig.json + types:["node"]
+├── e2e/
+│   ├── global-setup.ts            # spawn pnpm tauri:dev + wait 1420/9222
+│   ├── global-teardown.ts         # kill child + sweep ports + taskkill tauri.exe
+│   ├── helpers.ts                 # getTauriPage() / invoke() / clearAllHistory()
+│   ├── 01-app-launch.spec.ts      # canary: 启动 + chat 布局 + 无 console error
+│   ├── 02-settings-api-key.spec.ts # UI 配 key + IPC 验证 has_llm_key
+│   ├── 03-billing-tool.spec.ts    # 发消息 + chat loop 活着 (不验证 LLM 内容)
+│   ├── 04-theme-toggle.spec.ts    # update_settings.theme → <html.dark>
+│   └── .gitignore                 # playwright-report/ test-results/
+```
+
+### 跑通前置 (一次性)
+
+```bash
+cargo install tauri-driver --locked   # 二进制,与 src-tauri 共用 Rust 工具链
+npx playwright install msedge          # Edge WebDriver (Tauri WebView2 内核)
+# WebView2 Runtime: Win11 自带,Win10 需 https://developer.microsoft.com/microsoft-edge/webview2/
+pnpm add -D @playwright/test @types/node  # 项目 devDeps
+```
+
+### 跑测试
+
+```bash
+pnpm e2e               # 全跑 (~30-60s,首次 Rust 编译 5+ min)
+pnpm e2e:headed        # 有头模式看 UI
+pnpm e2e:debug         # Playwright Inspector
+pnpm e2e:report        # 看上一次 HTML 报告
+```
+
+### 当前覆盖的关键路径 (4 spec)
+
+| # | 场景 | 断言 |
+|---|---|---|
+| 01 | 启动 + chat 布局 | `<aside>` / `<textarea>` / Settings link 全可见,0 console error |
+| 02 | 配 LLM API key | UI Save → IPC `has_llm_key` 返回 true → 重载 input 不反射已存值 |
+| 03 | 聊天调 billing 工具 | user bubble 写入 + assistant 开始 streaming OR Cancel 出现 (LLM 可失败) |
+| 04 | 主题 light/dark/system | `update_settings.theme` → `<html class>` 在 5s poll 内切换 |
+
+### 反模式 (e2e 特有)
+
+- **不要在 e2e spec 里 mock IPC** — 这一层的价值是真后端,真数据库,真 keyring。Vitest + `__mocks__` 是单元测试的领域。
+- **不要并行跑** — Tauri 是单实例,多 worker 会撞同一个 window/Rust state。`workers: 1` 是硬约束。
+- **不要用真实 LLM key 跑 e2e** — 慢、不确定、贵。spec 03 只验 chat loop 活着,不验响应内容。
+- **不要断言 console.warn** — `console.error` 才算 canary 失败;warning 太嘈杂。
+- **不要在 e2e 写 BEM class** — ADR-0006;断言走 utility class (跟 vitest 一致)。
+- **不要在 e2e 测 Tailwind 样式细节** — 验 `classList.contains("dark")` 这种语义状态,不验 computed style。
+- **不要在 e2e 用 vitest 的 `vi.mock`** — Playwright 走自己的 fixture 体系 (`getTauriPage` / `invoke`)。
+- **不要直接 `taskkill /IM tauri.exe` 在 spec 里** — 那是 `global-teardown` 的职责,失败时一票否决。
+
+### 何时新增 e2e spec
+
+- 引入新的 IPC 命令 → 加一个"调用 + 断言" 的 spec (跟 02 一样)
+- 改路由 → 加一个"导航 + URL 匹配" 的 spec (跟 01 一样)
+- 改主题/外观语义 → 加到 04 或新开 "ui-state" describe
+- 加新 Tauri 插件 → 单独 spec,不要塞进现有 4 个
+
+### CI 留待后续
+
+用户已确认 V1 e2e **不进 CI**。后续接入时要装:WebView2 Runtime + `tauri-driver` + `@playwright/test` + Edge WebDriver;跑在 Windows runner;`tauri build` 产物比 `tauri dev` 稳定但慢 2x,看情况选。
 
 ## 子目录知识库表
 

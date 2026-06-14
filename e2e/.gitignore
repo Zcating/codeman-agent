@@ -1,0 +1,9 @@
+# Playwright test artifacts — never commit.
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
+
+# E2E video / trace uploads (if you wire them up later)
+playwright/.video/
+playwright/.trace.zip

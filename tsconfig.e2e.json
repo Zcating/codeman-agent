@@ -1,0 +1,12 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"types": ["node"],
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"noEmit": true,
+		"isolatedModules": true,
+		"verbatimModuleSyntax": false
+	},
+	"include": ["e2e/**/*", "playwright.config.ts"]
+}

@@ -37,9 +37,13 @@ export default defineConfig(async () => ({
     globals: true,
     setupFiles: ["./src/test-setup.ts"],
     passWithNoTests: true,
+    // E2E specs in /e2e are run by Playwright, not vitest. The patterns
+    // below keep vitest focused on the unit-test surface under /src.
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    exclude: ["node_modules", "dist", "e2e", "playwright-report"],
     server: {
       deps: {
-        inline: [/solid-js/, /@solidjs/],
+        inline: [/solid-js/, /solidjs/],
       },
     },
   },
