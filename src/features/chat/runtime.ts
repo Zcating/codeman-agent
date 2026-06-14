@@ -1,4 +1,4 @@
-// AgentRuntime — wraps pi-mono's agent loop in an Effect Stream.
+// AgentRuntime — 将 pi-mono 的 agent loop 包装在 Effect Stream 中。
 import { Effect, Stream, Layer, Context, Ref } from "effect";
 import type { Message as PiMessage, Model } from "@mariozechner/pi-ai";
 import { Agent, ProviderTransport, type AgentTransport } from "@mariozechner/pi-agent";
@@ -10,7 +10,7 @@ import {
 } from "../../shared/lib/tauri";
 import type { Conversation, Message, ToolCall } from "../../shared/types";
 
-// ─── Runtime Event & Error types ─────────────────────────────────────────────
+// ─── Runtime 事件 & 错误类型 ─────────────────────────────────────────────
 
 export type RuntimeEvent =
   | { type: "token"; content: string }
@@ -26,10 +26,10 @@ export class RuntimeError extends Error {
   }
 }
 
-// ─── Billing tools (loaded from billing feature) ──────────────────────────────
+// ─── Billing 工具（从 billing feature 加载） ──────────────────────────────
 import { billingTools } from "../billing/tools/billing";
 
-// ─── Service definition ─────────────────────────────────────────────────────
+// ─── 服务定义 ─────────────────────────────────────────────────────
 
 export class AgentRuntime extends Context.Tag("AgentRuntime")<
   AgentRuntime,
@@ -47,31 +47,31 @@ export class AgentRuntime extends Context.Tag("AgentRuntime")<
 export const AgentRuntimeLive = Layer.effect(
   AgentRuntime,
   Effect.gen(function* () {
-    // Ref to the current Agent instance so cancel() can abort it.
-    // Only one run() is expected active per runtime instance at a time.
+    // 持有当前 Agent 实例的引用，以便 cancel() 可以中止它。
+    // 预期每个 runtime 实例同时只有一个 run() 处于活跃状态。
     const agentRef = yield* Ref.make<Agent | null>(null);
 
     const run = (
       conversation: Conversation,
       userMessage: Message,
     ): Stream.Stream<RuntimeEvent, never, never> => {
-      // Build the Stream via flatMap so context stays local to the inner Effect.
-      // The RuntimeDeps layer is provided via RuntimeLayer at the call site.
-      // Cast to the documented return type — services are in scope via RuntimeLayer.
+      // 通过 flatMap 构建 Stream，使 context 保持在内部 Effect 的局部作用域。
+      // RuntimeDeps layer 通过 RuntimeLayer 在调用处提供。
+      // Cast 为文档中声明的返回类型 — services 通过 RuntimeLayer 保持在作用域内。
       return (Stream.flatMap(
         Stream.fromEffect(
           Effect.gen(function* () {
             const settingsSvc = yield* SettingsService;
 
-            // Load settings and active provider
+            // 加载设置和活跃 provider
             const settings = yield* settingsSvc.getSettings();
             const activeProvider = yield* settingsSvc.getActiveLlmProvider();
             if (!activeProvider) {
               return Stream.fail(new RuntimeError("no active LLM provider"));
             }
 
-            // Resolve model from provider config
-            // TODO (T35): wire real Model from pi-ai getModel() once provider key is available
+            // 从 provider 配置解析 model
+            // TODO (T35): provider key 可用后，通过 pi-ai getModel() 接入真实 Model
             const model: Model<any> = {
               id: activeProvider.default_model ?? "auto",
               name: activeProvider.label,
@@ -85,22 +85,22 @@ export const AgentRuntimeLive = Layer.effect(
               maxTokens: 8192,
             };
 
-            // Build transport — uses getApiKey to fetch key via SettingsService IPC
-            // NOTE: ProviderTransport makes direct HTTP calls; in webview this requires
-            // a CORS proxy or the provider must support direct browser calls.
+            // 构建 transport — 使用 getApiKey 通过 SettingsService IPC 获取密钥
+            // 注意：ProviderTransport 发起直接 HTTP 调用；在 webview 中这需要
+            // CORS 代理或 provider 必须支持直接浏览器调用。
             const transport: AgentTransport = new ProviderTransport({
               getApiKey: async (_provider: string) => {
-                // API key lives in Tauri store (not keyring) — retrieved via IPC.
-                // TODO: call a dedicated Tauri command to fetch the LLM API key.
-                // For now this returns undefined and the transport falls back to env vars.
+                // API 密钥存在 Tauri store 中（非 keyring）— 通过 IPC 检索。
+                // TODO: 调用专用 Tauri 命令获取 LLM API 密钥。
+                // 目前这返回 undefined，transport 回退到 env 变量。
                 return undefined as string | undefined;
               },
             });
 
-            // Create agent with ProviderTransport and billing tools.
-            // Cast tools to `any` — pi-agent expects AgentTool (extends Tool with
-            // label+execute) but we only have Tool from pi-ai@0.73.1 (no AgentTool in
-            // that version; pi-agent@0.9.0 uses pi-ai@0.9.4 where AgentTool exists).
+            // 使用 ProviderTransport 和 billing 工具创建 agent。
+            // 对 tools cast 为 `any` — pi-agent 期望 AgentTool（扩展 Tool 带
+            // label+execute），但我们只有 pi-ai@0.73.1 的 Tool（该版本无 AgentTool；
+            // pi-agent@0.9.0 使用 pi-ai@0.9.4，其中 AgentTool 存在）。
             const agent = new Agent({
               transport,
               initialState: {
@@ -111,10 +111,10 @@ export const AgentRuntimeLive = Layer.effect(
               },
             });
 
-            // Store agent ref so cancel() can abort this run
+            // 存储 agent ref 以便 cancel() 可以中止此次运行
             yield* Ref.set(agentRef, agent);
 
-            // Subscribe to pi-agent events and map them to RuntimeEvent
+            // 订阅 pi-agent 事件并映射到 RuntimeEvent
             const eventQueue: RuntimeEvent[] = [];
             let finishResolve: (msgs: PiMessage[]) => void;
             const finishPromise = new Promise<PiMessage[]>((resolve) => {
@@ -163,9 +163,9 @@ export const AgentRuntimeLive = Layer.effect(
               }
             });
 
-            // Append user message to agent and run prompt.
-            // Cast through `any` to bridge pi-ai@0.73.1 vs pi-ai@0.9.4 version mismatch
-            // (AssistantMessage.api field type differs between versions).
+            // 向 agent 追加用户消息并运行 prompt。
+            // 通过 `any` cast 桥接 pi-ai@0.73.1 与 pi-ai@0.9.4 版本不匹配
+            //（AssistantMessage.api 字段类型在不同版本间不同）。
             agent.appendMessage({
               role: "user",
               content: userMessage.content,
@@ -180,7 +180,7 @@ export const AgentRuntimeLive = Layer.effect(
               finishResolve!([]);
             });
 
-            // Wait for agent_end, then emit done event
+            // 等待 agent_end，然后发送 done 事件
             const finalPiMessages = yield* Effect.promise(() => finishPromise);
             unsub();
 
@@ -211,7 +211,7 @@ export const AgentRuntimeLive = Layer.effect(
               eventQueue.push({ type: "done", message: doneMessage });
             }
 
-            // Clear agent ref
+            // 清除 agent ref
             yield* Ref.set(agentRef, null);
 
             return Stream.fromIterable(eventQueue);
@@ -233,7 +233,7 @@ export const AgentRuntimeLive = Layer.effect(
   }),
 );
 
-// ─── Layer composing all runtime dependencies ────────────────────────────────
+// ─── 组合所有 runtime 依赖的 Layer ────────────────────────────────
 
 export const RuntimeDeps = Layer.mergeAll(
   SettingsServiceLive,

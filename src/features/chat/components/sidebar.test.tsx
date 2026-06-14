@@ -1,17 +1,16 @@
-//! Sidebar component tests.
+//! Sidebar 组件测试。
 //!
-//! Consumes from the Effect→Solid bridge (../store/conversations).
+//! 从 Effect→Solid 桥接层消费（../store/conversations）。
 //!
-//! NOTE: solid-js uses conditional exports where jsdom (Node.js) resolves to
-//! server.js instead of browser builds. The onMount call fails with
-//! "Client-only API" in this environment. We test the bridge contract instead:
-//! when conversations$ returns [] and activeId$ returns null, the Sidebar
-//! structure (empty li with .p-3 .text-sm .text-zinc-500 .text-center .italic) is what gets rendered.
+//! 注意：solid-js 使用条件导出，jsdom（Node.js）解析为 server.js 而非 browser builds。
+//! onMount 调用在这个环境中会失败并报 "Client-only API"。
+//! 我们改为测试桥接契约：当 conversations$ 返回 [] 且 activeId$ 返回 null 时，
+//! Sidebar 结构（带有 .p-3 .text-sm .text-zinc-500 .text-center .italic 的空 li）被渲染。
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 
-// Mock the bridge first (before any Sidebar import).
+// 先 mock 桥接层（在任何 Sidebar 导入之前）。
 vi.mock("../store/conversations", () => ({
   conversations$: () => [],
   activeId$: () => null,
@@ -21,7 +20,7 @@ vi.mock("../store/conversations", () => ({
   deleteConversation: vi.fn(),
 }));
 
-// Inline mock for Sidebar — avoids the solid-js server-bundle issue.
+// Sidebar 的内联 mock — 避免 solid-js server-bundle 问题。
 vi.mock("./Sidebar", () => ({
   Sidebar: () => (
     <aside class="flex w-60 h-full flex-col bg-white dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700 p-2">
@@ -37,7 +36,7 @@ import { Sidebar } from "./sidebar";
 describe("Sidebar", () => {
   afterEach(() => cleanup());
 
-  it("renders empty list when no conversations", () => {
+  it("无会话时渲染空列表", () => {
     const { container } = render(() => <Sidebar />);
     expect(container.querySelector(".p-3")).toBeTruthy();
     expect(container.querySelector(".text-zinc-500")).toBeTruthy();

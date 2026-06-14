@@ -1,13 +1,13 @@
-//! System prompt Effect service.
+//! System prompt Effect 服务。
 //!
-//! Effect signature:
-//!   SystemPromptService exposes 4 methods; each returns
-//!   Effect<A, AppError, never>.
+//! Effect 签名：
+//!   SystemPromptService 暴露 4 个方法；每个返回
+//!   Effect<A, AppError, never>。
 //!
-//! System prompt resolution order (per S1):
-//!   1. Conversation's system_prompt override (if set)
-//!   2. Settings.system_prompt.default (global)
-//!   3. Empty string (or some hardcoded fallback)
+//! System prompt 解析顺序（按 S1）：
+//!   1. Conversation 的 system_prompt 覆盖（如已设置）
+//!   2. Settings.system_prompt.default（全局）
+//!   3. 空字符串（或某个硬编码回退值）
 
 import { Effect, Context, Layer } from "effect";
 import { SettingsService } from "../../../shared/lib/tauri";

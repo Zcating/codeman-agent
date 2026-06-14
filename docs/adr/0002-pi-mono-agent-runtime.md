@@ -1,62 +1,57 @@
-# ADR 0002 — pi-mono as the agent runtime
+# ADR 0002 — pi-mono 作为 agent 运行时
 
 - Status: Accepted
 - Date: 2026-06-13
-- Scope: codeman-agent V1 agent layer
+- Scope: codeman-agent V1 agent 层
 - Supersedes: none
-- Related: ADR 0001 (Tauri 2 + Solid.js shell)
+- Related: ADR 0001 (Tauri 2 + Solid.js 壳)
 
 ## Context
 
-codeman-agent pivots from a passive billing widget to an active
-desktop AI agent. V1 needs a real LLM agent loop with tool
-calling, streaming, and provider abstraction. We evaluated
-building the loop from scratch vs adopting an existing
-TypeScript agent framework.
+codeman-agent 从被动计费 widget 转型为主动桌面 AI agent。
+V1 需要一个真正的 LLM agent loop，支持工具调用、流式输出与
+provider 抽象。我们评估了从零构建 loop vs 引入现有 TypeScript
+agent 框架两种方案。
 
 ## Decision
 
-Adopt **pi-mono** (https://github.com/badlogic/pi-mono) as the
-agent runtime, with the agent loop and LLM provider abstraction
-shipped from `@mariozechner/pi-agent` and `@mariozechner/pi-ai`.
-Billing tools are registered in TypeScript as `@tool()` entries
-whose handlers invoke Rust adapters via Tauri IPC commands
-("T1" tool bridging).
+采用 **pi-mono**（https://github.com/badlogic/pi-mono）作为
+agent 运行时；agent loop 与 LLM provider 抽象由
+`@mariozechner/pi-agent` 与 `@mariozechner/pi-ai` 提供。
+计费工具以 TypeScript 端 `@tool()` 条目形式注册，其 handler
+通过 Tauri IPC 命令调用 Rust adapter（"T1" 工具桥接模式）。
 
 ## Considered options
 
-- **T1 (chosen)** — TS-side tool registration. The agent loop
-  lives in the Tauri webview; tools are defined next to the
-  agent code; tool handlers call Rust via `invoke()`.
-- **T2 — MCP server in Rust.** pi-agent acts as an MCP client.
-  Rejected: extra process boundary, +50–200ms latency per tool
-  call, more lifecycle code.
-- **T3 — custom RPC bridge.** Rejected: no upside, all the
-  complexity of T2 plus a non-standard protocol.
+- **T1（已选）** —— TS 端工具注册。agent loop 位于 Tauri
+  webview；工具定义在 agent 代码旁；tool handler 通过
+  `invoke()` 调用 Rust。
+- **T2 —— Rust 端 MCP server。** pi-agent 作为 MCP client。
+  拒绝：多一层进程边界、每次工具调用 +50–200ms 延迟、生命周期
+  代码更多。
+- **T3 —— 自定义 RPC bridge。** 拒绝：没有收益，只有 T2 的
+  复杂度加上非标准协议。
 
 ## Consequences
 
-- The agent loop is bound to the Tauri webview (V8 / Chromium
-  kernel). This is fine for `fetch`-based LLM calls; Node-only
-  APIs (e.g. `fs`, `process`) are not available. We avoid any
-  pi-mono code path that touches the filesystem directly —
-  anything file-shaped goes through Tauri commands.
-- Tool input/output schema is defined twice: once as a Zod
-  schema in TS (for pi-agent), once as a `Deserialize` impl
-  in Rust (for the adapter). Drift between the two is a
-  silent-bug source. We accept this as V1 debt and add a
-  comment in `src/agent/tools/billing.ts` flagging it. A
-  `ts-rs` / `specta` codegen pass is on the V2 roadmap.
-- Tool calls are synchronous from the agent's perspective:
-  the LLM blocks until the tool returns. Long-running billing
-  API calls (e.g. 30s timeout) freeze the agent. We accept
-  this for V1; streaming tool results are V2.
-- LLM provider support is whatever pi-mono ships with. When
-  they add a provider, we get it. When they remove one, we
-  lose it. No bespoke provider code in this repo.
+- agent loop 绑定到 Tauri webview（V8 / Chromium 内核）。这对
+  `fetch` 形式的 LLM 调用没问题；Node 专属 API（如 `fs`、
+  `process`）不可用。我们规避任何直接触文件系统的 pi-mono
+  代码路径 —— 所有 file 形态的东西走 Tauri 命令。
+- 工具 input / output schema 定义两次：一次为 TS 端 Zod schema
+  （给 pi-agent），一次为 Rust 端 `Deserialize` impl（给
+  adapter）。两者漂移是 silent-bug 来源。我们接受为 V1 技术
+  债，并在 `src/agent/tools/billing.ts` 中加注释标记。
+  `ts-rs` / `specta` codegen 已列入 V2 路线图。
+- 工具调用从 agent 视角是同步的：LLM 阻塞直到工具返回。长时
+  计费 API 调用（如 30s 超时）会冻结 agent。我们接受为 V1
+  行为；流式 tool result 在 V2。
+- LLM provider 支持以 pi-mono 发布版为准：他们加 provider 我
+  们就拥有，他们删 provider 我们就失去。本仓不写任何
+  bespoke provider 代码。
 
 ## References
 
-- pi-mono: https://github.com/badlogic/pi-mono
-- @mariozechner/pi-ai: LLM provider abstraction
-- @mariozechner/pi-agent: agent loop
+- pi-mono：https://github.com/badlogic/pi-mono
+- @mariozechner/pi-ai：LLM provider 抽象
+- @mariozechner/pi-agent：agent loop

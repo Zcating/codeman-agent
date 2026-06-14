@@ -1,11 +1,11 @@
-//! Effect → Solid bridge for conversations.
+//! Effect → Solid 会话桥接层。
 //!
-//! Effect dependencies (consumed via layers, NEVER re-exported):
-//! - ConversationService (Effect.Context.Tag from src/shared/lib/tauri.ts)
+//! Effect 依赖（通过 layers 消费，**永不**重新导出）：
+//! - ConversationService（来自 src/shared/lib/tauri.ts 的 Effect.Context.Tag）
 //!
-//! UI surface (consumed by Solid components):
-//! - conversations: Accessor<Conversation[]> — current list
-//! - activeId: Accessor<string | null> — selected conversation id
+//! UI 暴露（由 Solid 组件消费）：
+//! - conversations: Accessor<Conversation[]> — 当前列表
+//! - activeId: Accessor<string | null> — 已选会话 id
 //! - createConversation(): Promise<void>
 //! - selectConversation(id: string): void
 //! - archiveConversation(id: string): Promise<void>
@@ -16,15 +16,15 @@ import { Effect, Exit } from "effect";
 import { ConversationService, ConversationServiceLive } from "../../../shared/lib/tauri";
 import type { Conversation } from "../../../shared/types";
 
-// The runtime layer for the ConversationService. In a fuller implementation,
-// this would be composed with other service layers in an app-level layer.
+// ConversationService 的 runtime layer。在更完整的实现中，
+// 这会与 app-level layer 中的其他服务 layer 组合。
 const ConversationLayer = ConversationServiceLive;
 
-// Signals hold plain data, never Effect instances.
+// Signals 持有纯数据，绝不是 Effect 实例。
 const [conversations, setConversations] = createSignal<Conversation[]>([]);
 const [activeId, setActiveId] = createSignal<string | null>(null);
 
-/** Initial load: fetch all (non-archived) conversations from the service. */
+/** 初始加载：从服务获取所有（非归档）会话。 */
 export async function loadConversations(includeArchived = false): Promise<void> {
   const program = Effect.gen(function* () {
     const svc = yield* ConversationService;
@@ -37,13 +37,13 @@ export async function loadConversations(includeArchived = false): Promise<void> 
   }
 }
 
-/** UI-facing accessor. */
+/** UI 暴露的访问器。 */
 export const conversations$: Accessor<Conversation[]> = conversations;
 
-/** UI-facing accessor for the active conversation id. */
+/** UI 暴露的活跃会话 id 访问器。 */
 export const activeId$: Accessor<string | null> = activeId;
 
-/** Create a new conversation, refresh list on success. */
+/** 创建新会话，成功后刷新列表。 */
 export async function createConversation(title: string, systemPrompt?: string): Promise<void> {
   const program = Effect.gen(function* () {
     const svc = yield* ConversationService;
@@ -57,12 +57,12 @@ export async function createConversation(title: string, systemPrompt?: string): 
   }
 }
 
-/** Select a conversation (UI-only; no IPC). */
+/** 选择会话（仅 UI；无 IPC）。 */
 export function selectConversation(id: string): void {
   setActiveId(id);
 }
 
-/** Archive (soft-delete) a conversation. */
+/** 归档（软删除）会话。 */
 export async function archiveConversation(id: string): Promise<void> {
   const program = Effect.gen(function* () {
     const svc = yield* ConversationService;
@@ -76,7 +76,7 @@ export async function archiveConversation(id: string): Promise<void> {
   }
 }
 
-/** Hard-delete a conversation. */
+/** 硬删除会话。 */
 export async function deleteConversation(id: string): Promise<void> {
   const program = Effect.gen(function* () {
     const svc = yield* ConversationService;

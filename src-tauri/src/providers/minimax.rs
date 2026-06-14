@@ -1,11 +1,10 @@
-﻿//! MiniMax adapter.
+﻿//! MiniMax 适配器。
 //!
-//! The plan records the MiniMax plan-quota endpoint as TBD. The adapter
-//! is wired against a configurable URL that defaults to a placeholder
-//! and returns `ProviderError::EndpointNotConfigured` until a verified
-//! endpoint + response schema is documented in `CONTEXT.md`.
+//! 计划将 MiniMax plan-quota 端点记录为 TBD。适配器连接到一个可配置 URL，
+//! 默认为占位符，在经验证的端点 + 响应 schema 记录到 `CONTEXT.md` 之前
+//! 返回 `ProviderError::EndpointNotConfigured`。
 //!
-//! Expected response shape (assumed; verified at endpoint-promotion time):
+//! 预期响应形状（假设；端点升级时验证）：
 //! ```json
 //! {
 //!   "remaining": 1200000,
@@ -34,8 +33,7 @@ impl MiniMaxAdapter {
         }
     }
 
-    /// Override the endpoint. Used by tests and by future code that
-    /// reads a verified URL from settings.
+    /// 覆盖端点。供测试和未来从设置读取经验证 URL 的代码使用。
     #[allow(dead_code)]
     pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
         self.endpoint = endpoint.into();
@@ -89,10 +87,10 @@ impl Provider for MiniMaxAdapter {
         let payload: MiniMaxQuota = resp
             .json()
             .await
-            .map_err(|e| ProviderError::InvalidResponse(format!("json parse: {e}")))?;
+            .map_err(|e| ProviderError::InvalidResponse(format!("JSON 解析：{e}")))?;
         if payload.total == 0 {
             return Err(ProviderError::InvalidResponse(
-                "total quota must be > 0".into(),
+                "总配额必须 > 0".into(),
             ));
         }
 
@@ -129,7 +127,7 @@ mod tests {
     }
 
     #[test]
-    fn with_endpoint_overrides() {
+    fn with_endpoint_覆盖端点() {
         let a = MiniMaxAdapter::new().with_endpoint("https://example.test/quota");
         assert_eq!(a.endpoint, "https://example.test/quota");
     }
@@ -183,7 +181,7 @@ mod tests {
                 assert!(expires_at.is_some());
                 assert_eq!(daily_avg, Some(12_000));
             }
-            _ => panic!("expected plan_quota snapshot"),
+            _ => panic!("期望 plan_quota 快照"),
         }
     }
 

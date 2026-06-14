@@ -1,4 +1,4 @@
-//! ProviderCard — single LLM provider row in Settings → LLM tab.
+//! ProviderCard — Settings → LLM 选项卡中的单个 LLM provider 行。
 
 import { createSignal, Show } from "solid-js";
 import { Effect } from "effect";
@@ -28,7 +28,7 @@ export function ProviderCard(props: {
       setApiKey("");
       setEditing(false);
     } catch (e) {
-      console.error("[ProviderCard] setApiKey failed:", e);
+      console.error("[ProviderCard] setApiKey 失败：", e);
     }
   };
 
@@ -48,7 +48,7 @@ export function ProviderCard(props: {
       setTestStatus("ok");
       setTestMessage("API key configured");
     } catch (e) {
-      console.error("[ProviderCard] hasApiKey failed:", e);
+      console.error("[ProviderCard] hasApiKey 失败：", e);
       setTestStatus("fail");
       setTestMessage("Error checking API key");
     }

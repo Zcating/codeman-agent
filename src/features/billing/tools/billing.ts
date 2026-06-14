@@ -1,29 +1,28 @@
-//! Billing tools registered with the agent.
+//! 注册到 agent 的 Billing 工具。
 //!
-//! T1 tool bridging (ADR 0002): tool definitions live in TS (here),
-//! handlers invoke Rust adapters via Tauri IPC commands.
+//! T1 工具桥接（ADR 0002）：工具定义存在于 TS（此处），
+//! handlers 通过 Tauri IPC 命令调用 Rust 适配器。
 //!
-//! NOTE: Unlike the template in T18's spec, the installed pi-agent (0.9.0) and
-//! pi-ai (0.73.1) do NOT export a `tool()` factory with an `execute` field.
-//! The actual API is pi-ai's plain `Tool` interface (name, description, parameters).
-//! Tool execution is handled by pi-ai's agentLoop via ProviderTransport — the
-//! transport passes tools to the LLM and receives tool_call events; there is no
-//! per-tool execute callback.
+//! 注意：与 T18 spec 中的模板不同，安装的 pi-agent (0.9.0) 和
+//! pi-ai (0.73.1) **不**导出带 `execute` 字段的 `tool()` 工厂。
+//! 实际 API 是 pi-ai 的纯 `Tool` 接口（name、description、parameters）。
+//! 工具执行由 pi-ai 的 agentLoop 通过 ProviderTransport 处理 — transport
+//! 将 tools 传递给 LLM 并接收 tool_call 事件；没有 per-tool execute 回调。
 //!
-//! If a newer pi-mono version adds `tool()` with `execute`, this file can be
-//! refactored to use that API. For now, we export plain Tool objects.
+//! 如果新版 pi-mono 添加了带 `execute` 的 `tool()`，可以重构此文件
+//! 使用该 API。目前，我们导出纯 Tool 对象。
 //!
-//! Effect signature:
-//!   get_balance, get_plan_quota: each take a provider id, return a
-//!   Snapshot (Balance | PlanQuota). Errors propagate via the Tauri command's
-//!   Result<T, AppError>.
+//! Effect 签名：
+//!   get_balance、get_plan_quota：每个接受一个 provider id，返回
+//!   Snapshot（Balance | PlanQuota）。错误通过 Tauri 命令的
+//!   Result<T, AppError> 传播。
 
 import { Type } from "@mariozechner/pi-ai";
 import type { Tool } from "@mariozechner/pi-ai";
 
-// NOTE: The template showed `import { tool } from "@mariozechner/pi-agent"` but that
-// export does not exist in pi-agent 0.9.0. We use the actual pi-ai Tool interface.
-// Also note pi-ai uses TypeBox, not Zod. We convert Zod enums to TypeBox enums.
+// 注意：模板显示了 `import { tool } from "@mariozechner/pi-agent"` 但该
+// 导出在 pi-agent 0.9.0 中不存在。我们使用实际的 pi-ai Tool 接口。
+// 还要注意 pi-ai 使用 TypeBox，不是 Zod。我们将 Zod enum 转换为 TypeBox enum。
 const ProviderEnum = Type.Union([
   Type.Literal("deepseek"),
   Type.Literal("minimax"),
@@ -49,11 +48,11 @@ export const getPlanQuota: Tool = {
 
 export const billingTools: Tool[] = [getBalance, getPlanQuota];
 
-// NOTE on execute handling:
-// The pi-ai Tool interface has no execute field. Tool execution is done by
-// pi-ai's agentLoop: the transport sends tools[] to the LLM, receives
-// tool_call events, and the transport's stream function returns tool results.
-// The runtime (runtime.ts) subscribes to tool_execution_start/end events and
-// dispatches to the correct handler based on toolName.
-// For billing tools, the handler would call invoke("get_provider_snapshot", ...)
-// and return the Snapshot. This is T17's concern (wiring the event handler).
+// 关于 execute 处理的注意：
+// pi-ai Tool 接口没有 execute 字段。工具执行由 pi-ai 的 agentLoop 完成：
+// transport 将 tools[] 发送给 LLM，接收 tool_call 事件，
+// transport 的 stream 函数返回工具结果。
+// runtime（runtime.ts）订阅 tool_execution_start/end 事件并根据 toolName
+// 分发到正确的 handler。
+// 对于 billing 工具，handler 会调用 invoke("get_provider_snapshot", ...)
+// 并返回 Snapshot。这是 T17 的工作（连接事件 handler）。

@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-06-14
-- Scope: codeman-agent V1 frontend architecture (src/ structure + UI primitive stack)
+- Scope: codeman-agent V1 前端架构（src/ 结构 + UI 原子栈）
 
 ## Context
 

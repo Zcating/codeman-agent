@@ -1,4 +1,4 @@
-//! ChatView component tests.
+//! ChatView 组件测试。
 //!
 //! Mocked: conversations store, messages store, runtime services.
 
@@ -60,19 +60,17 @@ vi.mock("../runtime", () => ({
   RuntimeLayer: {},
 }));
 
-
-
 describe("ChatView", () => {
   afterEach(() => cleanup());
 
-  it("renders message list from messages$", () => {
+  it("从 messages$ 渲染消息列表", () => {
     const { container } = render(() => <ChatView />);
-    // MessageBubble outer wrapper has class `mb-3 flex w-full` (Tailwind utilities)
+    // MessageBubble 外层包装有 class `mb-3 flex w-full`（Tailwind utilities）
     const bubbles = container.querySelectorAll("div.mb-3");
     expect(bubbles.length).toBe(2);
   });
 
-  it("Send button is disabled when input is empty", () => {
+  it("输入为空时 Send 按钮禁用", () => {
     const { container } = render(() => <ChatView />);
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
     expect(textarea.value).toBe("");
@@ -80,15 +78,15 @@ describe("ChatView", () => {
     expect(submitBtn).toBeDisabled();
   });
 
-  it("running state shows Cancel button", async () => {
+  it("运行中状态显示 Cancel 按钮", async () => {
     const { container } = render(() => <ChatView />);
-    // The running state is internal to the component - we test that when running() is true,
-    // the Cancel button is shown instead of Send. We can verify the initial state shows Send.
+    // 运行状态在组件内部 - 我们测试当 running() 为 true 时，
+    // Cancel 按钮替代 Send 按钮出现。我们可以验证初始状态显示 Send。
     const submitBtn = container.querySelector('button[type="submit"]');
     expect(submitBtn?.textContent).toBe("Send");
-    // When running, the button would change to "Cancel" via the <Show> fallback.
-    // We can verify the structure is correct - there is a Show component with fallback.
+    // 当运行时，按钮会通过 <Show> fallback 变为 "Cancel"。
+    // 我们可以验证结构是正确的 - 有一个带 fallback 的 Show 组件。
     const cancelBtn = container.querySelector('button:not([type="submit"])');
-    expect(cancelBtn).toBeNull(); // No cancel button initially
+    expect(cancelBtn).toBeNull(); // 初始时无 cancel 按钮
   });
 });

@@ -1,8 +1,8 @@
-﻿//! Thin wrapper around the `keyring` crate that namespaces API keys
-//! under `codeman-agent/<provider>/api_key` in Windows Credential Manager.
+﻿//! 围绕 `keyring` crate 的薄包装，将 API 密钥命名空间化为
+//! Windows Credential Manager 中的 `codeman-agent/<provider>/api_key`。
 //!
-//! `Secret<String>` (see `types`) keeps the value out of logs; this
-//! module keeps it out of the settings JSON file.
+//! `Secret<String>`（见 `types`）将值排除在日志之外；此模块将其
+//! 排除在 settings JSON 文件之外。
 
 use crate::types::ProviderId;
 use keyring::Entry;
@@ -13,23 +13,22 @@ const SERVICE: &str = "codeman-agent";
 
 #[derive(Debug, Error)]
 pub enum SecretError {
-    #[error("keyring error: {0}")]
+    #[error("keyring 错误：{0}")]
     Keyring(#[from] keyring::Error),
-    #[error("provider not found: {0}")]
+    #[error("提供商未找到：{0}")]
     NotFound(String),
 }
 
-/// Store or replace the API key for `provider`.
+/// 存储或替换 `provider` 的 API 密钥。
 pub fn set_api_key(provider: ProviderId, value: &str) -> Result<(), SecretError> {
     let entry = Entry::new(SERVICE, &format!("{}/api_key", provider.as_str()))?;
     entry.set_password(value)?;
-    debug!("stored api key for {}", provider.as_str());
+    debug!("已存储 {} 的 API 密钥", provider.as_str());
     Ok(())
 }
 
-/// Read the API key for `provider`, returning `None` when the user has
-/// never saved one. The returned `String` should be wrapped in a
-/// `Secret<String>` before being passed around.
+/// 读取 `provider` 的 API 密钥，用户从未保存时返回 `None`。
+/// 返回的 `String` 在传递之前应包装在 `Secret<String>` 中。
 pub fn get_api_key(provider: ProviderId) -> Result<Option<String>, SecretError> {
     let entry = Entry::new(SERVICE, &format!("{}/api_key", provider.as_str()))?;
     match entry.get_password() {
@@ -39,24 +38,23 @@ pub fn get_api_key(provider: ProviderId) -> Result<Option<String>, SecretError> 
     }
 }
 
-/// Delete the stored API key for `provider`. No-op if absent.
+/// 删除存储的 `provider` API 密钥。不存在时无操作。
 pub fn delete_api_key(provider: ProviderId) -> Result<(), SecretError> {
     let entry = Entry::new(SERVICE, &format!("{}/api_key", provider.as_str()))?;
     match entry.delete_credential() {
         Ok(()) => {
-            debug!("deleted api key for {}", provider.as_str());
+            debug!("已删除 {} 的 API 密钥", provider.as_str());
             Ok(())
         }
         Err(keyring::Error::NoEntry) => Ok(()),
         Err(e) => {
-            warn!("failed to delete api key for {}: {e}", provider.as_str());
+            warn!("删除 {} 的 API 密钥失败：{e}", provider.as_str());
             Err(SecretError::Keyring(e))
         }
     }
 }
 
-/// Lightweight probe used by the settings UI to render the "API key
-/// configured" indicator without exposing the secret.
+/// 供设置 UI 使用的轻量探测，在不暴露密钥的情况下渲染"已配置 API 密钥"指示器。
 pub fn has_api_key(provider: ProviderId) -> bool {
     matches!(get_api_key(provider), Ok(Some(_)))
 }
@@ -65,12 +63,12 @@ pub fn has_api_key(provider: ProviderId) -> bool {
 mod tests {
     use super::*;
 
-    // These tests touch the real Windows Credential Manager and so are
-    // gated behind `keyring-test` so a normal `cargo test` does not
-    // require a credential store. They are ignored by default.
+    // 这些测试接触真实的 Windows Credential Manager，因此被关在
+    // `keyring-test` 后面，以便普通的 `cargo test` 不需要凭据存储。
+    // 它们默认被忽略。
 
     #[test]
-    #[ignore = "touches the OS credential store"]
+    #[ignore = "接触 OS 凭据存储"]
     fn round_trip_api_key() {
         let provider = ProviderId::Deepseek;
         set_api_key(provider, "hello").unwrap();

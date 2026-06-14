@@ -1,14 +1,12 @@
-﻿//! Domain types shared by adapters, scheduler, commands, and the frontend.
+﻿//! 适配器、调度器、命令和前端共用的域类型。
 //!
-//! See `CONTEXT.md` for the project vocabulary; the names here intentionally
-//! mirror that document.
+//! 项目词汇表见 `CONTEXT.md`；此处名称刻意与该文档一致。
 
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-/// Identifies a billing source. Stable string used in settings and as a
-/// keyring namespace prefix.
+/// 计费来源的标识符。稳定字符串，用于设置和 keyring 命名空间前缀。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ProviderId {
@@ -47,8 +45,7 @@ impl std::fmt::Display for ProviderId {
     }
 }
 
-/// The two billing shapes we surface. See `CONTEXT.md` for the rationale
-/// for keeping these visually distinct on the widget.
+/// 我们呈现的两种计费形态。保持视觉差异的原因见 `CONTEXT.md`。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProviderKind {
@@ -56,9 +53,8 @@ pub enum ProviderKind {
     PlanQuota,
 }
 
-/// A fetched billing state for a single provider. The variants are
-/// intentionally not collapsible: Balance and PlanQuota have different
-/// information density and the widget renders them with different layouts.
+/// 单个提供商的获取到的计费状态。变体故意不可合并：Balance 和 PlanQuota
+/// 信息密度不同，小部件用不同布局渲染。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Snapshot {
@@ -86,9 +82,8 @@ impl Snapshot {
     }
 }
 
-/// Result of a fetch wrapped with metadata the frontend wants regardless
-/// of success. We always emit something so the widget can show a stale
-/// state instead of going blank.
+/// 获取结果的包装，包含前端需要的中继数据，无论成功与否。
+/// 我们总是发出内容，这样部件可以显示过期状态而不是空白。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SnapshotEnvelope {
     pub provider: ProviderId,
@@ -98,9 +93,8 @@ pub struct SnapshotEnvelope {
     pub error: Option<String>,
 }
 
-/// A provider-agnostic description of a billing source. Used by the
-/// frontend to render the provider switcher without coupling to adapter
-/// internals.
+/// 提供商无关的计费来源描述。供前端渲染提供商切换器，
+/// 不与适配器内部耦合。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProviderDescriptor {
     pub id: ProviderId,
@@ -109,26 +103,24 @@ pub struct ProviderDescriptor {
     pub has_key: bool,
 }
 
-/// Errors surfaced from adapters. Generic enough to wrap reqwest, serde,
-/// keyring, and adapter-specific parsing failures without leaking API
-/// key material.
+/// 适配器抛出的错误。足够通用，可包装 reqwest、serde、keyring
+/// 和适配器特定的解析失败，而不泄露 API 密钥材料。
 #[derive(Debug, thiserror::Error)]
 pub enum ProviderError {
-    #[error("missing api key for provider {0}")]
+    #[error("缺少提供商 {0} 的 API 密钥")]
     MissingKey(ProviderId),
-    #[error("http error: {0}")]
+    #[error("HTTP 错误：{0}")]
     Http(#[from] reqwest::Error),
-    #[error("invalid response: {0}")]
+    #[error("响应无效：{0}")]
     InvalidResponse(String),
-    #[error("upstream error: {0}")]
+    #[error("上游错误：{0}")]
     Upstream(String),
-    #[error("endpoint not configured")]
+    #[error("端点未配置")]
     EndpointNotConfigured,
 }
 
-/// Newtype around `String` representing an API key. The `Debug` and
-/// `Display` impls are deliberately redacted so log statements and
-/// error chains never reveal the value.
+/// `String` 的 newtype，表示 API 密钥。`Debug` 和 `Display` 实现
+/// 故意遮挡，日志语句和错误链永不会暴露其值。
 #[derive(Clone)]
 pub struct Secret(String);
 
@@ -170,18 +162,18 @@ impl From<String> for Secret {
     }
 }
 
-/// Application-level errors for IPC commands. Typed `kind` enables
-/// the TS bridge to translate to typed errors without parsing strings.
+/// IPC 命令的应用级错误。类型化的 `kind` 使 TS 桥接层可以
+/// 转换为类型化错误，而无需解析字符串。
 #[derive(Debug, thiserror::Error, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum AppError {
-    #[error("not found: {message}")]
+    #[error("未找到：{message}")]
     NotFound { message: String },
-    #[error("invalid config: {message}")]
+    #[error("配置无效：{message}")]
     InvalidConfig { message: String },
-    #[error("unauthorized: {message}")]
+    #[error("未授权：{message}")]
     Unauthorized { message: String },
-    #[error("upstream error: {message}")]
+    #[error("上游错误：{message}")]
     Upstream { message: String },
 }
 

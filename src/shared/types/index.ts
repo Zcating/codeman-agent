@@ -1,6 +1,6 @@
-﻿//! Wire contract between Rust IPC and TS. Mirrors src-tauri/src/types.rs.
-//! All fields snake_case to match Rust serde. Add new types here, never
-//! import from Rust directly.
+﻿//! Rust IPC 与 TS 之间的导线契约。镜像 src-tauri/src/types.rs。
+//! 所有字段 snake_case 以匹配 Rust serde。在此处添加新类型，绝不
+//! 直接从 Rust 导入。
 
 // Settings — 25+ fields, 9 categories
 export interface Settings {

@@ -1,6 +1,6 @@
-//! ProviderCard component tests.
+//! ProviderCard 组件测试。
 //!
-//! Mocked: LLMProviderService Effect service via direct import.
+//! Mocked: LLMProviderService Effect 服务（通过直接导入）。
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
@@ -28,14 +28,14 @@ describe("ProviderCard", () => {
     vi.clearAllMocks();
   });
 
-  it("renders all 6 controls", () => {
+  it("渲染全部 6 个控件", () => {
     const onChange = vi.fn();
     const onDelete = vi.fn();
     const { container } = render(() => (
       <ProviderCard provider={mockProvider} onChange={onChange} onDelete={onDelete} />
     ));
 
-    // Card renders with rounded-lg border (Card 7 subcomponents)
+    // Card 渲染为 rounded-lg border（Card 7 子组件）
     expect(container.querySelector('[class*="rounded-lg"][class*="border"]')).toBeTruthy();
 
     // enabled checkbox
@@ -67,7 +67,7 @@ describe("ProviderCard", () => {
     expect(deleteBtn?.textContent).toBe("Delete");
   });
 
-  it('"Set API key" button toggles the input field', async () => {
+  it('"Set API key" 按钮切换输入字段', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     const onDelete = vi.fn();
@@ -75,14 +75,14 @@ describe("ProviderCard", () => {
       <ProviderCard provider={mockProvider} onChange={onChange} onDelete={onDelete} />
     ));
 
-    // Initially, no API key input visible (button is shown)
+    // 初始时，无 API key 输入可见（显示按钮）
     const setKeyBtn = container.querySelector('button');
     expect(setKeyBtn?.textContent).toContain("Set API key");
 
-    // Click "Set API key"
+    // 点击 "Set API key"
     await user.click(setKeyBtn!);
 
-    // Now the password input + Save + Cancel buttons should be visible
+    // 现在应显示 password 输入框 + Save + Cancel 按钮
     const passwordInput = container.querySelector('input[type="password"]');
     expect(passwordInput).toBeTruthy();
 
@@ -91,7 +91,7 @@ describe("ProviderCard", () => {
     expect(allBtns[1].textContent).toBe("Cancel");
   });
 
-  it("clicking Test shows fail status when no API key set", async () => {
+  it("点击 Test 在未设置 API key 时显示失败状态", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     const onDelete = vi.fn();
@@ -102,7 +102,7 @@ describe("ProviderCard", () => {
     const testBtn = container.querySelectorAll("button")[1];
     await user.click(testBtn!);
 
-    // Status span shows the fail message
+    // Status span 显示失败消息
     const status = Array.from(container.querySelectorAll('span')).find(s => s.textContent === "Set API key first");
     expect(status?.textContent).toBe("Set API key first");
   });

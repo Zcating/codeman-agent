@@ -1,38 +1,35 @@
-# src/features/billing — Billing Feature
+# src/features/billing/ — Billing Feature (计费域)
 
-> **Scope:** V1 billing tool schemas + types. No UI, no runtime wiring in this directory.
+> **Scope：** V1 billing 工具 schema + types。本目录无 UI，无 runtime 接入。
 
-## Directory Layout
+## 目录布局
 
 ```
 src/features/billing/
 ├── index.ts              # Barrel: exports tools + shared types
-├── AGENTS.md             # This file
+├── AGENTS.md             # 本文件
 └── tools/
     ├── billing.ts        # Tool definitions (getBalance, getPlanQuota, billingTools)
     └── billing.test.ts   # Effect service tests (BillingService mock)
 ```
 
-## What This Feature Contains
+## 本 Feature 包含的内容
 
-- **Tool schemas** (`billing.ts`): `getBalance` and `getPlanQuota` as pi-ai `Tool` objects.
-  - `getBalance`: fetches balance snapshot for DeepSeek/MiniMax.
-  - `getPlanQuota`: fetches plan quota snapshot for DeepSeek/MiniMax.
-  - Both use `Type.Object({ provider: ProviderEnum })` with `ProviderEnum = Union([Literal("deepseek"), Literal("minimax")])`.
+- **Tool schemas**（`billing.ts`）：`getBalance` 和 `getPlanQuota` 作为 pi-ai `Tool` 对象。
+  - `getBalance`：获取 DeepSeek/MiniMax 的余额快照。
+  - `getPlanQuota`：获取 DeepSeek/MiniMax 的套餐配额快照。
+  - 两者均使用 `Type.Object({ provider: ProviderEnum })`，`ProviderEnum = Union([Literal("deepseek"), Literal("minimax")])`。
 
-- **Types** (re-exported from `src/shared/types`):
-  - `Snapshot`, `Balance`, `PlanQuota`, `BillingProviderMeta`.
+- **Types**（从 `src/shared/types` 重新导出）：
+  - `Snapshot`、`Balance`、`PlanQuota`、`BillingProviderMeta`。
 
-## What This Feature Does NOT Contain
+## 本 Feature 不包含的内容
 
-- **No tool execution.** Tools are pure schema declarations. Execution is dispatched by the
-  chat runtime's `agent.subscribe` listener on `tool_execution_end` events — that lives in
-  `src/features/chat/runtime.ts`, not here.
+- **无工具执行。** 工具是纯 schema 声明。执行由 chat runtime 的 `agent.subscribe` 监听器在 `tool_execution_end` 事件上分发——该逻辑在 `src/features/chat/runtime.ts` 中，不在本目录。
 
-- **No IPC.** All billing IPC (`getSnapshot`, `hasKey`, `setKey`) lives in `BillingService`
-  (`src/shared/lib/tauri.ts`). Tools do not call IPC directly.
+- **无 IPC。** 所有 billing IPC（`getSnapshot`、`hasKey`、`setKey`）位于 `BillingService`（`src/shared/lib/tauri.ts`）。工具不直接调用 IPC。
 
-## How Tools Are Registered
+## 工具注册方式
 
 ```
 // src/features/chat/runtime.ts
@@ -43,34 +40,32 @@ new Agent({
   initialState: {
     systemPrompt: ...,
     model,
-    tools: billingTools as any,   // ← registered here
+    tools: billingTools as any,   // ← 在此注册
     messages: [],
   },
 });
 ```
 
-## Tests
+## 测试
 
-`billing.test.ts` uses `it.effect` + `Layer.succeed(BillingService, ...)` to mock the
-service. No real IPC; tests verify `getSnapshot` dispatches to the correct provider and
-that `hasKey` returns the right boolean per provider.
+`billing.test.ts` 使用 `it.effect` + `Layer.succeed(BillingService, ...)` 来 mock 服务。无真实 IPC；测试验证 `getSnapshot` 分发到正确的 provider，以及 `hasKey` 对每个 provider 返回正确的布尔值。
 
 ```bash
 pnpm test src/features/billing/tools/billing.test.ts
 ```
 
-## Importing From This Feature
+## 从本 Feature 导入
 
 ```ts
-// Import tools only
+// 仅导入工具
 import { billingTools } from "./features/billing/tools/billing";
 
-// Or via barrel
+// 或通过 barrel
 import { billingTools, getBalance, getPlanQuota } from "./features/billing";
 ```
 
-## Key Constraints
+## 关键约束
 
-- Do NOT add HTTP calls or IPC inside `tools/billing.ts`.
-- Do NOT add tool execution logic here — it belongs in the runtime's event dispatcher.
-- Do NOT add UI components here — billing UI (if any) belongs in `src/features/chat/components/`.
+- 禁止在 `tools/billing.ts` 内添加 HTTP 调用或 IPC。
+- 禁止在此添加工具执行逻辑——它属于 runtime 的事件分发器。
+- 禁止在此添加 UI 组件——billing UI（若有）属于 `src/features/chat/components/`。

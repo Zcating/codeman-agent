@@ -1,10 +1,10 @@
-//! LLM API key storage — Tauri store backed, NOT keyring.
+//! LLM API 密钥存储 — Tauri store 支持，**不是** keyring。
 //!
-//! Lower-security tier than billing keys (LLM keys only burn tokens).
-//! Stored under `llm_providers/<provider_id>/api_key` in the Tauri store.
+//! 安全等级低于计费密钥（LLM 密钥只会消耗 token）。
+//! 存储在 Tauri store 的 `llm_providers/<provider_id>/api_key` 下。
 //!
-//! Two-namespace rule (AGENTS.md): LLM keys go in Tauri store, billing keys
-//! go in Windows Credential Manager. Never mix.
+//! 双命名空间规则（AGENTS.md）：LLM 密钥进 Tauri store，计费密钥
+//! 进 Windows Credential Manager。永不混合。
 
 use crate::types::Secret;
 use log::{debug, warn};
@@ -18,38 +18,37 @@ fn store_key(provider_id: &str) -> String {
     format!("{KEY_PREFIX}/{provider_id}/api_key")
 }
 
-/// Store or replace the LLM API key for `provider_id`.
+/// 存储或替换 `provider_id` 的 LLM API 密钥。
 pub fn set_llm_key(app: &AppHandle, provider_id: &str, key: &str) -> Result<(), String> {
     let store = app
         .store(STORE_FILE)
-        .map_err(|e| format!("failed to open store: {e}"))?;
+        .map_err(|e| format!("打开存储失败：{e}"))?;
     store.set(store_key(provider_id), serde_json::json!(key));
     store
         .save()
-        .map_err(|e| format!("failed to save store: {e}"))?;
-    debug!(target: "secrets_llm", "stored LLM key for provider_id={}", provider_id);
+        .map_err(|e| format!("保存存储失败：{e}"))?;
+    debug!(target: "secrets_llm", "已存储 provider_id={} 的 LLM 密钥", provider_id);
     Ok(())
 }
 
-/// Read the LLM API key for `provider_id`, returning `None` when absent.
-/// The returned `Secret<String>` keeps the value out of logs.
+/// 读取 `provider_id` 的 LLM API 密钥，不存在时返回 `None`。
+/// 返回的 `Secret<String>` 将值排除在日志之外。
 pub fn get_llm_key(app: &AppHandle, provider_id: &str) -> Result<Option<Secret>, String> {
     let store = app
         .store(STORE_FILE)
-        .map_err(|e| format!("failed to open store: {e}"))?;
+        .map_err(|e| format!("打开存储失败：{e}"))?;
     let key = store_key(provider_id);
     match store.get(&key) {
         Some(serde_json::Value::String(value)) => Ok(Some(Secret::new(value))),
         Some(_) => {
-            warn!(target: "secrets_llm", "unexpected type for {}; expected String", key);
+            warn!(target: "secrets_llm", "{} 的类型意外；期望 String", key);
             Ok(None)
         }
         None => Ok(None),
     }
 }
 
-/// Lightweight probe used by the settings UI to render the "API key
-/// configured" indicator without exposing the secret value.
+/// 供设置 UI 使用的轻量探测，在不暴露密钥值的情况下渲染"已配置 API 密钥"指示器。
 pub fn has_llm_key(app: &AppHandle, provider_id: &str) -> bool {
     let store = match app.store(STORE_FILE) {
         Ok(s) => s,
@@ -59,22 +58,22 @@ pub fn has_llm_key(app: &AppHandle, provider_id: &str) -> bool {
     store.get(&key).is_some()
 }
 
-/// Delete the stored LLM API key for `provider_id`. No-op if absent.
+/// 删除存储的 `provider_id` LLM API 密钥。不存在时无操作。
 pub fn delete_llm_key(app: &AppHandle, provider_id: &str) -> Result<(), String> {
     let store = app
         .store(STORE_FILE)
-        .map_err(|e| format!("failed to open store: {e}"))?;
+        .map_err(|e| format!("打开存储失败：{e}"))?;
     let key = store_key(provider_id);
     match store.delete(&key) {
         true => {
             store
                 .save()
-                .map_err(|e| format!("failed to save store after delete: {e}"))?;
-            debug!(target: "secrets_llm", "deleted LLM key for provider_id={}", provider_id);
+                .map_err(|e| format!("删除后保存存储失败：{e}"))?;
+            debug!(target: "secrets_llm", "已删除 provider_id={} 的 LLM 密钥", provider_id);
             Ok(())
         }
         false => {
-            // Key was not present — treat as success (no-op)
+            // 密钥不存在——视为成功（无操作）
             Ok(())
         }
     }
@@ -82,5 +81,5 @@ pub fn delete_llm_key(app: &AppHandle, provider_id: &str) -> Result<(), String> 
 
 #[cfg(test)]
 mod tests {
-    // Integration test deferred to V2 — requires Tauri runtime compatibility.
+    // 集成测试推迟到 V2——需要 Tauri 运行时兼容性。
 }

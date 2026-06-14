@@ -1,6 +1,6 @@
-//! SystemPromptService Effect service tests.
+//! SystemPromptService Effect 服务测试。
 //!
-//! Effect signature:
+//! Effect 签名：
 //!   SystemPromptService.getDefault(): Effect<string, AppError>
 //!   SystemPromptService.updateDefault(newDefault): Effect<void, AppError>
 //!   SystemPromptService.getUserCanEdit(): Effect<boolean, AppError>
@@ -76,7 +76,7 @@ describe("SystemPromptService", () => {
     mockImpl.rejected = undefined;
   });
 
-  it.effect("getDefault returns system_prompt.default", () =>
+  it.effect("getDefault 返回 system_prompt.default", () =>
     Effect.gen(function* () {
       const svc = yield* SystemPromptService;
       const result = yield* svc.getDefault();
@@ -84,7 +84,7 @@ describe("SystemPromptService", () => {
     }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive))
   );
 
-  it.effect("updateDefault modifies the default system prompt", () =>
+  it.effect("updateDefault 修改默认系统提示词", () =>
     Effect.gen(function* () {
       const svc = yield* SystemPromptService;
       yield* svc.updateDefault("You are a pirate.");
@@ -93,7 +93,7 @@ describe("SystemPromptService", () => {
     }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive))
   );
 
-  it.effect("getUserCanEdit returns user_can_edit flag", () =>
+  it.effect("getUserCanEdit 返回 user_can_edit 标志", () =>
     Effect.gen(function* () {
       const svc = yield* SystemPromptService;
       const result = yield* svc.getUserCanEdit();
@@ -101,7 +101,7 @@ describe("SystemPromptService", () => {
     }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive))
   );
 
-  it.effect("forConversation returns conversation override when set", () =>
+  it.effect("forConversation 在设置覆盖时返回会话覆盖", () =>
     Effect.gen(function* () {
       const svc = yield* SystemPromptService;
       const result = yield* svc.forConversation(convWithPrompt);
@@ -109,7 +109,7 @@ describe("SystemPromptService", () => {
     }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive))
   );
 
-  it.effect("forConversation falls back to settings default when no override", () =>
+  it.effect("forConversation 在无覆盖时回退到 settings 默认值", () =>
     Effect.gen(function* () {
       const svc = yield* SystemPromptService;
       const result = yield* svc.forConversation(convWithoutPrompt);

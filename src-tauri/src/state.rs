@@ -1,8 +1,7 @@
-﻿//! Application state shared across the scheduler, commands.
+﻿//! 调度器、命令之间共享的应用状态。
 //!
-//! `AppState` is `Clone` (all fields are `Arc` / `parking_lot` guards) so
-//! it can be moved into a background task and read by Tauri commands
-//! through `tauri::State`.
+//! `AppState` 是 `Clone`（所有字段都是 `Arc` / `parking_lot` 守卫），
+//! 因此可以移动到后台任务中，并通过 `tauri::State` 被 Tauri 命令读取。
 
 use crate::providers::{Adapter, registry};
 use crate::secrets;
@@ -48,7 +47,7 @@ impl AppState {
             http: Client::builder()
                 .user_agent(concat!("codeman-agent/", env!("CARGO_PKG_VERSION")))
                 .build()
-                .expect("build http client"),
+                .expect("构建 HTTP 客户端失败"),
             wakeup: Arc::new(Notify::new()),
             snapshots: Arc::new(RwLock::new(HashMap::new())),
             app_handle,
@@ -73,7 +72,7 @@ impl AppState {
 
     pub fn set_active(&self, id: ProviderId) -> Result<(), String> {
         if self.registry.iter().all(|p| p.id() != id) {
-            return Err(format!("unknown provider: {id:?}"));
+            return Err(format!("未知提供商：{id:?}"));
         }
         {
             let mut g = self.active_id.write();
@@ -84,7 +83,7 @@ impl AppState {
         }
         self.persist_settings();
         self.wakeup.notify_one();
-        info!("active provider set to {id:?}");
+        info!("活动提供商已设置为 {id:?}");
         Ok(())
     }
 
@@ -105,7 +104,7 @@ impl AppState {
         let value = match serde_json::to_value(self.settings.read().clone()) {
             Ok(v) => v,
             Err(e) => {
-                warn!("failed to serialize settings: {e}");
+                warn!("序列化设置失败：{e}");
                 return;
             }
         };
@@ -113,16 +112,15 @@ impl AppState {
             Ok(store) => {
                 store.set(STORE_KEY, value);
                 if let Err(e) = store.save() {
-                    warn!("failed to save settings: {e}");
+                    warn!("保存设置失败：{e}");
                 }
             }
-            Err(e) => warn!("failed to open settings store: {e}"),
+            Err(e) => warn!("打开设置存储失败：{e}"),
         }
     }
 
-    /// Fetch a single provider immediately, updating the in-memory
-    /// envelope cache and emitting events. Returns the envelope so the
-    /// `test_provider` command can surface the result synchronously.
+    /// 立即获取单个提供商，更新内存中的 envelope 缓存并发送事件。
+    /// 返回 envelope 以便 `test_provider` 命令同步返回结果。
     pub async fn fetch_provider(
         &self,
         id: ProviderId,
@@ -132,7 +130,7 @@ impl AppState {
             .iter()
             .find(|p| p.id() == id)
             .cloned()
-            .ok_or_else(|| ProviderError::InvalidResponse("unknown provider".into()))?;
+            .ok_or_else(|| ProviderError::InvalidResponse("未知提供商".into()))?;
 
         let secret = secrets::get_api_key(id)
             .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?
@@ -161,7 +159,7 @@ impl AppState {
         match &result {
             Ok(snap) => {
                 if let Err(e) = self.app_handle.emit("snapshot-updated", &envelope) {
-                    warn!("emit snapshot-updated failed: {e}");
+                    warn!("发送 snapshot-updated 事件失败：{e}");
                 }
                 if !prev_breached && is_breached(snap, &settings) {
                     self.fire_threshold_notification(id, snap);
@@ -170,9 +168,9 @@ impl AppState {
             Err(err) => {
                 let payload = json!({ "provider": id, "error": err.to_string() });
                 if let Err(e) = self.app_handle.emit("refresh-failed", &payload) {
-                    warn!("emit refresh-failed failed: {e}");
+                    warn!("发送 refresh-failed 事件失败：{e}");
                 }
-                warn!("refresh failed for {id:?}: {err}");
+                warn!("{id:?} 刷新失败：{err}");
             }
         }
 
@@ -191,7 +189,7 @@ impl AppState {
     fn fire_threshold_notification(&self, id: ProviderId, snap: &Snapshot) {
         let (title, body) = match snap {
             Snapshot::Balance { amount, currency, .. } => (
-                format!("{} balance low", id.label()),
+                format!("{} 余额不足", id.label()),
                 format!("{} {}", amount, currency),
             ),
             Snapshot::PlanQuota {
@@ -205,11 +203,11 @@ impl AppState {
                 } else {
                     0.0
                 };
-                let mut body = format!("{}% remaining", pct as u32);
+                let mut body = format!("剩余 {}%", pct as u32);
                 if let Some(exp) = expires_at {
-                    body.push_str(&format!(" (until {})", exp.format("%Y-%m-%d")));
+                    body.push_str(&format!("（至 {}）", exp.format("%Y-%m-%d")));
                 }
-                (format!("{} quota low", id.label()), body)
+                (format!("{} 配额不足", id.label()), body)
             }
         };
 
@@ -224,10 +222,10 @@ impl AppState {
             Ok(()) => {
                 let payload = json!({ "provider": id, "snapshot": snap });
                 if let Err(e) = self.app_handle.emit("low-threshold-breached", &payload) {
-                    warn!("emit low-threshold-breached failed: {e}");
+                    warn!("发送 low-threshold-breached 事件失败：{e}");
                 }
             }
-            Err(e) => error!("notification show failed: {e}"),
+            Err(e) => error!("显示通知失败：{e}"),
         }
     }
 }
@@ -250,7 +248,7 @@ fn load_settings(app: &AppHandle) -> Option<Settings> {
     match serde_json::from_value::<Settings>(v) {
         Ok(s) => Some(s.sanitized()),
         Err(e) => {
-            warn!("settings parse failed: {e}; using defaults");
+            warn!("设置解析失败：{e}；使用默认值");
             None
         }
     }
@@ -261,11 +259,11 @@ mod tests {
     use super::*;
     use rust_decimal::Decimal;
 
-    // NOTE: low_balance_threshold / low_quota_threshold_pct fields were removed
-    // from Settings V1; corresponding tests are stubs pending redesign.
+    // 注意：low_balance_threshold / low_quota_threshold_pct 字段已从 Settings V1 中移除；
+    // 对应测试为桩，等待重新设计。
     #[test]
     fn breach_detects_low_balance() {
-        // Stub: always pass - threshold fields not yet on Settings.
+        // 桩：始终通过——阈值字段尚未在 Settings 上实现。
         let snap = Snapshot::Balance {
             amount: Decimal::new(821, 2),
             currency: "CNY".into(),
@@ -277,7 +275,7 @@ mod tests {
 
     #[test]
     fn breach_detects_low_quota_percentage() {
-        // Stub: always pass - threshold fields not yet on Settings.
+        // 桩：始终通过——阈值字段尚未在 Settings 上实现。
         let snap = Snapshot::PlanQuota {
             remaining: 100,
             total: 1000,
@@ -290,7 +288,7 @@ mod tests {
 
     #[test]
     fn breach_handles_zero_total_safely() {
-        // Stub: always pass - threshold fields not yet on Settings.
+        // 桩：始终通过——阈值字段尚未在 Settings 上实现。
         let snap = Snapshot::PlanQuota {
             remaining: 0,
             total: 0,
@@ -301,8 +299,7 @@ mod tests {
         assert!(!is_breached(&snap, &s));
     }
 
-    // `is_breached` is a pure function tested in state::tests (see above).
-    // AppState itself is a thin wrapper; testing the full apply->persist
-    // cycle would require a full AppHandle, which is left to integration
-    // tests.
+    // `is_breached` 是纯函数，在 state::tests 中测试（见上文）。
+    // AppState 本身是薄包装；要测试完整的 apply->persist
+    // 周期需要完整的 AppHandle，留给集成测试。
 }

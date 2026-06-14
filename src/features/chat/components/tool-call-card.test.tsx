@@ -1,7 +1,7 @@
-//! ToolCallCard component tests.
+//! ToolCallCard 组件测试。
 //!
-//! States: running (no result yet), success (result, no error), error (result with error).
-//! Pure UI component. No Effect imports. No store mocks needed.
+//! 状态：running（无结果）、success（result，无 error）、error（result 带 error）。
+//! 纯 UI 组件。无 Effect 导入。无 store mocks 需要。
 
 import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
@@ -11,7 +11,7 @@ import type { ToolCall, ToolResult } from "../../../shared/types";
 describe("ToolCallCard", () => {
   afterEach(() => cleanup());
 
-  it("running state: shows ⏳", () => {
+  it("运行中状态：显示 ⏳", () => {
     const toolCall: ToolCall = {
       id: "tc-1",
       name: "get_balance",
@@ -26,7 +26,7 @@ describe("ToolCallCard", () => {
     expect(name?.textContent).toBe("get_balance");
   });
 
-  it("success state: shows ✓", () => {
+  it("成功状态：显示 ✓", () => {
     const toolCall: ToolCall = {
       id: "tc-2",
       name: "get_balance",
@@ -46,7 +46,7 @@ describe("ToolCallCard", () => {
     expect(resultPre?.textContent).toContain("87.42");
   });
 
-  it("error state: shows ✗ + error message", () => {
+  it("错误状态：显示 ✗ + 错误消息", () => {
     const toolCall: ToolCall = {
       id: "tc-3",
       name: "get_balance",
@@ -66,7 +66,7 @@ describe("ToolCallCard", () => {
     expect(errorDiv?.textContent).toBe("API key not set");
   });
 
-  it("shows tool call arguments", () => {
+  it("显示工具调用参数", () => {
     const toolCall: ToolCall = {
       id: "tc-4",
       name: "get_balance",

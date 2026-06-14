@@ -1,7 +1,7 @@
-//! ToolCallCard — single tool invocation card.
+//! ToolCallCard — 单个工具调用卡片。
 //!
-//! States: running (no result yet), success (result, no error), error (result with error).
-//! Pure UI. No effect imports.
+//! 状态：running（尚无结果）、success（有结果无错误）、error（有错误的结果）。
+//! 纯 UI。不导入 effect。
 
 import { Show } from "solid-js";
 import type { ToolCall, ToolResult } from "../../../shared/types";

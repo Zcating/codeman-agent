@@ -1,14 +1,14 @@
-//! ConversationService Effect bridge tests.
+//! ConversationService Effect 桥接层测试。
 //!
-//! Tests the Effect → Solid bridge functions (loadConversations,
-//! createConversation, selectConversation) using a mock ConversationService.
+//! 测试 Effect → Solid 桥接函数（loadConversations、createConversation、selectConversation），
+//! 使用 mock ConversationService。
 
 import { describe, it, expect, beforeEach } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { ConversationService } from "../../../shared/lib/tauri";
 import type { AppError, Conversation } from "../../../shared/types";
 
-// Test fixtures
+// 测试 fixture
 const fixtureA: Conversation = {
   id: "conv-a",
   title: "Conversation A",
@@ -26,7 +26,7 @@ const fixtureB: Conversation = {
   archived_at: null,
 };
 
-// Mutable state to track calls
+// Mutable state 用于跟踪调用
 let listCalls: boolean[] = [];
 let getCalls: string[] = [];
 let createCalls: { title: string; systemPrompt?: string }[] = [];
@@ -57,7 +57,7 @@ const MockConversationServiceLive = Layer.succeed(ConversationService, {
   },
 });
 
-describe("ConversationService bridge", () => {
+describe("ConversationService 桥接层", () => {
   beforeEach(() => {
     listCalls = [];
     getCalls = [];
@@ -66,7 +66,7 @@ describe("ConversationService bridge", () => {
     deleteCalls = [];
   });
 
-  it.effect("list returns conversation array", () =>
+  it.effect("list 返回会话数组", () =>
     Effect.gen(function* () {
       const svc = yield* ConversationService;
       const result = yield* svc.list(false);
@@ -76,7 +76,7 @@ describe("ConversationService bridge", () => {
     }).pipe(Effect.provide(MockConversationServiceLive))
   );
 
-  it.effect("list passes includeArchived flag", () =>
+  it.effect("list 传递 includeArchived 标志", () =>
     Effect.gen(function* () {
       const svc = yield* ConversationService;
       yield* svc.list(true);
@@ -86,7 +86,7 @@ describe("ConversationService bridge", () => {
     }).pipe(Effect.provide(MockConversationServiceLive))
   );
 
-  it.effect("get returns fixture for known id", () =>
+  it.effect("get 对已知 id 返回 fixture", () =>
     Effect.gen(function* () {
       const svc = yield* ConversationService;
       const result = yield* svc.get(fixtureA.id);
@@ -94,7 +94,7 @@ describe("ConversationService bridge", () => {
     }).pipe(Effect.provide(MockConversationServiceLive))
   );
 
-  it.effect("get fails for unknown id", () =>
+  it.effect("get 对未知 id 失败", () =>
     Effect.gen(function* () {
       const svc = yield* ConversationService;
       const result = yield* Effect.exit(svc.get("unknown-id"));
@@ -102,7 +102,7 @@ describe("ConversationService bridge", () => {
     }).pipe(Effect.provide(MockConversationServiceLive))
   );
 
-  it.effect("create passes title and systemPrompt to service", () =>
+  it.effect("create 传递 title 和 systemPrompt 给服务", () =>
     Effect.gen(function* () {
       const svc = yield* ConversationService;
       yield* svc.create("New Chat", "custom system prompt");
@@ -110,7 +110,7 @@ describe("ConversationService bridge", () => {
     }).pipe(Effect.provide(MockConversationServiceLive))
   );
 
-  it.effect("archive calls service with correct id", () =>
+  it.effect("archive 用正确 id 调用服务", () =>
     Effect.gen(function* () {
       const svc = yield* ConversationService;
       yield* svc.archive("conv-b");
@@ -118,7 +118,7 @@ describe("ConversationService bridge", () => {
     }).pipe(Effect.provide(MockConversationServiceLive))
   );
 
-  it.effect("delete calls service with correct id", () =>
+  it.effect("delete 用正确 id 调用服务", () =>
     Effect.gen(function* () {
       const svc = yield* ConversationService;
       yield* svc.delete("conv-a");

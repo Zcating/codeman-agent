@@ -1,5 +1,5 @@
-//! Button — primary UI action primitive.
-//! 6 variants × 4 sizes via cva. Pattern from solidcn-ui/solidcn (Solid port of shadcn/ui).
+//! Button — 主要 UI 操作原子组件。
+//! 6 变体 × 4 尺寸 via cva。Pattern from solidcn-ui/solidcn (Solid port of shadcn/ui)。
 
 import { type VariantProps, cva } from "class-variance-authority";
 import type { Component, JSX } from "solid-js";

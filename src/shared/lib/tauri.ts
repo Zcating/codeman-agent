@@ -1,25 +1,25 @@
-﻿//! Effect-TS IPC layer — every command goes through here.
- //! Services are Effect.Context.Tag classes; UI imports from
- //! `src/agent/store/*.ts` (the bridge), NEVER directly from here.
+﻿//! Effect-TS IPC 层 — 所有命令都经过这里。
+ //! Services 是 Effect.Context.Tag 类；UI 从
+ //! `src/agent/store/*.ts`（桥接层）导入，**永不**直接从这里导入。
  //!
- //! Effect signatures:
+ //! Effect 签名：
  //!   invoke<T>(name, args): Effect<T, AppError>
-//!   ConversationService.list(includeArchived): Effect<Conversation[], AppError>
-//!   MessageService.list(conversationId): Effect<Message[], AppError>
-//!   (BillingService + SettingsService stubbed for now — Task 21)
+ //!   ConversationService.list(includeArchived): Effect<Conversation[], AppError>
+ //!   MessageService.list(conversationId): Effect<Message[], AppError>
+ //!   (BillingService + SettingsService 暂存根 — Task 21)
 
  import { Effect, Context, Layer } from "effect";
  import { invoke as tauriInvoke } from "@tauri-apps/api/core";
  import type { AppError, Conversation, Message, Settings, LLMProvider, BillingProviderMeta, Snapshot } from "../types";
 
- /** Raw Tauri invoke wrapped in Effect. */
+ /** 包装在 Effect 中的原始 Tauri invoke。 */
  export const invoke = <T>(name: string, args?: Record<string, unknown>): Effect.Effect<T, AppError> =>
    Effect.tryPromise({
      try: () => tauriInvoke<T>(name, args),
      catch: (e) => ({ kind: "Unknown" as const, message: String(e) }),
    });
 
- // ─── Service tags ──────────────────────────────────────────
+ // ─── Service 标签 ──────────────────────────────────────────
  export class ConversationService extends Context.Tag("ConversationService")<
    ConversationService,
    {
@@ -60,8 +60,8 @@
    }
  >() {}
 
- // ─── Live layers (stubbed: each service method fails with NotFound) ─
- // Filled in by Tasks 14 (Conversation/Message) and 21 (Settings).
+ // ─── Live layers（暂存根：每个服务方法以 NotFound 失败） ─
+ // 由 Tasks 14 (Conversation/Message) 和 21 (Settings) 填充。
 export const ConversationServiceLive = Layer.succeed(ConversationService, {
   list: (includeArchived) =>
     invoke<Conversation[]>("list_conversations", { includeArchived }),
@@ -103,7 +103,7 @@ export const MessageServiceLive = Layer.succeed(MessageService, {
      }),
  });
 
- // ─── Bridge functions (Promise-based, for Solid UI) ──────────────────────────
+ // ─── 桥接函数（基于 Promise，用于 Solid UI） ──────────────────────────
 
  export async function getSettingsBridge(): Promise<Settings> {
    const program = Effect.gen(function* () {

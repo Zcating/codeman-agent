@@ -1,5 +1,5 @@
-﻿//! Tauri IPC commands. Each command is a thin wrapper around
-//! `AppState` methods so the wiring stays centralized.
+﻿//! Tauri IPC 命令。每个命令都是围绕 `AppState` 方法的薄包装，
+//! 以便布线保持集中。
 
 use crate::db::conversations;
 use crate::db::messages;
@@ -63,8 +63,8 @@ pub async fn set_api_key(
         secrets::set_api_key(provider, &value).map_err(|e| e.to_string())?;
     }
     let stored = secrets::has_api_key(provider);
-    // Trigger a re-render so the settings UI updates the "key configured"
-    // indicator and a key-on-file change refreshes the active snapshot.
+    // 触发重新渲染，以更新设置 UI 中的"已配置密钥"指示器，
+    // 文件中密钥变更时刷新活动快照。
     state.wakeup.notify_one();
     Ok(stored)
 }
@@ -91,7 +91,7 @@ pub async fn latest_snapshot(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Conversation / Message IPC (Task 12)
+// 会话 / 消息 IPC（任务 12）
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -108,12 +108,12 @@ pub async fn get_conversation(
     id: String,
 ) -> Result<conversations::Conversation, AppError> {
     let uuid = Uuid::parse_str(&id).map_err(|e| AppError::InvalidConfig {
-        message: format!("bad uuid: {e}"),
+        message: format!("UUID 格式错误：{e}"),
     })?;
     conversations::get_conversation(pool.inner(), &uuid)
         .await?
         .ok_or_else(|| AppError::NotFound {
-            message: format!("conversation {id} not found"),
+            message: format!("会话 {id} 未找到"),
         })
 }
 
@@ -132,7 +132,7 @@ pub async fn archive_conversation(
     id: String,
 ) -> Result<(), AppError> {
     let uuid = Uuid::parse_str(&id).map_err(|e| AppError::InvalidConfig {
-        message: format!("bad uuid: {e}"),
+        message: format!("UUID 格式错误：{e}"),
     })?;
     Ok(conversations::archive_conversation(pool.inner(), &uuid).await?)
 }
@@ -143,7 +143,7 @@ pub async fn delete_conversation(
     id: String,
 ) -> Result<(), AppError> {
     let uuid = Uuid::parse_str(&id).map_err(|e| AppError::InvalidConfig {
-        message: format!("bad uuid: {e}"),
+        message: format!("UUID 格式错误：{e}"),
     })?;
     Ok(conversations::hard_delete_conversation(pool.inner(), &uuid).await?)
 }
@@ -154,7 +154,7 @@ pub async fn list_messages(
     conversation_id: String,
 ) -> Result<Vec<messages::Message>, AppError> {
     let uuid = Uuid::parse_str(&conversation_id).map_err(|e| AppError::InvalidConfig {
-        message: format!("bad uuid: {e}"),
+        message: format!("UUID 格式错误：{e}"),
     })?;
     Ok(messages::list_messages(pool.inner(), &uuid).await?)
 }
@@ -172,7 +172,7 @@ pub async fn append_message(
     output_tokens: Option<i64>,
 ) -> Result<messages::Message, AppError> {
     let uuid = Uuid::parse_str(&conversation_id).map_err(|e| AppError::InvalidConfig {
-        message: format!("bad uuid: {e}"),
+        message: format!("UUID 格式错误：{e}"),
     })?;
     Ok(messages::append_message(
         pool.inner(),
@@ -198,7 +198,7 @@ pub async fn search_messages(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Billing Snapshot IPC (Task 13)
+// 计费快照 IPC（任务 13）
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -244,7 +244,7 @@ pub async fn get_provider_snapshot(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Settings + LLM Key IPC (Tasks 22 / 31)
+// 设置 + LLM 密钥 IPC（任务 22 / 31）
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[tauri::command]

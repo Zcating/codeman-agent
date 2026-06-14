@@ -1,5 +1,5 @@
-//! Card — composite container primitive (7 sub-components).
-//! cn-only, single-file multi-export. Pattern from solidcn-ui/solidcn.
+//! Card — 复合容器原子组件（7 个子组件）。
+//! 纯 cn，单文件多导出。Pattern from solidcn-ui/solidcn。
 
 import type { Component, JSX } from "solid-js";
 import { splitProps } from "solid-js";

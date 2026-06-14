@@ -1,7 +1,7 @@
-//! Sidebar — conversation list with search.
+//! Sidebar — 带搜索的会话列表。
 //!
-//! Consumes from the Effect→Solid bridge (`../store/conversations`).
-//! Does NOT import 'effect' anywhere in this file.
+//! 消费来自 Effect→Solid 桥接层（`../store/conversations`）。
+//! 本文件任何位置都**不**导入 'effect'。
 
 import { createSignal, createEffect, For, onMount, onCleanup } from "solid-js";
 import { Plus } from "lucide-solid";
@@ -28,7 +28,7 @@ export function Sidebar() {
     if (debounceTimer) clearTimeout(debounceTimer);
   });
 
-  // Debounce search input (200ms).
+  // 防抖搜索输入（200ms）。
   createEffect(() => {
     const q = query();
     if (debounceTimer) clearTimeout(debounceTimer);

@@ -1,17 +1,13 @@
-﻿//! Background task that polls the active provider on a fixed interval
-//! and reacts to switch / force / settings events.
+﻿//! 后台任务，以固定间隔轮询活动提供商，并响应切换 / 强制 / 设置事件。
 //!
-//! Design:
+//! 设计：
 //!
-//! * A single async task, spawned in `lib.rs`, drives the loop.
-//! * Each iteration starts a fresh `fetch_active` future, then races it
-//!   against three wake-up signals:
-//!     - `tokio::time::sleep(interval)` for the periodic tick
-//!     - `state.wakeup` for switch / force-refresh / interval change
-//!   Whichever fires first cancels the fetch future (the underlying
-//!   HTTP request is dropped) and the loop re-enters with a fresh
-//!   fetch. Switches therefore abort any in-flight request for the old
-//!   active provider.
+//! * 单个异步任务，在 `lib.rs` 中生成，驱动循环。
+//! * 每次迭代启动一个新的 `fetch_active` future，然后与三个唤醒信号赛跑：
+//!     - `tokio::time::sleep(interval)` 用于定期 tick
+//!     - `state.wakeup` 用于切换 / 强制刷新 / 间隔变更
+//!   任何一个先触发都会取消 fetch future（底层 HTTP 请求被丢弃），
+//!   循环以新的 fetch 重新进入。因此，切换会中止旧活动提供商的任何飞行中请求。
 
 use crate::providers::Provider;
 use crate::state::AppState;
@@ -34,7 +30,7 @@ impl Scheduler {
     }
 
     pub async fn run(self) {
-        info!("scheduler starting");
+        info!("调度器启动");
         loop {
             let interval = self.state.get_settings().refresh_interval();
             let fetch = self.state.fetch_active();
@@ -43,25 +39,24 @@ impl Scheduler {
             tokio::select! {
                 result = &mut fetch => {
                     if let Err(e) = result {
-                        warn!("fetch error: {e}");
+                        warn!("获取错误：{e}");
                     }
                 }
                 _ = sleep(interval) => {
-                    // periodic tick: drop fetch, loop will retry
+                    // 定期 tick：丢弃 fetch，循环将重试
                 }
                 _ = self.state.wakeup.notified() => {
-                    // switch / force / interval change: drop fetch, retry
+                    // 切换 / 强制 / 间隔变更：丢弃 fetch，重试
                 }
             }
-            // Yield once so a tight wakeup loop can't starve the runtime.
+            // yield 一次，防止紧密唤醒循环饿死运行时。
             tokio::task::yield_now().await;
         }
     }
 }
 
-/// Minimal test double: returns a `PlanQuota` snapshot, increments a
-/// shared counter on every `fetch` call, and blocks for a configurable
-/// delay so a switch can race the in-flight call.
+/// 最小测试替身：返回 `PlanQuota` 快照，每次 `fetch` 调用递增共享计数器，
+/// 并阻塞可配置的延迟，以便切换可以与飞行中调用赛跑。
 pub struct FakeProvider {
     id: ProviderId,
     delay: Duration,
@@ -113,8 +108,8 @@ impl Provider for FakeProvider {
         _secret: &Secret,
     ) -> Result<Snapshot, crate::types::ProviderError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
-        // Sleep before the increment of `completed` so a future that
-        // gets dropped mid-sleep does NOT count as completed.
+        // 在 `completed` 递增之前 sleep，这样中途被丢弃的 future
+        // 不会算作已完成。
         tokio::time::sleep(self.delay).await;
         self.completed.fetch_add(1, Ordering::SeqCst);
         Ok(Snapshot::PlanQuota {
@@ -133,9 +128,8 @@ mod tests {
     use crate::settings::Settings;
     use crate::types::ProviderId;
 
-    /// A scheduler-driven loop only fetches the active provider. This
-    /// is the "single-focus" property from the plan: a non-active
-    /// adapter's `fetch` MUST NOT be called.
+    /// 调度器驱动的循环只获取活动提供商。
+    /// 这是计划中的"单一焦点"属性：非活动适配器的 `fetch` 不得被调用。
     #[tokio::test]
     async fn only_active_provider_is_polled() {
         let active = Arc::new(parking_lot::Mutex::new(ProviderId::Deepseek));
@@ -144,7 +138,7 @@ mod tests {
         let ds_calls = deepseek.call_counter_handle();
         let mx_calls = minimax.call_counter_handle();
 
-        // One iteration: fetch whatever the active provider is.
+        // 一次迭代：获取活动提供商。
         let id = *active.lock();
         let adapter: Adapter = if id == ProviderId::Deepseek {
             deepseek.clone()
@@ -156,7 +150,7 @@ mod tests {
         assert_eq!(ds_calls.load(Ordering::SeqCst), 1);
         assert_eq!(mx_calls.load(Ordering::SeqCst), 0);
 
-        // Switch active, fetch again — only the new active is hit.
+        // 切换活动，再获取——只命中新的活动提供商。
         *active.lock() = ProviderId::Minimax;
         let id = *active.lock();
         let adapter: Adapter = if id == ProviderId::Deepseek {
@@ -169,18 +163,16 @@ mod tests {
         assert_eq!(mx_calls.load(Ordering::SeqCst), 1);
     }
 
-    /// A switch during an in-flight fetch aborts the call: the call
-    /// counter increments (we DID start the request) but the completed
-    /// counter does NOT (the future was cancelled before its tail
-    /// ran). This mirrors the scheduler's `tokio::select!` race: a
-    /// `wakeup.notified()` from `set_active` drops the fetch future.
+    /// 飞行中 fetch 期间的切换会中止调用：调用计数器递增（我们确实开始了请求）
+    /// 但完成计数器不增（future 在其尾部运行之前被取消）。
+    /// 这镜像了调度器的 `tokio::select!` 赛跑：`set_active` 的
+    /// `wakeup.notified()` 会丢弃 fetch future。
     ///
-    /// We use `tokio::time::timeout` rather than `tokio::spawn` because
-    /// `fetch` borrows its `&Client` / `&Secret` inputs by reference;
-    /// the elided lifetime of those borrows is not `'static` and
-    /// `spawn` would reject them. `timeout` accepts non-`'static`
-    /// futures and drops them on expiry, which is the property under
-    /// test.
+    /// 我们使用 `tokio::time::timeout` 而不是 `tokio::spawn`，
+    /// 因为 `fetch` 通过引用借用 `&Client` / `&Secret` 输入；
+    /// 这些借用的隐去生命周期不是 `'static`，`spawn` 会拒绝它们。
+    /// `timeout` 接受非 `'static` 的 future 并在超时时丢弃它们，
+    /// 这正是测试的属性。
     #[tokio::test]
     async fn switch_aborts_in_flight_fetch() {
         let provider = Arc::new(FakeProvider::new(
@@ -192,27 +184,25 @@ mod tests {
 
         let client = Client::new();
         let secret = Secret::new("x");
-        // Race the fetch against a short timeout. The fetch is
-        // entered (sleep hasn't run) but never completed (sleep
-        // would have run past the timeout).
+        // 将 fetch 与短超时赛跑。fetch 被进入（sleep 尚未运行）
+        // 但从未完成（sleep 会运行超过超时）。
         let outcome = tokio::time::timeout(
             Duration::from_millis(20),
             provider.fetch(&client, &secret),
         )
         .await;
-        assert!(outcome.is_err(), "fetch should have been aborted");
+        assert!(outcome.is_err(), "fetch 应当被中止");
 
-        assert_eq!(calls.load(Ordering::SeqCst), 1, "fetch was entered");
+        assert_eq!(calls.load(Ordering::SeqCst), 1, "fetch 被进入");
         assert_eq!(
             completed.load(Ordering::SeqCst),
             0,
-            "fetch was aborted before completing"
+            "fetch 在完成前被中止"
         );
     }
 
-    /// The scheduler honors the configured refresh interval. We can't
-    /// easily drive the full `AppState` here, but we can assert the
-    /// timing primitive the scheduler uses: `sleep(interval)`.
+    /// 调度器遵守配置的刷新间隔。我们不能轻易驱动完整的 `AppState`，
+    /// 但可以断言调度器使用的时间原语：`sleep(interval)`。
     #[tokio::test]
     async fn sleep_honors_interval() {
         let started = std::time::Instant::now();
@@ -220,13 +210,12 @@ mod tests {
         assert!(started.elapsed() >= Duration::from_millis(50));
     }
 
-    /// `Settings::refresh_interval` is the source of truth for the
-    /// loop's period; a 0-value configuration is floored to
-    /// `MIN_REFRESH_SECS` so the loop cannot busy-spin.
+    /// `Settings::refresh_interval` 是循环周期的真实来源；
+    /// 0 值配置会被下限为 `MIN_REFRESH_SECS`，以防止循环忙等待。
     #[test]
     fn settings_refresh_interval_floors() {
         let mut s = Settings::default();
-        // Insert a provider with 0 refresh interval; Settings floors it.
+        // 插入刷新间隔为 0 的提供商；Settings 将其下限。
         s.billing_providers.push(crate::settings::BillingProviderConfig {
             id: "test".into(),
             enabled: true,

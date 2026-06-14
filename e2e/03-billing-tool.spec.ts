@@ -1,29 +1,27 @@
-//! 03 — Chat → billing tool call.
+//! 03 — 聊天 → billing 工具调用。
 //!
-//! The hardest spec. The chat runtime calls a real LLM through pi-mono, which
-//! would (a) require a real API key and (b) hit the network. We do NOT
-//! assert on the LLM response itself — that's the integration spec's job,
-//! not e2e's.
+//! 最难的 spec。聊天运行时通过 pi-mono 调用真实 LLM，这会
+//! (a) 需要真实 API key 和 (b) 访问网络。我们不
+//! 断言 LLM 响应本身 — 那是集成 spec 的工作，不是 e2e 的。
 //!
-//! What we DO assert:
-//!  1. The chat layout is interactive: textarea enabled, send clickable.
-//!  2. A new conversation can be created from the sidebar.
-//!  3. Sending a message appends a user-message bubble to the DOM
-//!     (verifies the full write path: ChatView → store → IPC → SQLite).
-//!  4. The assistant begins responding (streaming bubble appears within
-//!     a reasonable timeout) OR the agent errors out cleanly — both
-//!     outcomes are acceptable; we just want the runtime to not deadlock.
+//! 我们断言的内容：
+//!  1. 聊天布局可交互：textarea 启用，send 可点击。
+//!  2. 可以从 sidebar 创建新会话。
+//!  3. 发送消息将 user-message bubble 追加到 DOM
+//!     （验证完整写入路径：ChatView → store → IPC → SQLite）。
+//!  4. 助手开始响应（流式 bubble 在合理超时内出现）或
+//!     agent 干净地报错 — 两种结果都可接受；我们只希望运行时不要死锁。
 //!
-//! This is the "chat loop is alive" smoke test.
+//! 这是"聊天循环活着"烟雾测试。
 
 import { test, expect } from "@playwright/test";
 import { getTauriPage, clearAllHistory, disposeTauriPage } from "./helpers";
 
 const USER_PROMPT = "查一下 DeepSeek 余额";
 
-test.describe("03 — chat → billing tool", () => {
+test.describe("03 — 聊天 → billing 工具", () => {
 	test.beforeEach(async () => {
-		// Wipe leftover conversations so "new conversation" is the only one.
+		// 清除遗留会话，使 "new conversation" 是唯一的一个。
 		await clearAllHistory();
 	});
 
@@ -31,42 +29,41 @@ test.describe("03 — chat → billing tool", () => {
 		await disposeTauriPage();
 	});
 
-	test("send a message and verify the chat loop is alive", async () => {
+	test("发送消息并验证聊天循环活着", async () => {
 		const page = await getTauriPage();
 
-		// Start fresh from / (the Tauri dev URL).
-		// No need to navigate if we're already there; the global CDP page
-		// is the chat window by default.
+		// 从 / 开始（Tauri dev URL）。
+		// 不需要导航；如果已经在那里，global CDP page
+		// 默认就是聊天窗口。
 
-		// 1. Create a new conversation. This is required: ChatView refuses
-		//    to send without an activeId.
+		// 1. 创建新会话。这是必需的：ChatView 拒绝在没有 activeId 的情况下发送。
 		const newConvButton = page.locator('button[title="New conversation"]');
 		await expect(newConvButton).toBeVisible();
 		await newConvButton.click();
 
-		// 2. The textarea should be enabled and empty.
+		// 2. textarea 应启用且为空。
 		const textarea = page.locator('textarea[placeholder="Type a message…"]');
 		await expect(textarea).toBeEnabled();
 
-		// 3. Type and send.
+		// 3. 输入并发送。
 		await textarea.fill(USER_PROMPT);
 		await page.locator('button[type="submit"]').click();
 
-		// 4. The user bubble appears immediately (sync write to the store
-		//    + DB), so this assertion is the "write path works" check.
+		// 4. user bubble 立即出现（同步写入 store + DB），
+		//    所以这个断言是"写入路径正常"检查。
 		await expect(page.getByText(USER_PROMPT, { exact: false })).toBeVisible({
 			timeout: 5_000,
 		});
 
-		// 5. After a short wait, either:
-		//    - An assistant message bubble appears (LLM call succeeded, OR
-		//      errored but the runtime still rendered a placeholder), OR
-		//    - The send button is replaced by the Cancel button (the runtime
-		//      is still streaming, which is the OK signal — it didn't deadlock).
+		// 5. 稍等片刻后，二者之一：
+		//    - assistant message bubble 出现（LLM 调用成功，或
+		//      报错但运行时仍渲染了占位符），或
+		//    - Send 按钮被 Cancel 按钮替代（运行时仍在流式，
+		//      这是 OK 信号 — 它没有死锁）。
 		//
-		//    We do NOT time out aggressively: real LLM calls can take
-		//    10-20s on cold start, and a missing API key still produces a
-		//    long-enough "thinking" state. 30s is a reasonable budget.
+		//    我们不激进超时：真实 LLM 调用冷启动可能需要
+		//    10-20s，缺失 API key 仍会产生足够长的 "thinking" 状态。
+		//    30s 是合理的预算。
 		await expect(async () => {
 			const hasAssistantBubble =
 				(await page.locator("text=/^Assistant|^assistant|tool/i").count()) > 0;

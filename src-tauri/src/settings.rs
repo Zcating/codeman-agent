@@ -1,9 +1,8 @@
-﻿//! Typed settings store on top of `tauri-plugin-store`.
+﻿//! 基于 `tauri-plugin-store` 的类型化设置存储。
 //!
-//! The plugin persists a JSON file under the OS app-data directory. We
-//! read it on startup, apply defaults when fields are missing, and write
-//! the whole struct back when a field changes. API keys never live here;
-//! see `secrets`.
+//! 插件在 OS app-data 目录下持久化一个 JSON 文件。我们在启动时读取它，
+//! 字段缺失时应用默认值，字段变更时将整个结构体写回。API 密钥永不存于此；
+//! 见 `secrets`。
 
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -11,10 +10,10 @@ use std::time::Duration;
 const STORE_FILE: &str = "settings.json";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Helper types
+// 辅助类型
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Pixel dimensions for a window.
+/// 窗口的像素尺寸。
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Size {
     pub width: u32,
@@ -31,10 +30,10 @@ impl Default for Size {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Enums
+// 枚举
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// UI language preference.
+/// UI 语言偏好。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum UserLanguage {
@@ -49,7 +48,7 @@ impl Default for UserLanguage {
     }
 }
 
-/// Visual theme.
+/// 视觉主题。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Theme {
@@ -65,10 +64,10 @@ impl Default for Theme {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Sub-structs
+// 子结构体
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// A single LLM provider configuration.
+/// 单个 LLM 提供商配置。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LLMProvider {
     pub id: String,
@@ -78,7 +77,7 @@ pub struct LLMProvider {
     pub default_model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base_url: Option<String>,
-    /// Path into Tauri store where the API key lives.
+    /// API 密钥所在的 Tauri store 路径。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub api_key_ref: Option<String>,
 }
@@ -96,7 +95,7 @@ impl Default for LLMProvider {
     }
 }
 
-/// Window geometry and persistence preferences.
+/// 窗口几何形状和持久化偏好。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WindowSettings {
     pub remember_position: bool,
@@ -116,7 +115,7 @@ impl Default for WindowSettings {
     }
 }
 
-/// System-prompt template settings.
+/// 系统提示模板设置。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemPromptSettings {
     pub default: String,
@@ -132,14 +131,14 @@ impl Default for SystemPromptSettings {
     }
 }
 
-/// A single billing provider configuration.
+/// 单个计费提供商配置。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BillingProviderConfig {
     pub id: String,
     pub enabled: bool,
-    /// How often to poll this provider (seconds). Sanitized to >= 5.
+    /// 轮询此提供商的频率（秒）。清理后 >= 5。
     pub refresh_interval_secs: u64,
-    /// Path into keyring where the API key lives.
+    /// API 密钥所在的 keyring 路径。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub api_key_ref: Option<String>,
 }
@@ -155,12 +154,12 @@ impl Default for BillingProviderConfig {
     }
 }
 
-/// Conversation archival and retention limits.
+/// 会话归档和保留限制。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConversationSettings {
-    /// Auto-archive conversations older than this many days. Sanitized to >= 1.
+    /// 自动归档早于此天数的会话。清理后 >= 1。
     pub auto_archive_after_days: u32,
-    /// Maximum number of non-archived conversations. Sanitized to >= 10.
+    /// 非归档会话的最大数量。清理后 >= 10。
     pub max_history: u32,
 }
 
@@ -174,14 +173,14 @@ impl Default for ConversationSettings {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Settings
+// 设置
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// The complete V1 settings object.
+/// 完整的 V1 设置对象。
 ///
-/// All writes MUST go through `Settings::sanitized()` to enforce the
-/// invariants listed there.  See `CONTEXT.md` "Settings (V1 shape)" for the
-/// canonical schema (source of truth) and `src/lib/types.ts` for the TS mirror.
+/// 所有写入必须经过 `Settings::sanitized()` 以强制执行其列出的不变量。
+/// 规范 schema（权威来源）见 `CONTEXT.md"Settings (V1 shape)"`，
+/// TS 镜像见 `src/lib/types.ts`。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     // A. LLM providers
@@ -226,11 +225,11 @@ impl Default for Settings {
 }
 
 impl Settings {
-    /// Floor on refresh interval to avoid hammering provider APIs.
+    /// 刷新间隔的下限，避免疯狂请求提供商 API。
     pub const MIN_REFRESH_SECS: u64 = 5;
 
-    /// Returns the shortest refresh interval across all enabled billing
-    /// providers, floored at `MIN_REFRESH_SECS`.  Used by the scheduler.
+    /// 返回所有已启用计费提供商中的最短刷新间隔，
+    /// 以 `MIN_REFRESH_SECS` 为下限。由调度器使用。
     pub fn refresh_interval(&self) -> Duration {
         let secs = self
             .billing_providers
@@ -244,28 +243,28 @@ impl Settings {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Sanitization invariants (all clamp-up or clamp-range):
-    //   1. refresh_interval_secs >= 5   (clamp up)
-    //   2. low_quota_threshold_pct ∈ [0, 100]  (clamp to range)
-    //   3. low_balance_threshold >= 0   (clamp up)
-    //   4. auto_archive_after_days >= 1  (clamp up)
-    //   5. max_history >= 10            (clamp up)
+    // 清理不变量（全部为向上或范围钳制）：
+    //   1. refresh_interval_secs >= 5   （向上钳制）
+    //   2. low_quota_threshold_pct ∈ [0, 100]  （范围钳制）
+    //   3. low_balance_threshold >= 0   （向上钳制）
+    //   4. auto_archive_after_days >= 1  （向上钳制）
+    //   5. max_history >= 10            （向上钳制）
     // ─────────────────────────────────────────────────────────────────────────
 
     pub fn sanitized(mut self) -> Self {
-        // Invariant 1: refresh_interval_secs >= 5
+        // 不变量 1：refresh_interval_secs >= 5
         for provider in &mut self.billing_providers {
             if provider.refresh_interval_secs < Self::MIN_REFRESH_SECS {
                 provider.refresh_interval_secs = Self::MIN_REFRESH_SECS;
             }
         }
 
-        // Invariant 4: auto_archive_after_days >= 1
+        // 不变量 4：auto_archive_after_days >= 1
         if self.conversations.auto_archive_after_days < 1 {
             self.conversations.auto_archive_after_days = 1;
         }
 
-        // Invariant 5: max_history >= 10
+        // 不变量 5：max_history >= 10
         if self.conversations.max_history < 10 {
             self.conversations.max_history = 10;
         }

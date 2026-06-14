@@ -1,11 +1,10 @@
-﻿//! DeepSeek adapter.
+﻿//! DeepSeek 适配器。
 //!
-//! `GET https://api.deepseek.com/user/balance` with a bearer token.
-//! The upstream response lists one entry per currency; we aggregate to
-//! a single `Balance` snapshot using the first non-empty entry (and
-//! pick CNY by default if present, since the widget displays CNY).
+//! `GET https://api.deepseek.com/user/balance`，带 bearer token。
+//! 上游响应按货币列出条目；我们聚合为单个 `Balance` 快照，
+//! 使用第一个非空条目（如果存在则默认选择 CNY，因为小部件显示 CNY）。
 //!
-//! Response shape (per public docs):
+//! 响应形状（根据公开文档）：
 //! ```json
 //! {
 //!   "is_available": true,
@@ -89,15 +88,15 @@ impl Provider for DeepSeekAdapter {
         let payload: DeepSeekBalance = resp
             .json()
             .await
-            .map_err(|e| ProviderError::InvalidResponse(format!("json parse: {e}")))?;
+            .map_err(|e| ProviderError::InvalidResponse(format!("JSON 解析：{e}")))?;
         let entry = pick_balance_entry(&payload.balance_infos).ok_or_else(|| {
-            ProviderError::InvalidResponse("no balance_infos entries".into())
+            ProviderError::InvalidResponse("无 balance_infos 条目".into())
         })?;
 
         let amount = entry
             .balance
             .parse::<Decimal>()
-            .map_err(|e| ProviderError::InvalidResponse(format!("balance parse: {e}")))?;
+            .map_err(|e| ProviderError::InvalidResponse(format!("余额解析：{e}")))?;
 
         Ok(Snapshot::Balance {
             amount,
@@ -123,8 +122,8 @@ struct DeepSeekBalanceInfo {
     auto_recharge: Option<bool>,
 }
 
-/// Pick the entry to render. Prefer CNY (the widget's default currency);
-/// otherwise fall back to the first entry.
+/// 选择要渲染的条目。优先 CNY（小部件的默认货币）；
+/// 否则回退到第一个条目。
 fn pick_balance_entry(entries: &[DeepSeekBalanceInfo]) -> Option<&DeepSeekBalanceInfo> {
     entries
         .iter()
@@ -200,7 +199,7 @@ mod tests {
                 assert_eq!(currency, "CNY");
                 assert_eq!(auto_recharge, Some(true));
             }
-            _ => panic!("expected balance snapshot"),
+            _ => panic!("期望余额快照"),
         }
     }
 

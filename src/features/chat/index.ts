@@ -1,8 +1,7 @@
-//! Chat feature public API.
+//! Chat feature 公共 API。
 //!
-//! **Barrel exports for the chat feature.** Components, runtime, stores, and types
-//! are all reachable from this single entry point. Internal implementation details
-//! (e.g. the Effect Context tags) are NOT exported.
+//! **Chat feature 的 barrel 导出。** Components、runtime、stores 和 types
+//! 都可从这单一入口点访问。内部实现细节（如 Effect Context tags）**不**导出。
 
 export { ChatView } from "./components/chat-view";
 export { Sidebar } from "./components/sidebar";

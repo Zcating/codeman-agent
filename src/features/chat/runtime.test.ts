@@ -1,6 +1,6 @@
-//! AgentRuntime Effect service tests.
+//! AgentRuntime Effect 服务测试。
 //!
-//! Effect signature:
+//! Effect 签名：
 //!   AgentRuntime.run(conversation, userMessage): Stream<RuntimeEvent>
 //!   AgentRuntime.cancel(): Effect<void>
 
@@ -80,17 +80,17 @@ const MockBillingServiceLive = Layer.succeed(BillingService, {
 const MockRuntimeDeps = Layer.mergeAll(MockSettingsServiceLive, MockBillingServiceLive);
 
 describe("AgentRuntime", () => {
-  it.effect("runtime cancel sets agent.abort()", () =>
+  it.effect("runtime cancel 设置 agent.abort()", () =>
     Effect.gen(function* () {
       agentAborted = false;
       const runtime = yield* AgentRuntime;
-      // Cancel before any run — agentRef is null, should be no-op
+      // 在任何 run 之前取消 — agentRef 为 null，应该是 no-op
       yield* runtime.cancel();
       expect(agentAborted).toBe(false);
     }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps))
   );
 
-  it.effect("runtime service is constructible with all deps", () =>
+  it.effect("runtime 服务可构造且包含所有依赖", () =>
     Effect.gen(function* () {
       const runtime = yield* AgentRuntime;
       expect(runtime).toBeDefined();
@@ -99,12 +99,12 @@ describe("AgentRuntime", () => {
     }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps))
   );
 
-  it.effect("runtime.run returns a Stream (not undefined)", () =>
+  it.effect("runtime.run 返回 Stream（不是 undefined）", () =>
     Effect.gen(function* () {
       const runtime = yield* AgentRuntime;
       const stream = runtime.run(testConversation, testMessage);
       expect(stream).toBeDefined();
-      expect(typeof stream.pipe).toBe("function"); // Stream has pipe
+      expect(typeof stream.pipe).toBe("function"); // Stream 有 pipe
     }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps))
   );
 });

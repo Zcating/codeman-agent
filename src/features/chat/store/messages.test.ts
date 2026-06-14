@@ -1,7 +1,7 @@
-//! MessageService Effect bridge tests.
+//! MessageService Effect 桥接层测试。
 //!
-//! Tests the Effect → Solid bridge functions (loadMessages,
-//! appendUserMessage) using a mock MessageService.
+//! 测试 Effect → Solid 桥接函数（loadMessages、appendUserMessage），
+//! 使用 mock MessageService。
 
 import { describe, it, expect, beforeEach } from "@effect/vitest";
 import { Effect, Layer } from "effect";
@@ -53,14 +53,14 @@ const MockMessageServiceLive = Layer.succeed(MessageService, {
   },
 });
 
-describe("MessageService bridge", () => {
+describe("MessageService 桥接层", () => {
   beforeEach(() => {
     listCalls = [];
     appendCalls = [];
     searchCalls = [];
   });
 
-  it.effect("list returns messages for conv-1", () =>
+  it.effect("list 对 conv-1 返回消息", () =>
     Effect.gen(function* () {
       const svc = yield* MessageService;
       const result = yield* svc.list("conv-1");
@@ -70,7 +70,7 @@ describe("MessageService bridge", () => {
     }).pipe(Effect.provide(MockMessageServiceLive))
   );
 
-  it.effect("list passes conversationId to service", () =>
+  it.effect("list 传递 conversationId 给服务", () =>
     Effect.gen(function* () {
       const svc = yield* MessageService;
       yield* svc.list("conv-1");
@@ -79,7 +79,7 @@ describe("MessageService bridge", () => {
     }).pipe(Effect.provide(MockMessageServiceLive))
   );
 
-  it.effect("list returns empty for unknown conversation", () =>
+  it.effect("list 对未知会话返回空", () =>
     Effect.gen(function* () {
       const svc = yield* MessageService;
       const result = yield* svc.list("conv-99");
@@ -87,7 +87,7 @@ describe("MessageService bridge", () => {
     }).pipe(Effect.provide(MockMessageServiceLive))
   );
 
-  it.effect("append passes correct args to service", () =>
+  it.effect("append 传递正确参数给服务", () =>
     Effect.gen(function* () {
       const svc = yield* MessageService;
       yield* svc.append({ conversation_id: "conv-1", role: "user", content: "test" });
@@ -95,7 +95,7 @@ describe("MessageService bridge", () => {
     }).pipe(Effect.provide(MockMessageServiceLive))
   );
 
-  it.effect("append returns persisted message", () =>
+  it.effect("append 返回持久化的消息", () =>
     Effect.gen(function* () {
       const svc = yield* MessageService;
       const result = yield* svc.append({ conversation_id: "conv-1", role: "user", content: "test" });
@@ -104,7 +104,7 @@ describe("MessageService bridge", () => {
     }).pipe(Effect.provide(MockMessageServiceLive))
   );
 
-  it.effect("search passes query and limit to service", () =>
+  it.effect("search 传递 query 和 limit 给服务", () =>
     Effect.gen(function* () {
       const svc = yield* MessageService;
       yield* svc.search("hello", 10);
@@ -112,7 +112,7 @@ describe("MessageService bridge", () => {
     }).pipe(Effect.provide(MockMessageServiceLive))
   );
 
-  it.effect("search returns matching messages", () =>
+  it.effect("search 返回匹配的消息", () =>
     Effect.gen(function* () {
       const svc = yield* MessageService;
       const result = yield* svc.search("Hello", 5);

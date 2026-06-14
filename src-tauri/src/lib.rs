@@ -1,5 +1,4 @@
-﻿//! Crate root. Wires plugins, state, scheduler, and
-//! IPC commands into the Tauri runtime.
+﻿//! Crate 根。将插件、状态、调度器和 IPC 命令接入 Tauri 运行时。
 
 mod commands;
 mod db;
@@ -80,7 +79,7 @@ pub fn run() {
         .setup(|app| {
             let handle = app.handle().clone();
 
-            // Initialize DB pool and manage it for IPC commands (T11)
+            // 初始化 DB pool 并为 IPC 命令管理它（T11）
             let pool = tokio::runtime::Runtime::new()
                 .unwrap()
                 .block_on(db::connect(&handle))?;
@@ -88,29 +87,29 @@ pub fn run() {
 
             let state = AppState::new(handle.clone());
 
-            // Apply the persisted start-at-login setting.
+            // 应用持久化的开机自启设置。
             apply_autostart(&handle, state.get_settings().start_at_login);
 
-            // Build the native menu (File → Quit).
+            // 构建原生菜单（文件 → 退出）。
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, Some("CmdOrCtrl+Q"))?;
             let file_menu = Menu::with_items(app, &[&quit_item])?;
             app.set_menu(file_menu)?;
 
-            // Handle menu events.
+            // 处理菜单事件。
             app.on_menu_event(move |app, event| {
                 if event.id().as_ref() == "quit" {
                     app.exit(0);
                 }
             });
 
-            // Spawn the scheduler loop.
+            // 生成调度器循环。
             let scheduler_state = state.clone();
             tauri::async_runtime::spawn(async move {
                 Scheduler::new(scheduler_state).run().await;
             });
 
             app.manage(state);
-            info!("codeman-agent started");
+            info!("codeman-agent 已启动");
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -122,7 +121,7 @@ pub fn run() {
             }
         })
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("运行 Tauri 应用时出错");
 }
 
 #[cfg(desktop)]
@@ -135,7 +134,7 @@ fn apply_autostart(app: &tauri::AppHandle, enable: bool) {
         manager.disable()
     };
     if let Err(e) = result {
-        warn!("autostart toggle failed: {e}");
+        warn!("开机自启切换失败：{e}");
     } else {
         info!("autostart set to {enable}");
     }
@@ -143,6 +142,5 @@ fn apply_autostart(app: &tauri::AppHandle, enable: bool) {
 
 #[cfg(not(desktop))]
 fn apply_autostart(_app: &tauri::AppHandle, _enable: bool) {
-    // Autostart is a desktop-only concern; the autostart plugin itself
-    // is no-op on mobile.
+    // 开机自启是仅桌面端的问题；自动启动插件本身在移动端是无操作的。
 }

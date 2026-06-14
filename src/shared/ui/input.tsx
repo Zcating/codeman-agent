@@ -1,5 +1,5 @@
-//! Input — text-style input primitive (text/password/email/search/etc).
-//! cn-only, type 透传. Pattern from solidcn-ui/solidcn.
+//! Input — 文本风格输入原子组件（text/password/email/search 等）。
+//! 纯 cn，type 透传。Pattern from solidcn-ui/solidcn。
 
 import type { Component, ComponentProps } from "solid-js";
 import { splitProps } from "solid-js";

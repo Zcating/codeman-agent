@@ -1,14 +1,14 @@
-# src/features/chat/ — Chat Feature
+# src/features/chat/ — Chat Feature (聊天域)
 
-> **chat feature** = AgentRuntime + 2 stores + 4 components + routes. Billing tools (Wave 6) import from `src/features/chat/` once moved.
+> **chat feature** = AgentRuntime + 2 stores + 4 components + routes。Billing tools (Wave 6) import from `src/features/chat/` once moved。
 
-## Directory Layout
+## 目录布局
 
 ```
 src/features/chat/
 ├── index.ts              # Barrel — public API
 ├── runtime.ts           # AgentRuntime + RuntimeLayer + RuntimeDeps
-├── runtime.test.ts      # Runtime unit tests
+├── runtime.test.ts      # Runtime 单元测试
 │
 ├── store/
 │   ├── conversations.ts  # Effect → Solid bridge: conversations$ + CRUD
@@ -30,50 +30,50 @@ src/features/chat/
     └── index.tsx         # ChatLayout — Sidebar + ChatView + Settings link
 ```
 
-## Hard Constraints
+## 硬性规则
 
-- **UI components (`components/*.tsx`) must NOT import `effect`.** They are pure Solid signal consumers. Logic lives in `store/` and `runtime.ts`.
-- **`AgentRuntime` is a single-instance.** `AgentRuntimeLive` holds `Ref<Agent | null>`. Only one `run()` at a time. `cancel()` calls `agent.abort()`.
-- **Store is the only bridge layer.** `store/*.ts` converts Effect results to Solid signals via `Effect.runPromiseExit`. Components never call `Effect.runPromise` directly.
-- **No IPC from components.** All Tauri IPC goes through `src/shared/lib/tauri.ts` Service Tags.
-- **`Sidebar` uses `createSignal` for local state.** The `query` / `debouncedQuery` / `setQuery/setDebouncedQuery` signals are component-local and do NOT conflict with store exports.
+- **UI 组件（`components/*.tsx`）禁止导入 `effect`。** 它们是纯 Solid signal 消费者。逻辑层在 `store/` 和 `runtime.ts` 中。
+- **`AgentRuntime` 是单例。** `AgentRuntimeLive` 持有 `Ref<Agent | null>`。同一时间只有一个 `run()`。`cancel()` 调用 `agent.abort()`。
+- **Store 是唯一的桥接层。** `store/*.ts` 通过 `Effect.runPromiseExit` 将 Effect 结果转换为 Solid signals。组件永远不直接调用 `Effect.runPromise`。
+- **组件不调 IPC。** 所有 Tauri IPC 走 `src/shared/lib/tauri.ts` Service Tags。
+- **`Sidebar` 用 `createSignal` 做局部状态。** `query` / `debouncedQuery` / `setQuery/setDebouncedQuery` signals 是组件局部的，不与 store 导出冲突。
 
-## Runtime Events (5 variants)
+## Runtime 事件（5 变体）
 
-| Variant | Payload | UI Side Effect |
+| 变体 | Payload | UI 副作用 |
 |---|---|---|
 | `token` | `string` | `appendAssistantMessageDelta` |
 | `tool_call` | `ToolCall` | `appendToolCall` |
 | `tool_result` | `toolCallId + result + error?` | `finalizeToolResult` |
 | `done` | `Message` | `finalizeAssistantMessage` |
-| `error` | `{ message: string }` | logged only |
+| `error` | `{ message: string }` | 仅记录日志 |
 
-## pi-mono Version Drift (Known Issue)
+## pi-mono 版本漂移（已知问题）
 
-`runtime.ts` has `// pi-ai@0.73.1 vs pi-agent@0.9.0 type drift — `as any` bridge` at line ~119.
-`pi-ai@0.73.1` exports `Tool` (no `AgentTool`). `pi-agent@0.9.0` expects `AgentTool` (has `label + execute`).
-Current workaround: `as any` cast on `billingTools`. **Before upgrading pi-ai**, remove the `as any` cast and wire real Model via `getModel()`.
+`runtime.ts` 在 ~119 行有 `// pi-ai@0.73.1 vs pi-agent@0.9.0 type drift — `as any` bridge`。
+`pi-ai@0.73.1` 导出 `Tool`（无 `AgentTool`）。`pi-agent@0.9.0` 期望 `AgentTool`（有 `label + execute`）。
+当前 workaround：`billingTools` 上的 `as any` 转换。**升级 pi-ai 前**，移除 `as any` 转换并通过 `getModel()` 接入真实 Model。
 
-## Test Patterns
+## 测试模式
 
-| Layer | Test file | Framework |
+| 层 | 测试文件 | 框架 |
 |---|---|---|
 | Runtime | `runtime.test.ts` | `@effect/vitest` + `it.effect()` + `Layer.succeed` |
 | Store | `store/*.test.ts` | `@effect/vitest` + `it.effect()` + `Layer.succeed` |
 | Components | `components/*.test.tsx` | `vitest` + `@solidjs/testing-library` + `render` |
 
-Component tests mock the store module via `vi.mock("../store/X")`. Runtime tests provide mock `SettingsService` + `BillingService` via `Layer.mergeAll`.
+Component tests 通过 `vi.mock("../store/X")` mock store 模块。Runtime tests 通过 `Layer.mergeAll` 提供 mock `SettingsService` + `BillingService`。
 
-## Icon Strategy
+## 图标策略
 
-Icons come from **lucide-solid** (already a project dependency). Do NOT use emoji in new code.
-Existing emoji (`⏳ ✓ ✗`) in `tool-call-card.tsx` are grandfathered; new UI uses lucide-solid.
+图标来自 **lucide-solid**（已是项目依赖）。新代码中不要使用 emoji。
+`tool-call-card.tsx` 中已有的 emoji（`⏳ ✓ ✗`）暂保留；新 UI 使用 lucide-solid。
 
-## Wave 4 Notes
+## Wave 4 笔记
 
-- All files migrated from `src/agent/` → `src/features/chat/`
-- Import paths updated: `../../lib/tauri` → `../../../shared/lib/tauri`, etc.
-- `routes/index.tsx` updated: `../agent/components/*` → `../../agent/components/*`
-- `lucide-solid` icons added: `Plus` in `sidebar.tsx`, `Send`/`X` in `chat-view.tsx`, `Settings` in `routes/index.tsx`
-- `runtime.test.ts` migrated alongside `runtime.ts` (test stays with impl)
-- Old files in `src/agent/` and `src/routes/index.tsx` left in place for Wave 7 cleanup
+- 所有文件从 `src/agent/` → `src/features/chat/` 迁移
+- Import 路径更新：`../../lib/tauri` → `../../../shared/lib/tauri` 等
+- `routes/index.tsx` 更新：`../agent/components/*` → `../../agent/components/*`
+- `lucide-solid` 图标已添加：`sidebar.tsx` 中的 `Plus`，`chat-view.tsx` 中的 `Send`/`X`，`routes/index.tsx` 中的 `Settings`
+- `runtime.test.ts` 随 `runtime.ts` 一起迁移（测试与实现同目录）
+- `src/agent/` 和 `src/routes/index.tsx` 中的旧文件保留，供 Wave 7 清理

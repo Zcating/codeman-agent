@@ -1,5 +1,5 @@
-//! Checkbox — boolean toggle primitive.
-//! cn-only, native <input type="checkbox"> wrapper. No Kobalte/Radix (V1 exclusion).
+//! Checkbox — 布尔切换原子组件。
+//! 纯 cn，原生 <input type="checkbox"> 包装器。无 Kobalte/Radix（V1 排除）。
 
 import type { Component, ComponentProps } from "solid-js";
 import { splitProps } from "solid-js";

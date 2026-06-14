@@ -1,11 +1,11 @@
-//! LLM provider Effect service (CRUD + API keys).
+//! LLM provider Effect 服务（CRUD + API 密钥）。
 //!
-//! Effect signature:
-//!   LLMProviderService exposes 7 methods; each returns
-//!   Effect<A, AppError, never>.
+//! Effect 签名：
+//!   LLMProviderService 暴露 7 个方法；每个返回
+//!   Effect<A, AppError, never>。
 //!
-//! The api_key is stored in Tauri store (NOT in Settings JSON, NOT in
-//! keyring). Two-namespace rule (AGENTS.md).
+//! api_key 存储在 Tauri store 中（**不**在 Settings JSON 中，**不**
+//! 在 keyring 中）。双命名空间规则（AGENTS.md）。
 
 import { Effect, Context, Layer } from "effect";
 import { invoke, SettingsServiceLive } from "../../../shared/lib/tauri";
@@ -70,7 +70,7 @@ export const LLMProviderServiceLive = Layer.effect(
   }),
 );
 
-// ─── Bridge functions (Promise-based, for Solid UI) ───────────────────────────
+// ─── 桥接函数（基于 Promise，用于 Solid UI） ───────────────────────────
 
 export async function setApiKeyForProvider(id: string, key: string): Promise<void> {
   const program = Effect.gen(function* () {

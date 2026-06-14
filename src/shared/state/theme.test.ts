@@ -1,12 +1,12 @@
-//! Theme bridge tests — verifies .dark class application on <html>.
+//! Theme 桥接层测试 — 验证 .dark 类应用于 <html>。
 //!
-//! Mocks getSettingsBridge to return specific Settings.theme values.
-//! Mocks matchMedia for system-theme resolution.
+//! 通过 mock getSettingsBridge 返回特定 Settings.theme 值。
+//! Mock matchMedia 用于 system-theme 解析。
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { Settings } from "../types";
 
-// Mutable mock settings — set in each test before importing
+// Mutable mock settings — 在每个测试导入前设置
 let mockTheme: Settings["theme"] = "dark";
 
 vi.mock("../lib/tauri", () => ({
@@ -27,33 +27,33 @@ vi.mock("../lib/tauri", () => ({
   }),
 }));
 
-// Import after vi.mock so the mock is applied
+// 在 vi.mock 之后导入，使 mock 生效
 import { startThemeSync, _resetThemeSync } from "./theme";
 
-describe("startThemeSync — .dark class application", () => {
-  // Reset document state AND module-level started flag before each test
+describe("startThemeSync — .dark 类应用", () => {
+  // 每个测试前重置 document 状态和模块级 started 标志
   beforeEach(() => {
     _resetThemeSync();
     document.documentElement.classList.remove("dark");
-    mockTheme = "dark"; // default
+    mockTheme = "dark"; // 默认值
   });
 
-  it("theme='dark' → adds .dark class to documentElement", async () => {
+  it("theme='dark' → 向 documentElement 添加 .dark 类", async () => {
     mockTheme = "dark";
     startThemeSync();
     await new Promise((r) => setTimeout(r, 10));
     expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
 
-  it("theme='light' → removes .dark class from documentElement", async () => {
-    document.documentElement.classList.add("dark"); // Pre-set from previous dark theme
+  it("theme='light' → 从 documentElement 移除 .dark 类", async () => {
+    document.documentElement.classList.add("dark"); // 从上一个 dark 主题预设置
     mockTheme = "light";
     startThemeSync();
     await new Promise((r) => setTimeout(r, 10));
     expect(document.documentElement.classList.contains("dark")).toBe(false);
   });
 
-  it("theme='system' + prefers-color-scheme:dark → adds .dark class", async () => {
+  it("theme='system' + prefers-color-scheme:dark → 添加 .dark 类", async () => {
     const listenerRegistry: Array<(e: MediaQueryListEvent) => void> = [];
     Object.defineProperty(window, "matchMedia", {
       writable: true,
@@ -76,7 +76,7 @@ describe("startThemeSync — .dark class application", () => {
 
     expect(document.documentElement.classList.contains("dark")).toBe(true);
 
-    // Cleanup
+    // 清理
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockReturnValue({
@@ -88,8 +88,8 @@ describe("startThemeSync — .dark class application", () => {
     });
   });
 
-  it("theme='system' + prefers-color-scheme:light → removes .dark class", async () => {
-    document.documentElement.classList.add("dark"); // Pre-set to verify removal
+  it("theme='system' + prefers-color-scheme:light → 移除 .dark 类", async () => {
+    document.documentElement.classList.add("dark"); // 预设置以验证移除
 
     Object.defineProperty(window, "matchMedia", {
       writable: true,
@@ -108,13 +108,13 @@ describe("startThemeSync — .dark class application", () => {
     expect(document.documentElement.classList.contains("dark")).toBe(false);
   });
 
-  it("startThemeSync() called twice → does not double-apply", async () => {
+  it("startThemeSync() 调用两次 → 不会重复应用", async () => {
     mockTheme = "dark";
     startThemeSync();
     startThemeSync();
     await new Promise((r) => setTimeout(r, 20));
 
-    // Only one .dark class should be present
+    // 只应存在一个 .dark 类
     const darkClassCount = document.documentElement.classList.value.split(" ").filter((c) => c === "dark").length;
     expect(darkClassCount).toBe(1);
   });

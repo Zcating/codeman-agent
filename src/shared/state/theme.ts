@@ -1,30 +1,30 @@
-//! Effect → Solid bridge for theme.
+//! Effect → Solid 主题桥接层。
 //!
-//! Bridges Settings.theme (light/dark/system) to <html class="dark">.
-//! Tailwind v4 dark variant is triggered by the .dark class.
+//! 将 Settings.theme (light/dark/system) 桥接到 <html class="dark">。
+//! Tailwind v4 dark variant 由 .dark class 触发。
 //!
-//! UI surface:
-//! - theme$: Accessor<"light" | "dark"> — resolved effective theme
-//! - startThemeSync(): void — idempotent; starts polling + media listener
+//! UI 暴露：
+//! - theme$: Accessor<"light" | "dark"> — 已解析的有效主题
+//! - startThemeSync(): void — 幂等；启动轮询 + media listener
 
 import { createSignal, type Accessor } from "solid-js";
 import { getSettingsBridge } from "../lib/tauri";
 
-// Module-level state — survives multiple startThemeSync() calls within a session.
-// Note: in dev this is never cleaned up (no onCleanup in the store pattern).
-// Production use: call startThemeSync() once from ChatView onMount.
+// 模块级状态 — 在同一 session 内多次调用 startThemeSync() 时保持。
+// 注意：开发环境下从不清理（store 模式中无 onCleanup）。
+// 生产使用：从 ChatView onMount 调用一次 startThemeSync()。
 let started = false;
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let mediaQuery: MediaQueryList | null = null;
 let mediaQueryListener: ((e: MediaQueryListEvent) => void) | null = null;
 
-// Resolved theme signal — only ever "light" or "dark" (never "system")
+// 已解析主题 signal — 只会是 "light" 或 "dark"（绝不是 "system"）
 const [theme, setTheme] = createSignal<"light" | "dark">("light");
 
-/** UI-facing accessor for the resolved theme. */
+/** UI 暴露的已解析主题访问器。 */
 export const theme$: Accessor<"light" | "dark"> = theme;
 
-/** Resolve system preference to "light" or "dark". */
+/** 将系统偏好解析为 "light" 或 "dark"。 */
 function resolveSystemTheme(): "light" | "dark" {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
     return "light";
@@ -32,7 +32,7 @@ function resolveSystemTheme(): "light" | "dark" {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-/** Resolve a Settings.theme value to the effective "light" or "dark". */
+/** 将 Settings.theme 值解析为有效的 "light" 或 "dark"。 */
 function resolveTheme(themeSetting: "light" | "dark" | "system"): "light" | "dark" {
   if (themeSetting === "system") {
     return resolveSystemTheme();
@@ -40,7 +40,7 @@ function resolveTheme(themeSetting: "light" | "dark" | "system"): "light" | "dar
   return themeSetting;
 }
 
-/** Apply .dark class to <html> based on resolved theme. */
+/** 根据已解析主题对 <html> 应用 .dark class。 */
 function applyDarkClass(isDark: boolean): void {
   if (typeof document === "undefined") return;
   if (isDark) {
@@ -50,11 +50,11 @@ function applyDarkClass(isDark: boolean): void {
   }
 }
 
-/** Setup a single matchMedia listener for system theme. Idempotent — cleans up old listener first. */
+/** 设置单个 matchMedia listener 监听系统主题。幂等 — 先清理旧 listener。 */
 function setupMediaQueryListener(): void {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
 
-  // Clean up any previous listener
+  // 清理之前的 listener
   if (mediaQuery && mediaQueryListener) {
     mediaQuery.removeEventListener("change", mediaQueryListener);
     mediaQueryListener = null;
@@ -70,13 +70,12 @@ function setupMediaQueryListener(): void {
 }
 
 /**
- * Idempotent theme sync.
+ * 幂等主题同步。
  *
- * Reads Settings.theme via getSettingsBridge(), applies .dark class to <html>,
- * subscribes to system preference changes if theme is "system", and polls
- * Settings.theme every 5s to re-apply on user change.
+ * 通过 getSettingsBridge() 读取 Settings.theme，对 <html> 应用 .dark class，
+ * 若主题为 "system" 则订阅系统偏好变化，并每 5s 轮询 Settings.theme 以在用户变更时重新应用。
  *
- * Safe to call multiple times — only the first call has effect.
+ * 可安全多次调用 — 只有首次调用生效。
  */
 export function startThemeSync(): void {
   if (started) return;
@@ -97,7 +96,7 @@ export function startThemeSync(): void {
   intervalId = setInterval(applyTheme, 5000);
 }
 
-/** Reset theme sync state (for testing only). */
+/** 重置主题同步状态（仅供测试用）。 */
 export function _resetThemeSync(): void {
   started = false;
   if (intervalId !== null) {

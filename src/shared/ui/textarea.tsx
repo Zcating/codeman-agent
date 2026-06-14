@@ -1,5 +1,5 @@
-//! Textarea — multi-line text input primitive.
-//! cn-only, rows 透传. Pattern from solidcn-ui/solidcn.
+//! Textarea — 多行文本输入原子组件。
+//! 纯 cn，rows 透传。Pattern from solidcn-ui/solidcn。
 
 import type { Component, ComponentProps } from "solid-js";
 import { splitProps } from "solid-js";

@@ -1,7 +1,7 @@
-//! SettingsPage route tests.
+//! SettingsPage 路由测试。
 //!
-//! Mocked: SettingsService Effect service via __mocks__/@tauri-apps/api/core.ts.
-//! Link from @tanstack/solid-router is mocked to avoid requiring RouterProvider.
+//! Mocked: SettingsService Effect 服务（通过 __mocks__/@tauri-apps/api/core.ts）。
+//! Link 从 @tanstack/solid-router mock 以避免需要 RouterProvider。
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
@@ -14,7 +14,7 @@ vi.mock("@tanstack/solid-router", async () => {
   const actual = await vi.importActual("@tanstack/solid-router");
   return {
     ...actual,
-    // Mock Link to avoid useRouter/useLinkProps which require RouterProvider context.
+    // Mock Link 以避免需要 useRouter/useLinkProps（需要 RouterProvider context）。
     Link: (props: { to?: string; href?: string; class?: string; children?: unknown }) =>
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       <a href={props.to ?? props.href} class={props.class}>{props.children as any}</a>,
@@ -57,32 +57,32 @@ describe("SettingsPage", () => {
     vi.clearAllMocks();
   });
 
-  it("renders 5 tabs", async () => {
+  it("渲染 5 个标签页", async () => {
     vi.useFakeTimers();
     const { container } = render(() => <SettingsPage />);
-    // Advance timers to flush the async IIFE that loads draft
+    // 推进计时器以刷新加载 draft 的异步 IIFE
     vi.advanceTimersByTime(0);
     vi.useRealTimers();
     const tabs = container.querySelectorAll("nav button");
     expect(tabs.length).toBe(5);
   });
 
-  it("clicking app tab activates it and shows app-specific content", async () => {
+  it("点击 app 标签页激活它并显示 app 特定内容", async () => {
     vi.useFakeTimers();
     const { container } = render(() => <SettingsPage />);
     vi.advanceTimersByTime(0);
     vi.useRealTimers();
     const user = userEvent.setup();
     const tabs = container.querySelectorAll("nav button");
-    // App tab is the second one (index 1)
+    // App 标签页是第二个（index 1）
     await user.click(tabs[1]);
-    // App tab button should have active styling
+    // App 标签页按钮应有 active 样式
     expect(tabs[1].classList.contains("bg-primary-500")).toBe(true);
-    // LLM tab should no longer be active
+    // LLM 标签页不应再处于激活状态
     expect(tabs[0].classList.contains("bg-primary-500")).toBe(false);
   });
 
-  it("header has Back link with correct text", async () => {
+  it("header 有带正确文本的 Back 链接", async () => {
     vi.useFakeTimers();
     const { container } = render(() => <SettingsPage />);
     vi.advanceTimersByTime(0);
@@ -91,7 +91,7 @@ describe("SettingsPage", () => {
     expect(backLink?.textContent).toContain("Back");
   });
 
-  it("has a Save button in footer", async () => {
+  it("footer 有 Save 按钮", async () => {
     vi.useFakeTimers();
     const { container } = render(() => <SettingsPage />);
     vi.advanceTimersByTime(0);

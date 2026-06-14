@@ -1,6 +1,6 @@
-//! MessageBubble component tests — one per role (user, assistant, tool, system).
+//! MessageBubble 组件测试 — 每个角色一个（user, assistant, tool, system）。
 //!
-//! Pure UI component. No Effect imports. No store mocks needed.
+//! 纯 UI 组件。无 Effect 导入。无 store mock 需要。
 
 import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
@@ -10,7 +10,7 @@ import type { Message, ToolCall, ToolResult } from "../../../shared/types";
 describe("MessageBubble", () => {
   afterEach(() => cleanup());
 
-  it("user role: HTML-escaped content", () => {
+  it("user 角色：HTML 转义内容", () => {
     const msg: Message = {
       id: "msg-1",
       conversation_id: "conv-1",
@@ -26,12 +26,12 @@ describe("MessageBubble", () => {
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-end");
     expect(bubble).toBeTruthy();
-    // The content should be escaped (no raw <script> tag)
+    // 内容应该被转义（无原始 <script> 标签）
     expect(bubble?.innerHTML).not.toContain("<script>");
     expect(bubble?.textContent).toContain("<script>alert('xss')</script>");
   });
 
-  it("assistant role: Markdown rendered with bold", () => {
+  it("assistant 角色：Markdown 渲染加粗", () => {
     const msg: Message = {
       id: "msg-2",
       conversation_id: "conv-1",
@@ -47,12 +47,12 @@ describe("MessageBubble", () => {
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");
     expect(bubble).toBeTruthy();
-    // marked parses **text** into <strong>
+    // marked 将 **text** 解析为 <strong>
     const strong = bubble?.querySelector("strong");
     expect(strong?.textContent).toBe("world");
   });
 
-  it("tool role: shows Tool result summary", () => {
+  it("tool 角色：显示 Tool 结果摘要", () => {
     const toolResults: ToolResult[] = [
       { tool_call_id: "tc-1", result: { ok: true }, error: null },
     ];
@@ -71,14 +71,14 @@ describe("MessageBubble", () => {
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");
     expect(bubble).toBeTruthy();
-    // Shows "Tool result" summary
+    // 显示 "Tool result" 摘要
     const summary = bubble?.querySelector("summary");
     expect(summary?.textContent).toBe("Tool result");
-    // Shows the tool result item with ✓
+    // 显示带 ✓ 的工具结果项
     expect(bubble?.textContent).toContain("✓");
   });
 
-  it("system role: muted text", () => {
+  it("system 角色：静音文本", () => {
     const msg: Message = {
       id: "msg-4",
       conversation_id: "conv-1",
@@ -97,7 +97,7 @@ describe("MessageBubble", () => {
     expect(bubble?.textContent).toContain("You are a helpful assistant.");
   });
 
-  it("assistant with tool_calls shows expandable tool call details", () => {
+  it("带 tool_calls 的 assistant 显示可展开工具调用详情", () => {
     const toolCalls: ToolCall[] = [
       { id: "tc-1", name: "get_balance", args: { provider: "deepseek" } },
     ];

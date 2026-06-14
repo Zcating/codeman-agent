@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Checkbox } from "./checkbox";
 
 describe("Checkbox", () => {
-  it("renders input checkbox", () => {
+  it("渲染 input checkbox", () => {
     const { container } = render(() => <Checkbox />);
     const el = container.querySelector("input") as HTMLInputElement;
     expect(el.type).toBe("checkbox");
@@ -11,7 +11,7 @@ describe("Checkbox", () => {
     expect(el.className).toContain("rounded");
   });
 
-  it("checked state", () => {
+  it("选中状态", () => {
     const { container } = render(() => <Checkbox checked={true} />);
     const el = container.querySelector("input") as HTMLInputElement;
     expect(el.checked).toBe(true);

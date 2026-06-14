@@ -1,7 +1,7 @@
-//! Effect → Solid bridge for messages (with stream integration point).
+//! Effect → Solid 消息桥接层（带 stream 集成点）。
 //!
-//! Bridge functions return Promises, never Effect, so Solid components
-//! stay effect-free per AGENTS.md.
+//! 桥接函数返回 Promise，绝不是 Effect，因此 Solid 组件
+//! 依据 AGENTS.md 保持无 Effect。
 //
 //! UI surface (consumed by Solid components):
 //! - messages$: Accessor<Message[]>
@@ -20,16 +20,16 @@ import { MessageService, MessageServiceLive } from "../../../shared/lib/tauri";
 import { AgentRuntime, RuntimeLayer, type RuntimeEvent } from "../runtime";
 import type { Message, ToolCall, ToolResult, Conversation } from "../../../shared/types";
 
-// The runtime layer for the MessageService.
+// MessageService 的 runtime layer。
 const MessageLayer = MessageServiceLive;
 
-// Signals hold plain data, never Effect instances.
+// Signals 持有纯数据，绝不是 Effect 实例。
 const [messages, setMessages] = createSignal<Message[]>([]);
 
-/** UI-facing accessor. */
+/** UI 暴露的访问器。 */
 export const messages$: Accessor<Message[]> = messages;
 
-/** Load messages for a conversation (called on conversation change). */
+/** 为会话加载消息（在会话变更时调用）。 */
 export async function loadMessages(conversationId: string): Promise<void> {
   const program = Effect.gen(function* () {
     const svc = yield* MessageService;
@@ -42,7 +42,7 @@ export async function loadMessages(conversationId: string): Promise<void> {
   }
 }
 
-/** Append a user message and persist via the service. */
+/** 追加用户消息并通过服务持久化。 */
 export async function appendUserMessage(
   content: string,
   conversationId: string,
@@ -58,7 +58,7 @@ export async function appendUserMessage(
   }
 }
 
-/** Append a streaming delta to an in-progress assistant message (local-only, no IPC). */
+/** 追加流式增量到进行中的 assistant 消息（仅本地，无 IPC）。 */
 export function appendAssistantMessageDelta(messageId: string, chunk: string): void {
   setMessages(
     messages().map((m) =>
@@ -67,12 +67,12 @@ export function appendAssistantMessageDelta(messageId: string, chunk: string): v
   );
 }
 
-/** Replace an in-progress assistant message with the final persisted one. */
+/** 用最终持久化的消息替换进行中的 assistant 消息。 */
 export function finalizeAssistantMessage(message: Message): void {
   setMessages(messages().map((m) => (m.id === message.id ? message : m)));
 }
 
-/** Append a tool call to a message (local-only). */
+/** 追加工具调用到消息（仅本地）。 */
 export function appendToolCall(messageId: string, toolCall: ToolCall): void {
   setMessages(
     messages().map((m) => {
@@ -83,7 +83,7 @@ export function appendToolCall(messageId: string, toolCall: ToolCall): void {
   );
 }
 
-/** Finalize a tool result on a message (local-only). */
+/** 完成消息上的工具结果（仅本地）。 */
 export function finalizeToolResult(
   messageId: string,
   toolCallId: string,
@@ -103,12 +103,12 @@ export function finalizeToolResult(
   );
 }
 
-/** Reset messages (e.g., on conversation switch before load completes). */
+/** 重置消息（例如：在会话切换时 load 完成前）。 */
 export function clearMessages(): void {
   setMessages([]);
 }
 
-// Insert a streaming assistant message stub (local-only, no IPC).
+// 插入流式 assistant 消息存根（仅本地，无 IPC）。
 export function appendStreamingAssistantMessage(
   messageId: string,
   conversationId: string,

@@ -1,18 +1,17 @@
-//! Agent-facing event types and emitter helpers.
+//! 面向 Agent 的事件类型和发送辅助函数。
 //!
-//! These events are consumed by the Solid.js frontend via
-//! `@tauri-apps/api/event::listen`.  The naming matches the IPC
-//! contract in `CONTEXT.md`.
+//! 这些事件通过 `@tauri-apps/api/event::listen` 由 Solid.js 前端消费。
+//! 命名与 `CONTEXT.md` 中的 IPC 契约一致。
 //!
-//! ## Event summary
-//! | Event name               | Payload struct            | Direction |
+//! ## 事件摘要
+//! | 事件名                  | Payload 结构体            | 方向 |
 //! |--------------------------|--------------------------|-----------|
 //! | `agent-state-changed`    | `AgentStateChanged`      | Rust→TS   |
 //! | `message-appended`       | `MessageAppendedPayload` | Rust→TS   |
 //! | `tool-call-started`      | `ToolCallStartedPayload` | Rust→TS   |
 //! | `tool-call-finished`     | `ToolCallFinishedPayload`| Rust→TS   |
 //!
-//! Legacy billing events (unchanged):
+//! 旧版计费事件（未变）：
 //! | `snapshot-updated`       | `SnapshotEnvelope`       | Rust→TS   |
 //! | `refresh-failed`         | `RefreshFailedPayload`  | Rust→TS   |
 //! | `low-threshold-breached` | `LowThresholdPayload`   | Rust→TS   |
@@ -24,12 +23,12 @@ use uuid::Uuid;
 use crate::db::messages::Message;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ToolCall — minimal mirror of the TS interface used in event payloads.
-// Stored as JSON in `messages.tool_calls`.
+// ToolCall — 事件 payload 中使用的 TS 接口的最小镜像。
+// 作为 JSON 存储在 `messages.tool_calls` 中。
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Minimal tool-call representation used in event payloads.
-/// Mirrors the TS `ToolCall` interface: `{ id, name, args }`.
+/// 事件 payload 中使用的最小工具调用表示。
+/// 镜像 TS 的 `ToolCall` 接口：`{ id, name, args }`。
 #[derive(Debug, Clone, Serialize)]
 pub struct ToolCall {
     pub id: String,
@@ -38,10 +37,10 @@ pub struct ToolCall {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Agent state
+// Agent 状态
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// The agent's current reasoning state.
+/// Agent 当前推理状态。
 #[derive(Clone, Serialize)]
 #[serde(tag = "state", rename_all = "snake_case")]
 pub enum AgentState {
@@ -50,17 +49,17 @@ pub enum AgentState {
     Error { error: String },
 }
 
-/// Fired when the agent transitions between idle / thinking / error.
+/// Agent 在 idle / thinking / error 之间转换时触发。
 #[derive(Clone, Serialize)]
 pub struct AgentStateChanged {
     pub state: AgentState,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Message events
+// 消息事件
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Fired when a new message is appended to a conversation.
+/// 新消息追加到会话时触发。
 #[derive(Clone, Serialize)]
 pub struct MessageAppendedPayload {
     pub conversation_id: Uuid,
@@ -68,17 +67,17 @@ pub struct MessageAppendedPayload {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tool-call events
+// 工具调用事件
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Fired when the agent starts invoking a tool.
+/// Agent 开始调用工具时触发。
 #[derive(Clone, Serialize)]
 pub struct ToolCallStartedPayload {
     pub message_id: Uuid,
     pub tool_call: ToolCall,
 }
 
-/// Fired when a tool invocation completes (success or error).
+/// 工具调用完成时触发（成功或错误）。
 #[derive(Clone, Serialize)]
 pub struct ToolCallFinishedPayload {
     pub message_id: Uuid,
@@ -88,15 +87,15 @@ pub struct ToolCallFinishedPayload {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Emitter helpers — fire-and-forget; failures are silently swallowed.
+// 发送辅助函数 — fire-and-forget；失败被静默吞掉。
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Emit `agent-state-changed`.
+/// 发送 `agent-state-changed` 事件。
 pub fn emit_agent_state(app: &AppHandle, state: AgentState) {
     let _ = app.emit("agent-state-changed", AgentStateChanged { state });
 }
 
-/// Emit `message-appended`.
+/// 发送 `message-appended` 事件。
 pub fn emit_message(app: &AppHandle, conversation_id: Uuid, message: Message) {
     let _ = app.emit(
         "message-appended",
@@ -104,7 +103,7 @@ pub fn emit_message(app: &AppHandle, conversation_id: Uuid, message: Message) {
     );
 }
 
-/// Emit `tool-call-started`.
+/// 发送 `tool-call-started` 事件。
 pub fn emit_tool_started(app: &AppHandle, message_id: Uuid, tool_call: ToolCall) {
     let _ = app.emit(
         "tool-call-started",
@@ -112,7 +111,7 @@ pub fn emit_tool_started(app: &AppHandle, message_id: Uuid, tool_call: ToolCall)
     );
 }
 
-/// Emit `tool-call-finished`.
+/// 发送 `tool-call-finished` 事件。
 pub fn emit_tool_finished(
     app: &AppHandle,
     message_id: Uuid,

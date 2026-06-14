@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-06-13
-- Scope: codeman-agent v1 frontend styling layer
+- Scope: codeman-agent V1 前端样式层
 
 ## Context
 

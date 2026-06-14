@@ -1,9 +1,9 @@
-//! /settings  — Full-page settings (replaces main content; not a modal).
+//! /settings  — 全页面设置（替换主内容；不是 modal）。
 //!
-//! Extracted from the deleted src/agent/components/settings-modal.tsx.
-//! The "app" tab no longer has start_minimized / close_behavior / hotkeys
-//! (those were removed in the V1.5 backend refactor — see ADR-0007).
-//! The "window" and "billing" tabs remain as placeholder stubs.
+//! 从已删除的 src/agent/components/settings-modal.tsx 提取。
+//! "app" 选项卡不再有 start_minimized / close_behavior / hotkeys
+//!（这些在 V1.5 后端重构中已移除 — 见 ADR-0007）。
+//! "window" 和 "billing" 选项卡保留为占位符存根。
 
 import { createSignal, Show, For } from "solid-js";
 import { Link } from "@tanstack/solid-router";
@@ -19,13 +19,13 @@ export function SettingsPage() {
   const [draft, setDraft] = createSignal<Settings | null>(null);
   const [confirmClear, setConfirmClear] = createSignal(false);
 
-  // Load settings + providers on mount.
+  // 挂载时加载设置 + providers。
   void (async () => {
     try {
       const s = await getSettingsBridge();
       setDraft(s);
     } catch (e) {
-      console.error("[SettingsPage] load failed:", e);
+      console.error("[SettingsPage] 加载失败：", e);
     }
   })();
 
@@ -35,7 +35,7 @@ export function SettingsPage() {
     try {
       await updateSettingsBridge(d);
     } catch (e) {
-      console.error("[SettingsPage] save failed:", e);
+      console.error("[SettingsPage] 保存失败：", e);
     }
   };
 
@@ -68,7 +68,7 @@ export function SettingsPage() {
       await clearAllHistoryBridge();
       setConfirmClear(false);
     } catch (e) {
-      console.error("[SettingsPage] clear failed:", e);
+      console.error("[SettingsPage] 清除失败：", e);
     }
   };
 

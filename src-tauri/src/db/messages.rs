@@ -1,9 +1,8 @@
-//! Message CRUD with FTS5 sync in the same transaction.
+//! 消息 CRUD，FTS5 同步在同一事务中。
 //!
-//! ## FTS5 sync contract
-//! Every write to `messages` must同步更新 `messages_fts` in the **same**
-//! transaction so that the FTS index is always consistent with the source
-//! table.  The pattern is:
+//! ## FTS5 同步契约
+//! 每次写入 `messages` 必须同步更新 `messages_fts`（在同一事务中），
+//! 以便 FTS 索引始终与源表一致。模式如下：
 //!
 //! ```ignore
 //! let mut tx = pool.begin().await?;
@@ -16,12 +15,12 @@
 //! tx.commit().await?;
 //! ```
 //!
-//! Functions exposed:
-//! - `append_message` – INSERT + FTS5 sync (single tx)
+//! 暴露的函数：
+//! - `append_message` – INSERT + FTS5 同步（单事务）
 //! - `list_messages`  – ORDER BY created_at ASC
-//! - `get_message`     – by UUID
-//! - `delete_message`  – DELETE FTS5 + message in same tx
-//! - `search_messages` – FTS5 MATCH query
+//! - `get_message`     – 按 UUID
+//! - `delete_message`  – 在同一事务中 DELETE FTS5 + message
+//! - `search_messages` – FTS5 MATCH 查询
 
 use chrono::{DateTime, TimeZone, Utc};
 use serde::Serialize;
@@ -29,7 +28,7 @@ use sqlx::{Row, SqlitePool};
 use sqlx::sqlite::SqliteRow;
 use uuid::Uuid;
 
-/// A message row as stored in SQLite.
+/// 在 SQLite 中存储的消息行。
 #[derive(Debug, Clone, Serialize)]
 pub struct Message {
     pub id: Uuid,
@@ -45,17 +44,17 @@ pub struct Message {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Internal helpers
+// 内部辅助函数
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Build a `Message` from a sqlx `Row` (avoids repeating column names).
+/// 从 sqlx `Row` 构建 `Message`（避免重复列名）。
 fn row_to_message(row: &SqliteRow) -> Result<Message, sqlx::Error> {
     let created_at_i64: i64 = row.try_get("created_at")?;
     let created_at = Utc.timestamp_opt(created_at_i64, 0).single().unwrap_or_default();
     Ok(Message {
-        id: Uuid::parse_str(&row.try_get::<String, _>("id")?).expect("invalid uuid in DB"),
+        id: Uuid::parse_str(&row.try_get::<String, _>("id")?).expect("DB 中无效的 UUID"),
         conversation_id: Uuid::parse_str(&row.try_get::<String, _>("conversation_id")?)
-            .expect("invalid uuid in DB"),
+            .expect("DB 中无效的 UUID"),
         role: row.try_get("role")?,
         content: row.try_get("content")?,
         tool_calls: row.try_get("tool_calls")?,
@@ -68,10 +67,10 @@ fn row_to_message(row: &SqliteRow) -> Result<Message, sqlx::Error> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Public API
+// 公共 API
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Append a message and sync its content to FTS5 in the same transaction.
+/// 追加消息并在同一事务中将其内容同步到 FTS5。
 pub async fn append_message(
     pool: &SqlitePool,
     conversation_id: Uuid,
@@ -113,7 +112,7 @@ pub async fn append_message(
 
     let rowid: i64 = row.try_get("rowid")?;
 
-    // Sync to FTS5
+    // 同步到 FTS5
     sqlx::query("INSERT INTO messages_fts(rowid, content) VALUES (?, ?)")
         .bind(rowid)
         .bind(content)
@@ -136,7 +135,7 @@ pub async fn append_message(
     })
 }
 
-/// List all messages for a conversation, ordered by creation time ascending.
+/// 列出会话的所有消息，按创建时间升序排列。
 pub async fn list_messages(
     pool: &SqlitePool,
     conversation_id: &Uuid,
@@ -157,7 +156,7 @@ pub async fn list_messages(
     rows.iter().map(row_to_message).collect()
 }
 
-/// Fetch a single message by id. Returns `Ok(None)` if not found.
+/// 按 id 获取单条消息。未找到时返回 `Ok(None)`。
 pub async fn get_message(pool: &SqlitePool, id: &Uuid) -> Result<Option<Message>, sqlx::Error> {
     let row = sqlx::query(
         r#"
@@ -177,11 +176,11 @@ pub async fn get_message(pool: &SqlitePool, id: &Uuid) -> Result<Option<Message>
     }
 }
 
-/// Delete a message and its FTS5 entry in the same transaction.
+/// 在同一事务中删除消息及其 FTS5 条目。
 pub async fn delete_message(pool: &SqlitePool, id: &Uuid) -> Result<(), sqlx::Error> {
     let mut tx = pool.begin().await?;
 
-    // Look up the rowid before deleting so we can clean up FTS5.
+    // 删除前查找 rowid 以便清理 FTS5。
     let row = sqlx::query("SELECT rowid FROM messages WHERE id = ?")
         .bind(id.to_string())
         .fetch_optional(&mut *tx)
@@ -204,8 +203,8 @@ pub async fn delete_message(pool: &SqlitePool, id: &Uuid) -> Result<(), sqlx::Er
     Ok(())
 }
 
-/// Full-text search across message content using FTS5 MATCH.
-/// Returns an empty vec when no results are found or when query is empty.
+/// 使用 FTS5 MATCH 对消息内容进行全文搜索。
+/// 未找到结果或查询为空时返回空 vec。
 pub async fn search_messages(
     pool: &SqlitePool,
     query: &str,
@@ -235,7 +234,7 @@ pub async fn search_messages(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tests
+// 测试
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -243,7 +242,7 @@ mod tests {
     use super::*;
     use sqlx::sqlite::SqlitePoolOptions;
 
-    // Returns a fresh in-memory SQLite pool with the schema applied.
+    // 返回应用了 schema 的全新内存 SQLite 池。
     async fn fresh_pool() -> SqlitePool {
         let pool = SqlitePoolOptions::new()
             .max_connections(1)
@@ -251,7 +250,7 @@ mod tests {
             .await
             .unwrap();
 
-        // Create schema exactly as defined in schema.sql
+        // 按 schema.sql 中的定义创建 schema
         sqlx::query(
             r#"
             CREATE TABLE IF NOT EXISTS conversations (
@@ -292,7 +291,7 @@ mod tests {
         let pool = fresh_pool().await;
         let conv_id = Uuid::new_v4();
 
-        // Insert a conversation first (messages references it).
+        // 先插入会话（消息引用它）。
         sqlx::query("INSERT INTO conversations (id,title,created_at,updated_at) VALUES (?,?,?,?)")
             .bind(conv_id.to_string())
             .bind("test conv")
@@ -321,7 +320,7 @@ mod tests {
         assert_eq!(msgs[0].role, "user");
         assert_eq!(msgs[1].id, m2.id);
         assert_eq!(msgs[1].role, "assistant");
-        // ASC order: first message should have earlier created_at
+        // ASC 顺序：第一条消息应有更早的 created_at
         assert!(msgs[0].created_at <= msgs[1].created_at);
     }
 
@@ -377,15 +376,15 @@ mod tests {
         .await
         .unwrap();
 
-        // Verify it is searchable before delete
+        // 删除前验证它可被搜索
         let before = search_messages(&pool, "password", 10).await.unwrap();
         assert_eq!(before.len(), 1);
 
         delete_message(&pool, &msg.id).await.unwrap();
 
-        // After delete, FTS5 search should return nothing
+        // 删除后，FTS5 搜索应返回空
         let after = search_messages(&pool, "password", 10).await.unwrap();
-        assert!(after.is_empty(), "deleted message should not appear in FTS5 results");
+        assert!(after.is_empty(), "删除的消息不应出现在 FTS5 结果中");
     }
 
     #[tokio::test]
@@ -409,10 +408,10 @@ mod tests {
         .unwrap();
 
         let lower = search_messages(&pool, "hello", 10).await.unwrap();
-        assert_eq!(lower.len(), 1, "lowercase query should match uppercase content");
+        assert_eq!(lower.len(), 1, "小写查询应匹配大写内容");
 
         let upper = search_messages(&pool, "HELLO", 10).await.unwrap();
-        assert_eq!(upper.len(), 1, "uppercase query should match uppercase content");
+        assert_eq!(upper.len(), 1, "大写查询应匹配大写内容");
     }
 
     #[tokio::test]
@@ -436,7 +435,7 @@ mod tests {
         .unwrap();
 
         let results = search_messages(&pool, "", 10).await.unwrap();
-        assert!(results.is_empty(), "empty query should return no results");
+        assert!(results.is_empty(), "空查询应返回无结果");
     }
 
     #[tokio::test]
@@ -470,6 +469,6 @@ mod tests {
         }
 
         let results = search_messages(&pool, "message", 3).await.unwrap();
-        assert_eq!(results.len(), 3, "search should respect limit");
+        assert_eq!(results.len(), 3, "搜索应遵守 limit");
     }
 }

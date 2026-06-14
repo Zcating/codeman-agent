@@ -1,12 +1,12 @@
-//! MessageBubble — renders a single Message by role.
+//! MessageBubble — 按 role 渲染单条 Message。
 //!
-//! Pure UI. Reads Message prop. No effect imports.
+//! 纯 UI。读取 Message prop。不导入 effect。
 
 import { Show, For } from "solid-js";
 import { marked } from "marked";
 import type { Message, ToolCall, ToolResult } from "../../../shared/types";
 
-/** Escape user-supplied text to prevent XSS. */
+/** 转义用户提供的文本以防止 XSS。 */
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -16,11 +16,11 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** Render Markdown to sanitized HTML. For assistant content (trusted). */
+/** 渲染 Markdown 为经清理的 HTML。用于 assistant 内容（可信）。 */
 function renderMarkdown(s: string): string {
-  // marked v9+: marked.parse returns string sync when given string input.
-  // We trust assistant output (no user-controlled content) but escape the source
-  // before Markdown parsing just in case.
+  // marked v9+：当给定字符串输入时，marked.parse 同步返回字符串。
+  // 我们信任 assistant 输出（无用户控制的内容），但以防万一在
+  // Markdown 解析前转义源文本。
   return marked.parse(s, { async: false }) as string;
 }
 

@@ -1,16 +1,16 @@
-//! Conversations CRUD — runtime sqlx queries on SqlitePool.
+//! 会话 CRUD — 在 SqlitePool 上的运行时 sqlx 查询。
 //!
-//! All timestamps are stored as UNIX epoch seconds in INTEGER columns.
-//! chrono DateTime<Utc> is used in the Rust API.
+//! 所有时间戳以 UNIX epoch 秒存储在 INTEGER 列中。
+//! Rust API 中使用 chrono DateTime<Utc>。
 
 use chrono::{DateTime, TimeZone, Utc};
 use serde::Serialize;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-/// A conversation row matching the D1 schema.
+/// 匹配 D1 schema 的会话行。
 ///
-/// `id` is stored as a UUID string in SQLite TEXT.
+/// `id` 在 SQLite TEXT 中存储为 UUID 字符串。
 #[derive(Debug, Clone, sqlx::FromRow, Serialize)]
 pub struct Conversation {
     pub id: String,
@@ -22,33 +22,33 @@ pub struct Conversation {
 }
 
 impl Conversation {
-    /// Parse `id` as a Uuid.
+    /// 将 `id` 解析为 Uuid。
     pub fn id(&self) -> Uuid {
-        Uuid::parse_str(&self.id).expect("valid uuid in DB")
+        Uuid::parse_str(&self.id).expect("DB 中的有效 UUID")
     }
 
-    /// Parse `created_at` from UNIX epoch seconds.
+    /// 从 UNIX epoch 秒解析 `created_at`。
     pub fn created_at_datetime(&self) -> DateTime<Utc> {
         Utc.timestamp_opt(self.created_at, 0).unwrap()
     }
 
-    /// Parse `updated_at` from UNIX epoch seconds.
+    /// 从 UNIX epoch 秒解析 `updated_at`。
     pub fn updated_at_datetime(&self) -> DateTime<Utc> {
         Utc.timestamp_opt(self.updated_at, 0).unwrap()
     }
 
-    /// Parse `archived_at` from UNIX epoch seconds, if set.
+    /// 从 UNIX epoch 秒解析 `archived_at`（如果设置）。
     pub fn archived_at_datetime(&self) -> Option<DateTime<Utc>> {
         self.archived_at.map(|ts| Utc.timestamp_opt(ts, 0).unwrap())
     }
 
-    /// Returns true when the conversation is soft-deleted (archived).
+    /// 会话被软删除（归档）时返回 true。
     pub fn is_archived(&self) -> bool {
         self.archived_at.is_some()
     }
 }
 
-/// Insert a new conversation, returning the full row.
+/// 插入新会话，返回完整行。
 pub async fn create_conversation(
     pool: &SqlitePool,
     title: &str,
@@ -73,7 +73,7 @@ pub async fn create_conversation(
     .await
 }
 
-/// Fetch a single conversation by id, or None if not found.
+/// 按 id 获取单个会话，未找到则返回 None。
 pub async fn get_conversation(
     pool: &SqlitePool,
     id: &Uuid,
@@ -86,8 +86,8 @@ pub async fn get_conversation(
     .await
 }
 
-/// List conversations ordered by `updated_at DESC`.
-/// Pass `include_archived = false` to exclude soft-deleted rows.
+/// 列出会话，按 `updated_at DESC` 排序。
+/// 传入 `include_archived = false` 以排除软删除行。
 pub async fn list_conversations(
     pool: &SqlitePool,
     include_archived: bool,
@@ -107,7 +107,7 @@ pub async fn list_conversations(
     }
 }
 
-/// Update only the title of an existing conversation.
+/// 仅更新现有会话的标题。
 pub async fn update_conversation_title(
     pool: &SqlitePool,
     id: &Uuid,
@@ -125,7 +125,7 @@ pub async fn update_conversation_title(
     Ok(())
 }
 
-/// Soft-delete: set `archived_at` to the current timestamp.
+/// 软删除：将 `archived_at` 设为当前时间戳。
 pub async fn archive_conversation(pool: &SqlitePool, id: &Uuid) -> Result<(), sqlx::Error> {
     let now = Utc::now().timestamp();
     sqlx::query("UPDATE conversations SET archived_at = $1 WHERE id = $2")
@@ -136,8 +136,8 @@ pub async fn archive_conversation(pool: &SqlitePool, id: &Uuid) -> Result<(), sq
     Ok(())
 }
 
-/// Hard-delete a conversation by id.
-/// Messages are cascade-deleted via the FK constraint.
+/// 按 id 硬删除会话。
+/// 消息通过 FK 约束级联删除。
 pub async fn hard_delete_conversation(pool: &SqlitePool, id: &Uuid) -> Result<(), sqlx::Error> {
     sqlx::query("DELETE FROM conversations WHERE id = $1")
         .bind(id.to_string())
@@ -150,14 +150,14 @@ pub async fn hard_delete_conversation(pool: &SqlitePool, id: &Uuid) -> Result<()
 mod tests {
     use super::*;
 
-    /// Build an in-memory pool and run the initial migration.
+    /// 构建内存池并运行初始迁移。
     async fn make_pool() -> SqlitePool {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-        // Create the schema for tests
+        // 为测试创建 schema
         sqlx::query(include_str!("schema.sql"))
             .execute(&pool)
             .await
-            .expect("schema migration");
+            .expect("schema 迁移");
         pool
     }
 
@@ -166,7 +166,7 @@ mod tests {
         let pool = make_pool().await;
         let created = create_conversation(&pool, "Test Title", Some("system prompt"))
             .await
-            .expect("create succeeds");
+            .expect("创建成功");
         assert_eq!(created.title, "Test Title");
         assert_eq!(created.system_prompt.as_deref(), Some("system prompt"));
         assert!(!created.is_archived());
@@ -174,8 +174,8 @@ mod tests {
         let id = created.id();
         let fetched = get_conversation(&pool, &id)
             .await
-            .expect("get succeeds")
-            .expect("conversation found");
+            .expect("获取成功")
+            .expect("找到会话");
         assert_eq!(fetched.id, created.id);
         assert_eq!(fetched.title, "Test Title");
     }
@@ -184,13 +184,13 @@ mod tests {
     async fn list_empty_then_one() {
         let pool = make_pool().await;
 
-        let list = list_conversations(&pool, false).await.expect("list succeeds");
+        let list = list_conversations(&pool, false).await.expect("列出成功");
         assert!(list.is_empty());
 
         let created = create_conversation(&pool, "First", None)
             .await
-            .expect("create succeeds");
-        let list = list_conversations(&pool, false).await.expect("list succeeds");
+            .expect("创建成功");
+        let list = list_conversations(&pool, false).await.expect("列出成功");
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].id, created.id);
     }
@@ -200,16 +200,16 @@ mod tests {
         let pool = make_pool().await;
         let created = create_conversation(&pool, "To Archive", None)
             .await
-            .expect("create succeeds");
+            .expect("创建成功");
 
         archive_conversation(&pool, &created.id())
             .await
-            .expect("archive succeeds");
+            .expect("归档成功");
 
-        let all = list_conversations(&pool, true).await.expect("list all succeeds");
+        let all = list_conversations(&pool, true).await.expect("列出全部成功");
         assert_eq!(all.len(), 1);
 
-        let active = list_conversations(&pool, false).await.expect("list active succeeds");
+        let active = list_conversations(&pool, false).await.expect("列出活跃成功");
         assert!(active.is_empty());
     }
 
@@ -218,17 +218,17 @@ mod tests {
         let pool = make_pool().await;
         let created = create_conversation(&pool, "Original Title", None)
             .await
-            .expect("create succeeds");
+            .expect("创建成功");
         let id = created.id();
 
         update_conversation_title(&pool, &id, "New Title")
             .await
-            .expect("update succeeds");
+            .expect("更新成功");
 
         let fetched = get_conversation(&pool, &id)
             .await
-            .expect("get succeeds")
-            .expect("conversation found");
+            .expect("获取成功")
+            .expect("找到会话");
         assert_eq!(fetched.title, "New Title");
     }
 
@@ -236,13 +236,13 @@ mod tests {
     async fn hard_delete_cascades_to_messages() {
         let pool = make_pool().await;
 
-        // Create a conversation and a message
+        // 创建会话和消息
         let conv = create_conversation(&pool, "To Delete", None)
             .await
-            .expect("create conv");
+            .expect("创建会话");
         let conv_id = conv.id();
 
-        // Manually insert a message to verify cascade delete.
+        // 手动插入消息以验证级联删除。
         let msg_id = Uuid::new_v4().to_string();
         let now = Utc::now().timestamp();
         sqlx::query(
@@ -255,33 +255,33 @@ mod tests {
         .bind(now)
         .execute(&pool)
         .await
-        .expect("insert message");
+        .expect("插入消息");
 
-        // Verify message exists
+        // 验证消息存在
         let before = sqlx::query("SELECT id FROM messages WHERE id = ?")
             .bind(&msg_id)
             .fetch_optional(&pool)
             .await
-            .expect("check message");
-        assert!(before.is_some(), "message should exist before delete");
+            .expect("检查消息");
+        assert!(before.is_some(), "删除前消息应存在");
 
-        // Hard-delete the conversation
+        // 硬删除会话
         hard_delete_conversation(&pool, &conv_id)
             .await
-            .expect("hard delete succeeds");
+            .expect("硬删除成功");
 
-        // Verify conversation is gone
+        // 验证会话已删除
         let conv_after = get_conversation(&pool, &conv_id)
             .await
-            .expect("get conv after delete");
-        assert!(conv_after.is_none(), "conversation should be deleted");
+            .expect("删除后获取会话");
+        assert!(conv_after.is_none(), "会话应被删除");
 
-        // Verify message was cascade-deleted
+        // 验证消息已被级联删除
         let msg_after = sqlx::query("SELECT id FROM messages WHERE id = ?")
             .bind(&msg_id)
             .fetch_optional(&pool)
             .await
-            .expect("check message after delete");
-        assert!(msg_after.is_none(), "message should be cascade-deleted with conversation");
+            .expect("删除后检查消息");
+        assert!(msg_after.is_none(), "消息应随会话被级联删除");
     }
 }

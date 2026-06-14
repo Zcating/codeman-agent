@@ -1,6 +1,6 @@
-//! LLMProviderService Effect service tests.
+//! LLMProviderService Effect 服务测试。
 //!
-//! Effect signature:
+//! Effect 签名：
 //!   LLMProviderService.list(): Effect<LLMProvider[], AppError>
 //!   LLMProviderService.add(provider): Effect<void, AppError>
 //!   LLMProviderService.update(id, patch): Effect<void, AppError>
@@ -98,7 +98,7 @@ describe("LLMProviderService", () => {
     mockState.rejected = undefined;
   });
 
-  it.effect("list returns all providers", () =>
+  it.effect("list 返回所有 provider", () =>
     Effect.gen(function* () {
       const svc = yield* LLMProviderService;
       const result = yield* svc.list();
@@ -108,7 +108,7 @@ describe("LLMProviderService", () => {
     }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive))
   );
 
-  it.effect("add appends provider to list", () =>
+  it.effect("add 追加 provider 到列表", () =>
     Effect.gen(function* () {
       const svc = yield* LLMProviderService;
       const newProvider: LLMProvider = {
@@ -124,7 +124,7 @@ describe("LLMProviderService", () => {
     }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive))
   );
 
-  it.effect("update modifies provider fields", () =>
+  it.effect("update 修改 provider 字段", () =>
     Effect.gen(function* () {
       const svc = yield* LLMProviderService;
       yield* svc.update("minimax", { label: "MiniMax Updated", enabled: true });
@@ -134,7 +134,7 @@ describe("LLMProviderService", () => {
     }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive))
   );
 
-  it.effect("remove filters out provider", () =>
+  it.effect("remove 从列表中过滤掉 provider", () =>
     Effect.gen(function* () {
       const svc = yield* LLMProviderService;
       yield* svc.remove("minimax");
@@ -144,7 +144,7 @@ describe("LLMProviderService", () => {
     }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive))
   );
 
-  it.effect("setActive updates default_llm_provider_id in settings", () =>
+  it.effect("setActive 更新 settings 中的 default_llm_provider_id", () =>
     Effect.gen(function* () {
       const svc = yield* LLMProviderService;
       yield* svc.setActive("minimax");
@@ -152,7 +152,7 @@ describe("LLMProviderService", () => {
     }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive))
   );
 
-  it.effect("hasApiKey delegates to mocked invoke (deepseek has key)", () =>
+  it.effect("hasApiKey 委托给 mock invoke（deepseek 有 key）", () =>
     Effect.gen(function* () {
       mockState.resolved = true;
       const svc = yield* LLMProviderService;
@@ -162,7 +162,7 @@ describe("LLMProviderService", () => {
     }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive))
   );
 
-  it.effect("hasApiKey delegates to mocked invoke (unknown has no key)", () =>
+  it.effect("hasApiKey 委托给 mock invoke（unknown 无 key）", () =>
     Effect.gen(function* () {
       mockState.resolved = false;
       const svc = yield* LLMProviderService;

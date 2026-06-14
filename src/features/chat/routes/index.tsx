@@ -1,4 +1,4 @@
-//! /  — Chat layout: Sidebar + ChatView + bottom Settings link.
+//! /  — Chat 布局：Sidebar + ChatView + 底部 Settings 链接。
 
 import { Sidebar } from "../components/sidebar";
 import { ChatView } from "../components/chat-view";

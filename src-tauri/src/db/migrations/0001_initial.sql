@@ -1,10 +1,10 @@
 CREATE TABLE conversations (
-    id              TEXT PRIMARY KEY,        -- uuid
-    title           TEXT NOT NULL,           -- auto from first user msg, ≤40 chars
-    system_prompt   TEXT,                    -- NULL = use global default
-    created_at      INTEGER NOT NULL,        -- unix epoch seconds
+    id              TEXT PRIMARY KEY,        -- UUID
+    title           TEXT NOT NULL,           -- 来自首条用户消息，≤40 字符
+    system_prompt   TEXT,                    -- NULL = 使用全局默认值
+    created_at      INTEGER NOT NULL,        -- unix epoch 秒
     updated_at      INTEGER NOT NULL,
-    archived_at     INTEGER                  -- NULL = active
+    archived_at     INTEGER                  -- NULL = 活跃
 );
 
 CREATE TABLE messages (
@@ -14,7 +14,7 @@ CREATE TABLE messages (
     content         TEXT NOT NULL,
     tool_calls      TEXT,                    -- JSON: [{name, args, id}]
     tool_results    TEXT,                    -- JSON: [{tool_call_id, result, error}]
-    model           TEXT,                    -- which LLM produced this
+    model           TEXT,                    -- 生成此消息的 LLM
     input_tokens    INTEGER,
     output_tokens   INTEGER,
     created_at      INTEGER NOT NULL

@@ -1,7 +1,7 @@
-//! ChatView — message list + input + stream subscription.
+//! ChatView — 消息列表 + 输入框 + stream 订阅。
 //!
-//! The centerpiece of the agent UI. Subscribes to AgentRuntime.run()
-//! and translates RuntimeEvents into UI updates.
+//! 代理 UI 的核心组件。订阅 AgentRuntime.run()
+//! 并将 RuntimeEvents 转换为 UI 更新。
 
 import { createSignal, createEffect, For, Show, onCleanup } from "solid-js";
 import { Effect, Exit, Stream } from "effect";
@@ -28,7 +28,7 @@ export function ChatView() {
   let abortController: AbortController | null = null;
   let messagesEndRef: HTMLDivElement | undefined;
 
-  // Load messages whenever the active conversation changes.
+  // 每当活跃会话变更时加载消息。
   createEffect(() => {
     const id = activeId$();
     if (id) {
@@ -38,7 +38,7 @@ export function ChatView() {
     }
   });
 
-  // Auto-scroll to bottom on new message.
+  // 新消息时自动滚动到底部。
   createEffect(() => {
     messages$(); // depend on signal
     if (messagesEndRef) {
@@ -103,7 +103,7 @@ export function ChatView() {
               break;
             }
             case "error": {
-              console.error("[ChatView] agent error:", evt.error);
+              console.error("[ChatView] 代理错误：", evt.error);
               break;
             }
           }
@@ -113,10 +113,10 @@ export function ChatView() {
 
       const result = await Effect.runPromiseExit(program);
       if (!Exit.isSuccess(result)) {
-        console.error("[ChatView] run error:", String(result.cause));
+        console.error("[ChatView] 运行错误：", String(result.cause));
       }
     } catch (e) {
-      console.error("[ChatView] run error:", e);
+      console.error("[ChatView] 运行错误：", e);
     } finally {
       setRunning(false);
       setStreamingMessageId(null);

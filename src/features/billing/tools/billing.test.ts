@@ -1,15 +1,14 @@
-//! Billing tools — Effect service tests (extended from T33).
+//! Billing 工具 — Effect 服务测试（从 T33 扩展）。
 //!
-//! Effect tests verify the tool definitions are usable with the pi-agent
-//! runtime's tool-dispatch pattern (T17's concern).
+//! Effect 测试验证工具定义可与 pi-agent 运行时的 tool-dispatch 模式配合使用（T17 的关注点）。
 
 import { describe, it, expect } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { BillingService } from "../../../shared/lib/tauri";
 import type { AppError } from "../../../shared/types";
 
-describe("billing tools — Effect service integration", () => {
-  // Mock BillingServiceLive that succeeds for known providers
+describe("billing 工具 — Effect 服务集成", () => {
+  // Mock BillingServiceLive，成功返回已知 provider
   const MockBillingServiceLive = Layer.succeed(BillingService, {
     listProviders: () =>
       Effect.succeed([
@@ -46,7 +45,7 @@ describe("billing tools — Effect service integration", () => {
     setKey: () => Effect.succeed(undefined),
   });
 
-  it.effect("BillingService.getSnapshot returns balance for deepseek", () =>
+  it.effect("BillingService.getSnapshot 返回 deepseek 的 balance", () =>
     Effect.gen(function* () {
       const svc = yield* BillingService;
       const snap = yield* svc.getSnapshot("deepseek");
@@ -58,7 +57,7 @@ describe("billing tools — Effect service integration", () => {
     }).pipe(Effect.provide(MockBillingServiceLive))
   );
 
-  it.effect("BillingService.getSnapshot returns plan_quota for minimax", () =>
+  it.effect("BillingService.getSnapshot 返回 minimax 的 plan_quota", () =>
     Effect.gen(function* () {
       const svc = yield* BillingService;
       const snap = yield* svc.getSnapshot("minimax");
@@ -70,7 +69,7 @@ describe("billing tools — Effect service integration", () => {
     }).pipe(Effect.provide(MockBillingServiceLive))
   );
 
-  it.effect("BillingService.getSnapshot fails for unknown provider", () =>
+  it.effect("BillingService.getSnapshot 对未知 provider 失败", () =>
     Effect.gen(function* () {
       const svc = yield* BillingService;
       const result = yield* Effect.exit(svc.getSnapshot("unknown"));
@@ -78,7 +77,7 @@ describe("billing tools — Effect service integration", () => {
     }).pipe(Effect.provide(MockBillingServiceLive))
   );
 
-  it.effect("BillingService.hasKey returns true for deepseek, false for minimax", () =>
+  it.effect("BillingService.hasKey 对 deepseek 返回 true，对 minimax 返回 false", () =>
     Effect.gen(function* () {
       const svc = yield* BillingService;
       const hasKey = yield* svc.hasKey("deepseek");

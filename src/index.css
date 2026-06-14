@@ -6,7 +6,7 @@
   --font-sans: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", ui-monospace, monospace;
 
-  /* 11-step OKLCH primary ramp, anchor #8b5cf6 (violet-500) at 500 */
+  /* 11 阶 OKLCH primary 渐变，锚点 #8b5cf6 (violet-500) 于 500 */
   --color-primary-50:  oklch(0.97 0.014 295);
   --color-primary-100: oklch(0.94 0.030 295);
   --color-primary-200: oklch(0.89 0.055 295);
