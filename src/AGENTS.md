@@ -8,12 +8,17 @@ V1 是 Tauri 2 + Solid chat agent，**不是 V0 280x100 浮窗**。视觉层走 
 
 ```
 src/
-├── index.tsx              # Solid 渲染入口（挂载 <ChatView>，6 行）
+├── index.tsx              # Solid 渲染入口（挂载 <RouterProvider>）
 │                         # 首行：import "./index.css"
 ├── index.css              # Tailwind v4 入口（@import + @theme + @layer base）
 ├── test-setup.ts          # vitest setup（jsdom polyfills）
 ├── shared-mock-state.ts   # 跨测试共享的 mock 状态
 ├── vite-env.d.ts          # Vite 类型
+├── router.tsx             # TanStack Router 路由定义（/ = chat，/settings = 设置）
+│
+├── routes/                # TanStack Router 路由组件
+│   ├── index.tsx          #   Chat 布局路由（挂载 ChatView + Sidebar）
+│   └── settings.tsx       #   Settings 路由
 │
 ├── lib/                   # 唯一允许 import @tauri-apps/api 的层
 │   ├── tauri.ts           #   invoke() 包装 + Service Tag + Live Layer
@@ -29,7 +34,6 @@ src/
 │       ├── ChatView.tsx
 │       ├── Sidebar.tsx
 │       ├── MessageBubble.tsx
-│       ├── SettingsModal.tsx
 │       ├── ProviderCard.tsx
 │       └── ToolCallCard.tsx
 │

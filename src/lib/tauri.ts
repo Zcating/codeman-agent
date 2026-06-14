@@ -90,7 +90,7 @@ export const MessageServiceLive = Layer.succeed(MessageService, {
  });
  export const SettingsServiceLive = Layer.succeed(SettingsService, {
    getSettings: () => invoke<Settings>("get_settings"),
-   updateSettings: (patch) => invoke<Settings>("update_settings", { patch }),
+    updateSettings: (patch) => invoke<Settings>("update_settings", { new_settings: patch }),
    clearAllHistory: () => invoke<void>("clear_all_history"),
    getActiveLlmProvider: () =>
      Effect.gen(function* () {

@@ -19,7 +19,7 @@ src-tauri/
 ├── commands.rs        # 25 个 #[tauri::command] IPC 入口（按任务分组）
     ├── types.rs           # 域类型：ProviderId, Snapshot, Secret, AppError, ProviderKind, ProviderDescriptor
     ├── state.rs           # AppState：Clone + Arc + parking_lot::RwLock 守卫
-    ├── settings.rs        # Settings (22 字段) + sanitized() + Default
+    ├── settings.rs        # Settings (19 字段) + sanitized() + Default
     ├── secrets.rs         # keyring 包装 (billing provider API key)
     ├── secrets_llm.rs     # LLM API key 存储（走 tauri-plugin-store）
     ├── scheduler.rs       # 单一异步轮询循环（tokio::select! + yield_now）

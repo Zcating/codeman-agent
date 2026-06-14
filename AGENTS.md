@@ -87,7 +87,7 @@ codeman-agent/
 - **Secret** = Rust 的 `Secret<String>` newtype；Debug/Display 都打印 `***`，**`expose()` 只在 `Provider::fetch` 内部调用**。
 - **Stale** = Snapshot 超过 `stale_after_seconds`；旧"stale badge"语义在 tool result 缓存中保留。
 
-完整词汇表 + Settings 22 字段 schema → **`CONTEXT.md`**。
+完整词汇表 + Settings 19 字段 schema → **`CONTEXT.md`**。
 
 ## 查阅指南
 
@@ -154,7 +154,7 @@ pnpm typecheck         # tsc --noEmit
 
 ## 注意事项（踩过的坑）
 
-- `src/index.tsx` 6 行，**没有** `app.tsx`。早期版本有过 hash 路由的 `app.tsx`，已废弃；当前 `ChatView` 自己处理 `#/settings`。
+- `src/index.tsx` 渲染入口，**没有** `app.tsx`。早期版本有过 hash 路由的 `app.tsx`，已废弃；V1.5 用 TanStack Router（`src/routes/`），`ChatView` 不再处理 hash 路由。
 - 现有 `src/AGENTS.md` 描述的是**旧 widget 时代结构**（`src/components/widget.tsx`、`src/stores/snapshot.ts`、`lib/format.ts`），全部不存在或已迁到 `src/agent/`。**不要照搬**。
 - `Cargo.lock` 由 pnpm 之外的 `cargo` 生成；改完 Rust 依赖后**手动**跑 `cargo build` 同步。
 - ADR-0005 (托盘形态) 已被 ADR-0007 替代；ADR-0001 提到的 '280×100 浮窗' 是 V0 形态，V1 早已不是那个尺寸，V1.5 进一步变成单 main 窗口。

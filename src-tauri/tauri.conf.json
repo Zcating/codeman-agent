@@ -40,8 +40,8 @@
     "active": true,
     "targets": ["msi", "nsis"],
     "category": "Utility",
-    "shortDescription": "Floating LLM billing widget",
-    "longDescription": "A frameless always-on-top widget that surfaces LLM provider balance and plan quota at a glance.",
+    "shortDescription": "LLM billing chat agent for DeepSeek and MiniMax",
+    "longDescription": "A single native main window chat agent that queries DeepSeek balance and MiniMax plan quota. Settings accessible via in-app route.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

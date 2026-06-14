@@ -301,11 +301,8 @@ mod tests {
         assert!(!is_breached(&snap, &s));
     }
 
-    // Widget position persistence is tested at the Settings type level
-    // (see `settings::tests`). The state layer is a thin pass-through
-    // that holds the in-memory copy and triggers a re-persist, which
-    // would require a full `AppHandle` to drive end-to-end. The pure
-    // logic — round-tripping via `set_widget_position` then reading
-    // `get_widget_position` — is exercised by the unit tests on the
-    // type itself.
+    // `is_breached` is a pure function tested in state::tests (see above).
+    // AppState itself is a thin wrapper; testing the full apply->persist
+    // cycle would require a full AppHandle, which is left to integration
+    // tests.
 }

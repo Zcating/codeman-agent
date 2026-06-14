@@ -7,9 +7,8 @@
 
 import { createSignal, Show, For } from "solid-js";
 import { Link } from "@tanstack/solid-router";
-import { Effect } from "effect";
 import { ProviderCard } from "../agent/components/provider-card";
-import { SettingsService, SettingsServiceLive } from "../lib/tauri";
+import { getSettingsBridge, updateSettingsBridge, clearAllHistoryBridge } from "../lib/tauri";
 import type { LLMProvider, Settings } from "../lib/types";
 
 type Tab = "llm" | "app" | "window" | "billing" | "advanced";
@@ -22,11 +21,7 @@ export function SettingsPage() {
   // Load settings + providers on mount.
   void (async () => {
     try {
-      const program = Effect.gen(function* () {
-        const svc = yield* SettingsService;
-        return yield* svc.getSettings();
-      }).pipe(Effect.provide(SettingsServiceLive));
-      const s = await Effect.runPromise(program);
+      const s = await getSettingsBridge();
       setDraft(s);
     } catch (e) {
       console.error("[SettingsPage] load failed:", e);
@@ -37,11 +32,7 @@ export function SettingsPage() {
     const d = draft();
     if (!d) return;
     try {
-      const program = Effect.gen(function* () {
-        const svc = yield* SettingsService;
-        yield* svc.updateSettings(d);
-      }).pipe(Effect.provide(SettingsServiceLive));
-      await Effect.runPromise(program);
+      await updateSettingsBridge(d);
     } catch (e) {
       console.error("[SettingsPage] save failed:", e);
     }
@@ -73,11 +64,7 @@ export function SettingsPage() {
 
   const clearHistory = async () => {
     try {
-      const program = Effect.gen(function* () {
-        const svc = yield* SettingsService;
-        yield* svc.clearAllHistory();
-      }).pipe(Effect.provide(SettingsServiceLive));
-      await Effect.runPromise(program);
+      await clearAllHistoryBridge();
       setConfirmClear(false);
     } catch (e) {
       console.error("[SettingsPage] clear failed:", e);

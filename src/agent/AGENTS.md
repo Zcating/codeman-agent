@@ -26,10 +26,9 @@ src/agent/
 │   └── llm_providers.test.ts
 │
 └── components/            # **Solid UI 组件**（不许 import 'effect'）
-    ├── ChatView.tsx       #   - 主聊天视图（被 index.tsx 渲染；处理 #/settings 路由）
+    ├── ChatView.tsx       #   - 主聊天视图（被路由渲染；不处理 hash 路由）
     ├── Sidebar.tsx        #   - 会话列表侧边栏
     ├── MessageBubble.tsx  #   - 单条消息气泡
-    ├── SettingsModal.tsx  #   - 设置弹窗（被 ChatView 在 #/settings 触发）
     ├── ProviderCard.tsx   #   - 计费 provider 卡片（DeepSeek / MiniMax）
     ├── ToolCallCard.tsx   #   - 工具调用 / 结果展示卡片
     └── <Name>.test.tsx    # 1:1 旁挂测试
@@ -62,7 +61,7 @@ src/agent/
 | 新增会话/消息 IPC 调用 | `store/conversations.ts` 或 `store/messages.ts`（桥接层） |
 | 新增设置项业务逻辑 | `settings/<name>.ts`（纯函数 + schema） |
 | 新增 UI 视图 | `components/<Name>.tsx`；被 `ChatView` 引入；订阅 `store/*$` 访问器 |
-| 新增主视图（非 chat/settings） | 先确认是不是 V1 范围内；当前 V1 只有 `ChatView` + `SettingsModal` |
+| 新增主视图（非 chat/settings） | 先确认是不是 V1.5 范围内；当前 V1.5 有 `ChatView`（chat 路由组件）+ `routes/settings.tsx`（settings 路由）；`ChatView` 不再处理 hash 路由 |
 | 桥接层测试 | `store/*.test.ts`（`it.effect` + mock Layer） |
 | UI 测试 | `components/<Name>.test.tsx`（`@solidjs/testing-library`） |
 

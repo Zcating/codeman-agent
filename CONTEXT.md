@@ -80,7 +80,7 @@ stay aligned.
 ### Settings & state
 
 - **Settings** — JSON document persisted via `tauri-plugin-store`
-in the OS app-data directory. Holds ~22 fields across 9
+in the OS app-data directory. Holds ~17 fields across 7
 categories. **No API keys** (those live in Tauri store or
   keyring, split by namespace).
 - **Hotkeys** (removed in V1.5): V1 had no hotkeys; V1.5 ships
@@ -164,8 +164,6 @@ interface Settings {
 
   // C. App
   start_at_login: boolean;
-  start_minimized: boolean;       // open to tray, not window
-  close_behavior: "hide_to_tray" | "quit";
 
   // D. Window
   window: {
@@ -181,14 +179,7 @@ interface Settings {
     user_can_edit: boolean;
   };
 
-  // F. Hotkeys (deprecated V1, reserved for V2)
-  hotkeys: {
-    toggle_window: string;
-    new_conversation: string;
-    open_settings: string;
-  };
-
-  // G. Billing
+  // F. Billing
   billing_providers: Array<{
     id: string;                  // "deepseek" | "minimax"
     enabled: boolean;
@@ -196,7 +187,7 @@ interface Settings {
     api_key_ref: string;         // path into keyring
   }>;
 
-  // H. Conversations
+  // G. Conversations
   conversations: {
     auto_archive_after_days: number;   // default 30
     max_history: number;               // default 1000
