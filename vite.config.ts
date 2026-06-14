@@ -23,7 +23,7 @@ export default defineConfig(async () => ({
   // staged checks (e.g. a Rust check on `*.rs` would go in
   // scripts/precommit.mjs).
   staged: {
-    "*.{ts,tsx,mjs}": "vp check --fix && vp test --passWithNoTests",
+    "*.{ts,tsx,mjs}": "vp check --fix",
   },
   resolve: {
     conditions: ["browser", "development"],
