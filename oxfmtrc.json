@@ -1,0 +1,10 @@
+{
+  "$schema": "https://oxfmt.rs/schema.json",
+  "indent": {
+    "kind": "space",
+    "width": 2
+  },
+  "line_width": 100,
+  "quote_style": "double",
+  "semi": true
+}

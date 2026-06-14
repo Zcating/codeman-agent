@@ -1,0 +1,6 @@
+{
+  "$schema": "https://oxlint.rs/schema.json",
+  "rules": {
+    "no-unused-vars": "warn"
+  }
+}
