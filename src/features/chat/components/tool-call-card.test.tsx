@@ -18,7 +18,9 @@ describe("ToolCallCard", () => {
       args: { provider: "deepseek" },
     };
     const { container } = render(() => <ToolCallCard toolCall={toolCall} />);
-    const card = container.querySelector("[class*='border-zinc-300']") ?? container.querySelector("[class*='dark:border-zinc-700']");
+    const card =
+      container.querySelector("[class*='border-zinc-300']") ??
+      container.querySelector("[class*='dark:border-zinc-700']");
     expect(card).toBeTruthy();
     const icon = card?.querySelector("span");
     expect(icon?.textContent).toBe("⏳");
@@ -38,7 +40,9 @@ describe("ToolCallCard", () => {
       error: null,
     };
     const { container } = render(() => <ToolCallCard toolCall={toolCall} result={result} />);
-    const card = container.querySelector("[class*='border-green-300']") ?? container.querySelector("[class*='dark:border-green-700']");
+    const card =
+      container.querySelector("[class*='border-green-300']") ??
+      container.querySelector("[class*='dark:border-green-700']");
     expect(card).toBeTruthy();
     const icon = card?.querySelector("span");
     expect(icon?.textContent).toBe("✓");
@@ -58,7 +62,9 @@ describe("ToolCallCard", () => {
       error: "API key not set",
     };
     const { container } = render(() => <ToolCallCard toolCall={toolCall} result={result} />);
-    const card = container.querySelector("[class*='border-red-300']") ?? container.querySelector("[class*='dark:border-red-700']");
+    const card =
+      container.querySelector("[class*='border-red-300']") ??
+      container.querySelector("[class*='dark:border-red-700']");
     expect(card).toBeTruthy();
     const icon = card?.querySelector("span");
     expect(icon?.textContent).toBe("✗");

@@ -47,7 +47,7 @@ export const LLMProviderServiceLive = Layer.effect(
         Effect.gen(function* () {
           const settings = yield* svc.getSettings();
           const next = settings.llm_providers.map((p) =>
-            p.id === id ? { ...p, ...patch, id: p.id } : p
+            p.id === id ? { ...p, ...patch, id: p.id } : p,
           );
           yield* svc.updateSettings({ llm_providers: next });
         }),

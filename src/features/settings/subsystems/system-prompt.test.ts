@@ -81,7 +81,7 @@ describe("SystemPromptService", () => {
       const svc = yield* SystemPromptService;
       const result = yield* svc.getDefault();
       expect(result).toBe("You are a helpful assistant.");
-    }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive))
+    }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive)),
   );
 
   it.effect("updateDefault 修改默认系统提示词", () =>
@@ -90,7 +90,7 @@ describe("SystemPromptService", () => {
       yield* svc.updateDefault("You are a pirate.");
       const result = yield* svc.getDefault();
       expect(result).toBe("You are a pirate.");
-    }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive))
+    }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive)),
   );
 
   it.effect("getUserCanEdit 返回 user_can_edit 标志", () =>
@@ -98,7 +98,7 @@ describe("SystemPromptService", () => {
       const svc = yield* SystemPromptService;
       const result = yield* svc.getUserCanEdit();
       expect(result).toBe(true);
-    }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive))
+    }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive)),
   );
 
   it.effect("forConversation 在设置覆盖时返回会话覆盖", () =>
@@ -106,7 +106,7 @@ describe("SystemPromptService", () => {
       const svc = yield* SystemPromptService;
       const result = yield* svc.forConversation(convWithPrompt);
       expect(result).toBe("Use Chinese.");
-    }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive))
+    }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive)),
   );
 
   it.effect("forConversation 在无覆盖时回退到 settings 默认值", () =>
@@ -114,6 +114,6 @@ describe("SystemPromptService", () => {
       const svc = yield* SystemPromptService;
       const result = yield* svc.forConversation(convWithoutPrompt);
       expect(result).toBe("You are a helpful assistant.");
-    }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive))
+    }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive)),
   );
 });

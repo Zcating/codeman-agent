@@ -9,21 +9,21 @@
 
 以下名称保持原文，禁止翻译：
 
-| 类别 | 名称 |
-|---|---|
-| 桌面壳 | Tauri, WebView2, tauri-driver |
-| UI 框架 | Solid.js, Solid, @solid-primitives |
-| 样式 | Tailwind, Tailwind CSS, tailwind-merge, cva, class-variance-authority, clsx, lucide-solid |
-| 逻辑层 | Effect, Effect-TS, @effect/platform-browser, @effect/vitest, Layer, Stream, Effect Service |
-| Agent 运行时 | pi-mono, pi-ai, pi-agent, @mariozechner/pi-ai, @mariozechner/pi-agent |
-| 路由 | TanStack Router, TanStack |
-| 测试 | Vitest, Playwright, @solidjs/testing-library, jsdom, @testing-library |
-| 持久化 | SQLite, FTS5, sqlx |
-| 密钥 | keyring (crate), Windows Credential Manager |
-| 构建 | Vite, vite-plugin-solid, pnpm, cargo, rustc |
-| 类型 | Rust `Secret<String>` newtype, `Result<T, E>`, `Option<T>`, `Result::Err` |
-| 协议 | IPC, Tauri store, Tauri plugin |
-| Web 标准 | HTML, CSS, JSX, TSX, TypeScript, ESM, CommonJS |
+| 类别         | 名称                                                                                       |
+| ------------ | ------------------------------------------------------------------------------------------ |
+| 桌面壳       | Tauri, WebView2, tauri-driver                                                              |
+| UI 框架      | Solid.js, Solid, @solid-primitives                                                         |
+| 样式         | Tailwind, Tailwind CSS, tailwind-merge, cva, class-variance-authority, clsx, lucide-solid  |
+| 逻辑层       | Effect, Effect-TS, @effect/platform-browser, @effect/vitest, Layer, Stream, Effect Service |
+| Agent 运行时 | pi-mono, pi-ai, pi-agent, @mariozechner/pi-ai, @mariozechner/pi-agent                      |
+| 路由         | TanStack Router, TanStack                                                                  |
+| 测试         | Vitest, Playwright, @solidjs/testing-library, jsdom, @testing-library                      |
+| 持久化       | SQLite, FTS5, sqlx                                                                         |
+| 密钥         | keyring (crate), Windows Credential Manager                                                |
+| 构建         | Vite, vite-plugin-solid, pnpm, cargo, rustc                                                |
+| 类型         | Rust `Secret<String>` newtype, `Result<T, E>`, `Option<T>`, `Result::Err`                  |
+| 协议         | IPC, Tauri store, Tauri plugin                                                             |
+| Web 标准     | HTML, CSS, JSX, TSX, TypeScript, ESM, CommonJS                                             |
 
 **判断标准**：该名称在 GitHub Issue / Stack Overflow / 官方文档中是
 brand-spelling 一致的形式 → 保留。
@@ -35,127 +35,127 @@ brand-spelling 一致的形式 → 保留。
 
 ### 2.1 领域核心
 
-| 英文（canonical / code identifier） | 中文（首次出现用） | 备注 |
-|---|---|---|
-| Agent | 代理 | 指"产品本身" |
-| Conversation | 会话 | |
-| Message | 消息 | |
-| Tool | 工具 | LLM 可调函数 |
-| Tool Call | 工具调用 | |
-| Tool Result | 工具结果 | |
-| Snapshot | 快照 | 计费时点视图 |
-| Balance | 余额 | 可充值 |
-| Plan Quota | 用量（套餐余量） | 不可充值，固定 |
-| Auto-recharge | 自动充值 | |
-| Auto-archive | 自动归档 | |
-| Stream | Stream | Effect-TS 库专名，**不译** |
+| 英文（canonical / code identifier） | 中文（首次出现用） | 备注                       |
+| ----------------------------------- | ------------------ | -------------------------- |
+| Agent                               | 代理               | 指"产品本身"               |
+| Conversation                        | 会话               |                            |
+| Message                             | 消息               |                            |
+| Tool                                | 工具               | LLM 可调函数               |
+| Tool Call                           | 工具调用           |                            |
+| Tool Result                         | 工具结果           |                            |
+| Snapshot                            | 快照               | 计费时点视图               |
+| Balance                             | 余额               | 可充值                     |
+| Plan Quota                          | 用量（套餐余量）   | 不可充值，固定             |
+| Auto-recharge                       | 自动充值           |                            |
+| Auto-archive                        | 自动归档           |                            |
+| Stream                              | Stream             | Effect-TS 库专名，**不译** |
 
 ### 2.2 Provider 体系
 
-| 英文 | 中文 | 备注 |
-|---|---|---|
-| LLM Provider | 大语言模型提供商 | 首次出现用全名，后续可简称"LLM 提供商" |
-| Billing Provider | 计费提供商 | |
-| Provider | （避免单用） | 总是说"LLM Provider"或"Billing Provider" |
-| Adapter | 适配器 | per-billing-provider HTTP client |
+| 英文             | 中文             | 备注                                     |
+| ---------------- | ---------------- | ---------------------------------------- |
+| LLM Provider     | 大语言模型提供商 | 首次出现用全名，后续可简称"LLM 提供商"   |
+| Billing Provider | 计费提供商       |                                          |
+| Provider         | （避免单用）     | 总是说"LLM Provider"或"Billing Provider" |
+| Adapter          | 适配器           | per-billing-provider HTTP client         |
 
 ### 2.3 架构层
 
-| 英文 | 中文 | 备注 |
-|---|---|---|
-| Runtime | 运行时 | Effect-TS 包装 pi-mono 的层 |
-| Bridge | 桥接层 | Effect → Solid signal 翻译器 |
-| Effect Service | Effect 服务 | "Effect" 不译 |
-| Layer | Layer | Effect-TS 库专名，不译 |
-| Stream | Stream | Effect-TS 库专名，不译 |
-| IPC | IPC | 协议名，不译 |
-| Store | 状态 / 存储 | **过载** —— Solid store = 状态，Tauri store = 存储 |
-| Tag | Tag | Effect 数据类型，保留 |
-| Schedule | Schedule | Effect 数据类型，保留 |
-| Ref | Ref | Effect 数据类型，保留 |
-| Fiber | Fiber | Effect 运行时概念，保留 |
-| Service Tag | Service Tag | Effect 设计模式，保留 |
-| Effect Stream | Effect Stream | 不译 "Effect" / "Stream" |
-| Effect Layer | Effect Layer | 不译 |
+| 英文           | 中文          | 备注                                               |
+| -------------- | ------------- | -------------------------------------------------- |
+| Runtime        | 运行时        | Effect-TS 包装 pi-mono 的层                        |
+| Bridge         | 桥接层        | Effect → Solid signal 翻译器                       |
+| Effect Service | Effect 服务   | "Effect" 不译                                      |
+| Layer          | Layer         | Effect-TS 库专名，不译                             |
+| Stream         | Stream        | Effect-TS 库专名，不译                             |
+| IPC            | IPC           | 协议名，不译                                       |
+| Store          | 状态 / 存储   | **过载** —— Solid store = 状态，Tauri store = 存储 |
+| Tag            | Tag           | Effect 数据类型，保留                              |
+| Schedule       | Schedule      | Effect 数据类型，保留                              |
+| Ref            | Ref           | Effect 数据类型，保留                              |
+| Fiber          | Fiber         | Effect 运行时概念，保留                            |
+| Service Tag    | Service Tag   | Effect 设计模式，保留                              |
+| Effect Stream  | Effect Stream | 不译 "Effect" / "Stream"                           |
+| Effect Layer   | Effect Layer  | 不译                                               |
 
 ### 2.4 密钥与安全
 
-| 英文 | 中文 | 备注 |
-|---|---|---|
-| Secret | 密钥 | Rust newtype 时保留 Secret |
-| LLM API Key | LLM API 密钥 | |
-| Billing API Key | 计费 API 密钥 | |
-| API Key Reference | API Key 引用 | `api_key_ref` 字段 |
-| Tauri Store | Tauri Store | 不译 "Tauri" |
-| Keyring | Keyring | crate 名，不译 |
-| Expose (Secret) | 暴露 | `.expose()` 方法 |
+| 英文              | 中文          | 备注                       |
+| ----------------- | ------------- | -------------------------- |
+| Secret            | 密钥          | Rust newtype 时保留 Secret |
+| LLM API Key       | LLM API 密钥  |                            |
+| Billing API Key   | 计费 API 密钥 |                            |
+| API Key Reference | API Key 引用  | `api_key_ref` 字段         |
+| Tauri Store       | Tauri Store   | 不译 "Tauri"               |
+| Keyring           | Keyring       | crate 名，不译             |
+| Expose (Secret)   | 暴露          | `.expose()` 方法           |
 
 ### 2.5 Settings 与状态
 
-| 英文 | 中文 | 备注 |
-|---|---|---|
-| Settings | 设置 | |
-| Theme | 主题 | |
-| Stale | 过期 | snapshot stale 语义 |
-| Archive | 归档 | |
-| Window | 窗口 | UI 窗口（不是 Rust struct Window） |
-| Tauri Window | Tauri 窗口 | Rust struct 时用全名 |
-| Default | 默认 | |
-| Enabled | 启用 | |
+| 英文         | 中文       | 备注                               |
+| ------------ | ---------- | ---------------------------------- |
+| Settings     | 设置       |                                    |
+| Theme        | 主题       |                                    |
+| Stale        | 过期       | snapshot stale 语义                |
+| Archive      | 归档       |                                    |
+| Window       | 窗口       | UI 窗口（不是 Rust struct Window） |
+| Tauri Window | Tauri 窗口 | Rust struct 时用全名               |
+| Default      | 默认       |                                    |
+| Enabled      | 启用       |                                    |
 
 ### 2.6 样式
 
-| 英文 | 中文 | 备注 |
-|---|---|---|
-| Utility Class | 工具类 | |
-| Style Token | 样式令牌 | |
-| cn | cn | 函数名，保留 |
-| Variant | 变体 | cva 变体 |
-| Compound | 复合 | cva 复合变体 |
+| 英文          | 中文     | 备注         |
+| ------------- | -------- | ------------ |
+| Utility Class | 工具类   |              |
+| Style Token   | 样式令牌 |              |
+| cn            | cn       | 函数名，保留 |
+| Variant       | 变体     | cva 变体     |
+| Compound      | 复合     | cva 复合变体 |
 
 ### 2.7 测试
 
-| 英文 | 中文 | 备注 |
-|---|---|---|
-| Test Description | 测试描述 | `it("xxx")` 里的字符串 |
-| Assertion | 断言 | `expect().toBe()` runtime check |
-| UI String | UI 字符串 | 浏览器展示文本 |
-| Developer String | 开发者字符串 | log / console / panic |
-| Fixture | 测试数据 | |
-| Mock | Mock | 不译 |
-| Spy | Spy | 不译 |
-| Stub | Stub | 不译 |
-| E2E Test | E2E 测试 | "E2E" 不译 |
-| Unit Test | 单元测试 | |
-| Integration Test | 集成测试 | |
+| 英文             | 中文         | 备注                            |
+| ---------------- | ------------ | ------------------------------- |
+| Test Description | 测试描述     | `it("xxx")` 里的字符串          |
+| Assertion        | 断言         | `expect().toBe()` runtime check |
+| UI String        | UI 字符串    | 浏览器展示文本                  |
+| Developer String | 开发者字符串 | log / console / panic           |
+| Fixture          | 测试数据     |                                 |
+| Mock             | Mock         | 不译                            |
+| Spy              | Spy          | 不译                            |
+| Stub             | Stub         | 不译                            |
+| E2E Test         | E2E 测试     | "E2E" 不译                      |
+| Unit Test        | 单元测试     |                                 |
+| Integration Test | 集成测试     |                                 |
 
 ### 2.8 Rust 专有
 
-| 英文 | 中文 | 备注 |
-|---|---|---|
-| Trait | Trait | 不译 |
-| Struct | Struct | 不译 |
-| Enum | Enum | 不译 |
-| Newtype | Newtype | 不译 |
-| Borrow Checker | Borrow Checker | 不译 |
-| Lifetime | 生命周期 | |
-| Ownership | 所有权 | |
-| Crate | Crate | 不译 |
-| Module | 模块 | |
-| Workspace | Workspace | 不译（cargo 概念） |
+| 英文           | 中文           | 备注               |
+| -------------- | -------------- | ------------------ |
+| Trait          | Trait          | 不译               |
+| Struct         | Struct         | 不译               |
+| Enum           | Enum           | 不译               |
+| Newtype        | Newtype        | 不译               |
+| Borrow Checker | Borrow Checker | 不译               |
+| Lifetime       | 生命周期       |                    |
+| Ownership      | 所有权         |                    |
+| Crate          | Crate          | 不译               |
+| Module         | 模块           |                    |
+| Workspace      | Workspace      | 不译（cargo 概念） |
 
 ### 2.9 pi-mono 专有
 
-| 英文 | 中文 | 备注 |
-|---|---|---|
-| Agent Loop | Agent 循环 | "Agent" 不译 |
-| Tool Registry | 工具注册表 | |
+| 英文                | 中文        | 备注          |
+| ------------------- | ----------- | ------------- |
+| Agent Loop          | Agent 循环  | "Agent" 不译  |
+| Tool Registry       | 工具注册表  |               |
 | Stream Subscription | Stream 订阅 | "Stream" 不译 |
-| Message Turn | 消息轮次 | |
-| System Prompt | 系统提示 | |
-| Token Usage | Token 用量 | "Token" 不译 |
-| Input Tokens | 输入 Tokens | |
-| Output Tokens | 输出 Tokens | |
+| Message Turn        | 消息轮次    |               |
+| System Prompt       | 系统提示    |               |
+| Token Usage         | Token 用量  | "Token" 不译  |
+| Input Tokens        | 输入 Tokens |               |
+| Output Tokens       | 输出 Tokens |               |
 
 ## 3. 标点规则
 
@@ -246,19 +246,19 @@ panic!("余额查询失败");
 
 以下情况**保持英文**，不走中文规则：
 
-| 例外 | 原因 |
-|---|---|
+| 例外                                                      | 原因                                                 |
+| --------------------------------------------------------- | ---------------------------------------------------- |
 | 锚定 UI 字符串的 `expect().toBe('Settings')` runtime 断言 | runtime check 必须跟 UI 完全匹配，UI 英文 → 断言英文 |
-| Tauri store key / env var / IPC 命令名 | 配置层 identifier，跨语言检索锚点 |
-| `user_language: "zh" \| "en" \| "auto"` 字段值 | 字段值是 enum 标识符 |
-| `.agents/skills/*` 内部 prompt | AI agent skill 训练数据语言对齐 |
-| commit message `type(scope):` 前缀 | 机器可读 + 生态兼容 |
-| branch name | git URL 编码 + 工具链兼容 |
-| npm / cargo 包名 | 不可译 |
-| 外部 URL / 文档链接 | 原文 |
-| 错误码（`AppError.Variant`） | 标识符 |
-| Log 文件路径（`%LocalAppData%\codeman-agent\logs\`） | 平台路径，保留原文 |
-| 协议 / 标准名（WebView2、CDP、CRUD、REST、JSON、YAML） | 行业标准名 |
+| Tauri store key / env var / IPC 命令名                    | 配置层 identifier，跨语言检索锚点                    |
+| `user_language: "zh" \| "en" \| "auto"` 字段值            | 字段值是 enum 标识符                                 |
+| `.agents/skills/*` 内部 prompt                            | AI agent skill 训练数据语言对齐                      |
+| commit message `type(scope):` 前缀                        | 机器可读 + 生态兼容                                  |
+| branch name                                               | git URL 编码 + 工具链兼容                            |
+| npm / cargo 包名                                          | 不可译                                               |
+| 外部 URL / 文档链接                                       | 原文                                                 |
+| 错误码（`AppError.Variant`）                              | 标识符                                               |
+| Log 文件路径（`%LocalAppData%\codeman-agent\logs\`）      | 平台路径，保留原文                                   |
+| 协议 / 标准名（WebView2、CDP、CRUD、REST、JSON、YAML）    | 行业标准名                                           |
 
 ## 8. 更新本文件
 

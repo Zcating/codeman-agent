@@ -30,15 +30,15 @@ src-tauri/
 
 ## 25 个 IPC 命令（按任务分组）
 
-| 分组 | 命令 | 用途 |
-|---|---|---|
-| **V0 Provider** | `list_providers` `get_active_provider` `set_active_provider` `force_refresh` | 旧版计费 provider 操作 |
-| **V0 Settings** | `get_settings` `update_settings` `set_api_key` `has_api_key` `test_provider` | 旧版设置 + 密钥 |
-| **V0 Snapshot** | `latest_snapshot` | V0 快照 |
-| **T12 会话** | `list_conversations` `get_conversation` `create_conversation` `archive_conversation` `delete_conversation` | 对话 CRUD |
-| **T12 消息** | `list_messages` `append_message` `search_messages` | 消息 CRUD + FTS5 搜索 |
-| **T13 计费** | `get_provider_snapshot` `list_billing_providers` `has_billing_key` `set_billing_key` | billing 工具桥接 |
-| **T22 设置+密钥** | `clear_all_history` `set_llm_key` `has_llm_key` | LLM key + 清空 |
+| 分组              | 命令                                                                                                       | 用途                   |
+| ----------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------- |
+| **V0 Provider**   | `list_providers` `get_active_provider` `set_active_provider` `force_refresh`                               | 旧版计费 provider 操作 |
+| **V0 Settings**   | `get_settings` `update_settings` `set_api_key` `has_api_key` `test_provider`                               | 旧版设置 + 密钥        |
+| **V0 Snapshot**   | `latest_snapshot`                                                                                          | V0 快照                |
+| **T12 会话**      | `list_conversations` `get_conversation` `create_conversation` `archive_conversation` `delete_conversation` | 对话 CRUD              |
+| **T12 消息**      | `list_messages` `append_message` `search_messages`                                                         | 消息 CRUD + FTS5 搜索  |
+| **T13 计费**      | `get_provider_snapshot` `list_billing_providers` `has_billing_key` `set_billing_key`                       | billing 工具桥接       |
+| **T22 设置+密钥** | `clear_all_history` `set_llm_key` `has_llm_key`                                                            | LLM key + 清空         |
 
 权威列表在 `src-tauri/src/lib.rs::invoke_handler!`；TS 镜像在 `src/lib/tauri.ts`。**两边漂移 = 前端静默 bug**。
 
@@ -78,17 +78,17 @@ main 窗口用 `default` capability。关键授权：
 
 ## 查阅指南
 
-| 任务 | 文件 |
-|---|---|
-| 新增 Tauri 命令 | `commands.rs` + `lib.rs::invoke_handler!`（**先两边同时改**） |
-| 新增域枚举/变体 | `types.rs`（镜像到 `src/lib/types.ts`） |
-| 新增设置项 | `settings.rs::Settings` + `sanitized()` + `Default`（**先 Rust**，再 TS 镜像） |
-| 改轮询行为 | `scheduler.rs`——**不要**拆循环 |
-| 新增系统通知 | `state.rs::fire_threshold_notification` |
-| 接入新插件 | `lib.rs::run` + `Cargo.toml` + `capabilities/default.json` |
-| 新增厂商 | `providers/<name>.rs` + `providers/mod.rs::registry`（详见子目录 AGENTS.md） |
-| 新增 SQLite 表 | `db/migrations/<seq>_<name>.sql` + `db/<table>.rs`（详见子目录 AGENTS.md） |
-| 改窗口关闭行为 | `lib.rs::on_window_event`（main 窗口 minimize） |
+| 任务            | 文件                                                                           |
+| --------------- | ------------------------------------------------------------------------------ |
+| 新增 Tauri 命令 | `commands.rs` + `lib.rs::invoke_handler!`（**先两边同时改**）                  |
+| 新增域枚举/变体 | `types.rs`（镜像到 `src/lib/types.ts`）                                        |
+| 新增设置项      | `settings.rs::Settings` + `sanitized()` + `Default`（**先 Rust**，再 TS 镜像） |
+| 改轮询行为      | `scheduler.rs`——**不要**拆循环                                                 |
+| 新增系统通知    | `state.rs::fire_threshold_notification`                                        |
+| 接入新插件      | `lib.rs::run` + `Cargo.toml` + `capabilities/default.json`                     |
+| 新增厂商        | `providers/<name>.rs` + `providers/mod.rs::registry`（详见子目录 AGENTS.md）   |
+| 新增 SQLite 表  | `db/migrations/<seq>_<name>.sql` + `db/<table>.rs`（详见子目录 AGENTS.md）     |
+| 改窗口关闭行为  | `lib.rs::on_window_event`（main 窗口 minimize）                                |
 
 ## 反模式（明确禁止）
 

@@ -35,7 +35,16 @@ const mockMessages: Message[] = [
 ];
 
 vi.mock("../store/conversations", () => ({
-  conversations$: vi.fn(() => [{ id: "conv-1", title: "Test", system_prompt: null, created_at: 1710000000, updated_at: 1710000000, archived_at: null }]),
+  conversations$: vi.fn(() => [
+    {
+      id: "conv-1",
+      title: "Test",
+      system_prompt: null,
+      created_at: 1710000000,
+      updated_at: 1710000000,
+      archived_at: null,
+    },
+  ]),
   activeId$: vi.fn(() => "conv-1"),
   loadConversations: vi.fn(),
   createConversation: vi.fn(),

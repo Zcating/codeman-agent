@@ -1,25 +1,43 @@
-# src/shared — 跨 Feature 共享规范
+# src/shared — 跨 Feature 共享规范（5+1 白名单）
 
-> 本目录是**只读的跨域基础设施**，所有 feature 均可 import，但任何 feature 均不可被 shared 依赖。
+> 本目录是**只读的跨域基础设施**，所有 feature 均可 import，但任何 feature 均不可被 shared 依赖。完整决策见 [ADR-0010](../../docs/adr/0010-frontend-5-1-folder-whitelist.md)。
 
-## 子目录职责
+## 5+1 子目录职责
 
-| 子目录 | 内容 | 维护者 |
-|---|---|---|
-| `lib/` | `tauri.ts`（IPC invoke 入口）+ `cn.ts`（clsx+tailwind-merge） | @/shared/lib 维护者 |
-| `types/` | 跨域 TypeScript 类型：Settings / Message / Conversation / Snapshot / AppError | 全员（改动走 DR） |
-| `state/` | 跨域 Solid 状态：`theme.ts`（`<html class="dark">` 切换） | @/shared/state 维护者 |
-| `assets/` | logo.svg 等静态资源 | 全员 |
-| `ui/` | 5 个原子组件：Button / Input / Textarea / Checkbox / Card | @/shared/ui 维护者 |
+| 子目录                 | 语义                                                              | 现状                                                                              |
+| ---------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `lib/`                 | 纯函数 + 跨域类型：`cn.ts` / `tauri.ts` / `units.ts` / `types.ts` | 4 个文件（ADR-0010 前：3 文件，types 是独立目录）                                 |
+| `stores/`              | 跨域 Solid signal                                                 | `theme.ts`（从 `state/` 迁，ADR-0010）                                            |
+| `hooks/`               | 跨域 composable（`use-` 前缀）                                    | 空，V1 预留                                                                       |
+| `components/ui/`       | 跨域**设计系统原子**                                              | 5 原子（Button / Card / Checkbox / Input / Textarea）+ `AGENTS.md`（从 `ui/` 迁） |
+| `components/internal/` | 跨域**业务组件**                                                  | 空，V1 预留（ErrorBoundary / LoadingSpinner / Provider wrappers / Layout atoms）  |
+
+**`shared/` 不允许**的子目录（旧命名已废弃，违反 ADR-0010 一律删除）：
+
+- `types/` — 旧跨域类型目录，合并到 `lib/types.ts`
+- `state/` — 旧 Solid 状态目录，重命名为 `stores/`
+- `ui/` — 旧设计系统目录，重命名为 `components/ui/`
+- `mocks/` — 已删除，唯一源在仓库根 `__mocks__/@tauri-apps/api/core.ts`（ADR-0010 Q6 修复双源 bug）
+- `assets/` — 当前无跨域静态资源需求；如未来有新增，走新 ADR 加进白名单
+
+## components/ui vs components/internal 边界（Q4 决策）
+
+| 类别                   | 定义                                                     | 例子                                                                                 |
+| ---------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `components/ui/`       | **跨域设计系统原子**——不依赖具体业务，可在其它项目里复用 | Button / Input / Textarea / Checkbox / Card（项目当前 5 原子）                       |
+| `components/internal/` | **跨域业务组件**——跟本应用业务绑定但被多个 feature 复用  | ErrorBoundary / LoadingSpinner / Toast / Provider wrappers / Layout atoms / AppShell |
+
+**为什么 `internal` 而不是 `app` 或 `feature-shared`**：与"设计系统（ui）"形成对照语义——"ui = 跨项目通用，internal = 跨 feature 通用但绑定本应用"。V1 当前空，未来首例添加时需新 ADR 跟进（命名 / 数量上限 / 维护者）。
 
 ## Import 方向规则
 
 ```
 features/chat  ──imports──►  shared/
-features/settings              shared/ui/
-features/billing                shared/types/
-                                 shared/state/
-                                 shared/lib/
+features/settings              shared/components/ui/
+features/billing                shared/lib/
+                                shared/stores/
+                                shared/hooks/        (V1 预留)
+                                shared/components/internal/  (V1 预留)
 ```
 
 **反向禁止**：`shared/` 目录下任何文件不得 import `src/features/` 下的任何模块。
@@ -28,17 +46,16 @@ features/billing                shared/types/
 
 ## 文件命名约定
 
-- `index.ts` 仅用于 public API barrel 导出（每个 feature 根 + shared/lib + shared/types）
+- `index.ts` 仅用于 public API barrel 导出（每个 feature 根 + shared/lib）
 - 非 barrel 文件：各自独立的 `.ts` / `.tsx`，不追求 `index` 聚合
 - 测试文件：`*.test.ts` 或 `*.test.tsx`，与被测文件同目录
+- hooks 文件以 `use-` 前缀（Q5 决策）：`use-theme.ts` / `use-debounce.ts`
 
 ## cn 工具
 
 `src/shared/lib/cn.ts` 是 `clsx + tailwind-merge` 的组合工具。
 
 ```typescript
-import { cn } from "../lib/cn";
-// or with path alias
 import { cn } from "@/shared/lib/cn";
 ```
 
@@ -46,17 +63,42 @@ import { cn } from "@/shared/lib/cn";
 
 **为什么**：tailwind-merge 解决同一 utility 的冲突（如 `px-2 px-4` → `px-4`），clsx 处理条件开关。两者缺一会有潜在样式 bug。
 
+## tauri IPC 唯一入口
+
+`src/shared/lib/tauri.ts` 是**整个项目唯一允许 `import { invoke } from "@tauri-apps/api"` 的地方**。所有 IPC 走里面的 `invoke<T>()` 包装 + Service Tag + Live Layer。`invoke()` 写在别处 = 契约漂移。
+
+跨域类型（Settings / Message / Conversation / Snapshot / AppError）镜像在 `src/shared/lib/types.ts`，不单独 `types/` 目录。
+
+## mockState 唯一源（ADR-0010 Q6）
+
+`mockState` 唯一源在仓库根 `__mocks__/@tauri-apps/api/core.ts`（vitest 约定路径，自动应用）。`src/shared/shared-mock-state.ts` 已删除，**所有**测试 import 从仓库根路径走。
+
+```ts
+// 正确
+import { mockState } from "<repo-root>/__mocks__/@tauri-apps/api/core";
+
+// 错误（已删除）
+import { mockState } from "@/shared/shared-mock-state";
+```
+
+`src/test-setup.ts` 用 `vi.mock("@tauri-apps/api/core", () => ({ invoke: ... }))` 配置 invoke 默认行为，`mockState` 从仓库根唯一源 import，运行时配置与测试 import 是同一引用。
+
 ## 测试策略
 
-| 文件 | 测试方式 |
-|---|---|
-| `cn.ts` | 独立测试（`cn.test.ts`），覆盖冲突合并 + 条件拼接 |
-| `state/theme.ts` | 独立测试（`theme.test.ts`），覆盖 dark mode 切换 |
-| `ui/*.tsx` | 各自独立的 `*.test.tsx`，契约测试 < 50 LOC（详见 `ui/AGENTS.md`） |
-| 其他 shared 文件 | 跟随消费方 feature 的集成测试，不单独写 |
+| 文件                        | 测试方式                                                                     |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| `lib/cn.ts`                 | 独立测试（`cn.test.ts`），覆盖冲突合并 + 条件拼接                            |
+| `lib/tauri.ts`              | 跟随消费方 feature 的集成测试，不单独写                                      |
+| `lib/types.ts`              | 纯类型，无运行时，不单独测                                                   |
+| `lib/units.ts`              | 独立测试（`units.test.ts`），覆盖格式化边界                                  |
+| `stores/theme.ts`           | 独立测试（`theme.test.ts`），覆盖 dark mode 切换                             |
+| `components/ui/*.tsx`       | 各自独立的 `*.test.tsx`，契约测试 < 50 LOC（详见 `components/ui/AGENTS.md`） |
+| `components/internal/*.tsx` | 各自独立的 `*.test.tsx`（V1 暂无）                                           |
+| `hooks/*.ts`                | 各自独立的 `*.test.ts`（V1 暂无）                                            |
 
 ## 变更流程
 
 1. 改动 `shared/` 下的基础设施前，确认没有 feature 会意外破坏
 2. `cn.ts` 改动需要独立测试全量通过
 3. 新增 shared 类型需要同步 Rust backend（走 Tauri 命令或 shared 类型定义）
+4. 新增 `components/internal/` 首例组件前，开新 ADR 跟进（命名 / 数量上限 / 维护者）

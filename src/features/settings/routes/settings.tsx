@@ -9,7 +9,11 @@ import { createSignal, Show, For } from "solid-js";
 import { Link } from "@tanstack/solid-router";
 import { ArrowLeft, Plus, Trash2 } from "lucide-solid";
 import { ProviderCard } from "../components/provider-card";
-import { getSettingsBridge, updateSettingsBridge, clearAllHistoryBridge } from "../../../shared/lib/tauri";
+import {
+  getSettingsBridge,
+  updateSettingsBridge,
+  clearAllHistoryBridge,
+} from "../../../shared/lib/tauri";
 import type { LLMProvider, Settings } from "../../../shared/types";
 
 type Tab = "llm" | "app" | "window" | "billing" | "advanced";
@@ -75,8 +79,12 @@ export function SettingsPage() {
   return (
     <main class="flex flex-col h-screen w-full bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 overflow-hidden">
       <header class="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
-        <Link to="/" class="text-sm text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 flex items-center gap-1">
-          <ArrowLeft class="h-4 w-4 inline mr-1" />Back
+        <Link
+          to="/"
+          class="text-sm text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 flex items-center gap-1"
+        >
+          <ArrowLeft class="h-4 w-4 inline mr-1" />
+          Back
         </Link>
         <h1 class="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Settings</h1>
         <div class="w-12" />
@@ -93,7 +101,15 @@ export function SettingsPage() {
               }`}
               onClick={() => setTab(t)}
             >
-              {t === "llm" ? "LLM" : t === "app" ? "App" : t === "window" ? "Window" : t === "billing" ? "Billing" : "Advanced"}
+              {t === "llm"
+                ? "LLM"
+                : t === "app"
+                  ? "App"
+                  : t === "window"
+                    ? "Window"
+                    : t === "billing"
+                      ? "Billing"
+                      : "Advanced"}
             </button>
           )}
         </For>
@@ -101,7 +117,9 @@ export function SettingsPage() {
       <div class="flex-1 overflow-y-auto p-4 space-y-4">
         <Show when={tab() === "llm" && draft()}>
           <section>
-            <h2 class="text-lg font-semibold mb-2 text-zinc-900 dark:text-zinc-100">LLM Providers</h2>
+            <h2 class="text-lg font-semibold mb-2 text-zinc-900 dark:text-zinc-100">
+              LLM Providers
+            </h2>
             <For each={draft()!.llm_providers}>
               {(p) => (
                 <ProviderCard
@@ -116,13 +134,16 @@ export function SettingsPage() {
               onClick={onAddProvider}
               class="mt-2 px-3 py-1.5 text-sm bg-primary-500 text-white rounded-md hover:bg-primary-600"
             >
-              <Plus class="h-4 w-4 inline mr-1" />Add provider
+              <Plus class="h-4 w-4 inline mr-1" />
+              Add provider
             </button>
           </section>
         </Show>
         <Show when={tab() === "app" && draft()}>
           <section>
-            <h2 class="text-lg font-semibold mb-2 text-zinc-900 dark:text-zinc-100">App behavior</h2>
+            <h2 class="text-lg font-semibold mb-2 text-zinc-900 dark:text-zinc-100">
+              App behavior
+            </h2>
             <label class="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
               <input
                 type="checkbox"
@@ -133,7 +154,8 @@ export function SettingsPage() {
               Start at login
             </label>
             <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
-              The app starts in the taskbar. Click the window to bring it forward; use File → Quit to exit.
+              The app starts in the taskbar. Click the window to bring it forward; use File → Quit
+              to exit.
             </p>
           </section>
         </Show>
@@ -144,14 +166,17 @@ export function SettingsPage() {
               when={!confirmClear()}
               fallback={
                 <div class="p-4 border border-amber-300 dark:border-amber-700 rounded-md bg-amber-50 dark:bg-amber-900/20 space-y-2">
-                  <p class="text-sm text-amber-900 dark:text-amber-200">Delete all conversations? This cannot be undone.</p>
+                  <p class="text-sm text-amber-900 dark:text-amber-200">
+                    Delete all conversations? This cannot be undone.
+                  </p>
                   <div class="flex gap-2">
                     <button
                       type="button"
                       onClick={() => void clearHistory()}
                       class="px-3 py-1.5 text-sm bg-red-500 text-white rounded-md hover:bg-red-600"
                     >
-                      <Trash2 class="h-4 w-4 inline mr-1" />Yes, delete all
+                      <Trash2 class="h-4 w-4 inline mr-1" />
+                      Yes, delete all
                     </button>
                     <button
                       type="button"
@@ -169,7 +194,8 @@ export function SettingsPage() {
                 onClick={() => setConfirmClear(true)}
                 class="px-3 py-1.5 text-sm text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-600 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-700"
               >
-                <Trash2 class="h-4 w-4 inline mr-1" />Clear all history…
+                <Trash2 class="h-4 w-4 inline mr-1" />
+                Clear all history…
               </button>
             </Show>
           </section>
@@ -177,7 +203,9 @@ export function SettingsPage() {
         <Show when={tab() === "window" || tab() === "billing"}>
           <section>
             <p class="text-sm text-zinc-500 dark:text-zinc-400 italic">
-              {tab() === "window" ? "Window settings (default size 800×600, min 600×400; position is remembered)" : "Billing providers — see ProviderCard for LLM; billing tools via tools/billing."}
+              {tab() === "window"
+                ? "Window settings (default size 800×600, min 600×400; position is remembered)"
+                : "Billing providers — see ProviderCard for LLM; billing tools via tools/billing."}
             </p>
           </section>
         </Show>

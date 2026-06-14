@@ -53,9 +53,7 @@ describe("MessageBubble", () => {
   });
 
   it("tool 角色：显示 Tool 结果摘要", () => {
-    const toolResults: ToolResult[] = [
-      { tool_call_id: "tc-1", result: { ok: true }, error: null },
-    ];
+    const toolResults: ToolResult[] = [{ tool_call_id: "tc-1", result: { ok: true }, error: null }];
     const msg: Message = {
       id: "msg-3",
       conversation_id: "conv-1",

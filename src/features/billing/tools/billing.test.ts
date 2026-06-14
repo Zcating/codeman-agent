@@ -39,9 +39,7 @@ describe("billing 工具 — Effect 服务集成", () => {
       } as AppError);
     },
     hasKey: (providerId) =>
-      providerId === "deepseek"
-        ? Effect.succeed(true)
-        : Effect.succeed(false),
+      providerId === "deepseek" ? Effect.succeed(true) : Effect.succeed(false),
     setKey: () => Effect.succeed(undefined),
   });
 
@@ -54,7 +52,7 @@ describe("billing 工具 — Effect 服务集成", () => {
         expect(snap.amount).toBe(87.42);
         expect(snap.currency).toBe("CNY");
       }
-    }).pipe(Effect.provide(MockBillingServiceLive))
+    }).pipe(Effect.provide(MockBillingServiceLive)),
   );
 
   it.effect("BillingService.getSnapshot 返回 minimax 的 plan_quota", () =>
@@ -66,7 +64,7 @@ describe("billing 工具 — Effect 服务集成", () => {
         expect(snap.remaining).toBe(1_200_000);
         expect(snap.total).toBe(5_000_000);
       }
-    }).pipe(Effect.provide(MockBillingServiceLive))
+    }).pipe(Effect.provide(MockBillingServiceLive)),
   );
 
   it.effect("BillingService.getSnapshot 对未知 provider 失败", () =>
@@ -74,7 +72,7 @@ describe("billing 工具 — Effect 服务集成", () => {
       const svc = yield* BillingService;
       const result = yield* Effect.exit(svc.getSnapshot("unknown"));
       expect(result._tag).toBe("Failure");
-    }).pipe(Effect.provide(MockBillingServiceLive))
+    }).pipe(Effect.provide(MockBillingServiceLive)),
   );
 
   it.effect("BillingService.hasKey 对 deepseek 返回 true，对 minimax 返回 false", () =>
@@ -84,6 +82,6 @@ describe("billing 工具 — Effect 服务集成", () => {
       expect(hasKey).toBe(true);
       const noKey = yield* svc.hasKey("minimax");
       expect(noKey).toBe(false);
-    }).pipe(Effect.provide(MockBillingServiceLive))
+    }).pipe(Effect.provide(MockBillingServiceLive)),
   );
 });

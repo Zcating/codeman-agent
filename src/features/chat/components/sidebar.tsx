@@ -64,7 +64,10 @@ export function Sidebar() {
         </button>
       </div>
       <ul class="flex-1 overflow-y-auto mt-2 space-y-1 list-none">
-        <For each={filtered()} fallback={<li class="p-3 text-sm text-zinc-500 text-center italic">No conversations</li>}>
+        <For
+          each={filtered()}
+          fallback={<li class="p-3 text-sm text-zinc-500 text-center italic">No conversations</li>}
+        >
           {(c) => (
             <li
               class={`p-2 rounded-md cursor-pointer transition-colors flex flex-col ${

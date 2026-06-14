@@ -34,6 +34,7 @@ V1.5 以**单个带 Tauri 菜单栏的原生主窗口**发货：
 ### 路由（TanStack Router）
 
 我们使用 **TanStack Router**（`@tanstack/solid-router`，code-based 路由）进行应用内导航：
+
 - `@tanstack/solid-router` 1.170.15 是当前版本，与 Solid 1.9.3 兼容
 - Code-based 路由（无 Vite 插件）—— 路由树在 `src/router.ts` 中用 `createRootRoute` + 2 个 `createRoute` 子节点构建
 - `createBrowserHistory()` 是历史实现；Tauri 2 单窗口 + Vite SPA fallback 处理其余部分
@@ -49,6 +50,7 @@ V1.5 以**单个带 Tauri 菜单栏的原生主窗口**发货：
 - **G4（拒绝）— 完整原生应用，主窗口带标签栏（Chat | Settings 标签）。** 标签可行，但随着新视图的到来（per-conversation 路由等），每个关注点一个完整路由扩展性更好。
 
 路由选项：
+
 - **R1（拒绝）— 保持基于哈希的路由（`location.hash`）。** V1 已在使用（通过 `ChatView`）。TanStack Router 添加类型化路由、`<A>` active-state 和嵌套布局——这些都是基于哈希的路由无法提供的。
 - **R2（已选）— TanStack Router（code-based）。** 类型安全、active link 样式化、无需 Vite 插件。Bundle 大小小（~15KB gzip）。
 - **R3（拒绝）— `@solidjs/router`（SolidStart 背书的路由）。** 更简单、更小，但缺少类型化路由、基于文件的路由 ergonomics 和更广泛的 TanStack 生态（start/table 等，V2 可能需要）。

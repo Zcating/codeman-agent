@@ -115,7 +115,9 @@ describe("startThemeSync — .dark 类应用", () => {
     await new Promise((r) => setTimeout(r, 20));
 
     // 只应存在一个 .dark 类
-    const darkClassCount = document.documentElement.classList.value.split(" ").filter((c) => c === "dark").length;
+    const darkClassCount = document.documentElement.classList.value
+      .split(" ")
+      .filter((c) => c === "dark").length;
     expect(darkClassCount).toBe(1);
   });
 });

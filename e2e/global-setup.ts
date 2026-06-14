@@ -36,131 +36,132 @@ const KILL_PORT = "node scripts/kill-port.mjs";
 const READY_TIMEOUT_MS = 90_000;
 
 async function waitForUrl(url: string, timeoutMs: number): Promise<void> {
-	const deadline = Date.now() + timeoutMs;
-	let lastErr: unknown;
-	while (Date.now() < deadline) {
-		try {
-			const res = await fetch(url, { method: "GET" });
-			if (res.ok || res.status === 404 /* /json/version is 200; tolerate others */) {
-				return;
-			}
-			lastErr = new Error(`status ${res.status}`);
-		} catch (e) {
-			lastErr = e;
-		}
-		await sleep(500);
-	}
-	throw new Error(
-		`Timed out waiting for ${url} after ${timeoutMs}ms (last error: ${String(lastErr)})`,
-	);
+  const deadline = Date.now() + timeoutMs;
+  let lastErr: unknown;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(url, { method: "GET" });
+      if (res.ok || res.status === 404 /* /json/version is 200; tolerate others */) {
+        return;
+      }
+      lastErr = new Error(`status ${res.status}`);
+    } catch (e) {
+      lastErr = e;
+    }
+    await sleep(500);
+  }
+  throw new Error(
+    `Timed out waiting for ${url} after ${timeoutMs}ms (last error: ${String(lastErr)})`,
+  );
 }
 
 export default async function globalSetup(): Promise<void> {
-	// 0. Pre-warm the Rust debug cache. Done synchronously so the test phase
-	//    never sees cargo compile output. `RUSTFLAGS=-A dead_code` silences
-	//    the pre-existing `methods never used` warnings in src/db/* that
-	//    otherwise flood the first-run output. On warm cache this is <1s.
-	console.log("[e2e setup] step 0/4 — pre-warming Rust debug cache");
-	const prewarmStart = Date.now();
-	try {
-		execSync("cargo build", {
-			cwd: "src-tauri",
-			stdio: "ignore",
-			env: { ...process.env, RUSTFLAGS: "-A dead_code" },
-		});
-	} catch (e) {
-		// Output is discarded, so we can't show the cargo log on failure.
-		// Tell the user to run cargo manually for full diagnostic.
-		const err = e as { status?: number | null; signal?: string; stderr?: Buffer; message?: string };
-		const stderr = err.stderr ? err.stderr.toString() : "(no stderr captured — stdio: ignore)";
-		throw new Error(
-			`[e2e setup] cargo build failed (status=${err.status ?? "?"}, signal=${err.signal ?? "none"})\n` +
-				`cwd: ${process.cwd()}\n` +
-				`--- stderr ---\n${stderr}\n--- end ---\n` +
-				`${err.message ?? String(e)}\n` +
-				`Run \`cd src-tauri && cargo build\` manually for interactive output.`,
-		);
-	}
-	const prewarmMs = Date.now() - prewarmStart;
-	console.log(`[e2e setup] step 0/4 — Rust cache warm (${(prewarmMs / 1000).toFixed(1)}s)`);
+  // 0. Pre-warm the Rust debug cache. Done synchronously so the test phase
+  //    never sees cargo compile output. `RUSTFLAGS=-A dead_code` silences
+  //    the pre-existing `methods never used` warnings in src/db/* that
+  //    otherwise flood the first-run output. On warm cache this is <1s.
+  console.log("[e2e setup] step 0/4 — pre-warming Rust debug cache");
+  const prewarmStart = Date.now();
+  try {
+    execSync("cargo build", {
+      cwd: "src-tauri",
+      stdio: "ignore",
+      env: { ...process.env, RUSTFLAGS: "-A dead_code" },
+    });
+  } catch (e) {
+    // Output is discarded, so we can't show the cargo log on failure.
+    // Tell the user to run cargo manually for full diagnostic.
+    const err = e as { status?: number | null; signal?: string; stderr?: Buffer; message?: string };
+    const stderr = err.stderr ? err.stderr.toString() : "(no stderr captured — stdio: ignore)";
+    throw new Error(
+      `[e2e setup] cargo build failed (status=${err.status ?? "?"}, signal=${err.signal ?? "none"})\n` +
+        `cwd: ${process.cwd()}\n` +
+        `--- stderr ---\n${stderr}\n--- end ---\n` +
+        `${err.message ?? String(e)}\n` +
+        `Run \`cd src-tauri && cargo build\` manually for interactive output.`,
+    );
+  }
+  const prewarmMs = Date.now() - prewarmStart;
+  console.log(`[e2e setup] step 0/4 — Rust cache warm (${(prewarmMs / 1000).toFixed(1)}s)`);
 
-	// 1. Free the dev ports in case a previous run left them bound.
-	//    Use the same script the user-facing dev path uses. Its output is
-	//    small (one line per port) so we keep it inline.
-	console.log("[e2e setup] step 1/4 — freeing ports");
-	spawnSync(KILL_PORT, [String(PORTS.VITE_PORT), "1421", String(PORTS.TAURI_DRIVER_PORT)], {
-		stdio: "inherit",
-	});
+  // 1. Free the dev ports in case a previous run left them bound.
+  //    Use the same script the user-facing dev path uses. Its output is
+  //    small (one line per port) so we keep it inline.
+  console.log("[e2e setup] step 1/4 — freeing ports");
+  spawnSync(KILL_PORT, [String(PORTS.VITE_PORT), "1421", String(PORTS.TAURI_DRIVER_PORT)], {
+    stdio: "inherit",
+  });
 
-	// 2. Spawn tauri dev with CDP enabled. The env var is read by WebView2
-	//    itself, not Tauri, so it works whether tauri dev shells out or not.
-	//    stdio is fully discarded — the test reporter owns the user-facing
-	//    stdout. To watch the raw stream during a run, spawn tauri:dev
-	//    manually in another terminal.
-	console.log("[e2e setup] step 2/4 — spawning pnpm tauri:dev (output discarded)");
-	const child: ChildProcess = spawn("pnpm", ["tauri:dev"], {
-		env: {
-			...process.env,
-			WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORTS.TAURI_DRIVER_PORT}`,
-		},
-		stdio: "ignore",
-		shell: true,
-		// detached so killing the parent doesn't necessarily take the whole
-		// tree — teardown is responsible for reaping it explicitly.
-		detached: false,
-	});
+  // 2. Spawn tauri dev with CDP enabled. The env var is read by WebView2
+  //    itself, not Tauri, so it works whether tauri dev shells out or not.
+  //    stdio is fully discarded — the test reporter owns the user-facing
+  //    stdout. To watch the raw stream during a run, spawn tauri:dev
+  //    manually in another terminal.
+  console.log("[e2e setup] step 2/4 — spawning pnpm tauri:dev (output discarded)");
+  const child: ChildProcess = spawn("pnpm", ["tauri:dev"], {
+    env: {
+      ...process.env,
+      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORTS.TAURI_DRIVER_PORT}`,
+    },
+    stdio: "ignore",
+    shell: true,
+    // detached so killing the parent doesn't necessarily take the whole
+    // tree — teardown is responsible for reaping it explicitly.
+    detached: false,
+  });
 
-	// Track exit state on a closure-scoped variable. We cannot `throw` from
-	// inside a `.once("exit")` listener — that becomes an unhandled exception
-	// and the globalSetup function never sees it, leading to a port-wait
-	// timeout instead of a fast, clear failure.
-	let tauriExitCode: number | null = null;
-	child.once("exit", (code) => {
-		tauriExitCode = code;
-	});
+  // Track exit state on a closure-scoped variable. We cannot `throw` from
+  // inside a `.once("exit")` listener — that becomes an unhandled exception
+  // and the globalSetup function never sees it, leading to a port-wait
+  // timeout instead of a fast, clear failure.
+  let tauriExitCode: number | null = null;
+  child.once("exit", (code) => {
+    tauriExitCode = code;
+  });
 
-	// Park the PID on globalThis for the teardown hook to find.
-	(globalThis as Record<string, unknown>).__TAURI_E2E_PID = child.pid;
-	(globalThis as Record<string, unknown>).__TAURI_E2E_CHILD = child;
+  // Park the PID on globalThis for the teardown hook to find.
+  (globalThis as Record<string, unknown>).__TAURI_E2E_PID = child.pid;
+  (globalThis as Record<string, unknown>).__TAURI_E2E_CHILD = child;
 
-	// 3. Wait for both endpoints. Use `localhost` (not `127.0.0.1`) — Vite
-	//    binds to whatever the system resolver makes of `localhost`, which
-	//    on this host is `::1` (IPv6 loopback). Using `127.0.0.1` here
-	//    silently times out (attempt #1 failure mode: 5min of fetch retries
-	//    against a port that nothing's listening on).
-	console.log(
-		`[e2e setup] step 3/4 — waiting for Vite (localhost:${PORTS.VITE_PORT}) and CDP (localhost:${PORTS.TAURI_DRIVER_PORT}) — up to 90s`,
-	);
-	try {
-		await waitForUrl(`http://localhost:${PORTS.VITE_PORT}/`, READY_TIMEOUT_MS);
-		await waitForUrl(`http://localhost:${PORTS.TAURI_DRIVER_PORT}/json/version`, READY_TIMEOUT_MS);
-	} catch (e) {
-		// If tauri:dev crashed, surface that first — the port-wait is a
-		// symptom, the real cause is in tauri:dev's output (which we've
-		// discarded, so the user has to re-run manually).
-		if (tauriExitCode !== null && tauriExitCode !== 0) {
-			throw new Error(
-				`[e2e setup] tauri:dev exited with code ${tauriExitCode} before tests could start. ` +
-					`Run \`pnpm tauri:dev\` manually for full diagnostic output.`,
-			);
-		}
-		// Otherwise tauri:dev is hung (most likely a compile or window-open
-		// issue). Same advice — run manually.
-		throw new Error(
-			`[e2e setup] port-wait failed: ${String(e)}. ` +
-				`Run \`pnpm tauri:dev\` manually for full diagnostic output.`,
-		);
-	}
+  // 3. Wait for both endpoints. Use `127.0.0.1` (IPv4) — Vite's
+  //    `host: '127.0.0.1'` in vite.config.ts binds to IPv4 loopback, and
+  //    WebView2's CDP also binds to IPv4. Node's DNS resolver on this
+  //    Windows host prefers `::1` for `localhost`, which causes the
+  //    fetch to hit ECONNREFUSED against the IPv4-only services. See
+  //    e2e/helpers.ts:24 for the matching CDP fix.
+  console.log(
+    `[e2e setup] step 3/4 — waiting for Vite (127.0.0.1:${PORTS.VITE_PORT}) and CDP (127.0.0.1:${PORTS.TAURI_DRIVER_PORT}) — up to 90s`,
+  );
+  try {
+    await waitForUrl(`http://127.0.0.1:${PORTS.VITE_PORT}/`, READY_TIMEOUT_MS);
+    await waitForUrl(`http://127.0.0.1:${PORTS.TAURI_DRIVER_PORT}/json/version`, READY_TIMEOUT_MS);
+  } catch (e) {
+    // If tauri:dev crashed, surface that first — the port-wait is a
+    // symptom, the real cause is in tauri:dev's output (which we've
+    // discarded, so the user has to re-run manually).
+    if (tauriExitCode !== null && tauriExitCode !== 0) {
+      throw new Error(
+        `[e2e setup] tauri:dev exited with code ${tauriExitCode} before tests could start. ` +
+          `Run \`pnpm tauri:dev\` manually for full diagnostic output.`,
+      );
+    }
+    // Otherwise tauri:dev is hung (most likely a compile or window-open
+    // issue). Same advice — run manually.
+    throw new Error(
+      `[e2e setup] port-wait failed: ${String(e)}. ` +
+        `Run \`pnpm tauri:dev\` manually for full diagnostic output.`,
+    );
+  }
 
-	// 4. Belt-and-braces: if the child exited 0 between the last wait and
-	//    now (e.g. immediately after binding the ports, the test reporter
-	//    is going to be very confused).
-	if (tauriExitCode !== null && tauriExitCode !== 0) {
-		throw new Error(
-			`[e2e setup] tauri:dev exited with code ${tauriExitCode} right after becoming ready. ` +
-				`Run \`pnpm tauri:dev\` manually for full diagnostic output.`,
-		);
-	}
+  // 4. Belt-and-braces: if the child exited 0 between the last wait and
+  //    now (e.g. immediately after binding the ports, the test reporter
+  //    is going to be very confused).
+  if (tauriExitCode !== null && tauriExitCode !== 0) {
+    throw new Error(
+      `[e2e setup] tauri:dev exited with code ${tauriExitCode} right after becoming ready. ` +
+        `Run \`pnpm tauri:dev\` manually for full diagnostic output.`,
+    );
+  }
 
-	console.log("[e2e setup] step 4/4 — ready, handing off to Playwright");
+  console.log("[e2e setup] step 4/4 — ready, handing off to Playwright");
 }

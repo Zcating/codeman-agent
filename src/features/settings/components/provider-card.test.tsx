@@ -43,19 +43,25 @@ describe("ProviderCard", () => {
     expect(checkbox).toBeTruthy();
 
     // label span
-    const labelSpan = Array.from(container.querySelectorAll('span')).find(s => s.textContent === "DeepSeek");
+    const labelSpan = Array.from(container.querySelectorAll("span")).find(
+      (s) => s.textContent === "DeepSeek",
+    );
     expect(labelSpan?.textContent).toBe("DeepSeek");
 
     // model input
-    const modelInput = container.querySelectorAll('input[type="text"]')[0] as HTMLInputElement | null;
+    const modelInput = container.querySelectorAll(
+      'input[type="text"]',
+    )[0] as HTMLInputElement | null;
     expect(modelInput?.value).toBe("deepseek-chat");
 
     // base_url input
-    const baseUrlInput = container.querySelectorAll('input[type="text"]')[1] as HTMLInputElement | null;
+    const baseUrlInput = container.querySelectorAll(
+      'input[type="text"]',
+    )[1] as HTMLInputElement | null;
     expect(baseUrlInput?.value).toBe("https://api.deepseek.com");
 
     // Set API key button
-    const setKeyBtn = container.querySelector('button');
+    const setKeyBtn = container.querySelector("button");
     expect(setKeyBtn?.textContent).toContain("Set API key");
 
     // Test button
@@ -63,7 +69,9 @@ describe("ProviderCard", () => {
     expect(testBtn?.textContent).toBe("Test");
 
     // Delete button
-    const deleteBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === "Delete");
+    const deleteBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "Delete",
+    );
     expect(deleteBtn?.textContent).toBe("Delete");
   });
 
@@ -76,7 +84,7 @@ describe("ProviderCard", () => {
     ));
 
     // 初始时，无 API key 输入可见（显示按钮）
-    const setKeyBtn = container.querySelector('button');
+    const setKeyBtn = container.querySelector("button");
     expect(setKeyBtn?.textContent).toContain("Set API key");
 
     // 点击 "Set API key"
@@ -103,7 +111,9 @@ describe("ProviderCard", () => {
     await user.click(testBtn!);
 
     // Status span 显示失败消息
-    const status = Array.from(container.querySelectorAll('span')).find(s => s.textContent === "Set API key first");
+    const status = Array.from(container.querySelectorAll("span")).find(
+      (s) => s.textContent === "Set API key first",
+    );
     expect(status?.textContent).toBe("Set API key first");
   });
 });

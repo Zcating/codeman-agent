@@ -3,25 +3,29 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans: "Inter", "Noto Sans SC", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-sans:
+    "Inter", "Noto Sans SC", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", ui-monospace, monospace;
 
   /* 11 阶 OKLCH primary 渐变，锚点 #8b5cf6 (violet-500) 于 500 */
-  --color-primary-50:  oklch(0.97 0.014 295);
-  --color-primary-100: oklch(0.94 0.030 295);
+  --color-primary-50: oklch(0.97 0.014 295);
+  --color-primary-100: oklch(0.94 0.03 295);
   --color-primary-200: oklch(0.89 0.055 295);
   --color-primary-300: oklch(0.82 0.095 295);
-  --color-primary-400: oklch(0.74 0.150 295);
-  --color-primary-500: oklch(0.607 0.220 295);  /* ≈ #8b5cf6 */
+  --color-primary-400: oklch(0.74 0.15 295);
+  --color-primary-500: oklch(0.607 0.22 295); /* ≈ #8b5cf6 */
   --color-primary-600: oklch(0.535 0.235 295);
-  --color-primary-700: oklch(0.460 0.225 295);
-  --color-primary-800: oklch(0.385 0.200 295);
-  --color-primary-900: oklch(0.310 0.170 295);
-  --color-primary-950: oklch(0.220 0.130 295);
+  --color-primary-700: oklch(0.46 0.225 295);
+  --color-primary-800: oklch(0.385 0.2 295);
+  --color-primary-900: oklch(0.31 0.17 295);
+  --color-primary-950: oklch(0.22 0.13 295);
 }
 
 @layer base {
-  html, body, #root {
+  html,
+  body,
+  #root {
     height: 100%;
   }
   :root {

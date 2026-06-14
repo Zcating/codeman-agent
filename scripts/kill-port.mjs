@@ -15,11 +15,11 @@
  *
  * Usage: node scripts/kill-port.mjs <port> [port...]
  */
-import { execFileSync, spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import process from 'node:process';
+import { execFileSync, spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import process from "node:process";
 
-const isWindows = process.platform === 'win32';
+const isWindows = process.platform === "win32";
 
 /** WSL detection — covers both WSL1 and WSL2. */
 function isWSL() {
@@ -28,7 +28,7 @@ function isWSL() {
   // "Microsoft" (WSL1/2). Either is sufficient on its own.
   if (process.env.WSL_DISTRO_NAME) return true;
   try {
-    return /microsoft/i.test(readFileSync('/proc/version', 'utf8'));
+    return /microsoft/i.test(readFileSync("/proc/version", "utf8"));
   } catch {
     return false;
   }
@@ -41,24 +41,24 @@ const ports = process.argv
   .filter((n) => Number.isFinite(n) && n > 0 && n < 65536);
 
 if (ports.length === 0) {
-  console.error('[kill-port] no valid ports given; expected integers 1-65535');
+  console.error("[kill-port] no valid ports given; expected integers 1-65535");
   process.exit(0);
 }
 
 /** @returns {string[]} PIDs currently LISTENING on `port`. */
 function pidsOnPort(port) {
   if (isWindows) {
-    let out = '';
+    let out = "";
     try {
       // `-p TCP` would hide IPv6-only LISTENING entries (e.g. [::1]:1420),
       // which still block a fresh bind on Windows. Omit it.
-      out = execFileSync('netstat', ['-ano'], { encoding: 'utf8' });
+      out = execFileSync("netstat", ["-ano"], { encoding: "utf8" });
     } catch {
       return [];
     }
     const pids = new Set();
     // Lines look like:  TCP    0.0.0.0:1420    0.0.0.0:0    LISTENING    12345
-    const re = new RegExp(`[:.]${port}\\s.*LISTENING\\s+(\\d+)\\s*$`, 'i');
+    const re = new RegExp(`[:.]${port}\\s.*LISTENING\\s+(\\d+)\\s*$`, "i");
     for (const line of out.split(/\r?\n/)) {
       const m = line.match(re);
       if (m) pids.add(m[1]);
@@ -67,8 +67,8 @@ function pidsOnPort(port) {
   }
 
   try {
-    const out = execFileSync('lsof', ['-ti', `tcp:${port}`, '-sTCP:LISTEN'], {
-      encoding: 'utf8',
+    const out = execFileSync("lsof", ["-ti", `tcp:${port}`, "-sTCP:LISTEN"], {
+      encoding: "utf8",
     });
     return out.split(/\s+/).filter(Boolean);
   } catch {
@@ -78,10 +78,10 @@ function pidsOnPort(port) {
 
 function killPid(pid) {
   if (isWindows) {
-    const r = spawnSync('taskkill', ['/F', '/PID', pid], { stdio: 'ignore' });
+    const r = spawnSync("taskkill", ["/F", "/PID", pid], { stdio: "ignore" });
     return r.status === 0;
   }
-  const r = spawnSync('kill', ['-9', pid], { stdio: 'ignore' });
+  const r = spawnSync("kill", ["-9", pid], { stdio: "ignore" });
   return r.status === 0;
 }
 
@@ -94,7 +94,7 @@ function killPid(pid) {
 function killWindowsSideOnPorts(targetPorts) {
   if (!inWSL || targetPorts.length === 0) return false;
   // Port values are validated to be safe integers above; safe to interpolate.
-  const portList = targetPorts.join(',');
+  const portList = targetPorts.join(",");
   const ps = [
     `$ErrorActionPreference = 'SilentlyContinue'`,
     `$ports = @(${portList})`,
@@ -106,11 +106,11 @@ function killWindowsSideOnPorts(targetPorts) {
     `    Stop-Process -Id $pid_ -Force -ErrorAction SilentlyContinue`,
     `  }`,
     `}`,
-  ].join('\n');
-  const r = spawnSync('powershell.exe', ['-NoProfile', '-Command', ps], {
-    encoding: 'utf8',
+  ].join("\n");
+  const r = spawnSync("powershell.exe", ["-NoProfile", "-Command", ps], {
+    encoding: "utf8",
   });
-  const out = r.stdout || '';
+  const out = r.stdout || "";
   if (out) process.stdout.write(out);
   return /killing Windows PID/.test(out);
 }

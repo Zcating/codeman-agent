@@ -65,14 +65,12 @@ const MockSettingsServiceLive = Layer.succeed(SettingsService, {
   getSettings: () => Effect.succeed(testSettings),
   updateSettings: () => Effect.succeed(testSettings),
   clearAllHistory: () => Effect.succeed(undefined),
-  getActiveLlmProvider: () =>
-    Effect.succeed(testSettings.llm_providers[0] as LLMProvider),
+  getActiveLlmProvider: () => Effect.succeed(testSettings.llm_providers[0] as LLMProvider),
 });
 
 const MockBillingServiceLive = Layer.succeed(BillingService, {
   listProviders: () => Effect.succeed([]),
-  getSnapshot: () =>
-    Effect.fail({ kind: "NotFound", message: "stub" } as any),
+  getSnapshot: () => Effect.fail({ kind: "NotFound", message: "stub" } as any),
   hasKey: () => Effect.succeed(false),
   setKey: () => Effect.succeed(undefined),
 });
@@ -87,7 +85,7 @@ describe("AgentRuntime", () => {
       // 在任何 run 之前取消 — agentRef 为 null，应该是 no-op
       yield* runtime.cancel();
       expect(agentAborted).toBe(false);
-    }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps))
+    }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps)),
   );
 
   it.effect("runtime 服务可构造且包含所有依赖", () =>
@@ -96,7 +94,7 @@ describe("AgentRuntime", () => {
       expect(runtime).toBeDefined();
       expect(typeof runtime.run).toBe("function");
       expect(typeof runtime.cancel).toBe("function");
-    }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps))
+    }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps)),
   );
 
   it.effect("runtime.run 返回 Stream（不是 undefined）", () =>
@@ -105,6 +103,6 @@ describe("AgentRuntime", () => {
       const stream = runtime.run(testConversation, testMessage);
       expect(stream).toBeDefined();
       expect(typeof stream.pipe).toBe("function"); // Stream 有 pipe
-    }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps))
+    }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps)),
   );
 });

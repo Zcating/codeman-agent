@@ -73,7 +73,7 @@ describe("ConversationService 桥接层", () => {
       expect(result).toHaveLength(2);
       expect(result[0].id).toBe("conv-a");
       expect(result[1].id).toBe("conv-b");
-    }).pipe(Effect.provide(MockConversationServiceLive))
+    }).pipe(Effect.provide(MockConversationServiceLive)),
   );
 
   it.effect("list 传递 includeArchived 标志", () =>
@@ -83,7 +83,7 @@ describe("ConversationService 桥接层", () => {
       expect(listCalls).toContain(true);
       yield* svc.list(false);
       expect(listCalls).toContain(false);
-    }).pipe(Effect.provide(MockConversationServiceLive))
+    }).pipe(Effect.provide(MockConversationServiceLive)),
   );
 
   it.effect("get 对已知 id 返回 fixture", () =>
@@ -91,7 +91,7 @@ describe("ConversationService 桥接层", () => {
       const svc = yield* ConversationService;
       const result = yield* svc.get(fixtureA.id);
       expect(result.id).toBe("conv-a");
-    }).pipe(Effect.provide(MockConversationServiceLive))
+    }).pipe(Effect.provide(MockConversationServiceLive)),
   );
 
   it.effect("get 对未知 id 失败", () =>
@@ -99,7 +99,7 @@ describe("ConversationService 桥接层", () => {
       const svc = yield* ConversationService;
       const result = yield* Effect.exit(svc.get("unknown-id"));
       expect(result._tag).toBe("Failure");
-    }).pipe(Effect.provide(MockConversationServiceLive))
+    }).pipe(Effect.provide(MockConversationServiceLive)),
   );
 
   it.effect("create 传递 title 和 systemPrompt 给服务", () =>
@@ -107,7 +107,7 @@ describe("ConversationService 桥接层", () => {
       const svc = yield* ConversationService;
       yield* svc.create("New Chat", "custom system prompt");
       expect(createCalls).toEqual([{ title: "New Chat", systemPrompt: "custom system prompt" }]);
-    }).pipe(Effect.provide(MockConversationServiceLive))
+    }).pipe(Effect.provide(MockConversationServiceLive)),
   );
 
   it.effect("archive 用正确 id 调用服务", () =>
@@ -115,7 +115,7 @@ describe("ConversationService 桥接层", () => {
       const svc = yield* ConversationService;
       yield* svc.archive("conv-b");
       expect(archiveCalls).toEqual(["conv-b"]);
-    }).pipe(Effect.provide(MockConversationServiceLive))
+    }).pipe(Effect.provide(MockConversationServiceLive)),
   );
 
   it.effect("delete 用正确 id 调用服务", () =>
@@ -123,6 +123,6 @@ describe("ConversationService 桥接层", () => {
       const svc = yield* ConversationService;
       yield* svc.delete("conv-a");
       expect(deleteCalls).toEqual(["conv-a"]);
-    }).pipe(Effect.provide(MockConversationServiceLive))
+    }).pipe(Effect.provide(MockConversationServiceLive)),
   );
 });

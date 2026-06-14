@@ -15,9 +15,12 @@ vi.mock("@tanstack/solid-router", async () => {
   return {
     ...actual,
     // Mock Link 以避免需要 useRouter/useLinkProps（需要 RouterProvider context）。
-    Link: (props: { to?: string; href?: string; class?: string; children?: unknown }) =>
+    Link: (props: { to?: string; href?: string; class?: string; children?: unknown }) => (
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <a href={props.to ?? props.href} class={props.class}>{props.children as any}</a>,
+      <a href={props.to ?? props.href} class={props.class}>
+        {props.children as any}
+      </a>
+    ),
   };
 });
 

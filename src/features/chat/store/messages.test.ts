@@ -67,7 +67,7 @@ describe("MessageService 桥接层", () => {
       expect(result).toHaveLength(2);
       expect(result[0].content).toBe("Hello");
       expect(result[1].role).toBe("assistant");
-    }).pipe(Effect.provide(MockMessageServiceLive))
+    }).pipe(Effect.provide(MockMessageServiceLive)),
   );
 
   it.effect("list 传递 conversationId 给服务", () =>
@@ -76,7 +76,7 @@ describe("MessageService 桥接层", () => {
       yield* svc.list("conv-1");
       yield* svc.list("conv-2");
       expect(listCalls).toEqual(["conv-1", "conv-2"]);
-    }).pipe(Effect.provide(MockMessageServiceLive))
+    }).pipe(Effect.provide(MockMessageServiceLive)),
   );
 
   it.effect("list 对未知会话返回空", () =>
@@ -84,7 +84,7 @@ describe("MessageService 桥接层", () => {
       const svc = yield* MessageService;
       const result = yield* svc.list("conv-99");
       expect(result).toHaveLength(0);
-    }).pipe(Effect.provide(MockMessageServiceLive))
+    }).pipe(Effect.provide(MockMessageServiceLive)),
   );
 
   it.effect("append 传递正确参数给服务", () =>
@@ -92,16 +92,20 @@ describe("MessageService 桥接层", () => {
       const svc = yield* MessageService;
       yield* svc.append({ conversation_id: "conv-1", role: "user", content: "test" });
       expect(appendCalls).toEqual([{ conversation_id: "conv-1", role: "user", content: "test" }]);
-    }).pipe(Effect.provide(MockMessageServiceLive))
+    }).pipe(Effect.provide(MockMessageServiceLive)),
   );
 
   it.effect("append 返回持久化的消息", () =>
     Effect.gen(function* () {
       const svc = yield* MessageService;
-      const result = yield* svc.append({ conversation_id: "conv-1", role: "user", content: "test" });
+      const result = yield* svc.append({
+        conversation_id: "conv-1",
+        role: "user",
+        content: "test",
+      });
       expect(result.content).toBe("test");
       expect(result.id).toBe("new-msg");
-    }).pipe(Effect.provide(MockMessageServiceLive))
+    }).pipe(Effect.provide(MockMessageServiceLive)),
   );
 
   it.effect("search 传递 query 和 limit 给服务", () =>
@@ -109,7 +113,7 @@ describe("MessageService 桥接层", () => {
       const svc = yield* MessageService;
       yield* svc.search("hello", 10);
       expect(searchCalls).toEqual([{ query: "hello", limit: 10 }]);
-    }).pipe(Effect.provide(MockMessageServiceLive))
+    }).pipe(Effect.provide(MockMessageServiceLive)),
   );
 
   it.effect("search 返回匹配的消息", () =>
@@ -118,6 +122,6 @@ describe("MessageService 桥接层", () => {
       const result = yield* svc.search("Hello", 5);
       expect(result).toHaveLength(1);
       expect(result[0].content).toBe("Hello");
-    }).pipe(Effect.provide(MockMessageServiceLive))
+    }).pipe(Effect.provide(MockMessageServiceLive)),
   );
 });

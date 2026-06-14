@@ -10,13 +10,15 @@ export const mockState = {
   calls: [] as string[],
 };
 
-export const invoke = vi.fn().mockImplementation((name: string, _args?: Record<string, unknown>) => {
-  mockState.calls.push(name);
-  if (mockState.rejected) {
-    return Promise.reject(mockState.rejected);
-  }
-  return Promise.resolve(mockState.resolved);
-});
+export const invoke = vi
+  .fn()
+  .mockImplementation((name: string, _args?: Record<string, unknown>) => {
+    mockState.calls.push(name);
+    if (mockState.rejected) {
+      return Promise.reject(mockState.rejected);
+    }
+    return Promise.resolve(mockState.resolved);
+  });
 
 export { invoke as TauriInvoke };
 export default { invoke };

@@ -1,8 +1,10 @@
 # ADR 0008 — Feature-Sliced 前端分层 + shadcn 风格 UI 原子
 
-- Status: Accepted
-- Date: 2026-06-14
+- Status: Superseded in part by [ADR-0010](./0010-frontend-5-1-folder-whitelist.md)
+- Date: 2026-06-14 (initial), 2026-06-15 (supersession note)
 - Scope: codeman-agent V1 前端架构（src/ 结构 + UI 原子栈）
+
+> **2026-06-15 补充**：本 ADR 描述的 V1.0 初始结构（`shared/{lib,types,state,assets,ui}` + `features/{chat,settings,billing}` 各自保留 `store/subsystems/tools` 等非统一命名）在 ADR-0010 中收口为 **5+1 子目录白名单**。本 ADR 的 UI 原子栈（cva + clsx + tailwind-merge + lucide-solid）、Feature-Sliced 跨域 import 方向规则、Card 7 子件契约、ADR-0006 / 0007 / 0003 引用关系均继续生效；变更的子目录命名约定、文件迁移映射、mockState 单一源修复见 [ADR-0010](./0010-frontend-5-1-folder-whitelist.md)。
 
 ## Context
 
@@ -40,23 +42,25 @@ src/
 
 ### UI 原子栈
 
-| 包 | 版本 | 用途 |
-|---|---|---|
-| `class-variance-authority` | `^0.7.1` | 变体契约（Button 6v×4s） |
-| `clsx` | `^2.1.1` | 条件 className 拼接 |
-| `tailwind-merge` | `^3.6.0` | 冲突 utility 解决（px-2 + px-4 → px-4） |
-| `lucide-solid` | `^1.18.0` | 图标库（1000+ 图标，Solid 官方包） |
+| 包                         | 版本      | 用途                                    |
+| -------------------------- | --------- | --------------------------------------- |
+| `class-variance-authority` | `^0.7.1`  | 变体契约（Button 6v×4s）                |
+| `clsx`                     | `^2.1.1`  | 条件 className 拼接                     |
+| `tailwind-merge`           | `^3.6.0`  | 冲突 utility 解决（px-2 + px-4 → px-4） |
+| `lucide-solid`             | `^1.18.0` | 图标库（1000+ 图标，Solid 官方包）      |
 
 **cn 工具**：`clsx + tailwind-merge` 组合，在 `src/shared/lib/cn.ts` 导出。所有 UI 组件 className 合并必须用 `cn()`，不得用 `clsx()` 单独使用。
 
 ### 范围限制
 
 **引入（OK）**：
+
 - 纯排版原子（Button / Input / Textarea / Checkbox）
 - 受控交互原子（Checkbox 用 native `<input type="checkbox">`）
 - 静态复合容器（Card + 7 子件）
 
 **排除（V1）**：
+
 - Radix UI / Kobalte — V1 排除 dependency 风险，等真实 Dialog 需求再开新 ADR
 - shadcn 复杂复合体 — Sidebar / Dialog / Sheet / DropdownMenu 全部 V1 排除
 
@@ -68,15 +72,15 @@ Card + CardHeader + CardTitle + CardDescription + CardContent + CardFooter + Car
 
 全面用 lucide-solid 替换 Unicode 字符（5 处）。设置域 7 个具体图标：
 
-| 用途 | 图标 |
-|---|---|
-| 添加 Provider | `Plus` |
-| 搜索 | `Search` |
-| 设置入口 | `Settings` |
-| 返回 | `ArrowLeft` |
-| 发送消息 | `Send` |
-| 关闭 | `X` |
-| 删除 | `Trash2` |
+| 用途          | 图标        |
+| ------------- | ----------- |
+| 添加 Provider | `Plus`      |
+| 搜索          | `Search`    |
+| 设置入口      | `Settings`  |
+| 返回          | `ArrowLeft` |
+| 发送消息      | `Send`      |
+| 关闭          | `X`         |
+| 删除          | `Trash2`    |
 
 ## Why not...
 

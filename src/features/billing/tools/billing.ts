@@ -23,10 +23,7 @@ import type { Tool } from "@mariozechner/pi-ai";
 // 注意：模板显示了 `import { tool } from "@mariozechner/pi-agent"` 但该
 // 导出在 pi-agent 0.9.0 中不存在。我们使用实际的 pi-ai Tool 接口。
 // 还要注意 pi-ai 使用 TypeBox，不是 Zod。我们将 Zod enum 转换为 TypeBox enum。
-const ProviderEnum = Type.Union([
-  Type.Literal("deepseek"),
-  Type.Literal("minimax"),
-]);
+const ProviderEnum = Type.Union([Type.Literal("deepseek"), Type.Literal("minimax")]);
 
 export const getBalance: Tool = {
   name: "get_balance",

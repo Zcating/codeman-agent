@@ -1,8 +1,7 @@
-# src/shared/ui — 原子组件规范
+# src/shared/components/ui — 跨域设计系统原子
 
-> **2026-06-15 弃用**：本目录已在 [ADR-0010](../../../../docs/adr/0010-frontend-5-1-folder-whitelist.md) 中迁移到 `src/shared/components/ui/`，新规范文档在那。本文件仅作迁移期占位。
->
 > 5 个纯排版 / 受控交互原子组件。无 Radix，无 Kobalte，无复杂复合体。
+> 本目录是从 `src/shared/ui/`（ADR-0008）迁移到 `src/shared/components/ui/`（ADR-0010）的同名内容，路径是 5+1 白名单的一部分（`components/ui/` = 跨域设计系统原子，与 `components/internal/` = 跨域业务组件 对照）。
 
 ## 组件清单
 
@@ -56,9 +55,15 @@ Card 是**静态子件聚合**，不走 cva（样式固定，不需要动态变�
 
 ## cn 导入路径
 
+> **ADR-0010 后路径变深**（从 `ui/` 到 `components/ui/` 深度 +1）。
+
 ```typescript
+// ADR-0010 后（当前）
+import { cn } from "../../../lib/cn";
+// 实际路径：从 components/ui/ 下的文件到 lib/cn.ts 是 ../../../lib/cn
+
+// ADR-0010 前（已废弃）
 import { cn } from "../../lib/cn";
-// 实际路径：从 ui/ 下的文件到 lib/cn.ts 是 ../../lib/cn
 ```
 
 项目配置的 `@/` path alias（如有）优先使用，否则用相对路径。**不得硬编码 `/shared/lib/cn`**。
@@ -93,7 +98,7 @@ describe("Button", () => {
 
 1. 2+ 个 feature 都有相似需求的 DOM 结构
 2. 样式逻辑涉及 cva 变体或重复 utility class 字符串
-3. 不是什么复杂交互（复杂交互走 feature/components，不走 shared/ui）
+3. 不是什么复杂交互（复杂交互走 feature/components，不走 shared/components/ui）
 
 **不在本期引入的复合体**（V1 排除，等真实需求）：
 
@@ -110,6 +115,17 @@ V1 明确排除 Radix UI 和 Kobalte 依赖，理由：
 - Dialog 需求未出现，引入 Radix 会带来 50KB+ bundle 成本
 - 若 V2 出现 Dialog/Sheet 需求，走新 ADR 评估（Radix vs Kobalte vs 手写）
 
+## 与 components/internal 的边界
+
+`components/ui/`（本目录）vs `components/internal/`（同级预留位）：
+
+| 类别                   | 适用场景                                  | 例子                                                              |
+| ---------------------- | ----------------------------------------- | ----------------------------------------------------------------- |
+| `components/ui/`       | 跨项目可复用的设计系统原子                | Button / Input / Textarea / Checkbox / Card                       |
+| `components/internal/` | 跨 feature 复用但绑定本应用业务的复合组件 | ErrorBoundary / LoadingSpinner / Provider wrappers / Layout atoms |
+
+判定标准：**如果该组件 0 修改可搬到另一个项目，它属于 `ui/`；如果它要改 props / 业务绑定才能复用，它属于 `internal/`**。
+
 ## 变更维护者
 
-`src/shared/ui/` 下的组件由 `@/shared/ui` 维护者统一负责，任何 feature 开发者均可提 PR，review 时重点检查 cva 用法正确性和测试覆盖率。
+`src/shared/components/ui/` 下的组件由 `@/shared/components/ui` 维护者统一负责，任何 feature 开发者均可提 PR，review 时重点检查 cva 用法正确性和测试覆盖率。

@@ -6,6 +6,7 @@ dist/
 
 # Vite cache
 .vite/
+vite.config.ts.timestamp-*.mjs
 
 # TypeScript incremental build info
 *.tsbuildinfo
@@ -21,6 +22,11 @@ npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# test
+playwright-report/
+test-results/
+
 
 # Editor / IDE
 .vscode/
@@ -44,4 +50,3 @@ coverage/
 .opencode/
 .omo/
 .agents/
-vite.config.ts.timestamp-*.mjs

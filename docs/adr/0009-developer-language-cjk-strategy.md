@@ -89,13 +89,13 @@ cleanup）。
 
 ### 4. 注释 / log / panic / Err 字符串（开发者字符串）
 
-| 元素 | 规则 |
-|---|---|
-| TS / TSX `//` `/* */` `/** */` 注释 | 中文 |
-| Rust `///` `//!` `//` 注释 | 中文 |
-| `console.log` / `console.error` / `console.warn` | 中文 |
-| `log::*!` / `tracing::*!` / `println!` | 中文 |
-| `panic!` / `unreachable!` | 中文 |
+| 元素                                                     | 规则 |
+| -------------------------------------------------------- | ---- |
+| TS / TSX `//` `/* */` `/** */` 注释                      | 中文 |
+| Rust `///` `//!` `//` 注释                               | 中文 |
+| `console.log` / `console.error` / `console.warn`         | 中文 |
+| `log::*!` / `tracing::*!` / `println!`                   | 中文 |
+| `panic!` / `unreachable!`                                | 中文 |
 | `Result::Err("...")` / `AppError::Message("...")` 字符串 | 中文 |
 
 判断标准：字符串字面量**写到哪里去**？去 log 文件 / console / panic
@@ -104,14 +104,14 @@ i18n runtime，本期不出现）。
 
 ### 5. 测试文件
 
-| 元素 | 规则 |
-|---|---|
-| `it("xxx")` / `test("xxx")` 描述 | **中文**（test report 显示） |
-| 文件内注释 | **中文** |
-| Fixture 中"用户消息"（模拟中文用户输入） | **中文** |
-| Fixture 中"技术数据"（balance 数字、mock provider ID、API key 形式） | 英文 |
+| 元素                                                                       | 规则                                               |
+| -------------------------------------------------------------------------- | -------------------------------------------------- |
+| `it("xxx")` / `test("xxx")` 描述                                           | **中文**（test report 显示）                       |
+| 文件内注释                                                                 | **中文**                                           |
+| Fixture 中"用户消息"（模拟中文用户输入）                                   | **中文**                                           |
+| Fixture 中"技术数据"（balance 数字、mock provider ID、API key 形式）       | 英文                                               |
 | `expect().toBe('Settings')` / `toHaveTextContent('Save')` 等锚定 UI 字符串 | **英文**（runtime check 必须跟 UI 字符串完全匹配） |
-| `expect().toHaveBeenCalledWith({ ... })` 内的 fixture | 中文 fixture 走中文，技术 fixture 走英文 |
+| `expect().toHaveBeenCalledWith({ ... })` 内的 fixture                      | 中文 fixture 走中文，技术 fixture 走英文           |
 
 > **术语消歧**：本项目**区分 Test Description / Assertion / UI
 > String**（见 `CONTEXT.md` § Localization）。`it("xxx")` 中的
@@ -128,7 +128,7 @@ i18n runtime，本期不出现）。
 ### 7. Git 协作层
 
 - **commit message 格式**：保留 conventional commits（`feat(ui):
-  xxx`），`type(scope):` 保持英文（机器可读 + 生态兼容），**subject 走
+xxx`），`type(scope):` 保持英文（机器可读 + 生态兼容），**subject 走
   中文**
   - 例：`feat(chat): 添加对话气泡组件` /
     `fix(provider-card): 处理空 API key 边界`
@@ -146,7 +146,7 @@ PR #1（本 PR）只动 policy + 工具链，不动源码 / 文档翻译。翻�
 2. **`AGENTS.md`**（根 + 7 个子）—— 域规则，operational 层
 3. **`src/shared/` + `src/features/`** —— 前端源码
 4. **`src-tauri/`** —— Rust 后端源码
-5. **`e2e/` + `**/*.test.{ts,tsx}`** —— 测试
+5. **`e2e/` + `**/\*.test.{ts,tsx}`\*\* —— 测试
 
 每路开工前必读 `docs/translation-rules.md`，术语歧义以该文件为准。
 5 路间术语一致性靠**统一规则文档**而非人工 review 抓。
@@ -196,13 +196,13 @@ PR #1（本 PR）只动 policy + 工具链，不动源码 / 文档翻译。翻�
 
 新增 identifier 时按以下门槛决定是否在 `CONTEXT.md` 加术语条目：
 
-| 情形 | 是否需要加 |
-|---|---|
-| 跨 ≥ 2 文件的 public type / function / interface / trait | **必须** |
-| 引入新的 external dependency（npm / cargo） | **必须** |
-| 1 个文件内 private helper（不出 module） | 不必 |
-| 已有 glossary 条目但翻译 / 含义变化 | 更新现有条目 |
-| 与现有术语同义的新 identifier | 不必（用现有术语） |
+| 情形                                                     | 是否需要加         |
+| -------------------------------------------------------- | ------------------ |
+| 跨 ≥ 2 文件的 public type / function / interface / trait | **必须**           |
+| 引入新的 external dependency（npm / cargo）              | **必须**           |
+| 1 个文件内 private helper（不出 module）                 | 不必               |
+| 已有 glossary 条目但翻译 / 含义变化                      | 更新现有条目       |
+| 与现有术语同义的新 identifier                            | 不必（用现有术语） |
 
 `CONTRIBUTING.md` 详细文档化此机制 + PR template checklist 强制。
 

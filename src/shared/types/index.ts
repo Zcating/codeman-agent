@@ -79,7 +79,13 @@ export interface ToolResult {
 // Billing snapshot
 export type Snapshot =
   | { kind: "balance"; amount: number; currency: string; auto_recharge: boolean | null }
-  | { kind: "plan_quota"; remaining: number; total: number; expires_at: number | null; daily_avg: number | null };
+  | {
+      kind: "plan_quota";
+      remaining: number;
+      total: number;
+      expires_at: number | null;
+      daily_avg: number | null;
+    };
 export type Balance = Extract<Snapshot, { kind: "balance" }>;
 export type PlanQuota = Extract<Snapshot, { kind: "plan_quota" }>;
 export interface BillingProviderMeta {

@@ -176,12 +176,12 @@ LLM Provider             Billing Provider
 interface Settings {
   // A. LLM providers
   llm_providers: Array<{
-    id: string;             // 稳定 id（如 "openai"、"anthropic"）
-    label: string;          // 人类可读名
+    id: string; // 稳定 id（如 "openai"、"anthropic"）
+    label: string; // 人类可读名
     enabled: boolean;
     default_model?: string; // per-provider 默认
-    base_url?: string;      // OpenAI 兼容专用
-    api_key_ref: string;    // 指向 Tauri store 的路径
+    base_url?: string; // OpenAI 兼容专用
+    api_key_ref: string; // 指向 Tauri store 的路径
   }>;
 
   // B. 默认行为
@@ -202,22 +202,22 @@ interface Settings {
 
   // E. System prompt
   system_prompt: {
-    default: string;             // 多行
+    default: string; // 多行
     user_can_edit: boolean;
   };
 
   // F. Billing
   billing_providers: Array<{
-    id: string;                  // "deepseek" | "minimax"
+    id: string; // "deepseek" | "minimax"
     enabled: boolean;
     refresh_interval_secs: number;
-    api_key_ref: string;         // 指向 keyring 的路径
+    api_key_ref: string; // 指向 keyring 的路径
   }>;
 
   // G. Conversations
   conversations: {
-    auto_archive_after_days: number;   // 默认 30
-    max_history: number;               // 默认 1000
+    auto_archive_after_days: number; // 默认 30
+    max_history: number; // 默认 1000
   };
 }
 ```

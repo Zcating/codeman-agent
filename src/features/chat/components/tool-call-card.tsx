@@ -8,10 +8,7 @@ import type { ToolCall, ToolResult } from "../../../shared/types";
 
 type Status = "running" | "success" | "error";
 
-export function ToolCallCard(props: {
-  toolCall: ToolCall;
-  result?: ToolResult;
-}) {
+export function ToolCallCard(props: { toolCall: ToolCall; result?: ToolResult }) {
   const status = (): Status => {
     if (!props.result) return "running";
     return props.result.error ? "error" : "success";
@@ -19,10 +16,11 @@ export function ToolCallCard(props: {
 
   const outerClass = () => {
     const s = status();
-    const base =
-      "p-3 border rounded-lg space-y-2 mb-2";
-    if (s === "running") return `${base} border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800`;
-    if (s === "success") return `${base} border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20`;
+    const base = "p-3 border rounded-lg space-y-2 mb-2";
+    if (s === "running")
+      return `${base} border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800`;
+    if (s === "success")
+      return `${base} border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20`;
     return `${base} border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20`;
   };
 
@@ -46,7 +44,10 @@ export function ToolCallCard(props: {
           {props.toolCall.id}
         </code>
       </div>
-      <details class="text-sm border-t border-zinc-200 dark:border-zinc-700 pt-2 mt-2" open={status() === "error"}>
+      <details
+        class="text-sm border-t border-zinc-200 dark:border-zinc-700 pt-2 mt-2"
+        open={status() === "error"}
+      >
         <summary class="cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 font-medium select-none py-1">
           Arguments
         </summary>

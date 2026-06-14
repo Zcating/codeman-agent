@@ -2,6 +2,7 @@
   "name": "codeman-agent",
   "version": "0.2.0",
   "description": "Native Windows desktop AI agent with billing tools (DeepSeek, MiniMax)",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "start": "vite",
@@ -25,7 +26,6 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check"
   },
-  "license": "MIT",
   "dependencies": {
     "@effect/platform-browser": "^0.75.0",
     "@fontsource/inter": "^5.2.8",

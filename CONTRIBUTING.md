@@ -58,13 +58,13 @@ pnpm typecheck:e2e
 
 新增 identifier 时，按以下门槛决定是否需要在 `CONTEXT.md` 加术语条目：
 
-| 情形 | 是否需要加 |
-|---|---|
-| 跨 ≥ 2 文件的 public type / function / interface / trait | **必须** |
-| 引入新的 external dependency（npm / cargo） | **必须** |
-| 1 个文件内 private helper（不出 module） | 不必 |
-| 已有 glossary 条目但翻译 / 含义变化 | 更新现有条目 |
-| 与现有术语同义的新 identifier | 不必（用现有术语） |
+| 情形                                                     | 是否需要加         |
+| -------------------------------------------------------- | ------------------ |
+| 跨 ≥ 2 文件的 public type / function / interface / trait | **必须**           |
+| 引入新的 external dependency（npm / cargo）              | **必须**           |
+| 1 个文件内 private helper（不出 module）                 | 不必               |
+| 已有 glossary 条目但翻译 / 含义变化                      | 更新现有条目       |
+| 与现有术语同义的新 identifier                            | 不必（用现有术语） |
 
 **Glossary 条目格式**（参考 `CONTEXT.md` § Localization）：
 
@@ -86,7 +86,7 @@ pnpm typecheck:e2e
 2. **`AGENTS.md`**（根 + 7 个子）—— 域规则，operational 层
 3. **`src/shared/` + `src/features/`** —— 前端源码
 4. **`src-tauri/`** —— Rust 后端源码
-5. **`e2e/` + `**/*.test.{ts,tsx}`** —— 测试
+5. **`e2e/` + `**/\*.test.{ts,tsx}`\*\* —— 测试
 
 每路开工前必读 `docs/translation-rules.md`，术语歧义以该文件为准。
 5 路间术语一致性靠**统一规则文档**而非人工 review 抓。
@@ -109,7 +109,7 @@ Reviewer 在 review 新 PR 时关注：
 
 1. **新增 identifier** 是否需要加 `CONTEXT.md` 条目（按上述门槛）
 2. **新注释** 是否遵守 `docs/translation-rules.md`（尤其 § 3 标点
-   + § 6 标识符引用）
+   - § 6 标识符引用）
 3. **中文 fixture** 在测试中是否合理（中文用户消息 vs 英文技术数据）
 4. **runtime 断言** 是否正确锚定 UI 字符串（`expect().toBe('Settings')`
    必须跟 UI 字符串完全匹配，否则测试必红）

@@ -3,11 +3,7 @@ import { Effect, Stream, Layer, Context, Ref } from "effect";
 import type { Message as PiMessage, Model } from "@mariozechner/pi-ai";
 import { Agent, ProviderTransport, type AgentTransport } from "@mariozechner/pi-agent";
 import type { AgentEvent } from "@mariozechner/pi-agent";
-import {
-  SettingsService,
-  SettingsServiceLive,
-  BillingServiceLive,
-} from "../../shared/lib/tauri";
+import { SettingsService, SettingsServiceLive, BillingServiceLive } from "../../shared/lib/tauri";
 import type { Conversation, Message, ToolCall } from "../../shared/types";
 
 // ─── Runtime 事件 & 错误类型 ─────────────────────────────────────────────
@@ -58,7 +54,7 @@ export const AgentRuntimeLive = Layer.effect(
       // 通过 flatMap 构建 Stream，使 context 保持在内部 Effect 的局部作用域。
       // RuntimeDeps layer 通过 RuntimeLayer 在调用处提供。
       // Cast 为文档中声明的返回类型 — services 通过 RuntimeLayer 保持在作用域内。
-      return (Stream.flatMap(
+      return Stream.flatMap(
         Stream.fromEffect(
           Effect.gen(function* () {
             const settingsSvc = yield* SettingsService;
@@ -127,7 +123,13 @@ export const AgentRuntimeLive = Layer.effect(
                   const assistantMsg = evt.message;
                   for (const block of assistantMsg.content) {
                     if (typeof block === "object" && block !== null && "type" in block) {
-                      const b = block as { type: string; text?: string; id?: string; name?: string; arguments?: Record<string, unknown> };
+                      const b = block as {
+                        type: string;
+                        text?: string;
+                        id?: string;
+                        name?: string;
+                        arguments?: Record<string, unknown>;
+                      };
                       if (b.type === "text" && b.text !== undefined) {
                         eventQueue.push({ type: "token", content: b.text });
                       } else if (b.type === "toolCall" && b.id !== undefined) {
@@ -186,22 +188,30 @@ export const AgentRuntimeLive = Layer.effect(
 
             if (finalPiMessages.length > 0) {
               const lastPiMsg = finalPiMessages[finalPiMessages.length - 1];
-              const textBlocks = (lastPiMsg.content as Array<{ type: string; text?: string }>)
-                .filter((b) => b.type === "text" && b.text !== undefined);
-              const toolBlocks = (lastPiMsg.content as Array<{ type: string; id?: string; name?: string; arguments?: Record<string, unknown> }>)
-                .filter((b) => b.type === "toolCall" && b.id !== undefined);
+              const textBlocks = (
+                lastPiMsg.content as Array<{ type: string; text?: string }>
+              ).filter((b) => b.type === "text" && b.text !== undefined);
+              const toolBlocks = (
+                lastPiMsg.content as Array<{
+                  type: string;
+                  id?: string;
+                  name?: string;
+                  arguments?: Record<string, unknown>;
+                }>
+              ).filter((b) => b.type === "toolCall" && b.id !== undefined);
               const doneMessage: Message = {
                 id: crypto.randomUUID(),
                 conversation_id: conversation.id,
                 role: "assistant",
                 content: textBlocks.map((b) => b.text ?? "").join(""),
-                tool_calls: toolBlocks.length > 0
-                  ? toolBlocks.map((b) => ({
-                      id: b.id!,
-                      name: b.name ?? "",
-                      args: b.arguments ?? {},
-                    }))
-                  : null,
+                tool_calls:
+                  toolBlocks.length > 0
+                    ? toolBlocks.map((b) => ({
+                        id: b.id!,
+                        name: b.name ?? "",
+                        args: b.arguments ?? {},
+                      }))
+                    : null,
                 tool_results: null,
                 model: activeProvider.default_model ?? null,
                 input_tokens: null,
@@ -218,7 +228,7 @@ export const AgentRuntimeLive = Layer.effect(
           }),
         ),
         (s) => s,
-      )) as Stream.Stream<RuntimeEvent, never, never>;
+      ) as Stream.Stream<RuntimeEvent, never, never>;
     };
 
     const cancel = (): Effect.Effect<void, never, never> =>
@@ -235,9 +245,6 @@ export const AgentRuntimeLive = Layer.effect(
 
 // ─── 组合所有 runtime 依赖的 Layer ────────────────────────────────
 
-export const RuntimeDeps = Layer.mergeAll(
-  SettingsServiceLive,
-  BillingServiceLive,
-);
+export const RuntimeDeps = Layer.mergeAll(SettingsServiceLive, BillingServiceLive);
 
 export const RuntimeLayer = Layer.provide(AgentRuntimeLive, RuntimeDeps);

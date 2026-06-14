@@ -43,10 +43,7 @@ export async function loadMessages(conversationId: string): Promise<void> {
 }
 
 /** 追加用户消息并通过服务持久化。 */
-export async function appendUserMessage(
-  content: string,
-  conversationId: string,
-): Promise<void> {
+export async function appendUserMessage(content: string, conversationId: string): Promise<void> {
   const program = Effect.gen(function* () {
     const svc = yield* MessageService;
     return yield* svc.append({ conversation_id: conversationId, role: "user", content });
@@ -61,9 +58,7 @@ export async function appendUserMessage(
 /** 追加流式增量到进行中的 assistant 消息（仅本地，无 IPC）。 */
 export function appendAssistantMessageDelta(messageId: string, chunk: string): void {
   setMessages(
-    messages().map((m) =>
-      m.id === messageId ? { ...m, content: m.content + chunk } : m
-    )
+    messages().map((m) => (m.id === messageId ? { ...m, content: m.content + chunk } : m)),
   );
 }
 
@@ -79,7 +74,7 @@ export function appendToolCall(messageId: string, toolCall: ToolCall): void {
       if (m.id !== messageId) return m;
       const existing = m.tool_calls ?? [];
       return { ...m, tool_calls: [...existing, toolCall] };
-    })
+    }),
   );
 }
 
@@ -99,7 +94,7 @@ export function finalizeToolResult(
           ? { tool_call_id: toolCallId, result, error }
           : { tool_call_id: toolCallId, result, error: null };
       return { ...m, tool_results: [...existing, entry] };
-    })
+    }),
   );
 }
 
@@ -109,10 +104,7 @@ export function clearMessages(): void {
 }
 
 // 插入流式 assistant 消息存根（仅本地，无 IPC）。
-export function appendStreamingAssistantMessage(
-  messageId: string,
-  conversationId: string,
-): void {
+export function appendStreamingAssistantMessage(messageId: string, conversationId: string): void {
   const stub: Message = {
     id: messageId,
     conversation_id: conversationId,
@@ -164,10 +156,7 @@ export async function runConversationStream(
 
   const program = Effect.gen(function* () {
     const runtime = yield* AgentRuntime;
-    yield* Stream.runForEach(
-      runtime.run(conversation, userMessage),
-      processEvent,
-    );
+    yield* Stream.runForEach(runtime.run(conversation, userMessage), processEvent);
   }).pipe(Effect.provide(RuntimeLayer));
 
   await Effect.runPromise(program);

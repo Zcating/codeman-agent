@@ -69,7 +69,10 @@ const MockSettingsServiceLive = Layer.succeed(SettingsService, {
   },
   clearAllHistory: () => Effect.succeed(undefined),
   getActiveLlmProvider: () =>
-    Effect.succeed(settingsState.llm_providers.find((p) => p.id === settingsState.default_llm_provider_id) ?? null),
+    Effect.succeed(
+      settingsState.llm_providers.find((p) => p.id === settingsState.default_llm_provider_id) ??
+        null,
+    ),
 });
 
 describe("LLMProviderService", () => {
@@ -105,7 +108,7 @@ describe("LLMProviderService", () => {
       expect(result).toHaveLength(2);
       expect(result[0].id).toBe("deepseek");
       expect(result[1].id).toBe("minimax");
-    }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive))
+    }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive)),
   );
 
   it.effect("add 追加 provider 到列表", () =>
@@ -121,7 +124,7 @@ describe("LLMProviderService", () => {
       const result = yield* svc.list();
       expect(result).toHaveLength(3);
       expect(result[2].id).toBe("openai");
-    }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive))
+    }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive)),
   );
 
   it.effect("update 修改 provider 字段", () =>
@@ -131,7 +134,7 @@ describe("LLMProviderService", () => {
       const result = yield* svc.list();
       const minimax = result.find((p) => p.id === "minimax");
       expect(minimax?.label).toBe("MiniMax Updated");
-    }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive))
+    }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive)),
   );
 
   it.effect("remove 从列表中过滤掉 provider", () =>
@@ -141,7 +144,7 @@ describe("LLMProviderService", () => {
       const result = yield* svc.list();
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("deepseek");
-    }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive))
+    }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive)),
   );
 
   it.effect("setActive 更新 settings 中的 default_llm_provider_id", () =>
@@ -149,7 +152,7 @@ describe("LLMProviderService", () => {
       const svc = yield* LLMProviderService;
       yield* svc.setActive("minimax");
       expect(settingsState.default_llm_provider_id).toBe("minimax");
-    }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive))
+    }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive)),
   );
 
   it.effect("hasApiKey 委托给 mock invoke（deepseek 有 key）", () =>
@@ -159,7 +162,7 @@ describe("LLMProviderService", () => {
       const result = yield* svc.hasApiKey("deepseek");
       expect(result).toBe(true);
       expect(mockState.calls).toContain("has_llm_key");
-    }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive))
+    }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive)),
   );
 
   it.effect("hasApiKey 委托给 mock invoke（unknown 无 key）", () =>
@@ -168,6 +171,6 @@ describe("LLMProviderService", () => {
       const svc = yield* LLMProviderService;
       const result = yield* svc.hasApiKey("unknown");
       expect(result).toBe(false);
-    }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive))
+    }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive)),
   );
 });

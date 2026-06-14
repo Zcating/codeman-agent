@@ -23,13 +23,19 @@ export default defineConfig(async () => ({
   // staged checks (e.g. a Rust check on `*.rs` would go in
   // scripts/precommit.mjs).
   staged: {
-    "*.{ts,tsx,mjs}": "node scripts/precommit.mjs",
+    "*.{ts,tsx,mjs}": "vp check --fix && vp test --bail --passWithNoTests",
   },
   resolve: {
     conditions: ["browser", "development"],
     alias: [
-      { find: /^solid-js$/, replacement: resolve(__dirname, "node_modules/solid-js/dist/solid.js") },
-      { find: "solid-js/web", replacement: resolve(__dirname, "node_modules/solid-js/web/dist/web.js") },
+      {
+        find: /^solid-js$/,
+        replacement: resolve(__dirname, "node_modules/solid-js/dist/solid.js"),
+      },
+      {
+        find: "solid-js/web",
+        replacement: resolve(__dirname, "node_modules/solid-js/web/dist/web.js"),
+      },
     ],
   },
   test: {
@@ -56,7 +62,13 @@ export default defineConfig(async () => ({
   server: {
     port: 1420,
     strictPort: true,
-    host: host || false,
+    // Bind explicitly to IPv4 loopback. The e2e globalSetup connects to
+    // `127.0.0.1` (see playwright.config.ts::use.baseURL) — and Node's DNS
+    // resolver on this host prefers `::1` for `localhost`, so we can't
+    // rely on the system default. `host: false` (the previous value) is
+    // equivalent to `'localhost'` on most setups, but the actual bind
+    // address is system-dependent and breaks e2e.
+    host: host || "127.0.0.1",
     hmr: host
       ? {
           protocol: "ws",

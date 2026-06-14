@@ -38,6 +38,7 @@ pub trait Provider: Send + Sync {
 - 永远不要对 `secret` 本身或任何从它派生的字符串用 `log::info!` / `log::debug!`。`Secret` 类型的 `Debug` 已经替换过了。
 
 `fetch` 在两条路径上被调用：
+
 1. **调度器轮询**（`scheduler.rs`）——只对**当前激活**的厂商调。非激活厂商保持冷态，见 `only_active_provider_is_polled` 测试。
 2. **T13 IPC 显式查询**（`commands::get_provider_snapshot`）——前端 `BillingService.getSnapshot(providerId)` 直接调任意 provider 的 `fetch`，不依赖激活状态；走的是单次 fetch，不入轮询。
 

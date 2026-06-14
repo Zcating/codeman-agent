@@ -73,14 +73,14 @@ CREATE VIRTUAL TABLE messages_fts USING fts5(
 
 ## 查阅指南
 
-| 任务 | 文件 |
-|---|---|
-| 新增表 | `migrations/000N_<name>.sql` + `db/<table>.rs` 模块 + `mod.rs::pub mod` |
-| 新增列 | `migrations/000N_add_<col>_to_<table>.sql`（**不要**改老 migration） |
-| 改列类型 | `migrations/000N_rebuild_<table>.sql`（新建表 + 复制 + DROP 旧表 + 改名） |
-| 新增 FTS 字段 | 改 messages 表 + 改 FTS 虚表 + 改 trigger；同 migration 文件 |
-| 调试 SQL | `cargo test -- --nocapture` 看 `sqlx` 编译错误；`sqlite3 <db_path>` 直接跑 |
-| 查 schema | `db/schema.sql`（**参考用**；权威是 migrations/） |
+| 任务           | 文件                                                                               |
+| -------------- | ---------------------------------------------------------------------------------- |
+| 新增表         | `migrations/000N_<name>.sql` + `db/<table>.rs` 模块 + `mod.rs::pub mod`            |
+| 新增列         | `migrations/000N_add_<col>_to_<table>.sql`（**不要**改老 migration）               |
+| 改列类型       | `migrations/000N_rebuild_<table>.sql`（新建表 + 复制 + DROP 旧表 + 改名）          |
+| 新增 FTS 字段  | 改 messages 表 + 改 FTS 虚表 + 改 trigger；同 migration 文件                       |
+| 调试 SQL       | `cargo test -- --nocapture` 看 `sqlx` 编译错误；`sqlite3 <db_path>` 直接跑         |
+| 查 schema      | `db/schema.sql`（**参考用**；权威是 migrations/）                                  |
 | 新增 IPC 调 DB | `commands.rs` 加 `#[tauri::command]` → `db/<table>.rs` 加函数 → 同步 TS 端 Service |
 
 ## 反模式（明确禁止）
