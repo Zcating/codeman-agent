@@ -1,10 +1,10 @@
-//! MessageBubble — 按 role 渲染单条 Message。
+﻿//! MessageBubble — 按 role 渲染单条 Message。
 //!
 //! 纯 UI。读取 Message prop。不导入 effect。
 
 import { Show, For } from "solid-js";
 import { marked } from "marked";
-import type { Message, ToolCall, ToolResult } from "../../../shared/types";
+import type { Message, ToolCall, ToolResult } from "../../../shared/lib/types";
 
 /** 转义用户提供的文本以防止 XSS。 */
 function escapeHtml(s: string): string {

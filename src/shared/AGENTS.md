@@ -17,7 +17,7 @@
 - `types/` — 旧跨域类型目录，合并到 `lib/types.ts`
 - `state/` — 旧 Solid 状态目录，重命名为 `stores/`
 - `ui/` — 旧设计系统目录，重命名为 `components/ui/`
-- `mocks/` — 已删除，唯一源在仓库根 `__mocks__/@tauri-apps/api/core.ts`（ADR-0010 Q6 修复双源 bug）
+- `mocks/` — 已删除，唯一源在src/__mocks__/@tauri-apps/api/core.ts（ADR-0010 Q6 修复双源 bug）
 - `assets/` — 当前无跨域静态资源需求；如未来有新增，走新 ADR 加进白名单
 
 ## components/ui vs components/internal 边界（Q4 决策）
@@ -71,17 +71,17 @@ import { cn } from "@/shared/lib/cn";
 
 ## mockState 唯一源（ADR-0010 Q6）
 
-`mockState` 唯一源在仓库根 `__mocks__/@tauri-apps/api/core.ts`（vitest 约定路径，自动应用）。`src/shared/shared-mock-state.ts` 已删除，**所有**测试 import 从仓库根路径走。
+`mockState` 唯一源在src/__mocks__/@tauri-apps/api/core.ts（vitest 约定路径，自动应用）。`src/shared/shared-mock-state.ts` 已删除，**所有**测试 import 从 src/__mocks__/ 路径走。
 
 ```ts
 // 正确
-import { mockState } from "<repo-root>/__mocks__/@tauri-apps/api/core";
+import { mockState } from "src/__mocks__/@tauri-apps/api/core";
 
 // 错误（已删除）
 import { mockState } from "@/shared/shared-mock-state";
 ```
 
-`src/test-setup.ts` 用 `vi.mock("@tauri-apps/api/core", () => ({ invoke: ... }))` 配置 invoke 默认行为，`mockState` 从仓库根唯一源 import，运行时配置与测试 import 是同一引用。
+`src/test-setup.ts` 用 `vi.mock("@tauri-apps/api/core", () => ({ invoke: ... }))` 配置 invoke 默认行为，`mockState` 从 src/__mocks__/ 唯一源 import，运行时配置与测试 import 是同一引用。
 
 ## 测试策略
 

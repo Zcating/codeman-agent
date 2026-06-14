@@ -1,2 +1,2 @@
-export { getBalance, getPlanQuota, billingTools } from "./tools/billing";
-export type { Snapshot, Balance, PlanQuota, BillingProviderMeta } from "../../shared/types";
+﻿export { getBalance, getPlanQuota, billingTools } from "./lib/billing";
+export type { Snapshot, Balance, PlanQuota, BillingProviderMeta } from "../../shared/lib/types";

@@ -1,4 +1,4 @@
-//! AgentRuntime Effect 服务测试。
+﻿//! AgentRuntime Effect 服务测试。
 //!
 //! Effect 签名：
 //!   AgentRuntime.run(conversation, userMessage): Stream<RuntimeEvent>
@@ -8,8 +8,8 @@ import { it, expect } from "@effect/vitest";
 import { describe } from "vitest";
 import { Effect, Layer } from "effect";
 import { AgentRuntime, AgentRuntimeLive } from "./runtime";
-import { SettingsService, BillingService } from "../../shared/lib/tauri";
-import type { Settings, LLMProvider, Conversation, Message } from "../../shared/types";
+import { SettingsService, BillingService } from "../../../shared/lib/tauri";
+import type { Settings, LLMProvider, Conversation, Message } from "../../../shared/lib/types";
 
 const testConversation: Conversation = {
   id: "conv-1",

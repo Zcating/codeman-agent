@@ -1,4 +1,4 @@
-//! MessageService Effect 桥接层测试。
+﻿//! MessageService Effect 桥接层测试。
 //!
 //! 测试 Effect → Solid 桥接函数（loadMessages、appendUserMessage），
 //! 使用 mock MessageService。
@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { MessageService } from "../../../shared/lib/tauri";
-import type { Message } from "../../../shared/types";
+import type { Message } from "../../../shared/lib/types";
 
 const fixtureMsg: Message = {
   id: "msg-1",

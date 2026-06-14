@@ -1,4 +1,4 @@
-//! ChatView — 消息列表 + 输入框 + stream 订阅。
+﻿//! ChatView — 消息列表 + 输入框 + stream 订阅。
 //!
 //! 代理 UI 的核心组件。订阅 AgentRuntime.run()
 //! 并将 RuntimeEvents 转换为 UI 更新。
@@ -17,9 +17,9 @@ import {
   finalizeToolResult,
   clearMessages,
   appendStreamingAssistantMessage,
-} from "../store/messages";
-import { activeId$, conversations$ } from "../store/conversations";
-import { AgentRuntime, RuntimeLayer } from "../runtime";
+} from "../stores/messages";
+import { activeId$, conversations$ } from "../stores/conversations";
+import { AgentRuntime, RuntimeLayer } from "../lib/runtime";
 
 export function ChatView() {
   const [input, setInput] = createSignal("");

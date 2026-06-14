@@ -1,6 +1,6 @@
-import "@testing-library/jest-dom";
+﻿import "@testing-library/jest-dom";
 import { vi } from "vitest";
-import { mockState } from "./shared/shared-mock-state";
+import { mockState } from "./__mocks__/@tauri-apps/api/core";
 
 if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = function () {};

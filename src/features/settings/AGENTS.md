@@ -100,7 +100,7 @@ it.effect("description", () =>
 
 `MockSettingsServiceLive = Layer.succeed(SettingsService, { getSettings, updateSettings, ... })`
 
-**注意**（ADR-0010 Q6）：`lib/*.test.ts` 中 `import { mockState } from "<repo-root>/__mocks__/@tauri-apps/api/core"`——`mockState` 唯一源在仓库根 `__mocks__/`，**不是** `@/shared/shared-mock-state`（该文件已删除）。
+**注意**（ADR-0010 Q6）：`lib/*.test.ts` 中 `import { mockState } from "src/__mocks__/@tauri-apps/api/core"`——`mockState` 唯一源在`src/__mocks__/`，**不是** `@/shared/shared-mock-state`（该文件已删除）。
 
 ### 测试：UI 组件
 
@@ -134,4 +134,4 @@ it("renders all controls", () => {
 ## Wave 笔记
 
 - **Wave 5**（2026-06-14）：lucide-solid 图标替换 4 处
-- **Wave V1.5**（2026-06-15，ADR-0010）：`subsystems/` 合并到 `lib/`；`llm_providers.ts` → `llm-providers.ts`（snake_case → kebab-case）；mockState 唯一源切到仓库根 `__mocks__/`；types 镜像路径从 `shared/types/` 改为 `shared/lib/types.ts`
+- **Wave V1.5**（2026-06-15，ADR-0010）：`subsystems/` 合并到 `lib/`；`llm_providers.ts` → `llm-providers.ts`（snake_case → kebab-case）；mockState 唯一源切到`src/__mocks__/`；types 镜像路径从 `shared/types/` 改为 `shared/lib/types.ts`

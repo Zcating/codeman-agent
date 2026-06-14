@@ -1,4 +1,4 @@
-//! System prompt Effect 服务。
+﻿//! System prompt Effect 服务。
 //!
 //! Effect 签名：
 //!   SystemPromptService 暴露 4 个方法；每个返回
@@ -11,7 +11,7 @@
 
 import { Effect, Context, Layer } from "effect";
 import { SettingsService } from "../../../shared/lib/tauri";
-import type { AppError, Conversation } from "../../../shared/types";
+import type { AppError, Conversation } from "../../../shared/lib/types";
 
 export class SystemPromptService extends Context.Tag("SystemPromptService")<
   SystemPromptService,

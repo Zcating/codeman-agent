@@ -70,7 +70,7 @@ codeman-agent/
 │
 ├── src-tauri/                     # Rust 后端（详见 src-tauri/AGENTS.md）
 ├── docs/adr/                      # 10 个 ADR（0001-0010，见下方索引）
-├── __mocks__/                     # 仓库根的 vitest auto-mock（@tauri-apps/api/core.ts）= mockState 唯一源
+├── (mocks 改在 src/__mocks__/ — 详见 src/AGENTS.md)
 ├── docs/                          # 治理文档（translation-rules 等）
 └── .agents/                       # 本地 agent skills
 ```

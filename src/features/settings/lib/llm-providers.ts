@@ -1,4 +1,4 @@
-//! LLM provider Effect 服务（CRUD + API 密钥）。
+﻿//! LLM provider Effect 服务（CRUD + API 密钥）。
 //!
 //! Effect 签名：
 //!   LLMProviderService 暴露 7 个方法；每个返回
@@ -10,7 +10,7 @@
 import { Effect, Context, Layer } from "effect";
 import { invoke, SettingsServiceLive } from "../../../shared/lib/tauri";
 import { SettingsService } from "../../../shared/lib/tauri";
-import type { AppError, LLMProvider } from "../../../shared/types";
+import type { AppError, LLMProvider } from "../../../shared/lib/types";
 
 export class LLMProviderService extends Context.Tag("LLMProviderService")<
   LLMProviderService,

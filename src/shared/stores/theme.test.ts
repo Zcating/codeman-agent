@@ -4,7 +4,7 @@
 //! Mock matchMedia 用于 system-theme 解析。
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { Settings } from "../types";
+import type { Settings } from "../lib/types";
 
 // Mutable mock settings — 在每个测试导入前设置
 let mockTheme: Settings["theme"] = "dark";

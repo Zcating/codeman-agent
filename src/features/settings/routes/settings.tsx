@@ -1,4 +1,4 @@
-//! /settings  — 全页面设置（替换主内容；不是 modal）。
+﻿//! /settings  — 全页面设置（替换主内容；不是 modal）。
 //!
 //! 从已删除的 src/agent/components/settings-modal.tsx 提取。
 //! "app" 选项卡不再有 start_minimized / close_behavior / hotkeys
@@ -14,7 +14,7 @@ import {
   updateSettingsBridge,
   clearAllHistoryBridge,
 } from "../../../shared/lib/tauri";
-import type { LLMProvider, Settings } from "../../../shared/types";
+import type { LLMProvider, Settings } from "../../../shared/lib/types";
 
 type Tab = "llm" | "app" | "window" | "billing" | "advanced";
 

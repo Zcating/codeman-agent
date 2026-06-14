@@ -1,4 +1,4 @@
-//! ProviderCard 组件测试。
+﻿//! ProviderCard 组件测试。
 //!
 //! Mocked: LLMProviderService Effect 服务（通过直接导入）。
 
@@ -6,8 +6,8 @@ import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
 import { ProviderCard } from "./provider-card";
-import type { LLMProvider } from "../../../shared/types";
-import { mockState } from "../../../shared/shared-mock-state";
+import type { LLMProvider } from "../../../shared/lib/types";
+import { mockState } from "../../../__mocks__/@tauri-apps/api/core";
 
 const mockProvider: LLMProvider = {
   id: "deepseek",

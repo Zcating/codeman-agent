@@ -1,11 +1,11 @@
-//! MessageBubble 组件测试 — 每个角色一个（user, assistant, tool, system）。
+﻿//! MessageBubble 组件测试 — 每个角色一个（user, assistant, tool, system）。
 //!
 //! 纯 UI 组件。无 Effect 导入。无 store mock 需要。
 
 import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import { MessageBubble } from "./message-bubble";
-import type { Message, ToolCall, ToolResult } from "../../../shared/types";
+import type { Message, ToolCall, ToolResult } from "../../../shared/lib/types";
 
 describe("MessageBubble", () => {
   afterEach(() => cleanup());

@@ -26,7 +26,7 @@ src/
 
 1. **子目录命名不一致**：chat 域 `store/`（单数）、shared `state/`（单数）、feature 内 `subsystems/` / `tools/`、shared `ui/`（5 原子）。6 个允许外子目录、5 种命名，新人 5 分钟说不清"Effect service 放哪"。
 2. **共享类型走单独目录**：`shared/types/` 装 5 个域类型，跟 `lib/` 其它 pure util 平级但分目录，无强理由。
-3. **`mockState` 双源 bug**：`__mocks__/@tauri-apps/api/core.ts`（vitest 约定路径，settings.test.tsx 直接 import 此处 mockState）和 `src/shared/shared-mock-state.ts`（test-setup.ts 用此 mock invoke）独立定义同名 export，互不引用。配置 `mockState.resolved` 改 A 不会影响 B——是真实隐藏 bug。
+3. **`mockState` 双源 bug**：`src/__mocks__/@tauri-apps/api/core.ts`（vitest 约定路径，settings.test.tsx 直接 import 此处 mockState）和 `src/shared/shared-mock-state.ts`（test-setup.ts 用此 mock invoke）独立定义同名 export，互不引用。配置 `mockState.resolved` 改 A 不会影响 B——是真实隐藏 bug。
 4. **死代码 / 空目录**：`src/assets/logo.svg`（无 import）、`src/styles/`（空）、`features/<feature>/types/`（3 个空目录）、`shared/mocks/`（仅 1 个文件且功能重复）、`subsystems/` 与 `tools/` 在新结构下概念重复。
 
 本期决定收口到 **5+1 白名单**：每个 feature 最多 5 个允许子目录、shared 最多 6 个（其中 components 拆 ui 与 internal 两子目录）。所有现存"非白名单"内容（subsystems、tools、store、state、types、ui、mocks、empty dirs）一次性归位或删除。
@@ -87,7 +87,7 @@ src/
 | --------------------------------- | ----------------------------------------------------------------- |
 | `src/assets/logo.svg`             | 死代码（无 import，tauri.conf.json icon 指向 `src-tauri/icons/`） |
 | `src/styles/`                     | 空目录                                                            |
-| `src/shared/shared-mock-state.ts` | 与 `__mocks__/@tauri-apps/api/core.ts` 重复，迁移唯一源后删除     |
+| `src/shared/shared-mock-state.ts` | 与 `src/__mocks__/@tauri-apps/api/core.ts` 重复，迁移唯一源后删除     |
 | `src/shared/mocks/`               | 删除 shared-mock-state.ts 后为空                                  |
 | `src/shared/types/`               | 已合并到 `lib/types.ts`                                           |
 | `src/shared/state/`               | 已重命名为 `stores/`                                              |
@@ -101,14 +101,14 @@ src/
 
 ### mockState 单一源（Bug 修复）
 
-**唯一源**：`__mocks__/@tauri-apps/api/core.ts`（vitest 约定路径，自动应用）。
+**唯一源**：`src/__mocks__/@tauri-apps/api/core.ts`（vitest 约定路径，自动应用）。
 
 **修复步骤**：
 
-1. 保留 `__mocks__/@tauri-apps/api/core.ts` 中的 `mockState` 定义与 `invoke` 实现
+1. 保留 `src/__mocks__/@tauri-apps/api/core.ts` 中的 `mockState` 定义与 `invoke` 实现
 2. 删除 `src/shared/shared-mock-state.ts`
-3. `src/test-setup.ts` 改为 `import { mockState } from "<root>/__mocks__/@tauri-apps/api/core"`
-4. `features/settings/components/provider-card.test.tsx`、`features/settings/subsystems/llm_providers.test.ts`（迁到 `features/settings/lib/` 后）改为从 `__mocks__/@tauri-apps/api/core` import
+3. `src/test-setup.ts` 改为 `import { mockState } from "src/__mocks__/@tauri-apps/api/core"`
+4. `features/settings/components/provider-card.test.tsx`、`features/settings/subsystems/llm_providers.test.ts`（迁到 `features/settings/lib/` 后）改为从 `src/__mocks__/@tauri-apps/api/core` import
 5. `features/settings/routes/settings.test.tsx`（当前已从 `__mocks__/` import，路径不变但因父目录迁移 import 路径需更新）
 
 **修复后**：`mockState` 在测试运行时与配置时是同一引用，配置 `resolved` 立即影响 `invoke` 返回。
@@ -149,7 +149,9 @@ src/
 
 ### Why not 保留 `mocks/` 目录
 
-`mocks/` 只装了 `shared-mock-state.ts` 一个文件，且该文件的 `mockState` 在 `__mocks__/@tauri-apps/api/core.ts` 已有等价定义。两者不互通是 bug，不是设计。`__mocks__/` 是 vitest 约定路径，删除 `shared/mocks/` 后所有 mock 走 `__mocks__/`，零认知负担，且修复双源 bug。
+`mocks/` 只装了 `shared-mock-state.ts` 一个文件，且该文件的 `mockState` 在 `src/__mocks__/@tauri-apps/api/core.ts` 已有等价定义。两者不互通是 bug，不是设计。`src/__mocks__/` 是 vitest 约定路径，删除 `shared/mocks/` 后所有 mock 走 `src/__mocks__/`，零认知负担，且修复双源 bug。
+
+> **2026-06-15 实施补充**：上述 ADR 中"仓库根 `__mocks__/`"已迁至 `src/__mocks__/`（保持 vitest auto-mock 行为不变）。tsconfig.json 的 `"include": ["src"]` 覆盖 `src/__mocks__/`，无需修改。所有引用路径的深度统一为：从 `src/test-setup.ts` 看是 `./__mocks__/@tauri-apps/api/core`，从 `src/features/<feature>/<dir>/<file>.test.tsx` 看是 `../../../__mocks__/@tauri-apps/api/core`。
 
 ### Why not `shared/assets/` 装 logo.svg
 

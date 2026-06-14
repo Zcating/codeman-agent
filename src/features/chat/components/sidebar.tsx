@@ -1,4 +1,4 @@
-//! Sidebar — 带搜索的会话列表。
+﻿//! Sidebar — 带搜索的会话列表。
 //!
 //! 消费来自 Effect→Solid 桥接层（`../store/conversations`）。
 //! 本文件任何位置都**不**导入 'effect'。
@@ -12,8 +12,8 @@ import {
   createConversation,
   selectConversation,
   deleteConversation,
-} from "../store/conversations";
-import type { Conversation } from "../../../shared/types";
+} from "../stores/conversations";
+import type { Conversation } from "../../../shared/lib/types";
 
 export function Sidebar() {
   const [query, setQuery] = createSignal("");

@@ -1,4 +1,4 @@
-//! ConversationService Effect 桥接层测试。
+﻿//! ConversationService Effect 桥接层测试。
 //!
 //! 测试 Effect → Solid 桥接函数（loadConversations、createConversation、selectConversation），
 //! 使用 mock ConversationService。
@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { ConversationService } from "../../../shared/lib/tauri";
-import type { AppError, Conversation } from "../../../shared/types";
+import type { AppError, Conversation } from "../../../shared/lib/types";
 
 // 测试 fixture
 const fixtureA: Conversation = {

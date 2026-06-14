@@ -1,10 +1,14 @@
-// AgentRuntime — 将 pi-mono 的 agent loop 包装在 Effect Stream 中。
+﻿// AgentRuntime — 将 pi-mono 的 agent loop 包装在 Effect Stream 中。
 import { Effect, Stream, Layer, Context, Ref } from "effect";
 import type { Message as PiMessage, Model } from "@mariozechner/pi-ai";
 import { Agent, ProviderTransport, type AgentTransport } from "@mariozechner/pi-agent";
 import type { AgentEvent } from "@mariozechner/pi-agent";
-import { SettingsService, SettingsServiceLive, BillingServiceLive } from "../../shared/lib/tauri";
-import type { Conversation, Message, ToolCall } from "../../shared/types";
+import {
+  SettingsService,
+  SettingsServiceLive,
+  BillingServiceLive,
+} from "../../../shared/lib/tauri";
+import type { Conversation, Message, ToolCall } from "../../../shared/lib/types";
 
 // ─── Runtime 事件 & 错误类型 ─────────────────────────────────────────────
 
@@ -23,7 +27,7 @@ export class RuntimeError extends Error {
 }
 
 // ─── Billing 工具（从 billing feature 加载） ──────────────────────────────
-import { billingTools } from "../billing/tools/billing";
+import { billingTools } from "../../billing/lib/billing";
 
 // ─── 服务定义 ─────────────────────────────────────────────────────
 

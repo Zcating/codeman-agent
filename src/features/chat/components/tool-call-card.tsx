@@ -1,10 +1,10 @@
-//! ToolCallCard — 单个工具调用卡片。
+﻿//! ToolCallCard — 单个工具调用卡片。
 //!
 //! 状态：running（尚无结果）、success（有结果无错误）、error（有错误的结果）。
 //! 纯 UI。不导入 effect。
 
 import { Show } from "solid-js";
-import type { ToolCall, ToolResult } from "../../../shared/types";
+import type { ToolCall, ToolResult } from "../../../shared/lib/types";
 
 type Status = "running" | "success" | "error";
 

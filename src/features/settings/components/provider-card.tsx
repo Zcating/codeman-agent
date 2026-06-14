@@ -1,11 +1,11 @@
-//! ProviderCard — Settings → LLM 选项卡中的单个 LLM provider 行。
+﻿//! ProviderCard — Settings → LLM 选项卡中的单个 LLM provider 行。
 
 import { createSignal, Show } from "solid-js";
 import { Effect } from "effect";
-import { Card, CardContent, CardHeader, CardFooter } from "../../../shared/ui/card";
-import { LLMProviderService, LLMProviderServiceLive } from "../subsystems/llm_providers";
+import { Card, CardContent, CardHeader, CardFooter } from "../../../shared/components/ui/card";
+import { LLMProviderService, LLMProviderServiceLive } from "../lib/llm-providers";
 import { SettingsServiceLive } from "../../../shared/lib/tauri";
-import type { LLMProvider } from "../../../shared/types";
+import type { LLMProvider } from "../../../shared/lib/types";
 
 export function ProviderCard(props: {
   provider: LLMProvider;

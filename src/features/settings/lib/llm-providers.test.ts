@@ -1,4 +1,4 @@
-//! LLMProviderService Effect 服务测试。
+﻿//! LLMProviderService Effect 服务测试。
 //!
 //! Effect 签名：
 //!   LLMProviderService.list(): Effect<LLMProvider[], AppError>
@@ -12,10 +12,10 @@
 import { it, expect, beforeEach } from "@effect/vitest";
 import { describe } from "vitest";
 import { Effect, Layer } from "effect";
-import { LLMProviderService, LLMProviderServiceLive } from "./llm_providers";
+import { LLMProviderService, LLMProviderServiceLive } from "./llm-providers";
 import { SettingsService } from "../../../shared/lib/tauri";
-import type { Settings, LLMProvider } from "../../../shared/types";
-import { mockState } from "../../../shared/shared-mock-state";
+import type { Settings, LLMProvider } from "../../../shared/lib/types";
+import { mockState } from "../../../__mocks__/@tauri-apps/api/core";
 
 const mockImpl: {
   resolved: unknown;

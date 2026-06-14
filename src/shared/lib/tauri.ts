@@ -18,7 +18,7 @@ import type {
   LLMProvider,
   BillingProviderMeta,
   Snapshot,
-} from "../types";
+} from "./types";
 
 /** 包装在 Effect 中的原始 Tauri invoke。 */
 export const invoke = <T>(

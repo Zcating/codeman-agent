@@ -1,14 +1,14 @@
-//! SettingsPage 路由测试。
+﻿//! SettingsPage 路由测试。
 //!
-//! Mocked: SettingsService Effect 服务（通过 __mocks__/@tauri-apps/api/core.ts）。
+//! Mocked: SettingsService Effect 服务（通过 src/__mocks__/@tauri-apps/api/core.ts）。
 //! Link 从 @tanstack/solid-router mock 以避免需要 RouterProvider。
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
 import { SettingsPage } from "./settings";
-import { mockState } from "../../../../__mocks__/@tauri-apps/api/core";
-import type { Settings } from "../../../shared/types";
+import { mockState } from "../../../__mocks__/@tauri-apps/api/core";
+import type { Settings } from "../../../shared/lib/types";
 
 vi.mock("@tanstack/solid-router", async () => {
   const actual = await vi.importActual("@tanstack/solid-router");

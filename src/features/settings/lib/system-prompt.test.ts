@@ -1,4 +1,4 @@
-//! SystemPromptService Effect 服务测试。
+﻿//! SystemPromptService Effect 服务测试。
 //!
 //! Effect 签名：
 //!   SystemPromptService.getDefault(): Effect<string, AppError>
@@ -11,7 +11,7 @@ import { describe } from "vitest";
 import { Effect, Layer } from "effect";
 import { SystemPromptService, SystemPromptServiceLive } from "./system-prompt";
 import { SettingsService } from "../../../shared/lib/tauri";
-import type { Settings, Conversation } from "../../../shared/types";
+import type { Settings, Conversation } from "../../../shared/lib/types";
 
 const mockImpl: {
   resolved: unknown;

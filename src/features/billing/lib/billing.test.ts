@@ -1,11 +1,11 @@
-//! Billing 工具 — Effect 服务测试（从 T33 扩展）。
+﻿//! Billing 工具 — Effect 服务测试（从 T33 扩展）。
 //!
 //! Effect 测试验证工具定义可与 pi-agent 运行时的 tool-dispatch 模式配合使用（T17 的关注点）。
 
 import { describe, it, expect } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { BillingService } from "../../../shared/lib/tauri";
-import type { AppError } from "../../../shared/types";
+import type { AppError } from "../../../shared/lib/types";
 
 describe("billing 工具 — Effect 服务集成", () => {
   // Mock BillingServiceLive，成功返回已知 provider

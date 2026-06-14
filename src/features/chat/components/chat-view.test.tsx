@@ -1,11 +1,11 @@
-//! ChatView 组件测试。
+﻿//! ChatView 组件测试。
 //!
 //! Mocked: conversations store, messages store, runtime services.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import { ChatView } from "./chat-view";
-import type { Message } from "../../../shared/types";
+import type { Message } from "../../../shared/lib/types";
 
 const mockMessages: Message[] = [
   {
@@ -34,7 +34,7 @@ const mockMessages: Message[] = [
   },
 ];
 
-vi.mock("../store/conversations", () => ({
+vi.mock("../stores/conversations", () => ({
   conversations$: vi.fn(() => [
     {
       id: "conv-1",
@@ -52,7 +52,7 @@ vi.mock("../store/conversations", () => ({
   deleteConversation: vi.fn(),
 }));
 
-vi.mock("../store/messages", () => ({
+vi.mock("../stores/messages", () => ({
   messages$: vi.fn(() => mockMessages),
   loadMessages: vi.fn(),
   appendUserMessage: vi.fn(),
@@ -64,7 +64,7 @@ vi.mock("../store/messages", () => ({
   appendStreamingAssistantMessage: vi.fn(),
 }));
 
-vi.mock("../runtime", () => ({
+vi.mock("../lib/runtime", () => ({
   AgentRuntime: { of: vi.fn() },
   RuntimeLayer: {},
 }));

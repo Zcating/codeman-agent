@@ -1,9 +1,9 @@
-//! Card — 复合容器原子组件（7 个子组件）。
+﻿//! Card — 复合容器原子组件（7 个子组件）。
 //! 纯 cn，单文件多导出。Pattern from solidcn-ui/solidcn。
 
 import type { Component, JSX } from "solid-js";
 import { splitProps } from "solid-js";
-import { cn } from "../lib/cn";
+import { cn } from "../../lib/cn";
 
 const Card: Component<JSX.HTMLAttributes<HTMLDivElement>> = (props) => {
   const [local, rest] = splitProps(props, ["class"]);

@@ -1,4 +1,4 @@
-//! ToolCallCard 组件测试。
+﻿//! ToolCallCard 组件测试。
 //!
 //! 状态：running（无结果）、success（result，无 error）、error（result 带 error）。
 //! 纯 UI 组件。无 Effect 导入。无 store mocks 需要。
@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import { ToolCallCard } from "./tool-call-card";
-import type { ToolCall, ToolResult } from "../../../shared/types";
+import type { ToolCall, ToolResult } from "../../../shared/lib/types";
 
 describe("ToolCallCard", () => {
   afterEach(() => cleanup());
