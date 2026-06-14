@@ -203,10 +203,12 @@ npx playwright install msedge          # Edge WebDriver (Tauri WebView2 内核)
 pnpm add -D @playwright/test @types/node  # 项目 devDeps
 ```
 
+> **可选预热 (省 5 min)**: 首次 `pnpm e2e` 会先编译 Rust 5+ min,Rust 日志挤占 stdout 会让 Playwright 真实输出被截。跑一次 `cd src-tauri && cargo build` 预热 debug profile,后续 `pnpm e2e` 直接命中缓存,30-60s 跑完。
+
 ### 跑测试
 
 ```bash
-pnpm e2e               # 全跑 (~30-60s,首次 Rust 编译 5+ min)
+pnpm e2e               # 全跑 (~30-60s,首次 5+ min 见上方预热说明)
 pnpm e2e:headed        # 有头模式看 UI
 pnpm e2e:debug         # Playwright Inspector
 pnpm e2e:report        # 看上一次 HTML 报告
