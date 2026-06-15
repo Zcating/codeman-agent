@@ -1,6 +1,7 @@
 ﻿//! MessageBubble — 按 role 渲染单条 Message。
 //!
 //! 纯 UI。读取 Message prop。不导入 effect。
+//! Polish C2/C6: 走 shadcn 语义 token,system 消息改用 lab-warning。
 
 import { Show, For } from "solid-js";
 import { marked } from "marked";
@@ -30,21 +31,21 @@ export function MessageBubble(props: { message: Message }) {
     <div class={`mb-3 flex w-full ${role() === "user" ? "justify-end" : "justify-start"}`}>
       <Show when={role() === "user"}>
         <div
-          class="max-w-prose p-3 rounded-lg leading-relaxed break-words bg-primary-500 text-white"
+          class="max-w-prose p-3 rounded-lg leading-relaxed break-words bg-primary text-primary-foreground"
           innerHTML={escapeHtml(props.message.content)}
         />
       </Show>
       <Show when={role() === "assistant"}>
         <div
-          class="max-w-prose p-3 rounded-lg leading-relaxed break-words bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700"
+          class="max-w-prose p-3 rounded-lg leading-relaxed break-words bg-card text-card-foreground border border-border"
           innerHTML={renderMarkdown(props.message.content)}
         />
         <Show when={props.message.tool_calls && props.message.tool_calls.length > 0}>
-          <details class="mt-2 text-sm border-t border-zinc-200 dark:border-zinc-700 pt-2">
-            <summary>Tool calls ({props.message.tool_calls!.length})</summary>
+          <details class="mt-2 text-sm border-t border-border pt-2">
+            <summary>工具调用 ({props.message.tool_calls!.length})</summary>
             <For each={props.message.tool_calls!}>
               {(tc: ToolCall) => (
-                <pre class="mt-1 p-2 bg-zinc-50 dark:bg-zinc-900 rounded font-mono text-xs overflow-x-auto whitespace-pre-wrap">
+                <pre class="mt-1 p-2 bg-muted rounded font-mono text-xs overflow-x-auto whitespace-pre-wrap">
                   {tc.name}({JSON.stringify(tc.args, null, 2)})
                 </pre>
               )}
@@ -53,17 +54,15 @@ export function MessageBubble(props: { message: Message }) {
         </Show>
       </Show>
       <Show when={role() === "tool"}>
-        <details class="mt-2 text-sm border-t border-zinc-200 dark:border-zinc-700 pt-2">
-          <summary>Tool result</summary>
-          <pre class="mt-1 p-2 bg-zinc-50 dark:bg-zinc-900 rounded font-mono text-xs overflow-x-auto whitespace-pre-wrap">
+        <details class="mt-2 text-sm border-t border-border pt-2">
+          <summary>工具结果</summary>
+          <pre class="mt-1 p-2 bg-muted rounded font-mono text-xs overflow-x-auto whitespace-pre-wrap">
             {JSON.stringify(props.message.content, null, 2)}
           </pre>
           <Show when={props.message.tool_results && props.message.tool_results.length > 0}>
             <For each={props.message.tool_results!}>
               {(tr: ToolResult) => (
-                <div
-                  class={`mt-1 text-xs ${tr.error ? "text-red-700 dark:text-red-400" : "text-green-700 dark:text-green-400"}`}
-                >
+                <div class={`mt-1 text-xs ${tr.error ? "text-destructive" : "text-success"}`}>
                   <code>{tr.tool_call_id}</code>: {tr.error ? "❌" : "✓"}{" "}
                   <code>{JSON.stringify(tr.result)}</code>
                 </div>
@@ -73,12 +72,15 @@ export function MessageBubble(props: { message: Message }) {
         </details>
       </Show>
       <Show when={role() === "system"}>
-        <div class="max-w-prose p-3 rounded-lg leading-relaxed break-words bg-amber-50 dark:bg-amber-900/20 text-amber-900 dark:text-amber-200 italic border border-amber-200 dark:border-amber-800">
+        {/* Polish C2: system 消息用 lab-warning 替代 amber(避免 cream/warm 默认)。
+            不写 border + shadow 组合(只有 border)。 */}
+        <div class="max-w-prose p-3 rounded-lg leading-relaxed break-words bg-warning/10 text-warning-foreground italic border border-warning/30">
           {props.message.content}
         </div>
       </Show>
       <Show when={props.message.model}>
-        <div class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{props.message.model}</div>
+        {/* Polish C6: metadata 走 muted-foreground token,4.5:1 对比度 */}
+        <div class="mt-1 text-xs text-muted-foreground">{props.message.model}</div>
       </Show>
     </div>
   );

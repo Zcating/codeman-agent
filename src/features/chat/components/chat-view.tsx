@@ -2,6 +2,7 @@
 //!
 //! 代理 UI 的核心组件。订阅 AgentRuntime.run()
 //! 并将 RuntimeEvents 转换为 UI 更新。
+//! Polish F2/F4/F6/F8: 中文 placeholder + 思考 loading + 5 原子 (Button / Textarea) + aria-label。
 
 import { createSignal, createEffect, For, Show, onCleanup } from "solid-js";
 import { Effect, Exit, Stream } from "effect";
@@ -20,6 +21,8 @@ import {
 } from "../stores/messages";
 import { activeId$, conversations$ } from "../stores/conversations";
 import { AgentRuntime, RuntimeLayer } from "../lib/runtime";
+import { Button } from "../../../shared/components/ui/button";
+import { Textarea } from "../../../shared/components/ui/textarea";
 
 export function ChatView() {
   const [input, setInput] = createSignal("");
@@ -127,44 +130,51 @@ export function ChatView() {
     <>
       <div class="flex-1 overflow-y-auto p-4 space-y-3">
         <For each={messages$()}>{(m) => <MessageBubble message={m} />}</For>
+        {/* Polish F4: agent 思考 loading,等第一个 token 来之前显示。 */}
+        <Show when={running() && streamingMessageId() === null}>
+          <div
+            class="max-w-prose p-3 rounded-lg leading-relaxed bg-card text-muted-foreground border border-border italic flex items-center gap-2"
+            role="status"
+            aria-live="polite"
+          >
+            <span aria-hidden="true">⏳</span>
+            <span>正在思考…</span>
+          </div>
+        </Show>
         <div ref={messagesEndRef} />
       </div>
       <form
-        class="flex gap-2 p-3 border-t border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
+        class="flex gap-2 p-3 border-t border-border bg-card"
         onSubmit={(e) => {
           e.preventDefault();
           void send();
         }}
       >
-        <textarea
-          class="flex-1 p-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 focus:border-primary-500 focus:ring-1 focus:ring-primary-500 placeholder:text-zinc-400 resize-none outline-none disabled:opacity-60"
+        <label for="chat-input" class="sr-only">
+          发条消息
+        </label>
+        <Textarea
+          id="chat-input"
+          class="flex-1"
           rows={3}
           value={input()}
           onInput={(e) => setInput(e.currentTarget.value)}
-          placeholder="Type a message…"
+          placeholder="发条消息…"
           disabled={running()}
         />
         <Show
           when={!running()}
           fallback={
-            <button
-              type="button"
-              onClick={cancel}
-              class="px-4 py-2 rounded-md font-medium bg-red-500 hover:bg-red-600 active:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Cancel
-              <X class="h-4 w-4 ml-1" />
-            </button>
+            <Button type="button" variant="destructive" onClick={cancel} aria-label="取消运行">
+              取消
+              <X class="h-4 w-4" />
+            </Button>
           }
         >
-          <button
-            type="submit"
-            disabled={!input().trim()}
-            class="px-4 py-2 rounded-md font-medium bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Send
-            <Send class="h-4 w-4 ml-1" />
-          </button>
+          <Button type="submit" disabled={!input().trim()} aria-label="发送消息">
+            发送
+            <Send class="h-4 w-4" />
+          </Button>
         </Show>
       </form>
     </>

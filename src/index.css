@@ -8,18 +8,45 @@
     "Microsoft YaHei", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", ui-monospace, monospace;
 
-  /* 11 阶 OKLCH primary 渐变，锚点 #8b5cf6 (violet-500) 于 500 */
-  --color-primary-50: oklch(0.97 0.014 295);
-  --color-primary-100: oklch(0.94 0.03 295);
-  --color-primary-200: oklch(0.89 0.055 295);
-  --color-primary-300: oklch(0.82 0.095 295);
-  --color-primary-400: oklch(0.74 0.15 295);
-  --color-primary-500: oklch(0.607 0.22 295); /* ≈ #8b5cf6 */
-  --color-primary-600: oklch(0.535 0.235 295);
-  --color-primary-700: oklch(0.46 0.225 295);
-  --color-primary-800: oklch(0.385 0.2 295);
-  --color-primary-900: oklch(0.31 0.17 295);
-  --color-primary-950: oklch(0.22 0.13 295);
+  /* 11 阶 OKLCH primary 渐变，Lab Sky 锚点 sky-500 (#0ea5e9) 于 500 (hue 230) */
+  --color-primary-50: oklch(0.97 0.014 230);
+  --color-primary-100: oklch(0.94 0.03 230);
+  --color-primary-200: oklch(0.89 0.055 230);
+  --color-primary-300: oklch(0.82 0.095 230);
+  --color-primary-400: oklch(0.74 0.15 230);
+  --color-primary-500: oklch(0.685 0.169 230); /* ≈ #0ea5e9 sky-500 */
+  --color-primary-600: oklch(0.61 0.18 230);
+  --color-primary-700: oklch(0.53 0.17 230);
+  --color-primary-800: oklch(0.45 0.15 230);
+  --color-primary-900: oklch(0.37 0.13 230);
+  --color-primary-950: oklch(0.27 0.1 230);
+
+  /* Shadcn-style semantic tokens (light mode defaults)
+     命名对齐 DESIGN.md: background = Cool Paper, foreground = Lab Graphite 等等。
+     5 ui 原子 (Button / Input / Textarea / Checkbox / Card) 的 cva variant
+     全部消费这些 token,所以必须先存在,否则 cva 编译会缺 utility。 */
+  --color-background: oklch(0.985 0.003 230);
+  --color-foreground: oklch(0.18 0.008 230);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.18 0.008 230);
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.18 0.008 230);
+  --color-primary-foreground: oklch(0.985 0.003 230);
+  --color-secondary: oklch(0.92 0.005 230);
+  --color-secondary-foreground: oklch(0.18 0.008 230);
+  --color-muted: oklch(0.92 0.005 230);
+  --color-muted-foreground: oklch(0.4 0.008 230);
+  --color-accent: oklch(0.97 0.014 230);
+  --color-accent-foreground: oklch(0.53 0.17 230);
+  --color-destructive: oklch(0.62 0.22 25);
+  --color-destructive-foreground: oklch(0.985 0.003 230);
+  --color-success: oklch(0.72 0.15 145);
+  --color-success-foreground: oklch(0.18 0.008 230);
+  --color-warning: oklch(0.78 0.16 80);
+  --color-warning-foreground: oklch(0.18 0.008 230);
+  --color-border: oklch(0.92 0.005 230);
+  --color-input: oklch(0.92 0.005 230);
+  --color-ring: oklch(0.685 0.169 230);
 }
 
 @layer base {
@@ -31,9 +58,49 @@
   :root {
     color-scheme: light dark;
   }
+
+  /* Dark mode token overrides — 跟 <html class="dark"> 触发,跟 @custom-variant dark 配合 */
+  .dark {
+    --color-background: oklch(0.18 0.008 230);
+    --color-foreground: oklch(0.95 0.005 230);
+    --color-card: oklch(0.22 0.008 230);
+    --color-card-foreground: oklch(0.95 0.005 230);
+    --color-popover: oklch(0.22 0.008 230);
+    --color-popover-foreground: oklch(0.95 0.005 230);
+    --color-primary-foreground: oklch(0.18 0.008 230);
+    --color-secondary: oklch(0.28 0.008 230);
+    --color-secondary-foreground: oklch(0.95 0.005 230);
+    --color-muted: oklch(0.28 0.008 230);
+    --color-muted-foreground: oklch(0.7 0.005 230);
+    --color-accent: oklch(0.27 0.1 230);
+    --color-accent-foreground: oklch(0.95 0.005 230);
+    --color-destructive: oklch(0.55 0.22 25);
+    --color-destructive-foreground: oklch(0.95 0.005 230);
+    --color-success: oklch(0.72 0.15 145);
+    --color-success-foreground: oklch(0.18 0.008 230);
+    --color-warning: oklch(0.78 0.16 80);
+    --color-warning-foreground: oklch(0.18 0.008 230);
+    --color-border: oklch(0.28 0.008 230);
+    --color-input: oklch(0.28 0.008 230);
+    --color-ring: oklch(0.685 0.169 230);
+  }
+
   body {
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Reduced motion: 取消所有 transition 和 animation,尊重系统偏好。
+     Polish F-requirement: WCAG 2.1 AA a11y 默认。 */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

@@ -90,10 +90,11 @@ describe("ChatView", () => {
   it("运行中状态显示 Cancel 按钮", async () => {
     const { container } = render(() => <ChatView />);
     // 运行状态在组件内部 - 我们测试当 running() 为 true 时，
-    // Cancel 按钮替代 Send 按钮出现。我们可以验证初始状态显示 Send。
+    // Cancel 按钮替代 Send 按钮出现。我们可以验证初始状态显示 "发送"。
+    // Polish F2: 按钮文字走中文 "发送" (前是 "Send")
     const submitBtn = container.querySelector('button[type="submit"]');
-    expect(submitBtn?.textContent).toBe("Send");
-    // 当运行时，按钮会通过 <Show> fallback 变为 "Cancel"。
+    expect(submitBtn?.textContent).toBe("发送");
+    // 当运行时，按钮会通过 <Show> fallback 变为 "取消"。
     // 我们可以验证结构是正确的 - 有一个带 fallback 的 Show 组件。
     const cancelBtn = container.querySelector('button:not([type="submit"])');
     expect(cancelBtn).toBeNull(); // 初始时无 cancel 按钮

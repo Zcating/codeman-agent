@@ -2,6 +2,7 @@
 //!
 //! 状态：running（尚无结果）、success（有结果无错误）、error（有错误的结果）。
 //! 纯 UI。不导入 effect。
+//! Polish C3: 中文 labels (参数 / 结果) + 走 shadcn 语义 token。
 
 import { Show } from "solid-js";
 import type { ToolCall, ToolResult } from "../../../shared/lib/types";
@@ -16,19 +17,18 @@ export function ToolCallCard(props: { toolCall: ToolCall; result?: ToolResult })
 
   const outerClass = () => {
     const s = status();
+    // Polish: 严格遵守 "border + shadow 不同现",只 border 不用 shadow。
     const base = "p-3 border rounded-lg space-y-2 mb-2";
-    if (s === "running")
-      return `${base} border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800`;
-    if (s === "success")
-      return `${base} border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20`;
-    return `${base} border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20`;
+    if (s === "running") return `${base} border-border bg-card`;
+    if (s === "success") return `${base} border-success/40 bg-success/5`;
+    return `${base} border-destructive/40 bg-destructive/5`;
   };
 
   const iconClass = () => {
     const s = status();
-    if (s === "running") return "text-zinc-500 dark:text-zinc-400";
-    if (s === "success") return "text-green-600 dark:text-green-400";
-    return "text-red-600 dark:text-red-400";
+    if (s === "running") return "text-muted-foreground";
+    if (s === "success") return "text-success";
+    return "text-destructive";
   };
 
   return (
@@ -37,34 +37,27 @@ export function ToolCallCard(props: { toolCall: ToolCall; result?: ToolResult })
         <span class={iconClass()} aria-hidden="true">
           {status() === "running" ? "⏳" : status() === "success" ? "✓" : "✗"}
         </span>
-        <code class="text-sm font-mono font-semibold text-zinc-900 dark:text-zinc-100">
-          {props.toolCall.name}
-        </code>
-        <code class="text-xs text-zinc-500 dark:text-zinc-400 font-mono ml-auto">
-          {props.toolCall.id}
-        </code>
+        <code class="text-sm font-mono font-semibold text-foreground">{props.toolCall.name}</code>
+        <code class="text-xs text-muted-foreground font-mono ml-auto">{props.toolCall.id}</code>
       </div>
-      <details
-        class="text-sm border-t border-zinc-200 dark:border-zinc-700 pt-2 mt-2"
-        open={status() === "error"}
-      >
-        <summary class="cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 font-medium select-none py-1">
-          Arguments
+      <details class="text-sm border-t border-border pt-2 mt-2" open={status() === "error"}>
+        <summary class="cursor-pointer hover:text-primary font-medium select-none py-1">
+          参数
         </summary>
-        <pre class="mt-2 p-2 bg-zinc-50 dark:bg-zinc-900 rounded text-xs font-mono overflow-x-auto whitespace-pre-wrap border border-zinc-200 dark:border-zinc-700">
+        <pre class="mt-2 p-2 bg-muted rounded text-xs font-mono overflow-x-auto whitespace-pre-wrap border border-border">
           {JSON.stringify(props.toolCall.args, null, 2)}
         </pre>
       </details>
       <Show when={props.result}>
-        <details class="text-sm border-t border-zinc-200 dark:border-zinc-700 pt-2 mt-2" open>
-          <summary class="cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 font-medium select-none py-1">
-            Result
+        <details class="text-sm border-t border-border pt-2 mt-2" open>
+          <summary class="cursor-pointer hover:text-primary font-medium select-none py-1">
+            结果
           </summary>
-          <pre class="mt-2 p-2 bg-zinc-50 dark:bg-zinc-900 rounded text-xs font-mono overflow-x-auto whitespace-pre-wrap border border-zinc-200 dark:border-zinc-700">
+          <pre class="mt-2 p-2 bg-muted rounded text-xs font-mono overflow-x-auto whitespace-pre-wrap border border-border">
             {JSON.stringify(props.result!.result, null, 2)}
           </pre>
           <Show when={props.result!.error}>
-            <div class="mt-2 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded text-sm border border-red-200 dark:border-red-800">
+            <div class="mt-2 p-2 bg-destructive/10 text-destructive rounded text-sm border border-destructive/30">
               {props.result!.error}
             </div>
           </Show>

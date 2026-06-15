@@ -1,0 +1,262 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-15T00:00:00Z",
+  "title": "Design System: codeman-agent",
+  "extensions": {
+    "colorMeta": {
+      "lab-sky-500": {
+        "role": "primary",
+        "displayName": "Lab Sky 500",
+        "canonical": "oklch(0.685 0.169 230)",
+        "tonalRamp": [
+          "oklch(0.27 0.1 230)",
+          "oklch(0.37 0.13 230)",
+          "oklch(0.45 0.15 230)",
+          "oklch(0.53 0.17 230)",
+          "oklch(0.61 0.18 230)",
+          "oklch(0.685 0.169 230)",
+          "oklch(0.74 0.15 230)",
+          "oklch(0.82 0.095 230)"
+        ]
+      },
+      "cool-paper": {
+        "role": "neutral",
+        "displayName": "Cool Paper",
+        "canonical": "oklch(0.985 0.003 230)",
+        "tonalRamp": [
+          "oklch(0.985 0.003 230)",
+          "oklch(1 0 0)",
+          "oklch(0.92 0.005 230)",
+          "oklch(0.4 0.008 230)",
+          "oklch(0.28 0.008 230)",
+          "oklch(0.22 0.008 230)",
+          "oklch(0.18 0.008 230)",
+          "oklch(0.95 0.005 230)"
+        ]
+      },
+      "lab-signal-success": {
+        "role": "semantic",
+        "displayName": "Lab Signal Success",
+        "canonical": "oklch(0.72 0.15 145)"
+      },
+      "lab-signal-warning": {
+        "role": "semantic",
+        "displayName": "Lab Signal Warning",
+        "canonical": "oklch(0.78 0.16 80)"
+      },
+      "lab-signal-error": {
+        "role": "semantic",
+        "displayName": "Lab Signal Error",
+        "canonical": "oklch(0.62 0.22 25)"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "V2 仪表板 hero 预留。V1 chat 域内无 display 级使用。"
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "消息正文、placeholder、标签正文。CJK 行高 1.55。"
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "sidebar 会话标题、按钮文字、tab 标签。禁 uppercase + 大 tracking。"
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "tool-call args / result / ID 渲染。JetBrains Mono。"
+      }
+    },
+    "shadows": [
+      {
+        "name": "card-ambient",
+        "value": "0 1px 2px rgba(0, 0, 0, 0.04)",
+        "purpose": "Card 唯一允许的 shadow,light 模式默认态使用,dark 模式不出现。"
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 2px var(--color-lab-sky-500)",
+        "purpose": "focus-visible 状态,所有交互元素统一。"
+      }
+    ],
+    "motion": [
+      {
+        "name": "transition-colors",
+        "value": "150ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "所有 hover / active / focus 颜色变化,默认使用。ease-out-quint。"
+      },
+      {
+        "name": "shimmer-thinking",
+        "value": "1.2s linear infinite",
+        "purpose": "'agent 正在思考' 文字 shimmer 动画。reduced-motion 下降级为静态 dots。"
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "主操作。Send / Save / Confirm。Lab Sky 500 → 600 → 700 阶梯 hover/active。",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m22 2-7 20-4-9-9-4Z\"/><path d=\"M22 2 11 13\"/></svg>Send</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border: none; border-radius: 8px; background: oklch(0.685 0.169 230); color: oklch(0.985 0.003 230); font: 500 0.875rem / 1 \"Inter\", \"Noto Sans SC\", system-ui, sans-serif; cursor: pointer; transition: background 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-primary:hover { background: oklch(0.61 0.18 230); } .ds-btn-primary:active { background: oklch(0.53 0.17 230); } .ds-btn-primary:focus-visible { outline: 2px solid oklch(0.685 0.169 230); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Destructive Button",
+      "kind": "button",
+      "refersTo": "button-destructive",
+      "description": "危险操作。删除会话 / 取消运行。Lab Signal Error。",
+      "html": "<button class=\"ds-btn-destructive\" type=\"button\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/></svg>Cancel</button>",
+      "css": ".ds-btn-destructive { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border: none; border-radius: 8px; background: oklch(0.62 0.22 25); color: oklch(0.985 0.003 230); font: 500 0.875rem / 1 \"Inter\", \"Noto Sans SC\", system-ui, sans-serif; cursor: pointer; transition: background 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-destructive:hover { background: oklch(0.55 0.22 25); } .ds-btn-destructive:active { background: oklch(0.48 0.22 25); } .ds-btn-destructive:focus-visible { outline: 2px solid oklch(0.685 0.169 230); outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "极低权重操作。Sidebar Footer 'Settings' 链接 / '新建会话' 文字按钮。",
+      "html": "<button class=\"ds-btn-ghost\" type=\"button\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z\"/></svg>Settings</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 32px; padding: 0 12px; border: none; border-radius: 8px; background: transparent; color: oklch(0.4 0.008 230); font: 500 0.75rem / 1 \"Inter\", \"Noto Sans SC\", system-ui, sans-serif; cursor: pointer; transition: background 150ms cubic-bezier(0.16, 1, 0.3, 1), color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-btn-ghost:hover { background: oklch(0.97 0.014 230); color: oklch(0.53 0.17 230); } .ds-btn-ghost:focus-visible { outline: 2px solid oklch(0.685 0.169 230); outline-offset: 2px; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input-default",
+      "description": "文本输入。1px 边界 + focus ring。中文 placeholder 走 0.4 灰度。",
+      "html": "<input class=\"ds-input-default\" type=\"text\" placeholder=\"发条消息…\" />",
+      "css": ".ds-input-default { display: block; width: 100%; height: 40px; padding: 0 12px; border: 1px solid oklch(0.92 0.005 230); border-radius: 8px; background: oklch(1 0 0); color: oklch(0.18 0.008 230); font: 400 0.875rem / 1.55 \"Inter\", \"Noto Sans SC\", system-ui, sans-serif; outline: none; transition: border-color 150ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-input-default::placeholder { color: oklch(0.4 0.008 230); } .ds-input-default:focus-visible { border-color: oklch(0.685 0.169 230); box-shadow: 0 0 0 2px oklch(0.685 0.169 230 / 0.25); } .ds-input-default:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Checkbox",
+      "kind": "input",
+      "refersTo": "checkbox-default",
+      "description": "受控勾选。原生 input,Lab Sky 500 选中色。",
+      "html": "<input class=\"ds-checkbox-default\" type=\"checkbox\" checked />",
+      "css": ".ds-checkbox-default { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; border: 1px solid oklch(0.92 0.005 230); border-radius: 4px; background: oklch(1 0 0); cursor: pointer; transition: background 150ms cubic-bezier(0.16, 1, 0.3, 1), border-color 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-checkbox-default:checked { background: oklch(0.685 0.169 230); border-color: oklch(0.685 0.169 230); } .ds-checkbox-default:focus-visible { outline: 2px solid oklch(0.685 0.169 230); outline-offset: 2px; } .ds-checkbox-default:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card-default",
+      "description": "信息容器。1px 边界 + shadow-sm。V1 唯一 border + shadow 同存例外。",
+      "html": "<div class=\"ds-card-default\"><div class=\"ds-card-header\"><h3 class=\"ds-card-title\">Card Title</h3><p class=\"ds-card-description\">Supporting description goes here.</p></div><div class=\"ds-card-content\"><p>Card body content.</p></div></div>",
+      "css": ".ds-card-default { background: oklch(1 0 0); color: oklch(0.18 0.008 230); border: 1px solid oklch(0.92 0.005 230); border-radius: 12px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); overflow: hidden; } .ds-card-header { display: flex; flex-direction: column; gap: 6px; padding: 24px; } .ds-card-title { margin: 0; font: 600 1.5rem / 1.2 \"Inter\", \"Noto Sans SC\", system-ui, sans-serif; letter-spacing: -0.02em; } .ds-card-description { margin: 0; color: oklch(0.4 0.008 230); font: 400 0.875rem / 1.55 \"Inter\", \"Noto Sans SC\", system-ui, sans-serif; } .ds-card-content { padding: 0 24px 24px; }"
+    },
+    {
+      "name": "Sidebar Item",
+      "kind": "nav",
+      "refersTo": "sidebar-item-active",
+      "description": "会话列表项。默认透明 + hover tint,选中态 Lab Sky 500 满色。",
+      "html": "<div class=\"ds-sidebar-list\"><a class=\"ds-sidebar-item\" href=\"#\"><span class=\"ds-sidebar-item-title\">帮我写一份 v1 PRD 模板</span><span class=\"ds-sidebar-item-meta\">今天</span></a><a class=\"ds-sidebar-item ds-sidebar-item-active\" href=\"#\" aria-current=\"page\"><span class=\"ds-sidebar-item-title\">codeman-agent V1 计划</span><span class=\"ds-sidebar-item-meta\">昨天</span></a><a class=\"ds-sidebar-item\" href=\"#\"><span class=\"ds-sidebar-item-title\">查一下 token 余额</span><span class=\"ds-sidebar-item-meta\">3 天前</span></a></div>",
+      "css": ".ds-sidebar-list { display: flex; flex-direction: column; gap: 4px; } .ds-sidebar-item { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-radius: 8px; color: oklch(0.18 0.008 230); text-decoration: none; cursor: pointer; transition: background 150ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-sidebar-item:hover { background: oklch(0.97 0.014 230); } .ds-sidebar-item:focus-visible { outline: 2px solid oklch(0.685 0.169 230); outline-offset: 2px; } .ds-sidebar-item-active { background: oklch(0.685 0.169 230); color: oklch(0.985 0.003 230); } .ds-sidebar-item-active:hover { background: oklch(0.685 0.169 230); } .ds-sidebar-item-title { font: 500 0.75rem / 1.3 \"Inter\", \"Noto Sans SC\", system-ui, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-sidebar-item-meta { font: 400 0.7rem / 1.3 \"Inter\", \"Noto Sans SC\", system-ui, sans-serif; color: oklch(0.4 0.008 230); } .ds-sidebar-item-active .ds-sidebar-item-meta { color: oklch(0.985 0.003 230 / 0.7); }"
+    },
+    {
+      "name": "Message Bubble — User",
+      "kind": "custom",
+      "refersTo": "message-bubble-user",
+      "description": "用户消息气泡。右对齐 + Lab Sky 500 满色 + cool-paper 文字。",
+      "html": "<div class=\"ds-msg-row ds-msg-row-user\"><div class=\"ds-msg-bubble-user\">帮我写一份 codeman-agent 的 v1 PRD 模板,目标是 2 周内进 E2E。</div></div>",
+      "css": ".ds-msg-row { display: flex; width: 100%; margin-bottom: 12px; } .ds-msg-row-user { justify-content: flex-end; } .ds-msg-bubble-user { max-width: 65ch; padding: 12px 16px; border-radius: 12px; background: oklch(0.685 0.169 230); color: oklch(0.985 0.003 230); font: 400 0.875rem / 1.55 \"Inter\", \"Noto Sans SC\", system-ui, sans-serif; word-wrap: break-word; }"
+    },
+    {
+      "name": "Message Bubble — Assistant",
+      "kind": "custom",
+      "refersTo": "message-bubble-assistant",
+      "description": "助手消息气泡。左对齐 + 1px 边界 + cool paper 背景。Markdown 渲染走 marked.js。",
+      "html": "<div class=\"ds-msg-row ds-msg-row-assistant\"><div class=\"ds-msg-bubble-assistant\"><p>好的,PRD 模板可以从以下五个部分展开:</p><ol><li>背景与目标</li><li>核心场景 (3-5 个用户故事)</li><li>非目标 / 范围限制</li><li>技术选型 + 关键 ADR</li><li>里程碑与验收标准</li></ol></div></div>",
+      "css": ".ds-msg-row { display: flex; width: 100%; margin-bottom: 12px; } .ds-msg-row-assistant { justify-content: flex-start; } .ds-msg-bubble-assistant { max-width: 65ch; padding: 12px 16px; border: 1px solid oklch(0.92 0.005 230); border-radius: 12px; background: oklch(1 0 0); color: oklch(0.18 0.008 230); font: 400 0.875rem / 1.55 \"Inter\", \"Noto Sans SC\", system-ui, sans-serif; word-wrap: break-word; } .ds-msg-bubble-assistant p { margin: 0 0 8px; } .ds-msg-bubble-assistant p:last-child { margin-bottom: 0; } .ds-msg-bubble-assistant code { font-family: \"JetBrains Mono\", ui-monospace, monospace; font-size: 0.85em; padding: 2px 4px; background: oklch(0.97 0.014 230); border-radius: 4px; } .ds-msg-bubble-assistant pre { font-family: \"JetBrains Mono\", ui-monospace, monospace; font-size: 0.75rem; line-height: 1.5; padding: 12px; background: oklch(0.97 0.014 230); border-radius: 8px; overflow-x: auto; }"
+    },
+    {
+      "name": "Tool Call Card — Running",
+      "kind": "custom",
+      "refersTo": "tool-call-running",
+      "description": "工具调用卡片运行态。1px cool-fog 边界 + 头部 ⏳ + 工具名 + ID + 折叠 args。",
+      "html": "<div class=\"ds-tool-card ds-tool-card-running\"><div class=\"ds-tool-card-header\"><span class=\"ds-tool-card-icon\" aria-hidden=\"true\">⏳</span><code class=\"ds-tool-card-name\">get_balance</code><code class=\"ds-tool-card-id\">toolu_01abc</code></div><details class=\"ds-tool-card-details\"><summary>Arguments</summary><pre>{\"provider_id\": \"deepseek\"}</pre></details></div>",
+      "css": ".ds-tool-card { padding: 12px; border: 1px solid oklch(0.92 0.005 230); border-radius: 8px; margin-bottom: 8px; } .ds-tool-card-running { background: oklch(1 0 0); } .ds-tool-card-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; } .ds-tool-card-icon { color: oklch(0.4 0.008 230); } .ds-tool-card-name { font: 600 0.875rem / 1.5 \"JetBrains Mono\", ui-monospace, monospace; color: oklch(0.18 0.008 230); } .ds-tool-card-id { margin-left: auto; font: 400 0.75rem / 1.5 \"JetBrains Mono\", ui-monospace, monospace; color: oklch(0.4 0.008 230); } .ds-tool-card-details { margin-top: 8px; padding-top: 8px; border-top: 1px solid oklch(0.92 0.005 230); font-size: 0.875rem; } .ds-tool-card-details summary { cursor: pointer; font: 500 0.75rem / 1.3 \"Inter\", \"Noto Sans SC\", system-ui, sans-serif; color: oklch(0.61 0.18 230); padding: 4px 0; } .ds-tool-card-details pre { margin-top: 8px; padding: 8px; background: oklch(0.97 0.014 230); border: 1px solid oklch(0.92 0.005 230); border-radius: 6px; font: 400 0.75rem / 1.5 \"JetBrains Mono\", ui-monospace, monospace; overflow-x: auto; white-space: pre-wrap; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Lab Notebook",
+    "overview": "这个系统是实验与计量的工作台——不是演示页,不是 hero 区,不是营销场。它的存在是为了让用户记下一条消息、看着流式 token 走完、看一眼余额数字,然后关掉。冷调 / 干 / 计量 是它的语气;不解释自己,不为 AI 道歉,不用 emoji 庆祝,不让任何像素挣不到位置。\n\n11 阶 Lab Sky 锚定在 sky-500 (oklch(0.685 0.169 230), ≈ #0ea5e9),中性面 Cool Paper (light) / Cool Charcoal (dark) 在 hue 230 方向染 0.003–0.008 chroma,让 cool 调性是品牌自己的,不是 'AI 默认那种偏冷'。排版上 Inter + Noto Sans SC 同权,CJK 与 Latin 混排节奏跟 JetBrains Mono 工具调用卡片配对协调。",
+    "keyCharacteristics": [
+      "Functional accent, not brand accent. Lab Sky 是计量色,不是品牌色;只用于状态变化、关键操作、选中态、信息焦点。中性面做主。",
+      "Flat by default, border-driven depth. 阴影几乎不存在,边界 1px 即可。border + shadow 不同现(戒律)。",
+      "CJK-first typography. Noto Sans SC 跟 Inter 同等优先级,行高按 CJK 优化 (1.55 body / 1.3 label)。",
+      "Three-state theme integrity. light / dark / system 三态中,Lab Sky 的相对地位保持不变;只换 cool-paper ↔ cool-charcoal。",
+      "Performance as design. 1.5s 首 token / 200ms 流式更新 / 没有动效装饰超过 150ms;状态变化靠 transition-colors 即可,不用 transform 弹跳。",
+      "Emoji is data, not decoration. 工具调用状态 (⏳ / ✓ / ✗) 是数据指示,保留;按钮文字、对话正文零 emoji。"
+    ],
+    "rules": [
+      {
+        "name": "The Lab Sky 10% Rule",
+        "body": "Lab Sky 在任意屏幕上占总面积 ≤ 10%。它的稀缺性是它能传达 '这是当前焦点' 的前提。满色浇满 sidebar + 主面板 + footer 是反例。",
+        "section": "colors"
+      },
+      {
+        "name": "The Cool 0.008 Rule",
+        "body": "中性面 chroma 永远 ≤ 0.008,方向永远朝 sky hue 230(不是暖白、不是纯灰)。这一条把 cool 调性从 'AI 默认偏冷' 变成 '这是 codeman-agent 自己的中性'。",
+        "section": "colors"
+      },
+      {
+        "name": "The Signal Hue Distance Rule",
+        "body": "任何信号色 (success / warning / error) 必须与 primary 在 OKLCH 色相上间隔 ≥ 90°。",
+        "section": "colors"
+      },
+      {
+        "name": "The CJK-First Line-Height Rule",
+        "body": "Body 行高 1.55(CJK 调整)。Latin 默认 1.5;CJK 用 1.55;混合以 CJK 为准。",
+        "section": "typography"
+      },
+      {
+        "name": "The No-Kicker Rule",
+        "body": "禁止 text-[10px] uppercase tracking-[0.2em] 这类 2023 营销 kicker。Label token 即可,不要加 uppercase。",
+        "section": "typography"
+      },
+      {
+        "name": "The Border-Over-Shadow Rule",
+        "body": "任意元素,有 border 时不写 box-shadow;有 box-shadow 时不写 border。Card 是 V1 唯一例外。",
+        "section": "elevation"
+      },
+      {
+        "name": "The State-Shadow-Only Rule",
+        "body": "Hover / focus / active 状态可以临时引入轻 shadow,但仅作为状态反馈,默认态不能存在。",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do 让 Lab Sky 严格保持 ≤ 10% 屏幕面积。选中 1 个会话 + 1 个主按钮 = 2 处出现,够。",
+      "Do hover / active 用色阶下降(-500 → -600 → -700),不用 bg-primary/80 这类透明度。",
+      "Do 用 border 而不是 shadow 区分状态 / 容器。",
+      "Do placeholder 用 text-lab-graphite-soft,4.5:1 对比度足够。",
+      "Do focus 永远 2px ring + 2px offset,不被 border 替代。",
+      "Do 任何动效配 prefers-reduced-motion: reduce 降级。",
+      "Do 中文消息默认 leading-relaxed (1.55+),英文消息 leading-snug (1.4)。",
+      "Do 用 5 原子 (Button / Input / Textarea / Checkbox / Card) 而非 raw utility class 重复造轮子。",
+      "Do 图标全用 lucide-solid,新代码零 emoji(tool-call-card 内的 ⏳✓✗ 是数据指示保留)。"
+    ],
+    "donts": [
+      "Don't 把产品做成 ChatGPT 居中紫色欢迎卡 + hero 输入区(2026 AI 工具定式第一反射)。",
+      "Don't 做成 Notion / Webflow 那种全黑侧栏 + emoji 弹 + 营销腔(本产品是工具,不是协作平台)。",
+      "Don't 做成 VSCode / Cursor 套壳的三面板 IDE 形态(我们是聊天 + 工具调用,不是 IDE)。",
+      "Don't body bg 用 cream / sand 暖白(AI 项目 2026 第二反射)。",
+      "Don't 写渐变文字 / 玻璃拟物 / 草绘 SVG 插画 / repeating-linear-gradient 条纹背景。",
+      "Don't 写 border-left: 4px solid 这种 side-stripe accent card。",
+      "Don't 用 text-[10px] uppercase tracking-[0.2em] 营销 kicker。",
+      "Don't 放 01 · About / 02 · Process 这种 numbered eyebrow 标号。",
+      "Don't 写 border + box-shadow 同一元素的 ghost-card 组合(除 Card 容器外)。",
+      "Don't 圆角超 12px 的卡片 / 容器。",
+      "Don't 在消息正文中用 emoji(对话 = 文字,tool-call = 数据指示 = 唯一例外)。",
+      "Don't 把 bg-lab-sky-500 浇满 sidebar + 主面板 + footer(违反 10% Rule)。",
+      "Don't 用浏览器原生 confirm() 弹窗(用 inline 确认 UI 或 native <dialog>)。",
+      "Don't 把 'agent 正在思考' 做成 disabled textarea + Cancel 按钮;要有 '正在思考…' 状态文字 + 文字 shimmer / dot animation。",
+      "Don't CJK 行高用 1.5(Latin 默认);用 1.55。",
+      "Don't placeholder 写英文 'Type a message…',目标是中文用户。"
+    ]
+  }
+}

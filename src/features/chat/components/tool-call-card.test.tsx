@@ -18,9 +18,8 @@ describe("ToolCallCard", () => {
       args: { provider: "deepseek" },
     };
     const { container } = render(() => <ToolCallCard toolCall={toolCall} />);
-    const card =
-      container.querySelector("[class*='border-zinc-300']") ??
-      container.querySelector("[class*='dark:border-zinc-700']");
+    // Polish: border 改走 shadcn token `border-border` (前是 border-zinc-300)
+    const card = container.querySelector("[class*='border-border']");
     expect(card).toBeTruthy();
     const icon = card?.querySelector("span");
     expect(icon?.textContent).toBe("⏳");
@@ -40,9 +39,8 @@ describe("ToolCallCard", () => {
       error: null,
     };
     const { container } = render(() => <ToolCallCard toolCall={toolCall} result={result} />);
-    const card =
-      container.querySelector("[class*='border-green-300']") ??
-      container.querySelector("[class*='dark:border-green-700']");
+    // Polish: 成功态 border 走 `border-success/40` (前是 border-green-300)
+    const card = container.querySelector("[class*='border-success']");
     expect(card).toBeTruthy();
     const icon = card?.querySelector("span");
     expect(icon?.textContent).toBe("✓");
@@ -62,13 +60,13 @@ describe("ToolCallCard", () => {
       error: "API key not set",
     };
     const { container } = render(() => <ToolCallCard toolCall={toolCall} result={result} />);
-    const card =
-      container.querySelector("[class*='border-red-300']") ??
-      container.querySelector("[class*='dark:border-red-700']");
+    // Polish: 错误态 border 走 `border-destructive/40` (前是 border-red-300)
+    const card = container.querySelector("[class*='border-destructive']");
     expect(card).toBeTruthy();
     const icon = card?.querySelector("span");
     expect(icon?.textContent).toBe("✗");
-    const errorDiv = card?.querySelector("[class*='bg-red-100']");
+    // Polish: 错误消息容器走 `bg-destructive/10` (前是 bg-red-100)
+    const errorDiv = card?.querySelector("[class*='bg-destructive']");
     expect(errorDiv?.textContent).toBe("API key not set");
   });
 

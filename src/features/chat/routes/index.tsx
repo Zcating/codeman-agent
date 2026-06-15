@@ -1,4 +1,5 @@
 //! /  — Chat 布局：Sidebar + ChatView + 底部 Settings 链接。
+//! Polish C1: footer 中文,Settings 链接可点击区域更大。
 
 import { Sidebar } from "../components/sidebar";
 import { ChatView } from "../components/chat-view";
@@ -7,20 +8,24 @@ import { Settings as SettingsIcon } from "lucide-solid";
 
 export function ChatLayout() {
   return (
-    <main class="flex h-screen w-full bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100">
+    <main class="flex h-screen w-full bg-background text-foreground">
       <Sidebar />
       <section class="flex-1 flex flex-col overflow-hidden">
         <div class="flex-1 overflow-hidden">
           <ChatView />
         </div>
-        <footer class="flex items-center justify-between px-4 py-2 border-t border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-zinc-500 dark:text-zinc-400">
+        <footer class="flex items-center justify-between px-4 py-2 border-t border-border bg-card text-xs text-muted-foreground">
           <span>codeman-agent</span>
           <Link
             to="/settings"
-            activeProps={{ class: "text-primary-500 font-medium" }}
-            inactiveProps={{ class: "hover:text-zinc-900 dark:hover:text-zinc-100" }}
+            activeProps={{ class: "text-primary font-medium" }}
+            inactiveProps={{
+              class:
+                "hover:text-foreground transition-colors flex items-center gap-1 px-2 py-1 -mx-2 -my-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+            }}
           >
-            <SettingsIcon class="h-4 w-4 inline mr-1" /> Settings
+            <SettingsIcon class="h-3.5 w-3.5" aria-hidden="true" />
+            <span>设置</span>
           </Link>
         </footer>
       </section>

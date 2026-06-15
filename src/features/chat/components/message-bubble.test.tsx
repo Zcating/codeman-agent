@@ -69,9 +69,9 @@ describe("MessageBubble", () => {
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");
     expect(bubble).toBeTruthy();
-    // 显示 "Tool result" 摘要
+    // Polish C3: tool 角色摘要走中文 "工具结果" (前是 "Tool result")
     const summary = bubble?.querySelector("summary");
-    expect(summary?.textContent).toBe("Tool result");
+    expect(summary?.textContent).toBe("工具结果");
     // 显示带 ✓ 的工具结果项
     expect(bubble?.textContent).toContain("✓");
   });
@@ -115,7 +115,7 @@ describe("MessageBubble", () => {
     const details = container.querySelector("details");
     expect(details).toBeTruthy();
     const summary = details?.querySelector("summary");
-    expect(summary?.textContent).toContain("Tool calls (1)");
+    expect(summary?.textContent).toContain("工具调用 (1)");
     expect(details?.textContent).toContain("get_balance");
   });
 });
