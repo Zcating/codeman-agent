@@ -136,7 +136,7 @@ impl Default for SystemPromptSettings {
 pub struct BillingProviderConfig {
     pub id: String,
     pub enabled: bool,
-    /// 轮询此提供商的频率（秒）。清理后 >= 5。
+    /// 轮询此提供商的频率（秒）。清理后 >= 60（决策 ADR-0011）。
     pub refresh_interval_secs: u64,
     /// API 密钥所在的 keyring 路径。
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -225,8 +225,10 @@ impl Default for Settings {
 }
 
 impl Settings {
-    /// 刷新间隔的下限，避免疯狂请求提供商 API。
-    pub const MIN_REFRESH_SECS: u64 = 5;
+    /// 刷新间隔的下限（秒），避免疯狂请求提供商 API。
+    /// 决策 ADR-0011：从 5 提到 60——LLM 厂商余额变化以分钟/小时计，
+    /// 60s 满足"用户切换/打开窗口后 1 分钟内看到数据"。
+    pub const MIN_REFRESH_SECS: u64 = 60;
 
     /// 返回所有已启用计费提供商中的最短刷新间隔，
     /// 以 `MIN_REFRESH_SECS` 为下限。由调度器使用。
@@ -244,7 +246,7 @@ impl Settings {
 
     // ─────────────────────────────────────────────────────────────────────────
     // 清理不变量（全部为向上或范围钳制）：
-    //   1. refresh_interval_secs >= 5   （向上钳制）
+    //   1. refresh_interval_secs >= 60  （向上钳制，决策 ADR-0011）
     //   2. low_quota_threshold_pct ∈ [0, 100]  （范围钳制）
     //   3. low_balance_threshold >= 0   （向上钳制）
     //   4. auto_archive_after_days >= 1  （向上钳制）
@@ -252,7 +254,7 @@ impl Settings {
     // ─────────────────────────────────────────────────────────────────────────
 
     pub fn sanitized(mut self) -> Self {
-        // 不变量 1：refresh_interval_secs >= 5
+        // 不变量 1：refresh_interval_secs >= MIN_REFRESH_SECS
         for provider in &mut self.billing_providers {
             if provider.refresh_interval_secs < Self::MIN_REFRESH_SECS {
                 provider.refresh_interval_secs = Self::MIN_REFRESH_SECS;
@@ -316,7 +318,8 @@ mod tests {
             api_key_ref: None,
         });
         let s = s.sanitized();
-        assert_eq!(s.billing_providers[0].refresh_interval_secs, 5);
+        // 决策 ADR-0011：下限 5 → 60
+        assert_eq!(s.billing_providers[0].refresh_interval_secs, 60);
     }
 
     #[test]

@@ -132,6 +132,21 @@ impl AppState {
             .cloned()
             .ok_or_else(|| ProviderError::InvalidResponse("未知提供商".into()))?;
 
+        // 决策 ADR-0011: 无 key 时跳过 fetch。用户未配 key 是稳定状态，
+        // 重复 fetch + 重复 warn 是噪音。返回 error envelope 让前端 UI
+        // 渲染"未配置"占位；调度器不再刷 warn 日志。
+        // 注意：仍写入 snapshots 缓存，与正常失败路径一致。
+        if !secrets::has_api_key(id) {
+            let envelope = SnapshotEnvelope {
+                provider: id,
+                snapshot: None,
+                fetched_at: Utc::now(),
+                error: Some("API key not configured".into()),
+            };
+            self.snapshots.write().insert(id, envelope.clone());
+            return Ok(envelope);
+        }
+
         let secret = secrets::get_api_key(id)
             .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?
             .map(Secret::new)

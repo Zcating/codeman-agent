@@ -30,6 +30,10 @@ pub fn run() {
         ))
         .plugin(
             tauri_plugin_log::Builder::new()
+                // 决策 ADR-0011: 默认 level = Info，关掉 keyring / reqwest 等
+                // 外部 crate 的 DEBUG 噪音。需要全量 DEBUG 走
+                // `$env:RUST_LOG = "keyring=debug,codeman_agent_lib=debug"`。
+                .level(log::LevelFilter::Info)
                 .target(tauri_plugin_log::Target::new(
                     tauri_plugin_log::TargetKind::Stdout,
                 ))

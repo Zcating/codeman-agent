@@ -104,7 +104,18 @@ main 窗口用 `default` capability。关键授权：
 
 ## 日志
 
-`%LocalAppData%\codeman-agent\logs\codeman-agent.log`（`tauri-plugin-log`，3 个 target：stdout + LogDir + Webview）。默认 `info` 级，要 `debug` 走 `RUST_LOG=debug pnpm tauri:dev`。
+`%LocalAppData%\codeman-agent\logs\codeman-agent.log`（`tauri-plugin-log`，3 个 target：stdout + LogDir + Webview）。
+
+**默认 level = `Info`**（决策 ADR-0011，`lib.rs::run` 的 builder 显式调 `.level(log::LevelFilter::Info)`）。项目内 `log::*!` 宏只用到 `info` / `warn` / `error` 三档；外部 crate（keyring / reqwest / sqlx 等）的 DEBUG 噪音默认被过滤。
+
+**全量 DEBUG 走环境变量**：
+
+```powershell
+$env:RUST_LOG = "keyring=debug,codeman_agent_lib=debug"
+pnpm tauri:dev
+```
+
+不带 `=` 的 `=debug` 等价于全局。常见 pattern：`keyring=debug`（只开 keyring 内部 DEBUG）、`codeman_agent_lib=debug`（只开本 crate DEBUG）。
 
 ## 测试
 

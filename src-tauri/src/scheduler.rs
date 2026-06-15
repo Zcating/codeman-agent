@@ -212,6 +212,7 @@ mod tests {
 
     /// `Settings::refresh_interval` 是循环周期的真实来源；
     /// 0 值配置会被下限为 `MIN_REFRESH_SECS`，以防止循环忙等待。
+    /// 决策 ADR-0011：下限从 5s 提到 60s。
     #[test]
     fn settings_refresh_interval_floors() {
         let mut s = Settings::default();
@@ -222,6 +223,6 @@ mod tests {
             refresh_interval_secs: 0,
             api_key_ref: None,
         });
-        assert!(s.refresh_interval() >= Duration::from_secs(5));
+        assert!(s.refresh_interval() >= Duration::from_secs(60));
     }
 }
