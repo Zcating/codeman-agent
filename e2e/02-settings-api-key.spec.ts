@@ -25,8 +25,15 @@ test.describe("02 — 设置 API key", () => {
   test("设置、持久化并重新加载 — key 被写入但永不反射", async () => {
     const page = await getTauriPage();
 
-    // 1. 通过真实用户会点击的链接到达 /settings。
-    await page.getByRole("link", { name: /Settings/i }).click();
+    // 0. 显式 navigate 到 / — 防止 disposeTauriPage 重新连 CDP 后 chat 路由
+    //    还没 mount 时,getByRole("link", { name: /Settings/i }) 拿不到 footer link。
+    await page.goto("/");
+
+    // 1. 通过真实用户会点击的链接到达 /settings。先用 a[href] 直查（同 spec 01
+    //    line 34 的容错 selector），再 fallback 到 role-based。
+    const settingsLink = page.locator('a[href="/settings"]');
+    await assert.visible(settingsLink, { timeout: 10_000 });
+    await settingsLink.click();
     await assert.urlMatches(page, /\/settings$/);
 
     // 2. 点击第一个 provider 的 "Set API key…"。每个 provider
@@ -55,7 +62,7 @@ test.describe("02 — 设置 API key", () => {
     expect(providerId, "provider id 应作为 code 元素可见").toBeTruthy();
     const trimmedId = (providerId ?? "").trim();
 
-    const hasKey = await invoke<boolean>("has_llm_key", { provider_id: trimmedId });
+    const hasKey = await invoke<boolean>("has_llm_key", { providerId: trimmedId });
     expect(hasKey, `has_llm_key 对 ${trimmedId} 应返回 true`).toBe(true);
 
     // 6. 重新加载页面(应用内导航回 /)。表单仍应收起 — 输入框必须

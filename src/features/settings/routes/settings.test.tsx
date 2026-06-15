@@ -32,6 +32,7 @@ const mockSettings: Settings = {
       enabled: true,
       default_model: "deepseek-chat",
       base_url: "https://api.deepseek.com",
+      api_type: "anthropic-messages",
       api_key_ref: "llm_providers/deepseek/api_key",
     },
   ],

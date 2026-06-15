@@ -1,7 +1,7 @@
 ﻿//! LLM provider Effect 服务（CRUD + API 密钥）。
 //!
 //! Effect 签名：
-//!   LLMProviderService 暴露 7 个方法；每个返回
+//!   LLMProviderService 暴露 8 个方法；每个返回
 //!   Effect<A, AppError, never>。
 //!
 //! api_key 存储在 Tauri store 中（**不**在 Settings JSON 中，**不**
@@ -21,6 +21,7 @@ export class LLMProviderService extends Context.Tag("LLMProviderService")<
     readonly remove: (id: string) => Effect.Effect<void, AppError>;
     readonly setApiKey: (id: string, key: string) => Effect.Effect<void, AppError>;
     readonly hasApiKey: (id: string) => Effect.Effect<boolean, AppError>;
+    readonly getApiKey: (id: string) => Effect.Effect<string | null, AppError>;
     readonly setActive: (id: string) => Effect.Effect<void, AppError>;
   }
 >() {}
@@ -61,6 +62,7 @@ export const LLMProviderServiceLive = Layer.effect(
 
       setApiKey: (id, key) => invoke<void>("set_llm_key", { providerId: id, key }),
       hasApiKey: (id) => invoke<boolean>("has_llm_key", { providerId: id }),
+      getApiKey: (id) => invoke<string | null>("get_llm_key", { providerId: id }),
 
       setActive: (id) =>
         Effect.gen(function* () {
@@ -84,6 +86,14 @@ export async function hasApiKeyForProvider(id: string): Promise<boolean> {
   const program = Effect.gen(function* () {
     const svc = yield* LLMProviderService;
     return yield* svc.hasApiKey(id);
+  }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(SettingsServiceLive));
+  return Effect.runPromise(program);
+}
+
+export async function getApiKeyForProvider(id: string): Promise<string | null> {
+  const program = Effect.gen(function* () {
+    const svc = yield* LLMProviderService;
+    return yield* svc.getApiKey(id);
   }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(SettingsServiceLive));
   return Effect.runPromise(program);
 }

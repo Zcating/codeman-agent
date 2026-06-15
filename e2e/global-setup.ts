@@ -84,6 +84,15 @@ export default async function globalSetup(): Promise<void> {
   const prewarmMs = Date.now() - prewarmStart;
   console.log(`[e2e setup] step 0/4 — Rust cache warm (${(prewarmMs / 1000).toFixed(1)}s)`);
 
+  // Warn if MiniMax key is missing (spec 04 needs it; other specs are key-agnostic).
+  if (!process.env.MINIMAX_API_KEY) {
+    console.warn(
+      "[e2e setup] ⚠ MINIMAX_API_KEY env not set — " +
+        "spec 04 requires a manually configured MiniMax key in Settings UI. " +
+        "If spec 04 fails with 401/403, open Settings → Providers → MiniMax → API Key, save, then re-run.",
+    );
+  }
+
   // 1. Free the dev ports in case a previous run left them bound.
   //    Use the same script the user-facing dev path uses. Its output is
   //    small (one line per port) so we keep it inline.

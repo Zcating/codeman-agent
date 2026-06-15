@@ -5,10 +5,12 @@
 //!   AgentRuntime.cancel(): Effect<void>
 
 import { it, expect } from "@effect/vitest";
-import { describe } from "vitest";
-import { Effect, Layer } from "effect";
+import { describe, vi } from "vitest";
+import { Effect, Layer, Stream } from "effect";
 import { AgentRuntime, AgentRuntimeLive } from "./runtime";
 import { SettingsService, BillingService } from "../../../shared/lib/tauri";
+import { LLMProviderService } from "../../settings/lib/llm-providers";
+import { buildModel } from "./build-model";
 import type { Settings, LLMProvider, Conversation, Message } from "../../../shared/lib/types";
 
 const testConversation: Conversation = {
@@ -41,6 +43,7 @@ const testSettings: Settings = {
       enabled: true,
       default_model: "deepseek-chat",
       base_url: "https://api.deepseek.com",
+      api_type: "anthropic-messages",
       api_key_ref: "llm_providers/deepseek/api_key",
     },
   ],
@@ -77,6 +80,29 @@ const MockBillingServiceLive = Layer.succeed(BillingService, {
 
 const MockRuntimeDeps = Layer.mergeAll(MockSettingsServiceLive, MockBillingServiceLive);
 
+const apiKeySpy = vi.fn(() => Effect.succeed<string | null>("sk-test-key"));
+const MockLLMProviderServiceLive = Layer.effect(
+  LLMProviderService,
+  Effect.gen(function* () {
+    return {
+      list: () => Effect.succeed(testSettings.llm_providers),
+      add: () => Effect.succeed(undefined),
+      update: () => Effect.succeed(undefined),
+      remove: () => Effect.succeed(undefined),
+      setApiKey: () => Effect.succeed(undefined),
+      hasApiKey: () => Effect.succeed(true),
+      getApiKey: apiKeySpy,
+      setActive: () => Effect.succeed(undefined),
+    };
+  }),
+);
+
+const MockRuntimeDepsWithLLM = Layer.mergeAll(
+  MockSettingsServiceLive,
+  MockBillingServiceLive,
+  MockLLMProviderServiceLive,
+);
+
 describe("AgentRuntime", () => {
   it.effect("runtime cancel 设置 agent.abort()", () =>
     Effect.gen(function* () {
@@ -105,4 +131,20 @@ describe("AgentRuntime", () => {
       expect(typeof stream.pipe).toBe("function"); // Stream 有 pipe
     }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps)),
   );
+
+  it.effect("runtime 通过 LLMProviderService.getApiKey 拉取 activeProvider 的密钥", () =>
+    Effect.gen(function* () {
+      apiKeySpy.mockClear();
+      const runtime = yield* AgentRuntime;
+      // Stream.take(1) 触发 Agent 构造（取首元素后 cancel）
+      yield* runtime.run(testConversation, testMessage).pipe(Stream.take(1), Stream.runDrain);
+      // 验证 getApiKey 被调用，参数是 activeProvider.id ("deepseek")
+      expect(apiKeySpy).toHaveBeenCalledWith("deepseek");
+    }).pipe(Effect.provide(MockRuntimeDepsWithLLM), Effect.provide(AgentRuntimeLive)),
+  );
+
+  it("buildModel 读取 activeProvider.api_type 作为 api 字段", () => {
+    const model = buildModel(testSettings.llm_providers[0]);
+    expect(model.api).toBe("anthropic-messages");
+  });
 });

@@ -80,6 +80,8 @@ pub struct LLMProvider {
     /// API 密钥所在的 Tauri store 路径。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub api_key_ref: Option<String>,
+    /// API 类型（协议），V1 固定为 "anthropic-messages"。
+    pub api_type: String,
 }
 
 impl Default for LLMProvider {
@@ -91,6 +93,7 @@ impl Default for LLMProvider {
             default_model: None,
             base_url: None,
             api_key_ref: None,
+            api_type: "anthropic-messages".into(),
         }
     }
 }
@@ -211,8 +214,16 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            llm_providers: Vec::new(),
-            default_llm_provider_id: None,
+            llm_providers: vec![LLMProvider {
+                id: "minimax".into(),
+                label: "MiniMax".into(),
+                enabled: true,
+                default_model: Some("MiniMax-M2.5-highspeed".into()),
+                base_url: Some("https://api.minimaxi.com/anthropic".into()),
+                api_key_ref: Some("llm_providers/minimax/api_key".into()),
+                api_type: "anthropic-messages".into(),
+            }],
+            default_llm_provider_id: Some("minimax".into()),
             user_language: UserLanguage::default(),
             theme: Theme::default(),
             start_at_login: true,
@@ -286,7 +297,11 @@ mod tests {
     #[test]
     fn default_settings_sanity() {
         let s = Settings::default();
-        assert!(s.llm_providers.is_empty());
+        // V1 预置 minimax provider（ADR-0011）
+        assert_eq!(s.llm_providers.len(), 1);
+        assert_eq!(s.llm_providers[0].id, "minimax");
+        assert_eq!(s.llm_providers[0].api_type, "anthropic-messages");
+        assert_eq!(s.default_llm_provider_id, Some("minimax".into()));
         assert!(s.billing_providers.is_empty());
         assert_eq!(s.user_language, UserLanguage::Auto);
         assert_eq!(s.theme, Theme::System);
@@ -375,14 +390,15 @@ mod tests {
     fn settings_round_trip_via_serde() {
         let s = Settings {
             llm_providers: vec![LLMProvider {
-                id: "openai".into(),
-                label: "OpenAI".into(),
+                id: "minimax".into(),
+                label: "MiniMax".into(),
                 enabled: true,
-                default_model: Some("gpt-4".into()),
-                base_url: None,
-                api_key_ref: Some("llm_providers/openai/api_key".into()),
+                default_model: Some("MiniMax-M2.5-highspeed".into()),
+                base_url: Some("https://api.minimaxi.com/anthropic".into()),
+                api_key_ref: Some("llm_providers/minimax/api_key".into()),
+                api_type: "anthropic-messages".into(),
             }],
-            default_llm_provider_id: Some("openai".into()),
+            default_llm_provider_id: Some("minimax".into()),
             user_language: UserLanguage::En,
             theme: Theme::Dark,
             start_at_login: false,
@@ -401,8 +417,9 @@ mod tests {
         };
         let json = serde_json::to_string(&s).unwrap();
         let back: Settings = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.llm_providers[0].id, "openai");
-        assert_eq!(back.default_llm_provider_id, Some("openai".into()));
+        assert_eq!(back.llm_providers[0].id, "minimax");
+        assert_eq!(back.default_llm_provider_id, Some("minimax".into()));
+        assert_eq!(back.llm_providers[0].api_type, "anthropic-messages");
         assert_eq!(back.user_language, UserLanguage::En);
         assert_eq!(back.theme, Theme::Dark);
         assert_eq!(back.billing_providers[0].id, "deepseek");

@@ -15,11 +15,28 @@
 //! 这是"聊天循环活着"烟雾测试。
 
 import { test, expect } from "@playwright/test";
-import { assert, clearAllHistory, disposeTauriPage, getTauriPage } from "./helpers";
+import { assert, clearAllHistory, disposeTauriPage, getTauriPage, invoke } from "./helpers";
+import type { Settings } from "../src/shared/lib/types";
 
 const USER_PROMPT = "查一下 DeepSeek 余额";
 
 test.describe("03 — 聊天 → billing 工具", () => {
+  test.beforeAll(async () => {
+    // 软注入：env 设了 MINIMAX_API_KEY 时通过 IPC 写入 Tauri store + 强制把活跃
+    // provider 切到 minimax（同 spec 04-llm-stream 的注入策略）。
+    const page = await getTauriPage();
+    await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
+
+    const envKey = process.env.MINIMAX_API_KEY;
+    if (envKey && envKey.length > 0) {
+      const current = await invoke<Settings>("get_settings");
+      await invoke("update_settings", {
+        new_settings: { ...current, default_llm_provider_id: "minimax" },
+      });
+      await invoke("set_llm_key", { providerId: "minimax", key: envKey });
+    }
+  });
+
   test.beforeEach(async () => {
     // 清除遗留会话,使 "new conversation" 是唯一的一个。
     await clearAllHistory();

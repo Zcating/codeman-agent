@@ -8,6 +8,8 @@ import {
   SettingsServiceLive,
   BillingServiceLive,
 } from "../../../shared/lib/tauri";
+import { LLMProviderService, LLMProviderServiceLive } from "../../settings/lib/llm-providers";
+import { buildModel } from "./build-model";
 import type { Conversation, Message, ToolCall } from "../../../shared/lib/types";
 
 // ─── Runtime 事件 & 错误类型 ─────────────────────────────────────────────
@@ -70,31 +72,16 @@ export const AgentRuntimeLive = Layer.effect(
               return Stream.fail(new RuntimeError("no active LLM provider"));
             }
 
-            // 从 provider 配置解析 model
-            // TODO (T35): provider key 可用后，通过 pi-ai getModel() 接入真实 Model
-            const model: Model<any> = {
-              id: activeProvider.default_model ?? "auto",
-              name: activeProvider.label,
-              api: "openai-completions",
-              provider: activeProvider.id as any,
-              baseUrl: activeProvider.base_url ?? "",
-              reasoning: false,
-              input: ["text"],
-              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-              contextWindow: 128000,
-              maxTokens: 8192,
-            };
+            // 从 provider 配置解析 model（使用 buildModel helper）
+            const model: Model<any> = buildModel(activeProvider);
 
-            // 构建 transport — 使用 getApiKey 通过 SettingsService IPC 获取密钥
+            // 构建 transport — 通过 LLMProviderService.getApiKey 获取密钥
             // 注意：ProviderTransport 发起直接 HTTP 调用；在 webview 中这需要
             // CORS 代理或 provider 必须支持直接浏览器调用。
+            const llmSvc = yield* LLMProviderService;
+            const apiKey = yield* llmSvc.getApiKey(activeProvider.id);
             const transport: AgentTransport = new ProviderTransport({
-              getApiKey: async (_provider: string) => {
-                // API 密钥存在 Tauri store 中（非 keyring）— 通过 IPC 检索。
-                // TODO: 调用专用 Tauri 命令获取 LLM API 密钥。
-                // 目前这返回 undefined，transport 回退到 env 变量。
-                return undefined as string | undefined;
-              },
+              getApiKey: async (_provider: string) => apiKey ?? undefined,
             });
 
             // 使用 ProviderTransport 和 billing 工具创建 agent。
@@ -249,6 +236,10 @@ export const AgentRuntimeLive = Layer.effect(
 
 // ─── 组合所有 runtime 依赖的 Layer ────────────────────────────────
 
-export const RuntimeDeps = Layer.mergeAll(SettingsServiceLive, BillingServiceLive);
+export const RuntimeDeps = Layer.mergeAll(
+  SettingsServiceLive,
+  BillingServiceLive,
+  LLMProviderServiceLive,
+);
 
 export const RuntimeLayer = Layer.provide(AgentRuntimeLive, RuntimeDeps);

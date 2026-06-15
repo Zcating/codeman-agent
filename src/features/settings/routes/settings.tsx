@@ -62,6 +62,7 @@ export function SettingsPage() {
       id: `custom-${Date.now()}`,
       label: `Custom ${d.llm_providers.length + 1}`,
       enabled: true,
+      api_type: "anthropic-messages",
       api_key_ref: `llm_providers/custom-${Date.now()}/api_key`,
     };
     setDraft({ ...d, llm_providers: [...d.llm_providers, newProvider] });

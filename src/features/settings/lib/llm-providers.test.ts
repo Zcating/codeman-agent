@@ -33,6 +33,7 @@ const providerA: LLMProvider = {
   enabled: true,
   default_model: "deepseek-chat",
   base_url: "https://api.deepseek.com",
+  api_type: "anthropic-messages",
   api_key_ref: "llm_providers/deepseek/api_key",
 };
 const providerB: LLMProvider = {
@@ -41,6 +42,7 @@ const providerB: LLMProvider = {
   enabled: false,
   default_model: "abab6",
   base_url: "https://api.minimax.chat",
+  api_type: "anthropic-messages",
   api_key_ref: "llm_providers/minimax/api_key",
 };
 
@@ -118,6 +120,7 @@ describe("LLMProviderService", () => {
         id: "openai",
         label: "OpenAI",
         enabled: true,
+        api_type: "anthropic-messages",
         api_key_ref: "llm_providers/openai/api_key",
       };
       yield* svc.add(newProvider);
@@ -171,6 +174,25 @@ describe("LLMProviderService", () => {
       const svc = yield* LLMProviderService;
       const result = yield* svc.hasApiKey("unknown");
       expect(result).toBe(false);
+    }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive)),
+  );
+
+  it.effect("getApiKey 委托给 mock invoke 返回 fake key", () =>
+    Effect.gen(function* () {
+      mockState.resolved = "sk-ant-test-fake-key";
+      const svc = yield* LLMProviderService;
+      const result = yield* svc.getApiKey("deepseek");
+      expect(result).toBe("sk-ant-test-fake-key");
+      expect(mockState.calls).toContain("get_llm_key");
+    }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive)),
+  );
+
+  it.effect("getApiKey 委托给 mock invoke 返回 null（无 key）", () =>
+    Effect.gen(function* () {
+      mockState.resolved = null;
+      const svc = yield* LLMProviderService;
+      const result = yield* svc.getApiKey("unknown");
+      expect(result).toBeNull();
     }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(MockSettingsServiceLive)),
   );
 });

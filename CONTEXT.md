@@ -30,9 +30,15 @@ message 保持一致。
 
 ### Providers
 
-- **LLM Provider (大语言模型提供商)** — Agent 用来生成响应的服务
-  （OpenAI、Anthropic、OpenAI 兼容、本地）。Agent 的"燃料"。
-  _避免_：model、AI provider。
+- **LLM Provider (大语言模型提供商)** — Agent 用来生成响应的服务。
+  V1 唯一内置为 MiniMax（通过其官方 Anthropic 兼容端点
+  `https://api.minimaxi.com/anthropic`）；只接受 anthropic-messages
+  协议（见 [ADR-0011](./docs/adr/0011-anthropic-messages-only.md)）。
+  Agent 的"燃料"。_避免_：model、AI provider、model provider。
+- **Protocol (协议)** — LLM 上游调用的 HTTP/SSE 形态。
+  V1 锁定 anthropic-messages（Anthropic Messages API 的请求/响应
+  形状）；pi-ai 按 `api` 字段路由到对应 transport 实现。
+  _避免_：API format、API type（实现细节）、wire format。
 - **Billing Provider (计费提供商)** — Agent 可查询其计费状态的服务
   （DeepSeek、MiniMax）。Agent 的一级工具目标。
 - **Provider** — 过载术语，避免单用。总是明确为 LLM Provider 或
@@ -176,11 +182,12 @@ LLM Provider             Billing Provider
 interface Settings {
   // A. LLM providers
   llm_providers: Array<{
-    id: string; // 稳定 id（如 "openai"、"anthropic"）
+    id: string; // V1 预置 "minimax"
     label: string; // 人类可读名
     enabled: boolean;
-    default_model?: string; // per-provider 默认
-    base_url?: string; // OpenAI 兼容专用
+    default_model?: string; // per-provider 默认；V1 预置 "MiniMax-M2.5-highspeed"
+    base_url?: string; // V1 预置 "https://api.minimaxi.com/anthropic"
+    api_type: "anthropic-messages"; // V1 锁定；见 ADR-0011
     api_key_ref: string; // 指向 Tauri store 的路径
   }>;
 
@@ -224,6 +231,13 @@ interface Settings {
 
 API 密钥**永不**进入此文件。LLM 密钥存 Tauri store，计费密钥
 存 keyring，两套命名空间互不冲突。
+
+**V1 预置**：`Settings::Default` 编译时预置一条 LLM provider 记录
+（`id: "minimax"` / `default_model: "MiniMax-M2.5-highspeed"` /
+`base_url: "https://api.minimaxi.com/anthropic"` /
+`api_type: "anthropic-messages"`），并把 `default_llm_provider_id`
+设为 `"minimax"`。首次启动即可用，用户只需在 Settings UI 填 MiniMax
+API key。
 
 ## 认证约定
 

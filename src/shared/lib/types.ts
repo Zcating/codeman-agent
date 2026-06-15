@@ -20,6 +20,8 @@ export interface LLMProvider {
   enabled: boolean;
   default_model?: string;
   base_url?: string;
+  /** ADR-0011: V1 only supports anthropic-messages protocol */
+  api_type: "anthropic-messages";
   api_key_ref: string;
 }
 export interface WindowSettings {

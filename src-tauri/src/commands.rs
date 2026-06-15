@@ -286,3 +286,16 @@ pub async fn has_llm_key(
     Ok(secrets_llm::has_llm_key(&app, &provider_id))
 }
 
+/// 读取指定 LLM provider 的 API 密钥。
+///
+/// `Secret::expose()` 是该 `Secret` 出 IPC 边界的唯一允许点。
+/// 已在 `secrets_llm.rs` / `types.rs` 论证，本函数遵循同一约定。
+#[tauri::command]
+pub async fn get_llm_key(
+    app: tauri::AppHandle,
+    provider_id: String,
+) -> Result<Option<String>, String> {
+    let secret = secrets_llm::get_llm_key(&app, &provider_id)?;
+    Ok(secret.map(|s| s.expose().to_string()))
+}
+

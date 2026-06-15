@@ -79,6 +79,7 @@ pub fn run() {
             commands::clear_all_history,
             commands::set_llm_key,
             commands::has_llm_key,
+            commands::get_llm_key,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
