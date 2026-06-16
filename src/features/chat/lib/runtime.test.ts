@@ -78,8 +78,6 @@ const MockBillingServiceLive = Layer.succeed(BillingService, {
   setKey: () => Effect.succeed(undefined),
 });
 
-const MockRuntimeDeps = Layer.mergeAll(MockSettingsServiceLive, MockBillingServiceLive);
-
 const apiKeySpy = vi.fn(() => Effect.succeed<string | null>("sk-test-key"));
 const MockLLMProviderServiceLive = Layer.effect(
   LLMProviderService,
@@ -97,7 +95,9 @@ const MockLLMProviderServiceLive = Layer.effect(
   }),
 );
 
-const MockRuntimeDepsWithLLM = Layer.mergeAll(
+// AgentRuntimeLive 现在 yield* SettingsService + LLMProviderService 在 layer 内部,
+// 所以 MockRuntimeDeps 必须包含这俩 + BillingService 才能 build layer。
+const MockRuntimeDeps = Layer.mergeAll(
   MockSettingsServiceLive,
   MockBillingServiceLive,
   MockLLMProviderServiceLive,
@@ -140,7 +140,7 @@ describe("AgentRuntime", () => {
       yield* runtime.run(testConversation, testMessage).pipe(Stream.take(1), Stream.runDrain);
       // 验证 getApiKey 被调用，参数是 activeProvider.id ("deepseek")
       expect(apiKeySpy).toHaveBeenCalledWith("deepseek");
-    }).pipe(Effect.provide(MockRuntimeDepsWithLLM), Effect.provide(AgentRuntimeLive)),
+    }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps)),
   );
 
   it("buildModel 读取 activeProvider.api_type 作为 api 字段", () => {

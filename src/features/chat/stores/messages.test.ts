@@ -34,7 +34,7 @@ const fixtureMsg2: Message = {
 };
 
 let listCalls: string[] = [];
-let appendCalls: { conversation_id: string; role: string; content: string }[] = [];
+let appendCalls: { conversationId: string; role: string; content: string }[] = [];
 let searchCalls: { query: string; limit: number }[] = [];
 
 const MockMessageServiceLive = Layer.succeed(MessageService, {
@@ -90,8 +90,8 @@ describe("MessageService 桥接层", () => {
   it.effect("append 传递正确参数给服务", () =>
     Effect.gen(function* () {
       const svc = yield* MessageService;
-      yield* svc.append({ conversation_id: "conv-1", role: "user", content: "test" });
-      expect(appendCalls).toEqual([{ conversation_id: "conv-1", role: "user", content: "test" }]);
+      yield* svc.append({ conversationId: "conv-1", role: "user", content: "test" });
+      expect(appendCalls).toEqual([{ conversationId: "conv-1", role: "user", content: "test" }]);
     }).pipe(Effect.provide(MockMessageServiceLive)),
   );
 
@@ -99,7 +99,7 @@ describe("MessageService 桥接层", () => {
     Effect.gen(function* () {
       const svc = yield* MessageService;
       const result = yield* svc.append({
-        conversation_id: "conv-1",
+        conversationId: "conv-1",
         role: "user",
         content: "test",
       });

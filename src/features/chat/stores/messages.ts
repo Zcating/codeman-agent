@@ -15,10 +15,16 @@
 //! - runConversationStream(conversation, userMessage, callbacks): Promise<void>
 
 import { createSignal, type Accessor } from "solid-js";
-import { Effect, Exit, Stream } from "effect";
-import { MessageService, MessageServiceLive } from "../../../shared/lib/tauri";
-import { AgentRuntime, RuntimeLayer, type RuntimeEvent } from "../lib/runtime";
-import type { Message, ToolCall, ToolResult, Conversation } from "../../../shared/lib/types";
+import { Effect, Exit, Layer, Stream } from "effect";
+import {
+  MessageService,
+  MessageServiceLive,
+  SettingsServiceLive,
+  BillingServiceLive,
+} from "../../../shared/lib/tauri";
+import { AgentRuntime, AgentRuntimeLive, type RuntimeEvent, type RuntimeError } from "../lib/runtime";
+import { LLMProviderServiceLive } from "../../settings/lib/llm-providers";
+import type { AppError, Message, ToolCall, ToolResult, Conversation } from "../../../shared/lib/types";
 
 // MessageService 的 runtime layer。
 const MessageLayer = MessageServiceLive;
@@ -46,7 +52,9 @@ export async function loadMessages(conversationId: string): Promise<void> {
 export async function appendUserMessage(content: string, conversationId: string): Promise<void> {
   const program = Effect.gen(function* () {
     const svc = yield* MessageService;
-    return yield* svc.append({ conversation_id: conversationId, role: "user", content });
+    // Tauri 2 IPC 约定 camelCase: `conversationId` 不是 `conversation_id`。
+    // Rust 端参数 `conversation_id: String` 通过 serde 自动映射。
+    return yield* svc.append({ conversationId, role: "user", content });
   }).pipe(Effect.provide(MessageLayer));
 
   const result = await Effect.runPromiseExit(program);
@@ -120,6 +128,10 @@ export function appendStreamingAssistantMessage(messageId: string, conversationI
   setMessages([...messages(), stub]);
 }
 
+// 注：上面 stub 里的 snake_case 字段（conversation_id / tool_calls / 等）是
+// Message 接口本身的形状(镜像 Rust serde),不是 IPC 参数名。Tauri IPC 边界
+// 只在 invoke 的 args 对象上要求 camelCase。
+
 export type StreamCallbacks = {
   onToken: (content: string) => void;
   onToolCall: (toolCall: ToolCall) => void;
@@ -157,7 +169,16 @@ export async function runConversationStream(
   const program = Effect.gen(function* () {
     const runtime = yield* AgentRuntime;
     yield* Stream.runForEach(runtime.run(conversation, userMessage), processEvent);
-  }).pipe(Effect.provide(RuntimeLayer));
+  }).pipe(
+    Effect.provide(
+      Layer.mergeAll(
+        AgentRuntimeLive,
+        SettingsServiceLive,
+        LLMProviderServiceLive,
+        BillingServiceLive,
+      ),
+    ),
+  ) as Effect.Effect<void, AppError | RuntimeError, never>;
 
   await Effect.runPromise(program);
 }

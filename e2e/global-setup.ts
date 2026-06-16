@@ -22,6 +22,8 @@
 import { spawn, type ChildProcess, execSync } from "node:child_process";
 import { spawnSync } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { PORTS } from "../playwright.config";
 
 // Path to the port-killer so we don't depend on a separate `predev` step.
@@ -84,12 +86,15 @@ export default async function globalSetup(): Promise<void> {
   const prewarmMs = Date.now() - prewarmStart;
   console.log(`[e2e setup] step 0/4 — Rust cache warm (${(prewarmMs / 1000).toFixed(1)}s)`);
 
-  // Warn if MiniMax key is missing (spec 04 needs it; other specs are key-agnostic).
-  if (!process.env.MINIMAX_API_KEY) {
+  // Warn if .env is missing or has no key (spec 04 needs it; other specs are key-agnostic).
+  // .env 是测试用例来源,包含 MINIMAX_CN_API_KEY + MINIMAX_CN_API_BASE_URL。
+  // 跟之前 MINIMAX_API_KEY 走 PowerShell session env 的方式不同。
+  const envFileExists = existsSync(resolve(process.cwd(), ".env"));
+  if (!envFileExists) {
     console.warn(
-      "[e2e setup] ⚠ MINIMAX_API_KEY env not set — " +
-        "spec 04 requires a manually configured MiniMax key in Settings UI. " +
-        "If spec 04 fails with 401/403, open Settings → Providers → MiniMax → API Key, save, then re-run.",
+      "[e2e setup] ⚠ .env not found in cwd — " +
+        "spec 04 will fail unless MiniMax key is manually configured in Settings UI. " +
+        "Create .env with MINIMAX_CN_API_KEY=... + MINIMAX_CN_API_BASE_URL=..., then re-run.",
     );
   }
 

@@ -3,8 +3,8 @@
 //! 代理 UI 的核心组件。订阅 AgentRuntime.run()
 //! 并将 RuntimeEvents 转换为 UI 更新。
 
-import { createSignal, createEffect, For, Show, onCleanup } from "solid-js";
-import { Effect, Exit, Stream } from "effect";
+import { createSignal, createEffect, For, Show, onCleanup, onMount } from "solid-js";
+import { Effect, Exit, Layer, Stream } from "effect";
 import { Send, X } from "lucide-solid";
 import { MessageBubble } from "./message-bubble";
 import {
@@ -19,7 +19,16 @@ import {
   appendStreamingAssistantMessage,
 } from "../stores/messages";
 import { activeId$, conversations$ } from "../stores/conversations";
-import { AgentRuntime, RuntimeLayer } from "../lib/runtime";
+import { AgentRuntime, AgentRuntimeLive, type RuntimeError } from "../lib/runtime";
+import {
+  SettingsService,
+  SettingsServiceImpl,
+  BillingService,
+  BillingServiceImpl,
+} from "../../../shared/lib/tauri";
+import { LLMProviderServiceLive } from "../../settings/lib/llm-providers";
+import type { AppError } from "../../../shared/lib/types";
+import { startThemeSync } from "../../../shared/stores/theme";
 
 export function ChatView() {
   const [input, setInput] = createSignal("");
@@ -27,6 +36,12 @@ export function ChatView() {
   const [streamingMessageId, setStreamingMessageId] = createSignal<string | null>(null);
   let abortController: AbortController | null = null;
   let messagesEndRef: HTMLDivElement | undefined;
+
+  // 启动 theme store 的 5s 轮询 — 把 Settings.theme 桥接到 <html class="dark">。
+  // 没这个调用,theme store 是死代码,用户改了 Settings.theme 后 html class 不切。
+  onMount(() => {
+    startThemeSync();
+  });
 
   // 每当活跃会话变更时加载消息。
   createEffect(() => {
@@ -71,6 +86,11 @@ export function ChatView() {
       return;
     }
     const userMsg = messages$()[messages$().length - 1];
+    if (!userMsg) {
+      console.error("[ChatView] 运行错误：userMsg 是 undefined — appendUserMessage 可能没成功,convId=", convId, "messagesLen=", messages$().length);
+      setRunning(false);
+      return;
+    }
 
     try {
       const program = Effect.gen(function* () {
@@ -109,7 +129,25 @@ export function ChatView() {
           }
           return Effect.succeed(undefined);
         });
-      }).pipe(Effect.provide(RuntimeLayer));
+      }).pipe(
+        // LLMProviderServiceLive 内部 yield* SettingsService,AgentRuntimeLive 内部
+        // yield* SettingsService + LLMProviderService。Layer.mergeAll 不保证 build
+        // 顺序,可能导致 "Service not found"。Layer.provide 显式 feed SettingsService
+        // 给 LLMProviderServiceLive,再 feed SettingsService + LLMProviderService
+        // 给 AgentRuntimeLive,最后 merge BillingService。
+        Effect.provide(
+          Layer.merge(
+            Layer.provide(
+              AgentRuntimeLive,
+              Layer.merge(
+                Layer.succeed(SettingsService, SettingsServiceImpl),
+                Layer.provide(LLMProviderServiceLive, Layer.succeed(SettingsService, SettingsServiceImpl)),
+              ),
+            ),
+            Layer.succeed(BillingService, BillingServiceImpl),
+          ),
+        ),
+      ) as Effect.Effect<void, AppError | RuntimeError, never>;
 
       const result = await Effect.runPromiseExit(program);
       if (!Exit.isSuccess(result)) {
@@ -159,6 +197,14 @@ export function ChatView() {
         >
           <button
             type="submit"
+            // 直接 onClick 也调 send — 双重保险。Form onSubmit 在某些 webview
+            // (WebView2) + Solid 组合下不可靠(诊断验证 submit event 派发了
+            // 但 Solid onSubmit listener 没反应)。加 onClick 让 button click
+            // 链独立工作,跟 form submit 解耦。
+            onClick={(e) => {
+              e.preventDefault();
+              void send();
+            }}
             disabled={!input().trim()}
             class="px-4 py-2 rounded-md font-medium bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >

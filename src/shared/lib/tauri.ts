@@ -50,14 +50,17 @@ export class MessageService extends Context.Tag("MessageService")<
   {
     readonly list: (conversationId: string) => Effect.Effect<Message[], AppError>;
     readonly append: (args: {
-      conversation_id: string;
+      // Tauri 2 IPC 约定 camelCase 参数:Rust `conversation_id: String`
+      // 通过自动 serde rename 映射。`Message` 返回值本身的字段仍是
+      // snake_case(镜像 Rust serde 默认)。
+      conversationId: string;
       role: string;
       content: string;
-      tool_calls?: string;
-      tool_results?: string;
+      toolCalls?: string;
+      toolResults?: string;
       model?: string;
-      input_tokens?: number;
-      output_tokens?: number;
+      inputTokens?: number;
+      outputTokens?: number;
     }) => Effect.Effect<Message, AppError>;
     readonly search: (query: string, limit: number) => Effect.Effect<Message[], AppError>;
   }
@@ -104,9 +107,17 @@ export const BillingServiceLive = Layer.succeed(BillingService, {
   hasKey: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
   setKey: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
 });
+
+// 暴露 impl object — 给 chat runtime 显式 Effect.provideService 用
+export const BillingServiceImpl = {
+  listProviders: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+  getSnapshot: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+  hasKey: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+  setKey: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
+} as const;
 export const SettingsServiceLive = Layer.succeed(SettingsService, {
   getSettings: () => invoke<Settings>("get_settings"),
-  updateSettings: (patch) => invoke<Settings>("update_settings", { new_settings: patch }),
+  updateSettings: (patch) => invoke<Settings>("update_settings", { newSettings: patch }),
   clearAllHistory: () => invoke<void>("clear_all_history"),
   getActiveLlmProvider: () =>
     Effect.gen(function* () {
@@ -118,6 +129,23 @@ export const SettingsServiceLive = Layer.succeed(SettingsService, {
       );
     }),
 });
+
+// 暴露 impl object — 给 chat runtime 等需要显式 Effect.provideService 的地方用
+// (Layer.succeed 在 type narrowing 上不可靠,runtime 时 Context 也可能找不到)。
+export const SettingsServiceImpl = {
+  getSettings: () => invoke<Settings>("get_settings"),
+  updateSettings: (patch: unknown) => invoke<Settings>("update_settings", { newSettings: patch }),
+  clearAllHistory: () => invoke<void>("clear_all_history"),
+  getActiveLlmProvider: () =>
+    Effect.gen(function* () {
+      const settings = yield* invoke<Settings>("get_settings");
+      const id = settings.default_llm_provider_id;
+      if (!id) return yield* Effect.succeed(null);
+      return yield* Effect.succeed(
+        settings.llm_providers.find((p) => p.id === id && p.enabled) ?? null,
+      );
+    }),
+} as const;
 
 // ─── 桥接函数（基于 Promise，用于 Solid UI） ──────────────────────────
 
