@@ -23,8 +23,8 @@ pub struct Size {
 impl Default for Size {
     fn default() -> Self {
         Self {
-            width: 800,
-            height: 600,
+            width: 1280,
+            height: 1280,
         }
     }
 }
@@ -113,7 +113,10 @@ impl Default for WindowSettings {
             remember_position: true,
             remember_size: true,
             default_size: Size::default(),
-            min_size: Size { width: 600, height: 400 },
+            min_size: Size {
+                width: 800,
+                height: 800,
+            },
         }
     }
 }
@@ -426,9 +429,9 @@ mod tests {
     }
 
     #[test]
-    fn size_defaults_to_800x600() {
-        assert_eq!(Size::default().width, 800);
-        assert_eq!(Size::default().height, 600);
+    fn size_defaults_to_1280x1280() {
+        assert_eq!(Size::default().width, 1280);
+        assert_eq!(Size::default().height, 1280);
     }
 
     #[test]

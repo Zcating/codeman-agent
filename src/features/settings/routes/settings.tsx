@@ -205,7 +205,7 @@ export function SettingsPage() {
           <section>
             <p class="text-sm text-zinc-500 dark:text-zinc-400 italic">
               {tab() === "window"
-                ? "Window settings (default size 800×600, min 600×400; position is remembered)"
+                ? "Window settings (default size 1280×1280, min 800×800; position is remembered)"
                 : "Billing providers — see ProviderCard for LLM; billing tools via tools/billing."}
             </p>
           </section>

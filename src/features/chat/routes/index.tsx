@@ -11,7 +11,9 @@ export function ChatLayout() {
     <main class="flex h-screen w-full bg-background text-foreground">
       <Sidebar />
       <section class="flex-1 flex flex-col overflow-hidden">
-        <div class="flex-1 overflow-hidden">
+        {/* Polish: flex flex-col 让 ChatView 内部 bubble div 的 `flex-1` 生效,
+            这样 form 才能被钉在底部、bubble 区域撑满剩余高度并独立滚动。 */}
+        <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
           <ChatView />
         </div>
         <footer class="flex items-center justify-between px-4 py-2 border-t border-border bg-card text-xs text-muted-foreground">
