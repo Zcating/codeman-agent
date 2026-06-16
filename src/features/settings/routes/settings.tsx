@@ -1,6 +1,6 @@
 ﻿//! /settings  — 全页面设置（替换主内容；不是 modal）。
 //!
-//! 从已删除的 src/agent/components/settings-modal.tsx 提取。
+//! V1.5: 使用统一 providers[] (Provider 类型)，不再使用 V1 llm_providers[]。
 //! "app" 选项卡不再有 start_minimized / close_behavior / hotkeys
 //!（这些在 V1.5 后端重构中已移除 — 见 ADR-0007）。
 //! "window" 和 "billing" 选项卡保留为占位符存根。
@@ -14,7 +14,7 @@ import {
   updateSettingsBridge,
   clearAllHistoryBridge,
 } from "../../../shared/lib/tauri";
-import type { LLMProvider, Settings } from "../../../shared/lib/types";
+import type { Provider, Settings } from "../../../shared/lib/types";
 
 type Tab = "llm" | "app" | "window" | "billing" | "advanced";
 
@@ -43,29 +43,29 @@ export function SettingsPage() {
     }
   };
 
-  const onProviderChange = (next: LLMProvider) => {
+  // V1.5: 使用 Provider 类型 (不是 LLMProvider)
+  const onProviderChange = (next: Provider) => {
     const d = draft();
     if (!d) return;
-    setDraft({ ...d, llm_providers: d.llm_providers.map((p) => (p.id === next.id ? next : p)) });
+    setDraft({
+      ...d,
+      providers: (d.providers ?? []).map((p) => (p.id === next.id ? next : p)),
+    });
   };
 
   const onProviderDelete = (id: string) => {
     const d = draft();
     if (!d) return;
-    setDraft({ ...d, llm_providers: d.llm_providers.filter((p) => p.id !== id) });
+    setDraft({
+      ...d,
+      providers: (d.providers ?? []).filter((p) => p.id !== id),
+    });
   };
 
+  // V1.5: Add provider 是未来工作，当前只 alert
   const onAddProvider = () => {
-    const d = draft();
-    if (!d) return;
-    const newProvider: LLMProvider = {
-      id: `custom-${Date.now()}`,
-      label: `Custom ${d.llm_providers.length + 1}`,
-      enabled: true,
-      api_type: "anthropic-messages",
-      api_key_ref: `llm_providers/custom-${Date.now()}/api_key`,
-    };
-    setDraft({ ...d, llm_providers: [...d.llm_providers, newProvider] });
+    // V1.5+ 只有一个默认 MiniMax provider，用户可以配置但不能添加更多
+    alert("Add provider: future work (V1.5+ has 1 pre-fill MiniMax)");
   };
 
   const clearHistory = async () => {
@@ -121,15 +121,28 @@ export function SettingsPage() {
             <h2 class="text-lg font-semibold mb-2 text-zinc-900 dark:text-zinc-100">
               LLM Providers
             </h2>
-            <For each={draft()!.llm_providers}>
-              {(p) => (
-                <ProviderCard
-                  provider={p}
-                  onChange={onProviderChange}
-                  onDelete={() => onProviderDelete(p.id)}
-                />
-              )}
-            </For>
+            {/* V1.5: 空状态友好提示 */}
+            <Show
+              when={(draft()!.providers ?? []).length > 0}
+              fallback={
+                <div class="text-center py-12 space-y-2 border border-dashed border-zinc-300 dark:border-zinc-600 rounded-lg">
+                  <p class="text-zinc-500 dark:text-zinc-400">No providers configured.</p>
+                  <p class="text-zinc-400 dark:text-zinc-500 text-sm">
+                    Add your first provider to get started.
+                  </p>
+                </div>
+              }
+            >
+              <For each={draft()!.providers ?? []}>
+                {(p) => (
+                  <ProviderCard
+                    provider={p}
+                    onUpdate={onProviderChange}
+                    onDelete={() => onProviderDelete(p.id)}
+                  />
+                )}
+              </For>
+            </Show>
             <button
               type="button"
               onClick={onAddProvider}

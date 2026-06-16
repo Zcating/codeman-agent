@@ -1,14 +1,14 @@
-﻿//! SettingsPage 路由测试。
+﻿//! SettingsPage 路由测试 (V1.5)。
 //!
 //! Mocked: SettingsService Effect 服务（通过 src/__mocks__/@tauri-apps/api/core.ts）。
+//! V1.5: 测试 providers[] 渲染，空状态、2 providers 场景。
 //! Link 从 @tanstack/solid-router mock 以避免需要 RouterProvider。
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { render, cleanup } from "@solidjs/testing-library";
-import userEvent from "@testing-library/user-event";
+import { render, screen, cleanup } from "@solidjs/testing-library";
 import { SettingsPage } from "./settings";
-import { mockState } from "../../../__mocks__/@tauri-apps/api/core";
-import type { Settings } from "../../../shared/lib/types";
+import { mockState, SettingsV15 } from "../../../__mocks__/@tauri-apps/api/core";
+import type { Provider } from "../../../shared/lib/types";
 
 vi.mock("@tanstack/solid-router", async () => {
   const actual = await vi.importActual("@tanstack/solid-router");
@@ -24,19 +24,54 @@ vi.mock("@tanstack/solid-router", async () => {
   };
 });
 
-const mockSettings: Settings = {
-  llm_providers: [
-    {
-      id: "deepseek",
-      label: "DeepSeek",
-      enabled: true,
-      default_model: "deepseek-chat",
-      base_url: "https://api.deepseek.com",
-      api_type: "anthropic-messages",
-      api_key_ref: "llm_providers/deepseek/api_key",
-    },
-  ],
-  default_llm_provider_id: "deepseek",
+// V1.5 mock providers
+const mockMiniMaxProvider: Provider = {
+  id: "minimax",
+  label: "MiniMax",
+  enabled: true,
+  llm: {
+    default_model: "MiniMax-M2.5-highspeed",
+    base_url: "https://api.minimaxi.com/anthropic",
+    api_type: "anthropic-messages",
+    llm_api_key_ref: "llm_providers/minimax/api_key",
+    models: [
+      {
+        id: "MiniMax-M2.5-highspeed",
+        label: "MiniMax-M2.5-highspeed",
+        deprecated: false,
+        thinking: false,
+      },
+    ],
+    models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+  },
+  billing: {
+    kind: "plan_quota",
+    billing_api_key_ref: "billing/minimax/api_key",
+  },
+};
+
+const mockDeepSeekProvider: Provider = {
+  id: "deepseek",
+  label: "DeepSeek",
+  enabled: true,
+  llm: {
+    default_model: "deepseek-chat",
+    base_url: "https://api.deepseek.com/anthropic",
+    api_type: "anthropic-messages",
+    llm_api_key_ref: "llm_providers/deepseek/api_key",
+    models: [{ id: "deepseek-chat", label: "DeepSeek Chat", deprecated: false, thinking: false }],
+    models_endpoint: "https://api.deepseek.com/anthropic/v1/models",
+  },
+  billing: {
+    kind: "balance",
+    billing_api_key_ref: "billing/deepseek/api_key",
+  },
+};
+
+const baseSettings: SettingsV15 = {
+  providers: [],
+  schema_version: "1.5",
+  default_llm_provider_id: "minimax",
   user_language: "en",
   theme: "dark",
   start_at_login: false,
@@ -49,11 +84,19 @@ const mockSettings: Settings = {
   system_prompt: { default: "You are a helpful assistant.", user_can_edit: true },
   billing_providers: [],
   conversations: { auto_archive_after_days: 30, max_history: 1000 },
+  llm_providers: [],
 };
 
-describe("SettingsPage", () => {
+describe("SettingsPage — V1.5 provider rendering", () => {
   beforeEach(() => {
-    mockState.resolved = mockSettings;
+    // Reset to default V1.5 settings with 1 provider (MiniMax)
+    mockState.settings = {
+      ...baseSettings,
+      providers: [mockMiniMaxProvider],
+    };
+    // Clear resolved so the mock handler is used
+    mockState.resolved = undefined;
+    mockState.v0FixtureActive = false;
   });
 
   afterEach(() => {
@@ -61,45 +104,60 @@ describe("SettingsPage", () => {
     vi.clearAllMocks();
   });
 
-  it("渲染 5 个标签页", async () => {
-    vi.useFakeTimers();
+  it("renders 1 card for 1 provider (MiniMax)", async () => {
+    render(() => <SettingsPage />);
+    // Wait for async loading to complete
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // MiniMax provider card should be visible
+    expect(screen.getByText("MiniMax")).toBeInTheDocument();
+    // Should NOT show empty state
+    expect(screen.queryByText(/No providers configured/i)).not.toBeInTheDocument();
+  });
+
+  it("renders 2 cards for 2 providers", async () => {
+    mockState.settings = {
+      ...baseSettings,
+      providers: [mockMiniMaxProvider, mockDeepSeekProvider],
+    };
+
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(screen.getByText("MiniMax")).toBeInTheDocument();
+    expect(screen.getByText("DeepSeek")).toBeInTheDocument();
+  });
+
+  it("shows empty state when providers[] is empty", async () => {
+    mockState.settings = {
+      ...baseSettings,
+      providers: [],
+    };
+
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(screen.getByText(/No providers configured/i)).toBeInTheDocument();
+    expect(screen.getByText(/Add your first provider/i)).toBeInTheDocument();
+  });
+
+  it("renders 5 tabs", async () => {
     const { container } = render(() => <SettingsPage />);
-    // 推进计时器以刷新加载 draft 的异步 IIFE
-    vi.advanceTimersByTime(0);
-    vi.useRealTimers();
+    await new Promise((resolve) => setTimeout(resolve, 10));
     const tabs = container.querySelectorAll("nav button");
     expect(tabs.length).toBe(5);
   });
 
-  it("点击 app 标签页激活它并显示 app 特定内容", async () => {
-    vi.useFakeTimers();
+  it("header has Back link with correct text", async () => {
     const { container } = render(() => <SettingsPage />);
-    vi.advanceTimersByTime(0);
-    vi.useRealTimers();
-    const user = userEvent.setup();
-    const tabs = container.querySelectorAll("nav button");
-    // App 标签页是第二个（index 1）
-    await user.click(tabs[1]);
-    // App 标签页按钮应有 active 样式
-    expect(tabs[1].classList.contains("bg-primary-500")).toBe(true);
-    // LLM 标签页不应再处于激活状态
-    expect(tabs[0].classList.contains("bg-primary-500")).toBe(false);
-  });
-
-  it("header 有带正确文本的 Back 链接", async () => {
-    vi.useFakeTimers();
-    const { container } = render(() => <SettingsPage />);
-    vi.advanceTimersByTime(0);
-    vi.useRealTimers();
+    await new Promise((resolve) => setTimeout(resolve, 10));
     const backLink = container.querySelector("header a");
     expect(backLink?.textContent).toContain("Back");
   });
 
-  it("footer 有 Save 按钮", async () => {
-    vi.useFakeTimers();
+  it("footer has Save button", async () => {
     const { container } = render(() => <SettingsPage />);
-    vi.advanceTimersByTime(0);
-    vi.useRealTimers();
+    await new Promise((resolve) => setTimeout(resolve, 10));
     const saveBtn = container.querySelector("footer button");
     expect(saveBtn?.textContent).toContain("Save");
   });

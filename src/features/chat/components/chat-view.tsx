@@ -21,6 +21,7 @@ import {
 } from "../stores/messages";
 import { activeId$, conversations$ } from "../stores/conversations";
 import { AgentRuntime, RuntimeLayer } from "../lib/runtime";
+import { SettingsServiceLive } from "../../../shared/lib/tauri";
 import { Button } from "../../../shared/components/ui/button";
 import { Textarea } from "../../../shared/components/ui/textarea";
 
@@ -112,7 +113,7 @@ export function ChatView() {
           }
           return Effect.succeed(undefined);
         });
-      }).pipe(Effect.provide(RuntimeLayer));
+      }).pipe(Effect.provide(RuntimeLayer), Effect.provide(SettingsServiceLive));
 
       const result = await Effect.runPromiseExit(program);
       if (!Exit.isSuccess(result)) {

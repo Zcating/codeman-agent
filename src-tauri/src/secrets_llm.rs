@@ -58,6 +58,29 @@ pub fn has_llm_key(app: &AppHandle, provider_id: &str) -> bool {
     store.get(&key).is_some()
 }
 
+/// 存储或替换 `provider_id` 的计费 API 密钥。
+pub fn set_billing_key(app: &AppHandle, provider_id: &str, key: &str) -> Result<(), String> {
+    let store = app
+        .store(BILLING_STORE_FILE)
+        .map_err(|e| format!("打开计费存储失败：{e}"))?;
+    store.set(billing_store_key(provider_id), serde_json::json!(key));
+    store
+        .save()
+        .map_err(|e| format!("保存计费存储失败：{e}"))?;
+    debug!(target: "secrets_llm", "已存储 provider_id={} 的计费密钥", provider_id);
+    Ok(())
+}
+
+/// 供设置 UI 使用的轻量探测，检测计费密钥是否存在。
+pub fn has_billing_key(app: &AppHandle, provider_id: &str) -> bool {
+    let store = match app.store(BILLING_STORE_FILE) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    let key = billing_store_key(provider_id);
+    store.get(&key).is_some()
+}
+
 /// 删除存储的 `provider_id` LLM API 密钥。不存在时无操作。
 pub fn delete_llm_key(app: &AppHandle, provider_id: &str) -> Result<(), String> {
     let store = app
@@ -70,6 +93,38 @@ pub fn delete_llm_key(app: &AppHandle, provider_id: &str) -> Result<(), String> 
                 .save()
                 .map_err(|e| format!("删除后保存存储失败：{e}"))?;
             debug!(target: "secrets_llm", "已删除 provider_id={} 的 LLM 密钥", provider_id);
+            Ok(())
+        }
+        false => {
+            // 密钥不存在——视为成功（无操作）
+            Ok(())
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 计费密钥存储（走 Tauri store）
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BILLING_STORE_FILE: &str = "billing_secrets.json";
+const BILLING_KEY_PREFIX: &str = "billing";
+
+fn billing_store_key(provider_id: &str) -> String {
+    format!("{BILLING_KEY_PREFIX}/{provider_id}/api_key")
+}
+
+/// 删除存储的 `provider_id` 计费 API 密钥。不存在时无操作。
+pub fn delete_billing_key(app: &AppHandle, provider_id: &str) -> Result<(), String> {
+    let store = app
+        .store(BILLING_STORE_FILE)
+        .map_err(|e| format!("打开计费存储失败：{e}"))?;
+    let key = billing_store_key(provider_id);
+    match store.delete(&key) {
+        true => {
+            store
+                .save()
+                .map_err(|e| format!("删除后保存计费存储失败：{e}"))?;
+            debug!(target: "secrets_llm", "已删除 provider_id={} 的计费密钥", provider_id);
             Ok(())
         }
         false => {

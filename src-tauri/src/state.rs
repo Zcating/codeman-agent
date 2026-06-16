@@ -3,16 +3,11 @@
 //! `AppState` 是 `Clone`（所有字段都是 `Arc` / `parking_lot` 守卫），
 //! 因此可以移动到后台任务中，并通过 `tauri::State` 被 Tauri 命令读取。
 
-use crate::providers::{Adapter, registry};
-use crate::secrets;
 use crate::settings::Settings;
-use crate::types::{
-    ProviderError, ProviderId, ProviderKind, Secret, Snapshot, SnapshotEnvelope,
-};
+use crate::types::{ProviderId, ProviderKind, Snapshot, SnapshotEnvelope};
 use chrono::Utc;
 use log::{error, info, warn};
 use parking_lot::RwLock;
-use reqwest::Client;
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -29,8 +24,6 @@ const STORE_KEY: &str = "settings";
 pub struct AppState {
     pub settings: Arc<RwLock<Settings>>,
     pub active_id: Arc<RwLock<ProviderId>>,
-    pub registry: Arc<Vec<Adapter>>,
-    pub http: Client,
     pub wakeup: Arc<Notify>,
     pub snapshots: Arc<RwLock<HashMap<ProviderId, SnapshotEnvelope>>>,
     pub app_handle: AppHandle,
@@ -43,11 +36,6 @@ impl AppState {
         Self {
             settings: Arc::new(RwLock::new(settings)),
             active_id: Arc::new(RwLock::new(active_id)),
-            registry: Arc::new(registry()),
-            http: Client::builder()
-                .user_agent(concat!("codeman-agent/", env!("CARGO_PKG_VERSION")))
-                .build()
-                .expect("构建 HTTP 客户端失败"),
             wakeup: Arc::new(Notify::new()),
             snapshots: Arc::new(RwLock::new(HashMap::new())),
             app_handle,
@@ -55,15 +43,9 @@ impl AppState {
     }
 
     pub fn list_providers(&self) -> Vec<ProviderDescriptor> {
-        self.registry
-            .iter()
-            .map(|p| ProviderDescriptor {
-                id: p.id(),
-                label: p.label(),
-                kind: p.kind(),
-                has_key: secrets::has_api_key(p.id()),
-            })
-            .collect()
+        // V0 provider 枚举已删除；billing provider 列表从 Settings 获取（TS 侧）。
+        // 返回空 Vec，Rust 侧不再维护 provider 枚举。
+        Vec::new()
     }
 
     pub fn get_active(&self) -> ProviderId {
@@ -71,9 +53,7 @@ impl AppState {
     }
 
     pub fn set_active(&self, id: ProviderId) -> Result<(), String> {
-        if self.registry.iter().all(|p| p.id() != id) {
-            return Err(format!("未知提供商：{id:?}"));
-        }
+        // V0 provider 枚举已删除；活动 provider 切换走 Settings（TS 侧）。
         {
             let mut g = self.active_id.write();
             if *g == id {
@@ -119,80 +99,25 @@ impl AppState {
         }
     }
 
-    /// 立即获取单个提供商，更新内存中的 envelope 缓存并发送事件。
-    /// 返回 envelope 以便 `test_provider` 命令同步返回结果。
+    /// 获取快照信封（V0 provider 枚举已删除，计费迁移至 TS）。
+    /// 返回错误表示该功能已弃用。
     pub async fn fetch_provider(
         &self,
         id: ProviderId,
-    ) -> Result<SnapshotEnvelope, ProviderError> {
-        let adapter = self
-            .registry
-            .iter()
-            .find(|p| p.id() == id)
-            .cloned()
-            .ok_or_else(|| ProviderError::InvalidResponse("未知提供商".into()))?;
-
-        // 决策 ADR-0011: 无 key 时跳过 fetch。用户未配 key 是稳定状态，
-        // 重复 fetch + 重复 warn 是噪音。返回 error envelope 让前端 UI
-        // 渲染"未配置"占位；调度器不再刷 warn 日志。
-        // 注意：仍写入 snapshots 缓存，与正常失败路径一致。
-        if !secrets::has_api_key(id) {
-            let envelope = SnapshotEnvelope {
-                provider: id,
-                snapshot: None,
-                fetched_at: Utc::now(),
-                error: Some("API key not configured".into()),
-            };
-            self.snapshots.write().insert(id, envelope.clone());
-            return Ok(envelope);
-        }
-
-        let secret = secrets::get_api_key(id)
-            .map_err(|e| ProviderError::InvalidResponse(e.to_string()))?
-            .map(Secret::new)
-            .unwrap_or_else(Secret::empty);
-
-        let settings = self.settings.read().clone();
-        let prev_breached = self
-            .snapshots
-            .read()
-            .get(&id)
-            .and_then(|e| e.snapshot.as_ref())
-            .map(|s| is_breached(s, &settings))
-            .unwrap_or(false);
-
-        let fetched_at = Utc::now();
-        let result = adapter.fetch(&self.http, &secret).await;
+    ) -> Result<SnapshotEnvelope, crate::types::ProviderError> {
+        // V0 provider 枚举已删除；billing fetch 走 TS 侧。
+        // 返回错误信封，TS 侧会接管真实的 fetch 逻辑。
         let envelope = SnapshotEnvelope {
             provider: id,
-            snapshot: result.as_ref().ok().cloned(),
-            fetched_at,
-            error: result.as_ref().err().map(|e| e.to_string()),
+            snapshot: None,
+            fetched_at: Utc::now(),
+            error: Some("Billing fetch moved to TypeScript (ADR-0012)".into()),
         };
         self.snapshots.write().insert(id, envelope.clone());
-
-        match &result {
-            Ok(snap) => {
-                if let Err(e) = self.app_handle.emit("snapshot-updated", &envelope) {
-                    warn!("发送 snapshot-updated 事件失败：{e}");
-                }
-                if !prev_breached && is_breached(snap, &settings) {
-                    self.fire_threshold_notification(id, snap);
-                }
-            }
-            Err(err) => {
-                let payload = json!({ "provider": id, "error": err.to_string() });
-                if let Err(e) = self.app_handle.emit("refresh-failed", &payload) {
-                    warn!("发送 refresh-failed 事件失败：{e}");
-                }
-                warn!("{id:?} 刷新失败：{err}");
-            }
-        }
-
-        result.map(|_| envelope)
+        Ok(envelope)
     }
 
-    pub async fn fetch_active(&self) -> Result<SnapshotEnvelope, ProviderError> {
+    pub async fn fetch_active(&self) -> Result<SnapshotEnvelope, crate::types::ProviderError> {
         let id = self.get_active();
         self.fetch_provider(id).await
     }

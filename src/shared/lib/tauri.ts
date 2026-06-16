@@ -6,7 +6,8 @@
 //!   invoke<T>(name, args): Effect<T, AppError>
 //!   ConversationService.list(includeArchived): Effect<Conversation[], AppError>
 //!   MessageService.list(conversationId): Effect<Message[], AppError>
-//!   (BillingService + SettingsService 暂存根 — Task 21)
+//!   ProviderService.list(): Effect<Provider[], TauriError>
+//!   BillingService.fetchSnapshot(providerId, args): Effect<Snapshot, BillingError>
 
 import { Effect, Context, Layer } from "effect";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
@@ -18,7 +19,29 @@ import type {
   LLMProvider,
   BillingProviderMeta,
   Snapshot,
+  Provider,
+  ModelMeta,
 } from "./types";
+
+// ─── Error Types ────────────────────────────────────────────
+
+/** Tauri IPC error - distinct from AppError for service-specific error handling */
+export interface TauriError {
+  readonly kind: "IPC";
+  readonly message: string;
+}
+
+export const TauriError = {
+  IPC: (message: string): TauriError => ({ kind: "IPC" as const, message }),
+};
+
+/** Billing-specific errors */
+export type BillingError =
+  | { kind: "NotFound"; message: string }
+  | { kind: "Network"; message: string; cause?: string }
+  | { kind: "Unauthorized"; message: string }
+  | { kind: "InvalidResponse"; message: string }
+  | { kind: "Unknown"; message: string };
 
 /** 包装在 Effect 中的原始 Tauri invoke。 */
 export const invoke = <T>(
@@ -63,8 +86,37 @@ export class MessageService extends Context.Tag("MessageService")<
   }
 >() {}
 
+// ─── ProviderService (V1.5) ──────────────────────────────────
+
+export class ProviderService extends Context.Tag("ProviderService")<
+  ProviderService,
+  {
+    readonly list: () => Effect.Effect<Provider[], TauriError>;
+    readonly listByKind: (kind: "llm" | "billing") => Effect.Effect<Provider[], TauriError>;
+    readonly get: (id: string) => Effect.Effect<Provider, TauriError>;
+    readonly getModels: (id: string) => Effect.Effect<ModelMeta[], TauriError>;
+    readonly fetchModels: (id: string) => Effect.Effect<ModelMeta[], TauriError>;
+  }
+>() {}
+
+// ─── BillingService (V1.5) ──────────────────────────────────
+
 export class BillingService extends Context.Tag("BillingService")<
   BillingService,
+  {
+    /** List providers that have billing configured */
+    readonly list: () => Effect.Effect<Provider[], BillingError>;
+    /** Fetch billing snapshot for a provider */
+    readonly fetchSnapshot: (
+      providerId: string,
+      args?: { force_refresh?: boolean },
+    ) => Effect.Effect<Snapshot, BillingError>;
+  }
+>() {}
+
+/** @deprecated V1 stub — use BillingService from V1.5 */
+export class BillingServiceV1 extends Context.Tag("BillingServiceV1")<
+  BillingServiceV1,
   {
     readonly listProviders: () => Effect.Effect<BillingProviderMeta[], AppError>;
     readonly getSnapshot: (providerId: string) => Effect.Effect<Snapshot, AppError>;
@@ -83,8 +135,8 @@ export class SettingsService extends Context.Tag("SettingsService")<
   }
 >() {}
 
-// ─── Live layers（暂存根：每个服务方法以 NotFound 失败） ─
-// 由 Tasks 14 (Conversation/Message) 和 21 (Settings) 填充。
+// ─── Live layers ────────────────────────────────────────────
+
 export const ConversationServiceLive = Layer.succeed(ConversationService, {
   list: (includeArchived) => invoke<Conversation[]>("list_conversations", { includeArchived }),
   get: (id) => invoke<Conversation>("get_conversation", { id }),
@@ -98,12 +150,183 @@ export const MessageServiceLive = Layer.succeed(MessageService, {
   append: (args) => invoke<Message>("append_message", args),
   search: (query, limit) => invoke<Message[]>("search_messages", { query, limit }),
 });
-export const BillingServiceLive = Layer.succeed(BillingService, {
+
+// ProviderServiceLive
+export const ProviderServiceLive = Layer.effect(
+  ProviderService,
+  Effect.gen(function* () {
+    // Helper to get all providers
+    const getProviders = Effect.tryPromise({
+      try: () =>
+        tauriInvoke<{ providers: Provider[] }>("get_settings").then((s) => s.providers ?? []),
+      catch: (e) => TauriError.IPC(String(e)),
+    });
+
+    // Helper to get a single provider by id
+    const getProvider = (id: string) =>
+      Effect.gen(function* () {
+        const providers = yield* getProviders;
+        const provider = providers.find((p) => p.id === id);
+        if (!provider) {
+          return yield* Effect.fail(TauriError.IPC(`Provider not found: ${id}`));
+        }
+        return provider;
+      });
+
+    return {
+      list: () =>
+        Effect.gen(function* () {
+          const providers = yield* getProviders;
+          return providers.filter((p) => p.enabled);
+        }),
+
+      listByKind: (kind) =>
+        Effect.gen(function* () {
+          const providers = yield* getProviders;
+          if (kind === "llm") {
+            return providers.filter((p) => p.enabled && p.llm);
+          } else {
+            return providers.filter((p) => p.enabled && p.billing);
+          }
+        }),
+
+      get: (id) => getProvider(id),
+
+      getModels: (id) =>
+        Effect.gen(function* () {
+          const provider = yield* getProvider(id);
+          if (!provider.llm.models) {
+            return yield* Effect.succeed([]);
+          }
+          return provider.llm.models;
+        }),
+
+      fetchModels: (id) =>
+        Effect.gen(function* () {
+          const provider = yield* getProvider(id);
+          const { models_endpoint } = provider.llm;
+
+          if (!models_endpoint) {
+            return yield* Effect.fail(TauriError.IPC(`No models_endpoint for provider: ${id}`));
+          }
+
+          // Fetch API key from Tauri store via IPC
+          const apiKey = yield* Effect.tryPromise({
+            try: () =>
+              tauriInvoke<string | null>("get_llm_key", { providerId: id }).then((k) => k ?? ""),
+            catch: (e) => TauriError.IPC(String(e)),
+          });
+
+          const response = yield* Effect.tryPromise({
+            try: async () => {
+              const res = await fetch(models_endpoint, {
+                headers: {
+                  Authorization: `Bearer ${apiKey}`,
+                  "Content-Type": "application/json",
+                },
+              });
+              if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+              }
+              return res.json() as Promise<{
+                data: Array<{ id: string; name: string; context_window?: number }>;
+              }>;
+            },
+            catch: (e) => TauriError.IPC(`fetchModels failed: ${String(e)}`),
+          });
+
+          return response.data.map((m) => ({
+            id: m.id,
+            label: m.name,
+            context_window: m.context_window,
+            deprecated: false,
+            thinking: false,
+          }));
+        }),
+    };
+  }),
+);
+
+// BillingServiceLive
+export const BillingServiceLive = Layer.effect(
+  BillingService,
+  Effect.gen(function* () {
+    // Helper to get billing providers with BillingError type
+    const getBillingProviders = (): Effect.Effect<Provider[], BillingError> =>
+      Effect.gen(function* () {
+        const settings = yield* Effect.tryPromise({
+          try: () => tauriInvoke<{ providers: Provider[] }>("get_settings"),
+          catch: (e) => TauriError.IPC(String(e)),
+        });
+        return (settings.providers ?? []).filter((p) => p.enabled && p.billing);
+      }).pipe(
+        Effect.mapError((e) => {
+          const err = e as TauriError;
+          return {
+            kind: "Network" as const,
+            message: err.message,
+          } satisfies BillingError;
+        }),
+      );
+
+    return {
+      list: () => getBillingProviders(),
+
+      fetchSnapshot: (providerId, args) =>
+        Effect.gen(function* () {
+          // Get provider billing config
+          const providers = yield* getBillingProviders();
+          const provider = providers.find((p) => p.id === providerId);
+
+          if (!provider || !provider.billing) {
+            return yield* Effect.fail({
+              kind: "NotFound" as const,
+              message: `Billing provider not found: ${providerId}`,
+            } satisfies BillingError);
+          }
+
+          // TypeScript needs this assignment to properly narrow the type
+          const billingConfig = provider.billing;
+
+          // Call Rust adapter via IPC
+          let snapshot: Snapshot;
+          try {
+            snapshot = yield* Effect.tryPromise({
+              try: () =>
+                tauriInvoke<Snapshot>("fetch_billing_snapshot", {
+                  provider_id: providerId,
+                  billing_kind: billingConfig.kind,
+                  force_refresh: args?.force_refresh ?? false,
+                }),
+              catch: (e) => {
+                const msg = String(e);
+                if (msg.includes("401") || msg.includes("unauthorized")) {
+                  throw { kind: "Unauthorized" as const, message: msg } satisfies BillingError;
+                }
+                if (msg.includes("network") || msg.includes("fetch")) {
+                  throw { kind: "Network" as const, message: msg } satisfies BillingError;
+                }
+                throw { kind: "Unknown" as const, message: msg } satisfies BillingError;
+              },
+            });
+          } catch (e) {
+            return yield* Effect.fail(e as BillingError);
+          }
+
+          return snapshot;
+        }),
+    };
+  }),
+);
+
+/** @deprecated V1 stub — use BillingServiceLive */
+export const BillingServiceV1Live = Layer.succeed(BillingServiceV1, {
   listProviders: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
   getSnapshot: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
   hasKey: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
   setKey: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
 });
+
 export const SettingsServiceLive = Layer.succeed(SettingsService, {
   getSettings: () => invoke<Settings>("get_settings"),
   updateSettings: (patch) => invoke<Settings>("update_settings", { new_settings: patch }),

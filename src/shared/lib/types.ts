@@ -2,28 +2,98 @@
 //! 所有字段 snake_case 以匹配 Rust serde。在此处添加新类型，绝不
 //! 直接从 Rust 导入。
 
-// Settings — 25+ fields, 9 categories
+// ============================================================================
+// V1.5 Unified Provider Schema (ADR-0012)
+// ============================================================================
+
+export type BillingKind = "balance" | "plan_quota";
+
+export interface ModelMeta {
+  id: string;
+  label: string;
+  context_window?: number;
+  deprecated: boolean;
+  thinking: boolean;
+}
+
+export interface ProviderBilling {
+  kind: BillingKind;
+  billing_api_key_ref: string;
+}
+
+export interface ProviderLlm {
+  default_model: string;
+  base_url: string;
+  /** ADR-0011: V1 only supports anthropic-messages protocol */
+  api_type: "anthropic-messages";
+  llm_api_key_ref: string;
+  models: ModelMeta[];
+  models_endpoint: string;
+}
+
+export interface Provider {
+  id: string;
+  label: string;
+  enabled: boolean;
+  llm: ProviderLlm;
+  billing?: ProviderBilling;
+}
+
+// ============================================================================
+// Settings (V1.5)
+// ============================================================================
+
 export interface Settings {
-  llm_providers: LLMProvider[];
+  /** V1.5: unified providers array. Optional for V1 backward-compat. */
+  providers?: Provider[];
+  /** V1.5: schema version marker. Optional for V1 backward-compat. */
+  schema_version?: "1.5";
   default_llm_provider_id?: string;
   user_language: "zh" | "en" | "auto";
   theme: "light" | "dark" | "system";
   start_at_login: boolean;
   window: WindowSettings;
   system_prompt: SystemPromptSettings;
-  billing_providers: BillingProviderConfig[];
   conversations: ConversationSettings;
+  /** @deprecated Use providers instead. Kept for V1 consumer backward-compatibility. */
+  llm_providers: LLMProvider[];
+  /** @deprecated Use providers[].billing instead. Kept for V1 consumer backward-compatibility. */
+  billing_providers: BillingProviderConfig[];
 }
+
+// ============================================================================
+// Legacy V1 Types (deprecated - for backward compatibility)
+// ============================================================================
+// These types mirror the V1 flat structure. V1.5 uses nested Provider type.
+// Will be removed after all consumers are migrated to V1.5 Provider schema.
+
+/**
+ * @deprecated Use Provider.llm instead. Will be removed after T6-T11 migrations.
+ */
 export interface LLMProvider {
   id: string;
   label: string;
   enabled: boolean;
   default_model?: string;
   base_url?: string;
-  /** ADR-0011: V1 only supports anthropic-messages protocol */
   api_type: "anthropic-messages";
   api_key_ref: string;
 }
+
+/**
+ * @deprecated Use Provider.billing instead. Will be removed after T6-T11 migrations.
+ */
+export interface BillingProviderConfig {
+  id: "deepseek" | "minimax";
+  enabled: boolean;
+  refresh_interval_secs: number;
+  api_key_ref: string;
+}
+
+// ============================================================================
+// Window & System Prompt Settings (preserved from V1)
+// ============================================================================
+
 export interface WindowSettings {
   remember_position: boolean;
   remember_size: boolean;
@@ -34,18 +104,15 @@ export interface SystemPromptSettings {
   default: string;
   user_can_edit: boolean;
 }
-export interface BillingProviderConfig {
-  id: "deepseek" | "minimax";
-  enabled: boolean;
-  refresh_interval_secs: number;
-  api_key_ref: string;
-}
 export interface ConversationSettings {
   auto_archive_after_days: number; // default 30
   max_history: number; // default 1000
 }
 
-// Domain
+// ============================================================================
+// Domain Types (preserved)
+// ============================================================================
+
 export type Role = "user" | "assistant" | "tool" | "system";
 export interface Conversation {
   id: string;
@@ -78,7 +145,10 @@ export interface ToolResult {
   error: string | null;
 }
 
-// Billing snapshot
+// ============================================================================
+// Billing snapshot (preserved)
+// ============================================================================
+
 export type Snapshot =
   | { kind: "balance"; amount: number; currency: string; auto_recharge: boolean | null }
   | {
@@ -96,7 +166,10 @@ export interface BillingProviderMeta {
   enabled: boolean;
 }
 
-// Error
+// ============================================================================
+// Error (preserved)
+// ============================================================================
+
 export type AppError =
   | { kind: "NotFound"; message: string }
   | { kind: "Unauthorized"; message: string }

@@ -3,15 +3,11 @@
 mod commands;
 mod db;
 mod events;
-mod providers;
-mod scheduler;
-mod secrets;
 mod secrets_llm;
 mod settings;
 mod state;
 mod types;
 
-use crate::scheduler::Scheduler;
 use crate::state::AppState;
 use log::{info, warn};
 use tauri::menu::{Menu, MenuItem};
@@ -49,17 +45,9 @@ pub fn run() {
         )
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
-            // V0 / pre-existing
-            commands::list_providers,
-            commands::get_active_provider,
-            commands::set_active_provider,
-            commands::force_refresh,
+            // V0 removed per ADR-0012 T7
             commands::get_settings,
             commands::update_settings,
-            commands::set_api_key,
-            commands::has_api_key,
-            commands::test_provider,
-            commands::latest_snapshot,
             // T12: conversations
             commands::list_conversations,
             commands::get_conversation,
@@ -80,6 +68,8 @@ pub fn run() {
             commands::set_llm_key,
             commands::has_llm_key,
             commands::get_llm_key,
+            // Metis #9
+            commands::delete_provider_keys,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -107,11 +97,7 @@ pub fn run() {
                 }
             });
 
-            // 生成调度器循环。
-            let scheduler_state = state.clone();
-            tauri::async_runtime::spawn(async move {
-                Scheduler::new(scheduler_state).run().await;
-            });
+            // V0 调度器已删除；billing 轮询迁移至 TS（ADR-0012）。
 
             app.manage(state);
             info!("codeman-agent 已启动");

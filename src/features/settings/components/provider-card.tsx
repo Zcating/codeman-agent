@@ -1,183 +1,273 @@
-﻿//! ProviderCard — Settings → LLM 选项卡中的单个 LLM provider 行。
+﻿//! ProviderCard — V1.5 unified provider card.
+//! 1 card per provider with LLM subform (always) + Billing subform (if provider.billing).
+//! Uses Tailwind v4 utility classes only (ADR-0006). No BEM, no <style> blocks.
 
-import { createSignal, Show } from "solid-js";
-import { Effect } from "effect";
-import { Card, CardContent, CardHeader, CardFooter } from "../../../shared/components/ui/card";
-import { LLMProviderService, LLMProviderServiceLive } from "../lib/llm-providers";
-import { SettingsServiceLive } from "../../../shared/lib/tauri";
-import type { LLMProvider } from "../../../shared/lib/types";
+import { createSignal, Show, For } from "solid-js";
+import { invoke } from "@tauri-apps/api/core";
+import type { Provider, ModelMeta } from "../../../shared/lib/types";
+import { Button } from "../../../shared/components/ui/button";
+import { Input } from "../../../shared/components/ui/input";
+import { Checkbox } from "../../../shared/components/ui/checkbox";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "../../../shared/components/ui/card";
 
-export function ProviderCard(props: {
-  provider: LLMProvider;
-  onChange: (next: LLMProvider) => void;
-  onDelete: () => void;
-}) {
-  const [editing, setEditing] = createSignal(false);
-  const [apiKey, setApiKey] = createSignal("");
-  const [testStatus, setTestStatus] = createSignal<"idle" | "testing" | "ok" | "fail">("idle");
-  const [testMessage, setTestMessage] = createSignal("");
+export interface ProviderCardProps {
+  provider: Provider;
+  /** Called after provider is updated in settings */
+  onUpdate: (provider: Provider) => void;
+  /** Called after provider is deleted from settings */
+  onDelete: (providerId: string) => void;
+}
 
-  const saveApiKey = async () => {
-    if (!apiKey()) return;
+export function ProviderCard(props: ProviderCardProps) {
+  // Local UI state
+  const [selectedModel, setSelectedModel] = createSignal(props.provider.llm.default_model);
+  const [isRefreshing, setIsRefreshing] = createSignal(false);
+  const [refreshMsg, setRefreshMsg] = createSignal<string | null>(null);
+  const [isDeleting, setIsDeleting] = createSignal(false);
+  const [llmApiKey, setLlmApiKey] = createSignal("");
+  const [billingApiKey, setBillingApiKey] = createSignal("");
+
+  // ─── Handlers ───────────────────────────────────────────────
+
+  const handleEnabledToggle = async (enabled: boolean) => {
+    const updated: Provider = { ...props.provider, enabled };
+    await invoke("update_settings", { new_settings: { providers: [updated] } });
+    props.onUpdate(updated);
+  };
+
+  const handleModelChange = async (modelId: string) => {
+    setSelectedModel(modelId);
+    const updated: Provider = {
+      ...props.provider,
+      llm: { ...props.provider.llm, default_model: modelId },
+    };
+    await invoke("update_settings", { new_settings: { providers: [updated] } });
+    props.onUpdate(updated);
+  };
+
+  const handleBaseUrlChange = async (base_url: string) => {
+    const updated: Provider = {
+      ...props.provider,
+      llm: { ...props.provider.llm, base_url },
+    };
+    await invoke("update_settings", { new_settings: { providers: [updated] } });
+    props.onUpdate(updated);
+  };
+
+  const handleRefreshModels = async () => {
+    setIsRefreshing(true);
+    setRefreshMsg(null);
     try {
-      const program = Effect.gen(function* () {
-        const svc = yield* LLMProviderService;
-        yield* svc.setApiKey(props.provider.id, apiKey());
-      }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(SettingsServiceLive));
-      await Effect.runPromise(program);
-      setApiKey("");
-      setEditing(false);
+      const models = await invoke<ModelMeta[]>("fetch_models", { providerId: props.provider.id });
+      const updated: Provider = {
+        ...props.provider,
+        llm: { ...props.provider.llm, models },
+      };
+      await invoke("update_settings", { new_settings: { providers: [updated] } });
+      props.onUpdate(updated);
+      setRefreshMsg(`Loaded ${models.length} model(s)`);
     } catch (e) {
-      console.error("[ProviderCard] setApiKey 失败：", e);
+      setRefreshMsg(`Refresh failed: ${e}`);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
-  const testConnection = async () => {
-    setTestStatus("testing");
+  const handleLlmKeySave = async () => {
+    const key = llmApiKey();
+    if (!key) return;
+    await invoke("set_llm_key", { providerId: props.provider.id, key });
+    setLlmApiKey("");
+  };
+
+  const handleBillingKindChange = async (kind: "balance" | "plan_quota") => {
+    if (!props.provider.billing) return;
+    const updated: Provider = {
+      ...props.provider,
+      billing: { ...props.provider.billing, kind },
+    };
+    await invoke("update_settings", { new_settings: { providers: [updated] } });
+    props.onUpdate(updated);
+  };
+
+  const handleBillingKeySave = async () => {
+    const key = billingApiKey();
+    if (!key || !props.provider.billing) return;
+    await invoke("set_billing_key", { providerId: props.provider.id, api_key: key });
+    setBillingApiKey("");
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`Delete provider "${props.provider.label}"? This wipes its Tauri store keys.`))
+      return;
+    setIsDeleting(true);
     try {
-      const program = Effect.gen(function* () {
-        const svc = yield* LLMProviderService;
-        return yield* svc.hasApiKey(props.provider.id);
-      }).pipe(Effect.provide(LLMProviderServiceLive), Effect.provide(SettingsServiceLive));
-      const hasKey = await Effect.runPromise(program);
-      if (!hasKey) {
-        setTestStatus("fail");
-        setTestMessage("Set API key first");
-        return;
-      }
-      setTestStatus("ok");
-      setTestMessage("API key configured");
-    } catch (e) {
-      console.error("[ProviderCard] hasApiKey 失败：", e);
-      setTestStatus("fail");
-      setTestMessage("Error checking API key");
+      // Metis #9: wipe keys FIRST, then remove from settings
+      await invoke("delete_provider_keys", { id: props.provider.id });
+      await invoke("update_settings", {
+        new_settings: { providers: [] },
+      });
+      props.onDelete(props.provider.id);
+    } finally {
+      setIsDeleting(false);
     }
   };
+
+  // ─── Render ─────────────────────────────────────────────────
 
   return (
-    <Card class="mb-3">
-      <CardHeader>
-        <div class="flex items-center justify-between gap-2">
-          <label class="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={props.provider.enabled}
-              onChange={(e) =>
-                props.onChange({ ...props.provider, enabled: e.currentTarget.checked })
-              }
-              class="rounded text-primary-500 focus:ring-primary-500 w-4 h-4"
-            />
-            <span class="text-base font-medium text-zinc-900 dark:text-zinc-100">
-              {props.provider.label}
-            </span>
-          </label>
-          <code class="text-xs text-zinc-500 dark:text-zinc-400 font-mono bg-zinc-100 dark:bg-zinc-900 px-2 py-0.5 rounded">
+    <Card class="p-0 overflow-hidden">
+      {/* ── Header: label + enabled toggle ── */}
+      <CardHeader class="flex flex-row items-center justify-between p-4 pb-3">
+        <div class="flex flex-col gap-0.5">
+          <CardTitle class="text-base font-semibold">{props.provider.label}</CardTitle>
+          <CardDescription class="text-xs font-mono text-muted-foreground">
             {props.provider.id}
-          </code>
+          </CardDescription>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-muted-foreground">
+            {props.provider.enabled ? "Enabled" : "Disabled"}
+          </span>
+          <Checkbox
+            checked={props.provider.enabled}
+            onChange={(e) => handleEnabledToggle(e.currentTarget.checked)}
+          />
         </div>
       </CardHeader>
-      <CardContent class="space-y-3">
-        <Show when={props.provider.default_model !== undefined || editing()}>
-          <div class="flex items-center gap-2">
-            <label class="w-32 text-sm text-zinc-600 dark:text-zinc-400 flex-shrink-0">Model</label>
-            <input
+
+      <CardContent class="space-y-4 p-4 pt-0">
+        {/* ── LLM Subform (always rendered) ── */}
+        <div class="space-y-3 rounded-md border border-border p-3">
+          <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">LLM</p>
+
+          {/* Model dropdown */}
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-muted-foreground">Model</label>
+            <select
+              class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              value={selectedModel()}
+              onChange={(e) => handleModelChange(e.currentTarget.value)}
+            >
+              <For each={props.provider.llm.models}>
+                {(m) => (
+                  <option value={m.id}>
+                    {m.label}
+                    {m.deprecated ? " (deprecated)" : ""}
+                  </option>
+                )}
+              </For>
+            </select>
+          </div>
+
+          {/* Base URL */}
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-muted-foreground">Base URL</label>
+            <Input
               type="text"
-              value={props.provider.default_model ?? ""}
-              placeholder="e.g. gpt-4o / claude-3-5-sonnet"
-              onInput={(e) =>
-                props.onChange({ ...props.provider, default_model: e.currentTarget.value })
-              }
-              class="flex-1 p-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none"
+              value={props.provider.llm.base_url}
+              onInput={(e) => handleBaseUrlChange(e.currentTarget.value)}
+              placeholder="https://api.example.com/v1"
             />
           </div>
-        </Show>
-        <Show when={props.provider.base_url !== undefined || editing()}>
+
+          {/* Refresh models */}
           <div class="flex items-center gap-2">
-            <label class="w-32 text-sm text-zinc-600 dark:text-zinc-400 flex-shrink-0">
-              Base URL (OpenAI-compat only)
-            </label>
-            <input
-              type="text"
-              value={props.provider.base_url ?? ""}
-              placeholder="https://api.openai.com/v1"
-              onInput={(e) =>
-                props.onChange({ ...props.provider, base_url: e.currentTarget.value })
-              }
-              class="flex-1 p-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none"
-            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefreshModels}
+              disabled={isRefreshing()}
+            >
+              {isRefreshing() ? "Refreshing…" : "Refresh models"}
+            </Button>
+            <Show when={refreshMsg()}>
+              <span class="text-xs text-muted-foreground">{refreshMsg()}</span>
+            </Show>
           </div>
-        </Show>
-        <div class="flex items-center gap-2">
-          <label class="w-32 text-sm text-zinc-600 dark:text-zinc-400 flex-shrink-0">API Key</label>
-          <Show
-            when={editing()}
-            fallback={
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                class="px-3 py-1.5 text-sm border border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+
+          {/* LLM API Key */}
+          <div class="flex flex-col gap-1">
+            <label class="text-xs text-muted-foreground">LLM API Key</label>
+            <div class="flex gap-2">
+              <Input
+                type="password"
+                value={llmApiKey()}
+                onInput={(e) => setLlmApiKey(e.currentTarget.value)}
+                placeholder="sk-…"
+                class="flex-1"
+              />
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleLlmKeySave}
+                disabled={!llmApiKey()}
               >
-                Set API key…
-              </button>
-            }
-          >
-            <input
-              type="password"
-              autocomplete="off"
-              value={apiKey()}
-              onInput={(e) => setApiKey(e.currentTarget.value)}
-              placeholder="sk-…"
-              class="flex-1 p-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-zinc-50 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={() => void saveApiKey()}
-              disabled={!apiKey()}
-              class="px-3 py-1.5 text-sm bg-primary-500 text-white rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Save
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditing(false);
-                setApiKey("");
-              }}
-              class="px-3 py-1.5 text-sm border border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
-            >
-              Cancel
-            </button>
-          </Show>
+                Save
+              </Button>
+            </div>
+          </div>
         </div>
-      </CardContent>
-      <CardFooter class="flex justify-between items-center flex-wrap gap-2 mt-3">
-        <button
-          type="button"
-          onClick={() => void testConnection()}
-          class="px-3 py-1.5 text-sm bg-primary-500 text-white rounded-md font-medium hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          Test
-        </button>
-        <Show when={testStatus() !== "idle"}>
-          <span
-            class={`ml-2 text-sm font-medium ${
-              testStatus() === "ok"
-                ? "text-green-600 dark:text-green-400"
-                : testStatus() === "fail"
-                  ? "text-red-600 dark:text-red-400"
-                  : "text-zinc-500 dark:text-zinc-400"
-            }`}
-          >
-            {testStatus() === "testing" ? "Testing…" : testMessage()}
-          </span>
+
+        {/* ── Billing Subform (only if provider.billing exists) ── */}
+        <Show when={props.provider.billing}>
+          <div class="space-y-3 rounded-md border border-border p-3">
+            <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Billing
+            </p>
+
+            {/* Billing kind */}
+            <div class="flex flex-col gap-1">
+              <label class="text-xs text-muted-foreground">Kind</label>
+              <select
+                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={props.provider.billing!.kind}
+                onChange={(e) =>
+                  handleBillingKindChange(e.currentTarget.value as "balance" | "plan_quota")
+                }
+              >
+                <option value="balance">Balance</option>
+                <option value="plan_quota">Plan Quota</option>
+              </select>
+            </div>
+
+            {/* Billing API Key */}
+            <div class="flex flex-col gap-1">
+              <label class="text-xs text-muted-foreground">Billing API Key</label>
+              <div class="flex gap-2">
+                <Input
+                  type="password"
+                  value={billingApiKey()}
+                  onInput={(e) => setBillingApiKey(e.currentTarget.value)}
+                  placeholder="sk-…"
+                  class="flex-1"
+                />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleBillingKeySave}
+                  disabled={!billingApiKey()}
+                >
+                  Save
+                </Button>
+              </div>
+            </div>
+          </div>
         </Show>
-        <button
-          type="button"
-          onClick={() => props.onDelete()}
-          class="ml-auto text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:underline transition-colors"
-        >
-          Delete
-        </button>
+      </CardContent>
+
+      {/* ── Footer: delete ── */}
+      <CardFooter class="flex justify-end p-4 pt-0">
+        <Button variant="destructive" size="sm" onClick={handleDelete} disabled={isDeleting()}>
+          {isDeleting() ? "Deleting…" : "Delete provider"}
+        </Button>
       </CardFooter>
     </Card>
   );

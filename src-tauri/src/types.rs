@@ -183,6 +183,64 @@ impl From<sqlx::Error> for AppError {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// V1.5+ Provider schema (unified llm + billing)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// 计费类型。决策 ADR-0012：V1.5+ billing 全迁 TS，不再用 Rust adapter。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BillingKind {
+    Balance,
+    PlanQuota,
+}
+
+/// 单个模型的元数据。供 Settings UI 渲染模型选择器。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ModelMeta {
+    pub id: String,
+    pub label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u32>,
+    pub deprecated: bool,
+    pub thinking: bool,
+}
+
+/// 单个提供商的计费配置。V1.5+ 存 Tauri store（V0 是 keyring）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProviderBilling {
+    pub kind: BillingKind,
+    /// 指向 Tauri store 的路径，如 `"billing/minimax/api_key"`。
+    pub billing_api_key_ref: String,
+}
+
+/// 单个提供商的 LLM 配置。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProviderLlm {
+    pub default_model: String,
+    pub base_url: String,
+    /// API 类型，V1.5+ 固定为 `"anthropic-messages"`（ADR-0011）。
+    pub api_type: String,
+    /// 指向 Tauri store 的路径，如 `"llm_providers/minimax/api_key"`。
+    pub llm_api_key_ref: String,
+    pub models: Vec<ModelMeta>,
+    pub models_endpoint: String,
+}
+
+/// 统一的 Provider 记录。V1.5+ schema 替代 `llm_providers[] + billing_providers[]` 双数组。
+/// 每条记录 `llm` 必选 + `billing` 可选（ADR-0012）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Provider {
+    pub id: String,
+    pub label: String,
+    pub enabled: bool,
+    /// LLM 配置，必选。
+    pub llm: ProviderLlm,
+    /// 计费配置，可选（某些 provider 只有 LLM 没有 billing）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub billing: Option<ProviderBilling>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

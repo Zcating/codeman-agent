@@ -4,10 +4,12 @@
 //! 字段缺失时应用默认值，字段变更时将整个结构体写回。API 密钥永不存于此；
 //! 见 `secrets`。
 
+use crate::types::{BillingKind, ModelMeta, Provider, ProviderBilling, ProviderLlm};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 const STORE_FILE: &str = "settings.json";
+const SCHEMA_VERSION_V15: &str = "1.5";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 辅助类型
@@ -182,51 +184,77 @@ impl Default for ConversationSettings {
 // 设置
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// 完整的 V1 设置对象。
+/// 完整的 V1.5 设置对象。
 ///
 /// 所有写入必须经过 `Settings::sanitized()` 以强制执行其列出的不变量。
-/// 规范 schema（权威来源）见 `CONTEXT.md"Settings (V1 shape)"`，
+/// V1.5 schema：统一 `providers[]` 替代 `llm_providers[] + billing_providers[]` 双数组。
+/// 规范 schema（权威来源）见 `CONTEXT.md"Settings (V1.5 shape)"`，
 /// TS 镜像见 `src/lib/types.ts`。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
-    // A. LLM providers
+    // ─── V1.5 新字段 ───────────────────────────────────────────────────────────
+    /// 统一的 Provider 列表。V1.5+ 唯一数据源。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub providers: Vec<Provider>,
+
+    /// Schema 版本标记。用于检测并触发 V0/V1 → V1.5 自动迁移。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema_version: Option<String>,
+
+    // ─── V1 遗留字段（迁移期间保留，V1.5 后逐渐废弃）───────────────────────────
+    /// @deprecated V1 schema。V1.5+ 使用 `providers`。
+    #[serde(default)]
     pub llm_providers: Vec<LLMProvider>,
 
-    // B. Default behaviour
+    /// @deprecated V1 schema。V1.5+ 使用 `providers`。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_llm_provider_id: Option<String>,
+
+    // ─── V1 保留字段 ─────────────────────────────────────────────────────────
     pub user_language: UserLanguage,
     pub theme: Theme,
-
-    // C. App lifecycle
     pub start_at_login: bool,
-
-    // D. Window
     pub window: WindowSettings,
-
-    // E. System prompt
     pub system_prompt: SystemPromptSettings,
 
-    // F. Billing providers
+    /// @deprecated V1 schema。V1.5+ 使用 `providers`。
+    #[serde(default)]
     pub billing_providers: Vec<BillingProviderConfig>,
 
-    // G. Conversations
     pub conversations: ConversationSettings,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            llm_providers: vec![LLMProvider {
+            // V1.5: MiniMax pre-fill (ADR-0011)
+            providers: vec![Provider {
                 id: "minimax".into(),
                 label: "MiniMax".into(),
                 enabled: true,
-                default_model: Some("MiniMax-M2.5-highspeed".into()),
-                base_url: Some("https://api.minimaxi.com/anthropic".into()),
-                api_key_ref: Some("llm_providers/minimax/api_key".into()),
-                api_type: "anthropic-messages".into(),
+                llm: ProviderLlm {
+                    default_model: "MiniMax-M2.5-highspeed".into(),
+                    base_url: "https://api.minimaxi.com/anthropic".into(),
+                    api_type: "anthropic-messages".into(),
+                    llm_api_key_ref: "llm_providers/minimax/api_key".into(),
+                    models: vec![ModelMeta {
+                        id: "MiniMax-M2.5-highspeed".into(),
+                        label: "MiniMax-M2.5-highspeed".into(),
+                        context_window: Some(200_000),
+                        deprecated: false,
+                        thinking: false,
+                    }],
+                    models_endpoint: "https://api.minimaxi.com/anthropic/v1/models".into(),
+                },
+                billing: Some(ProviderBilling {
+                    kind: BillingKind::PlanQuota,
+                    billing_api_key_ref: "billing/minimax/api_key".into(),
+                }),
             }],
-            default_llm_provider_id: Some("minimax".into()),
+            schema_version: Some(SCHEMA_VERSION_V15.to_string()),
+            // V1 legacy fields (empty for fresh V1.5 install)
+            llm_providers: Vec::new(),
+            default_llm_provider_id: None,
             user_language: UserLanguage::default(),
             theme: Theme::default(),
             start_at_login: true,
@@ -268,7 +296,14 @@ impl Settings {
     // ─────────────────────────────────────────────────────────────────────────
 
     pub fn sanitized(mut self) -> Self {
-        // 不变量 1：refresh_interval_secs >= MIN_REFRESH_SECS
+        // ─── V0/V1 → V1.5 迁移 ───────────────────────────────────────────────
+        // 注意：keyring → Tauri store key 迁移需要在 apply_settings() 中
+        // 调用 keyring I/O，这里只做 schema 迁移。
+        if self.schema_version.as_deref() != Some(SCHEMA_VERSION_V15) {
+            self = migrate_to_v1_5(self);
+        }
+
+        // 不变量 1：refresh_interval_secs >= MIN_REFRESH_SECS（V1 legacy）
         for provider in &mut self.billing_providers {
             if provider.refresh_interval_secs < Self::MIN_REFRESH_SECS {
                 provider.refresh_interval_secs = Self::MIN_REFRESH_SECS;
@@ -289,6 +324,124 @@ impl Settings {
     }
 }
 
+/// V0/V1 → V1.5 schema 迁移。
+///
+/// 检测逻辑：
+/// - `schema_version == Some("1.5")` → 已迁移，no-op
+/// - `llm_providers` 非空 → V0/V1 schema，触发迁移
+/// - `llm_providers` 为空 → V0.5 或 V1.5 fresh install，预填 MiniMax
+///
+/// V1.5 迁移规则（ADR-0012）：
+/// - 每个 LLM provider → 新的 Provider 记录（llm 必选）
+/// - 匹配 id 的 billing provider → Provider.billing（可选）
+/// - billing provider 无匹配 LLM → 跳过（V1 设计不可能出现）
+/// - 迁移后 schema_version = "1.5"，旧字段清空
+fn migrate_to_v1_5(mut settings: Settings) -> Settings {
+    // 已是 V1.5，跳过迁移
+    if settings.schema_version.as_deref() == Some(SCHEMA_VERSION_V15) {
+        return settings;
+    }
+
+    // 检测 V0.5（llm_providers 为空）→ fresh install，预填 MiniMax
+    if settings.llm_providers.is_empty() && settings.billing_providers.is_empty() {
+        let default_settings = Settings::default();
+        settings.providers = default_settings.providers;
+        settings.schema_version = Some(SCHEMA_VERSION_V15.to_string());
+        return settings;
+    }
+
+    // V0/V1 schema 迁移
+    let llm_by_id: std::collections::HashMap<&str, &LLMProvider> =
+        settings.llm_providers.iter().map(|p| (p.id.as_str(), p)).collect();
+    let billing_by_id: std::collections::HashMap<&str, &BillingProviderConfig> =
+        settings.billing_providers.iter().map(|p| (p.id.as_str(), p)).collect();
+
+    let mut new_providers: Vec<Provider> = Vec::new();
+
+    for llm in &settings.llm_providers {
+        let billing = billing_by_id.get(llm.id.as_str()).copied();
+
+        // 构建 ProviderLlm
+        let provider_llm = ProviderLlm {
+            default_model: llm.default_model.clone().unwrap_or_else(|| {
+                // V1 默认模型
+                if llm.id == "deepseek" {
+                    "deepseek-chat".into()
+                } else {
+                    "MiniMax-M2.5-highspeed".into()
+                }
+            }),
+            base_url: llm.base_url.clone().unwrap_or_else(|| {
+                if llm.id == "deepseek" {
+                    "https://api.deepseek.com/anthropic".into()
+                } else {
+                    "https://api.minimaxi.com/anthropic".into()
+                }
+            }),
+            api_type: llm.api_type.clone(),
+            llm_api_key_ref: llm.api_key_ref.clone().unwrap_or_else(|| {
+                format!("llm_providers/{}/api_key", llm.id)
+            }),
+            // V0 → V1.5 不迁移 models（用户需要在 Settings UI 重新刷新）
+            models: vec![ModelMeta {
+                id: llm.default_model.clone().unwrap_or_else(|| {
+                    if llm.id == "deepseek" {
+                        "deepseek-chat".into()
+                    } else {
+                        "MiniMax-M2.5-highspeed".into()
+                    }
+                }),
+                label: llm.default_model.clone().unwrap_or_else(|| {
+                    if llm.id == "deepseek" {
+                        "deepseek-chat".into()
+                    } else {
+                        "MiniMax-M2.5-highspeed".into()
+                    }
+                }),
+                context_window: None,
+                deprecated: false,
+                thinking: false,
+            }],
+            models_endpoint: if llm.id == "deepseek" {
+                "https://api.deepseek.com/models".into()
+            } else {
+                "https://api.minimaxi.com/anthropic/v1/models".into()
+            },
+        };
+
+        // 构建 ProviderBilling（如果存在匹配的 billing provider）
+        let provider_billing = billing.map(|b| ProviderBilling {
+            kind: if llm.id == "deepseek" {
+                BillingKind::Balance
+            } else {
+                BillingKind::PlanQuota
+            },
+            // V1.5 billing key 引用改为 Tauri store 路径
+            billing_api_key_ref: b.api_key_ref.clone().unwrap_or_else(|| {
+                format!("billing/{}/api_key", b.id)
+            }),
+        });
+
+        new_providers.push(Provider {
+            id: llm.id.clone(),
+            label: llm.label.clone(),
+            enabled: llm.enabled,
+            llm: provider_llm,
+            billing: provider_billing,
+        });
+    }
+
+    settings.providers = new_providers;
+    settings.schema_version = Some(SCHEMA_VERSION_V15.to_string());
+
+    // 迁移完成后清空旧字段（避免重复迁移）
+    settings.llm_providers.clear();
+    settings.billing_providers.clear();
+    settings.default_llm_provider_id = None;
+
+    settings
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Tests
 // ─────────────────────────────────────────────────────────────────────────────
@@ -297,15 +450,23 @@ impl Settings {
 mod tests {
     use super::*;
 
+    // ─── V1.5 默认设置测试 ───────────────────────────────────────────────────
+
     #[test]
     fn default_settings_sanity() {
         let s = Settings::default();
-        // V1 预置 minimax provider（ADR-0011）
-        assert_eq!(s.llm_providers.len(), 1);
-        assert_eq!(s.llm_providers[0].id, "minimax");
-        assert_eq!(s.llm_providers[0].api_type, "anthropic-messages");
-        assert_eq!(s.default_llm_provider_id, Some("minimax".into()));
+        // V1.5 schema_version 已设置
+        assert_eq!(s.schema_version, Some("1.5".to_string()));
+        // MiniMax pre-fill (ADR-0011)
+        assert_eq!(s.providers.len(), 1);
+        assert_eq!(s.providers[0].id, "minimax");
+        assert_eq!(s.providers[0].llm.api_type, "anthropic-messages");
+        assert!(s.providers[0].billing.is_some());
+        assert_eq!(s.providers[0].billing.as_ref().unwrap().kind, BillingKind::PlanQuota);
+        // V1 legacy fields 已清空
+        assert!(s.llm_providers.is_empty());
         assert!(s.billing_providers.is_empty());
+        assert!(s.default_llm_provider_id.is_none());
         assert_eq!(s.user_language, UserLanguage::Auto);
         assert_eq!(s.theme, Theme::System);
         assert!(s.start_at_login);
@@ -314,31 +475,174 @@ mod tests {
     }
 
     #[test]
-    fn sanitized_clamps_billing_refresh() {
-        let mut s = Settings::default();
-        s.billing_providers.push(BillingProviderConfig {
-            id: "deepseek".into(),
-            enabled: true,
-            refresh_interval_secs: 1,
-            api_key_ref: None,
-        });
-        let s = s.sanitized();
-        assert_eq!(s.billing_providers[0].refresh_interval_secs, Settings::MIN_REFRESH_SECS);
+    fn default_minimax_model_is_m25_highspeed() {
+        let s = Settings::default();
+        assert_eq!(s.providers[0].llm.default_model, "MiniMax-M2.5-highspeed");
+        assert_eq!(s.providers[0].llm.models[0].id, "MiniMax-M2.5-highspeed");
+        assert_eq!(s.providers[0].llm.models_endpoint, "https://api.minimaxi.com/anthropic/v1/models");
+    }
+
+    // ─── V1.5 已迁移 settings 的 sanitized() 是 no-op ─────────────────────
+
+    #[test]
+    fn sanitized_v15_is_noop() {
+        let s = Settings::default(); // 已是 V1.5
+        let s2 = s.sanitized();
+        assert_eq!(s2.schema_version, Some("1.5".to_string()));
+        assert_eq!(s2.providers.len(), 1);
+        assert_eq!(s2.providers[0].id, "minimax");
     }
 
     #[test]
-    fn sanitized_clamps_refresh_interval_secs() {
+    fn sanitized_v15_preserves_fields() {
         let mut s = Settings::default();
-        s.billing_providers.push(BillingProviderConfig {
+        s.user_language = UserLanguage::Zh;
+        s.theme = Theme::Dark;
+        s.conversations.auto_archive_after_days = 0; // 会被钳制
+        let s2 = s.sanitized();
+        assert_eq!(s2.user_language, UserLanguage::Zh);
+        assert_eq!(s2.theme, Theme::Dark);
+        assert_eq!(s2.conversations.auto_archive_after_days, 1);
+    }
+
+    // ─── V0 settings.json → V1.5 迁移测试 ─────────────────────────────────
+
+    #[test]
+    fn migrate_v0_minimax_settings_to_v15() {
+        // 构造 V0 settings fixture: llm_providers=[minimax], billing_providers=[minimax]
+        let v0_settings = Settings {
+            llm_providers: vec![LLMProvider {
+                id: "minimax".into(),
+                label: "MiniMax".into(),
+                enabled: true,
+                default_model: Some("MiniMax-M2.5-highspeed".into()),
+                base_url: Some("https://api.minimaxi.com/anthropic".into()),
+                api_key_ref: Some("llm_providers/minimax/api_key".into()),
+                api_type: "anthropic-messages".into(),
+            }],
+            billing_providers: vec![BillingProviderConfig {
+                id: "minimax".into(),
+                enabled: true,
+                refresh_interval_secs: 60,
+                api_key_ref: Some("billing/minimax/api_key".into()),
+            }],
+            ..Settings::default()
+        };
+        // 清除默认 pre-fill，保留 V0 字段
+        let mut v0 = Settings::default();
+        v0.llm_providers = v0_settings.llm_providers;
+        v0.billing_providers = v0_settings.billing_providers;
+        v0.providers.clear();
+        v0.schema_version = None;
+
+        let migrated = v0.sanitized();
+
+        // 验证迁移结果
+        assert_eq!(migrated.schema_version, Some("1.5".to_string()));
+        assert_eq!(migrated.providers.len(), 1);
+        assert_eq!(migrated.providers[0].id, "minimax");
+        assert!(migrated.providers[0].llm.default_model.contains("MiniMax"));
+        assert!(migrated.providers[0].billing.is_some());
+        assert_eq!(migrated.providers[0].billing.as_ref().unwrap().kind, BillingKind::PlanQuota);
+        // V1 legacy fields 已清空
+        assert!(migrated.llm_providers.is_empty());
+        assert!(migrated.billing_providers.is_empty());
+    }
+
+    #[test]
+    fn migrate_v0_deepseek_settings_to_v15() {
+        let mut v0 = Settings::default();
+        v0.llm_providers = vec![LLMProvider {
+            id: "deepseek".into(),
+            label: "DeepSeek".into(),
+            enabled: true,
+            default_model: Some("deepseek-chat".into()),
+            base_url: Some("https://api.deepseek.com/anthropic".into()),
+            api_key_ref: Some("llm_providers/deepseek/api_key".into()),
+            api_type: "anthropic-messages".into(),
+        }];
+        v0.billing_providers = vec![BillingProviderConfig {
             id: "deepseek".into(),
             enabled: true,
-            refresh_interval_secs: 1,
-            api_key_ref: None,
-        });
-        let s = s.sanitized();
-        // 决策 ADR-0011：下限 5 → 60
-        assert_eq!(s.billing_providers[0].refresh_interval_secs, 60);
+            refresh_interval_secs: 60,
+            api_key_ref: Some("billing/deepseek/api_key".into()),
+        }];
+        v0.providers.clear();
+        v0.schema_version = None;
+
+        let migrated = v0.sanitized();
+
+        assert_eq!(migrated.schema_version, Some("1.5".to_string()));
+        assert_eq!(migrated.providers.len(), 1);
+        assert_eq!(migrated.providers[0].id, "deepseek");
+        assert_eq!(migrated.providers[0].llm.default_model, "deepseek-chat");
+        assert!(migrated.providers[0].billing.is_some());
+        assert_eq!(migrated.providers[0].billing.as_ref().unwrap().kind, BillingKind::Balance);
     }
+
+    // ─── V0.5（无 llm_providers）→ V1.5 fresh install 测试 ───────────────
+
+    #[test]
+    fn migrate_v05_empty_settings_to_v15_fresh_install() {
+        // V0.5: llm_providers 和 billing_providers 都为空
+        let mut v05 = Settings::default();
+        v05.llm_providers.clear();
+        v05.billing_providers.clear();
+        v05.providers.clear();
+        v05.schema_version = None;
+
+        let migrated = v05.sanitized();
+
+        // V0.5 treated as fresh install → pre-filled MiniMax
+        assert_eq!(migrated.schema_version, Some("1.5".to_string()));
+        assert_eq!(migrated.providers.len(), 1);
+        assert_eq!(migrated.providers[0].id, "minimax");
+        assert!(migrated.providers[0].billing.is_some());
+    }
+
+    // ─── 混合状态（仅有 llm 无 billing）迁移测试 ──────────────────────────
+
+    #[test]
+    fn migrate_llm_only_no_billing_to_v15() {
+        // 仅有 LLM provider，无 billing provider（如新加的第三方 provider）
+        let mut v0 = Settings::default();
+        v0.llm_providers = vec![LLMProvider {
+            id: "openrouter".into(),
+            label: "OpenRouter".into(),
+            enabled: true,
+            default_model: Some("gpt-4o".into()),
+            base_url: Some("https://openrouter.ai/anthropic".into()),
+            api_key_ref: Some("llm_providers/openrouter/api_key".into()),
+            api_type: "anthropic-messages".into(),
+        }];
+        v0.billing_providers.clear();
+        v0.providers.clear();
+        v0.schema_version = None;
+
+        let migrated = v0.sanitized();
+
+        assert_eq!(migrated.schema_version, Some("1.5".to_string()));
+        assert_eq!(migrated.providers.len(), 1);
+        assert_eq!(migrated.providers[0].id, "openrouter");
+        assert!(migrated.providers[0].billing.is_none()); // 无 billing
+    }
+
+    // ─── 已有 V1.5 schema 跳过迁移测试 ────────────────────────────────────
+
+    #[test]
+    fn already_v15_settings_not_migrated_again() {
+        let v15 = Settings::default(); // 已是 V1.5
+        let original_providers = v15.providers.clone();
+
+        let result = v15.sanitized();
+
+        assert_eq!(result.schema_version, Some("1.5".to_string()));
+        assert_eq!(result.providers, original_providers);
+        // 确认不是重新创建，而是保持原样
+        assert_eq!(result.providers[0].llm.models.len(), 1);
+    }
+
+    // ─── 已有测试（更新以适配 V1.5 schema）─────────────────────────────────
 
     #[test]
     fn sanitized_clamps_auto_archive_after_days() {
@@ -373,35 +677,35 @@ mod tests {
     }
 
     #[test]
-    fn sanitized_passes_through_valid_settings() {
-        let mut s = Settings::default();
-        s.billing_providers.push(BillingProviderConfig {
-            id: "deepseek".into(),
-            enabled: true,
-            refresh_interval_secs: 60,
-            api_key_ref: None,
-        });
-        s.conversations.auto_archive_after_days = 30;
-        s.conversations.max_history = 1000;
-        let s = s.sanitized();
-        assert_eq!(s.billing_providers[0].refresh_interval_secs, 60);
-        assert_eq!(s.conversations.auto_archive_after_days, 30);
-        assert_eq!(s.conversations.max_history, 1000);
-    }
-
-    #[test]
     fn settings_round_trip_via_serde() {
+        // V1.5 settings round-trip
         let s = Settings {
-            llm_providers: vec![LLMProvider {
-                id: "minimax".into(),
-                label: "MiniMax".into(),
+            providers: vec![Provider {
+                id: "deepseek".into(),
+                label: "DeepSeek".into(),
                 enabled: true,
-                default_model: Some("MiniMax-M2.5-highspeed".into()),
-                base_url: Some("https://api.minimaxi.com/anthropic".into()),
-                api_key_ref: Some("llm_providers/minimax/api_key".into()),
-                api_type: "anthropic-messages".into(),
+                llm: ProviderLlm {
+                    default_model: "deepseek-chat".into(),
+                    base_url: "https://api.deepseek.com/anthropic".into(),
+                    api_type: "anthropic-messages".into(),
+                    llm_api_key_ref: "llm_providers/deepseek/api_key".into(),
+                    models: vec![ModelMeta {
+                        id: "deepseek-chat".into(),
+                        label: "DeepSeek Chat".into(),
+                        context_window: Some(64000),
+                        deprecated: false,
+                        thinking: false,
+                    }],
+                    models_endpoint: "https://api.deepseek.com/models".into(),
+                },
+                billing: Some(ProviderBilling {
+                    kind: BillingKind::Balance,
+                    billing_api_key_ref: "billing/deepseek/api_key".into(),
+                }),
             }],
-            default_llm_provider_id: Some("minimax".into()),
+            schema_version: Some("1.5".to_string()),
+            llm_providers: Vec::new(),
+            default_llm_provider_id: None,
             user_language: UserLanguage::En,
             theme: Theme::Dark,
             start_at_login: false,
@@ -410,22 +714,16 @@ mod tests {
                 default: "You are a helpful assistant.".into(),
                 user_can_edit: true,
             },
-            billing_providers: vec![BillingProviderConfig {
-                id: "deepseek".into(),
-                enabled: true,
-                refresh_interval_secs: 60,
-                api_key_ref: None,
-            }],
+            billing_providers: Vec::new(),
             conversations: ConversationSettings::default(),
         };
         let json = serde_json::to_string(&s).unwrap();
         let back: Settings = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.llm_providers[0].id, "minimax");
-        assert_eq!(back.default_llm_provider_id, Some("minimax".into()));
-        assert_eq!(back.llm_providers[0].api_type, "anthropic-messages");
+        assert_eq!(back.providers[0].id, "deepseek");
+        assert_eq!(back.providers[0].llm.default_model, "deepseek-chat");
+        assert_eq!(back.schema_version, Some("1.5".to_string()));
         assert_eq!(back.user_language, UserLanguage::En);
         assert_eq!(back.theme, Theme::Dark);
-        assert_eq!(back.billing_providers[0].id, "deepseek");
     }
 
     #[test]

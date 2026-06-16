@@ -3,37 +3,12 @@
 
 use crate::db::conversations;
 use crate::db::messages;
-use crate::secrets;
 use crate::secrets_llm;
 use crate::settings::Settings;
 use crate::state::{AppState, ProviderDescriptor};
 use crate::types::{AppError, ProviderId, SnapshotEnvelope};
 use tauri::State;
 use uuid::Uuid;
-
-#[tauri::command]
-pub async fn list_providers(state: State<'_, AppState>) -> Result<Vec<ProviderDescriptor>, String> {
-    Ok(state.list_providers())
-}
-
-#[tauri::command]
-pub async fn get_active_provider(state: State<'_, AppState>) -> Result<ProviderId, String> {
-    Ok(state.get_active())
-}
-
-#[tauri::command]
-pub async fn set_active_provider(
-    id: ProviderId,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    state.set_active(id)
-}
-
-#[tauri::command]
-pub async fn force_refresh(state: State<'_, AppState>) -> Result<(), String> {
-    state.wakeup.notify_one();
-    Ok(())
-}
 
 #[tauri::command]
 pub async fn get_settings(state: State<'_, AppState>) -> Result<Settings, String> {
@@ -49,45 +24,6 @@ pub async fn update_settings(
     state.apply_settings(sanitized.clone())?;
     state.persist_settings();
     Ok(sanitized)
-}
-
-#[tauri::command]
-pub async fn set_api_key(
-    provider: ProviderId,
-    value: String,
-    state: State<'_, AppState>,
-) -> Result<bool, String> {
-    if value.is_empty() {
-        secrets::delete_api_key(provider).map_err(|e| e.to_string())?;
-    } else {
-        secrets::set_api_key(provider, &value).map_err(|e| e.to_string())?;
-    }
-    let stored = secrets::has_api_key(provider);
-    // 触发重新渲染，以更新设置 UI 中的"已配置密钥"指示器，
-    // 文件中密钥变更时刷新活动快照。
-    state.wakeup.notify_one();
-    Ok(stored)
-}
-
-#[tauri::command]
-pub async fn has_api_key(provider: ProviderId) -> Result<bool, String> {
-    Ok(secrets::has_api_key(provider))
-}
-
-#[tauri::command]
-pub async fn test_provider(
-    provider: ProviderId,
-    state: State<'_, AppState>,
-) -> Result<SnapshotEnvelope, String> {
-    state.fetch_provider(provider).await.map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub async fn latest_snapshot(
-    provider: ProviderId,
-    state: State<'_, AppState>,
-) -> Result<Option<SnapshotEnvelope>, String> {
-    Ok(state.latest_snapshot(provider))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -210,25 +146,25 @@ pub async fn list_billing_providers(
 
 #[tauri::command]
 pub async fn has_billing_key(
-    provider: ProviderId,
+    app: tauri::AppHandle,
+    provider_id: String,
 ) -> Result<bool, AppError> {
-    Ok(secrets::has_api_key(provider))
+    Ok(secrets_llm::has_billing_key(&app, &provider_id))
 }
 
 #[tauri::command]
 pub async fn set_billing_key(
-    provider: ProviderId,
+    app: tauri::AppHandle,
+    provider_id: String,
     value: String,
-    state: State<'_, AppState>,
 ) -> Result<(), AppError> {
     if value.is_empty() {
-        secrets::delete_api_key(provider)
-            .map_err(|e| AppError::Unauthorized { message: e.to_string() })?;
+        secrets_llm::delete_billing_key(&app, &provider_id)
+            .map_err(|e| AppError::Unauthorized { message: e })?;
     } else {
-        secrets::set_api_key(provider, &value)
-            .map_err(|e| AppError::Unauthorized { message: e.to_string() })?;
+        secrets_llm::set_billing_key(&app, &provider_id, &value)
+            .map_err(|e| AppError::Unauthorized { message: e })?;
     }
-    state.wakeup.notify_one();
     Ok(())
 }
 
@@ -297,5 +233,21 @@ pub async fn get_llm_key(
 ) -> Result<Option<String>, String> {
     let secret = secrets_llm::get_llm_key(&app, &provider_id)?;
     Ok(secret.map(|s| s.expose().to_string()))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// delete_provider_keys IPC（Metis #9）
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn delete_provider_keys(
+    provider_id: String,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    // 删除 LLM provider 密钥（llm_providers/<id>/api_key）
+    secrets_llm::delete_llm_key(&app, &provider_id)?;
+    // 删除计费密钥（billing/<id>/api_key）
+    secrets_llm::delete_billing_key(&app, &provider_id)?;
+    Ok(())
 }
 

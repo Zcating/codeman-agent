@@ -12,7 +12,6 @@ export {
   AgentRuntime,
   AgentRuntimeLive,
   RuntimeLayer,
-  RuntimeDeps,
   type RuntimeEvent,
   type RuntimeError,
 } from "./lib/runtime";

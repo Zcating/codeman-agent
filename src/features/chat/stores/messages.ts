@@ -16,7 +16,7 @@
 
 import { createSignal, type Accessor } from "solid-js";
 import { Effect, Exit, Stream } from "effect";
-import { MessageService, MessageServiceLive } from "../../../shared/lib/tauri";
+import { MessageService, MessageServiceLive, SettingsServiceLive } from "../../../shared/lib/tauri";
 import { AgentRuntime, RuntimeLayer, type RuntimeEvent } from "../lib/runtime";
 import type { Message, ToolCall, ToolResult, Conversation } from "../../../shared/lib/types";
 
@@ -157,7 +157,7 @@ export async function runConversationStream(
   const program = Effect.gen(function* () {
     const runtime = yield* AgentRuntime;
     yield* Stream.runForEach(runtime.run(conversation, userMessage), processEvent);
-  }).pipe(Effect.provide(RuntimeLayer));
+  }).pipe(Effect.provide(RuntimeLayer), Effect.provide(SettingsServiceLive));
 
   await Effect.runPromise(program);
 }

@@ -1,22 +1,24 @@
-﻿// AgentRuntime — 将 pi-mono 的 agent loop 包装在 Effect Stream 中。
+﻿//! AgentRuntime — pi-agent 0.9.0 的 Effect Stream 包装。
+//!
+//! T13: 使用 pi-ai 0.9.4 的 AgentTool 声明式调度模式。
+//! - 工具通过 AgentTool[] 传入 agent 构造函数（pi-agent 自动调度 tool.execute）
+//! - 仅订阅高级事件：token（来自 message_update）、done（来自 agent_end）、error
+//! - 使用 ProviderService 读取提供商配置（不再用 V1 LLMProviderService）
+
 import { Effect, Stream, Layer, Context, Ref } from "effect";
-import type { Message as PiMessage, Model } from "@mariozechner/pi-ai";
 import { Agent, ProviderTransport, type AgentTransport } from "@mariozechner/pi-agent";
 import type { AgentEvent } from "@mariozechner/pi-agent";
-import {
-  SettingsService,
-  SettingsServiceLive,
-  BillingServiceLive,
-} from "../../../shared/lib/tauri";
-import { LLMProviderService, LLMProviderServiceLive } from "../../settings/lib/llm-providers";
-import { buildModel } from "./build-model";
-import type { Conversation, Message, ToolCall } from "../../../shared/lib/types";
+import type { Model } from "@mariozechner/pi-ai";
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { ProviderService, ProviderServiceLive } from "../../../shared/lib/tauri";
+import { getBalanceTool, getPlanQuotaTool } from "../../billing/lib/billing";
+import type { Conversation, Message } from "../../../shared/lib/types";
 
-// ─── Runtime 事件 & 错误类型 ─────────────────────────────────────────────
+// ─── Runtime 事件类型 ─────────────────────────────────────────────
 
 export type RuntimeEvent =
   | { type: "token"; content: string }
-  | { type: "tool_call"; toolCall: ToolCall }
+  | { type: "tool_call"; toolCall: { id: string; name: string; args: Record<string, unknown> } }
   | { type: "tool_result"; toolCallId: string; result: unknown; error?: string }
   | { type: "done"; message: Message }
   | { type: "error"; error: { message: string } };
@@ -28,10 +30,7 @@ export class RuntimeError extends Error {
   }
 }
 
-// ─── Billing 工具（从 billing feature 加载） ──────────────────────────────
-import { billingTools } from "../../billing/lib/billing";
-
-// ─── 服务定义 ─────────────────────────────────────────────────────
+// ─── AgentRuntime 服务定义 ────────────────────────────────────────
 
 export class AgentRuntime extends Context.Tag("AgentRuntime")<
   AgentRuntime,
@@ -44,100 +43,111 @@ export class AgentRuntime extends Context.Tag("AgentRuntime")<
   }
 >() {}
 
-// ─── Live layer ─────────────────────────────────────────────────────────────
+// ─── 工具注册（AgentTool[] — pi-agent 自动调度） ─────────────────
+
+const tools = [getBalanceTool, getPlanQuotaTool];
+
+// ─── Live Layer ─────────────────────────────────────────────────────
 
 export const AgentRuntimeLive = Layer.effect(
   AgentRuntime,
   Effect.gen(function* () {
-    // 持有当前 Agent 实例的引用，以便 cancel() 可以中止它。
-    // 预期每个 runtime 实例同时只有一个 run() 处于活跃状态。
     const agentRef = yield* Ref.make<Agent | null>(null);
 
     const run = (
       conversation: Conversation,
       userMessage: Message,
     ): Stream.Stream<RuntimeEvent, never, never> => {
-      // 通过 flatMap 构建 Stream，使 context 保持在内部 Effect 的局部作用域。
-      // RuntimeDeps layer 通过 RuntimeLayer 在调用处提供。
-      // Cast 为文档中声明的返回类型 — services 通过 RuntimeLayer 保持在作用域内。
       return Stream.flatMap(
         Stream.fromEffect(
           Effect.gen(function* () {
-            const settingsSvc = yield* SettingsService;
+            // 1. 获取提供商列表
+            const providerSvc = yield* ProviderService;
+            const providers = yield* providerSvc.list();
 
-            // 加载设置和活跃 provider
-            const settings = yield* settingsSvc.getSettings();
-            const activeProvider = yield* settingsSvc.getActiveLlmProvider();
-            if (!activeProvider) {
-              return Stream.fail(new RuntimeError("no active LLM provider"));
+            if (providers.length === 0) {
+              return Stream.fail(new RuntimeError("No providers configured. Add one in Settings."));
             }
 
-            // 从 provider 配置解析 model（使用 buildModel helper）
-            const model: Model<any> = buildModel(activeProvider);
-
-            // 构建 transport — 通过 LLMProviderService.getApiKey 获取密钥
-            // 注意：ProviderTransport 发起直接 HTTP 调用；在 webview 中这需要
-            // CORS 代理或 provider 必须支持直接浏览器调用。
-            const llmSvc = yield* LLMProviderService;
-            const apiKey = yield* llmSvc.getApiKey(activeProvider.id);
-            const transport: AgentTransport = new ProviderTransport({
-              getApiKey: async (_provider: string) => apiKey ?? undefined,
+            // 2. 选取默认提供商（或第一个）
+            const settings = yield* Effect.tryPromise({
+              try: () => tauriInvoke<{ default_llm_provider_id?: string }>("get_settings"),
+              catch: (e) => new RuntimeError(`Failed to get settings: ${e}`),
             });
 
-            // 使用 ProviderTransport 和 billing 工具创建 agent。
-            // 对 tools cast 为 `any` — pi-agent 期望 AgentTool（扩展 Tool 带
-            // label+execute），但我们只有 pi-ai@0.73.1 的 Tool（该版本无 AgentTool；
-            // pi-agent@0.9.0 使用 pi-ai@0.9.4，其中 AgentTool 存在）。
+            let provider = providers[0];
+            if (settings.default_llm_provider_id) {
+              const defaultProvider = providers.find(
+                (p) => p.id === settings.default_llm_provider_id,
+              );
+              if (defaultProvider) provider = defaultProvider;
+            }
+
+            // 3. 获取 LLM 配置
+            const { base_url, default_model } = provider.llm;
+
+            // 4. 获取 API key（Tauri store）
+            const apiKey = yield* Effect.tryPromise({
+              try: () =>
+                tauriInvoke<string | null>("get_llm_key", {
+                  providerId: provider.id,
+                }).then((k) => k ?? ""),
+              catch: (e) => new RuntimeError(`Failed to get API key: ${e}`),
+            });
+
+            // 5. 构建 Model（inline buildModel 逻辑）
+            const model: Model<any> = {
+              id: default_model,
+              name: provider.label,
+              api: provider.llm.api_type,
+              provider: provider.id,
+              baseUrl: base_url ?? "",
+              reasoning: false,
+              input: ["text"],
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+              contextWindow: 128000,
+              maxTokens: 8192,
+            };
+
+            // 6. 创建 Transport 和 Agent
+            const transport: AgentTransport = new ProviderTransport({
+              getApiKey: async () => apiKey,
+            });
+
             const agent = new Agent({
               transport,
               initialState: {
-                systemPrompt: conversation.system_prompt ?? settings.system_prompt.default,
+                systemPrompt: conversation.system_prompt ?? "You are a helpful assistant.",
                 model,
-                tools: billingTools as any,
+                tools,
                 messages: [],
               },
             });
 
-            // 存储 agent ref 以便 cancel() 可以中止此次运行
+            // 存储 agent ref 以便 cancel() 可以中止
             yield* Ref.set(agentRef, agent);
 
-            // 订阅 pi-agent 事件并映射到 RuntimeEvent
+            // 7. 订阅高级事件并映射到 RuntimeEvent
             const eventQueue: RuntimeEvent[] = [];
-            let finishResolve: (msgs: PiMessage[]) => void;
-            const finishPromise = new Promise<PiMessage[]>((resolve) => {
+            let finishResolve: (messages: unknown[]) => void;
+            const finishPromise = new Promise<unknown[]>((resolve) => {
               finishResolve = resolve;
             });
 
             const unsub = agent.subscribe((evt: AgentEvent) => {
               switch (evt.type) {
                 case "message_update": {
-                  const assistantMsg = evt.message;
-                  for (const block of assistantMsg.content) {
-                    if (typeof block === "object" && block !== null && "type" in block) {
-                      const b = block as {
-                        type: string;
-                        text?: string;
-                        id?: string;
-                        name?: string;
-                        arguments?: Record<string, unknown>;
-                      };
-                      if (b.type === "text" && b.text !== undefined) {
-                        eventQueue.push({ type: "token", content: b.text });
-                      } else if (b.type === "toolCall" && b.id !== undefined) {
-                        eventQueue.push({
-                          type: "tool_call",
-                          toolCall: {
-                            id: b.id,
-                            name: b.name ?? "",
-                            args: b.arguments ?? {},
-                          },
-                        });
-                      }
+                  // 提取文本块作为 token 事件
+                  for (const block of evt.message.content) {
+                    if (
+                      typeof block === "object" &&
+                      block !== null &&
+                      block.type === "text" &&
+                      "text" in block
+                    ) {
+                      eventQueue.push({ type: "token", content: block.text });
                     }
                   }
-                  break;
-                }
-                case "tool_execution_start": {
                   break;
                 }
                 case "tool_execution_end": {
@@ -150,20 +160,18 @@ export const AgentRuntimeLive = Layer.effect(
                   break;
                 }
                 case "agent_end": {
-                  finishResolve!(evt.messages as PiMessage[]);
+                  finishResolve!(evt.messages);
                   break;
                 }
               }
             });
 
-            // 向 agent 追加用户消息并运行 prompt。
-            // 通过 `any` cast 桥接 pi-ai@0.73.1 与 pi-ai@0.9.4 版本不匹配
-            //（AssistantMessage.api 字段类型在不同版本间不同）。
+            // 8. 发送用户消息并触发 agent prompt
             agent.appendMessage({
               role: "user",
               content: userMessage.content,
               timestamp: userMessage.created_at,
-            } as any);
+            });
 
             agent.prompt(userMessage.content).catch((e: unknown) => {
               eventQueue.push({
@@ -173,23 +181,27 @@ export const AgentRuntimeLive = Layer.effect(
               finishResolve!([]);
             });
 
-            // 等待 agent_end，然后发送 done 事件
-            const finalPiMessages = yield* Effect.promise(() => finishPromise);
+            // 9. 等待 agent_end，构造 done 事件
+            const finalMessages = yield* Effect.promise(() => finishPromise);
             unsub();
 
-            if (finalPiMessages.length > 0) {
-              const lastPiMsg = finalPiMessages[finalPiMessages.length - 1];
-              const textBlocks = (
-                lastPiMsg.content as Array<{ type: string; text?: string }>
-              ).filter((b) => b.type === "text" && b.text !== undefined);
-              const toolBlocks = (
-                lastPiMsg.content as Array<{
+            if (finalMessages.length > 0) {
+              const lastMsg = finalMessages[finalMessages.length - 1] as {
+                content: Array<{
                   type: string;
+                  text?: string;
                   id?: string;
                   name?: string;
                   arguments?: Record<string, unknown>;
-                }>
-              ).filter((b) => b.type === "toolCall" && b.id !== undefined);
+                }>;
+                model?: string;
+              };
+
+              const textBlocks =
+                lastMsg.content?.filter((b) => b.type === "text" && b.text !== undefined) ?? [];
+              const toolBlocks =
+                lastMsg.content?.filter((b) => b.type === "toolCall" && b.id !== undefined) ?? [];
+
               const doneMessage: Message = {
                 id: crypto.randomUUID(),
                 conversation_id: conversation.id,
@@ -204,15 +216,16 @@ export const AgentRuntimeLive = Layer.effect(
                       }))
                     : null,
                 tool_results: null,
-                model: activeProvider.default_model ?? null,
+                model: provider.llm.default_model ?? null,
                 input_tokens: null,
                 output_tokens: null,
                 created_at: Date.now(),
               };
+
               eventQueue.push({ type: "done", message: doneMessage });
             }
 
-            // 清除 agent ref
+            // 10. 清除 agent ref
             yield* Ref.set(agentRef, null);
 
             return Stream.fromIterable(eventQueue);
@@ -234,12 +247,6 @@ export const AgentRuntimeLive = Layer.effect(
   }),
 );
 
-// ─── 组合所有 runtime 依赖的 Layer ────────────────────────────────
+// ─── Layer（依赖 ProviderService） ────────────────────────────────
 
-export const RuntimeDeps = Layer.mergeAll(
-  SettingsServiceLive,
-  BillingServiceLive,
-  LLMProviderServiceLive,
-);
-
-export const RuntimeLayer = Layer.provide(AgentRuntimeLive, RuntimeDeps);
+export const RuntimeLayer = Layer.provide(AgentRuntimeLive, ProviderServiceLive);
