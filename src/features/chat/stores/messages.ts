@@ -46,7 +46,9 @@ export async function loadMessages(conversationId: string): Promise<void> {
 export async function appendUserMessage(content: string, conversationId: string): Promise<void> {
   const program = Effect.gen(function* () {
     const svc = yield* MessageService;
-    return yield* svc.append({ conversation_id: conversationId, role: "user", content });
+    // Tauri 2 IPC 约定 camelCase: `conversationId` 不是 `conversation_id`。
+    // Rust 端参数 `conversation_id: String` 通过 serde 自动映射。
+    return yield* svc.append({ conversationId, role: "user", content });
   }).pipe(Effect.provide(MessageLayer));
 
   const result = await Effect.runPromiseExit(program);
@@ -119,6 +121,10 @@ export function appendStreamingAssistantMessage(messageId: string, conversationI
   };
   setMessages([...messages(), stub]);
 }
+
+// 注：上面 stub 里的 snake_case 字段（conversation_id / tool_calls / 等）是
+// Message 接口本身的形状(镜像 Rust serde),不是 IPC 参数名。Tauri IPC 边界
+// 只在 invoke 的 args 对象上要求 camelCase。
 
 export type StreamCallbacks = {
   onToken: (content: string) => void;

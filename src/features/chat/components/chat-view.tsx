@@ -4,7 +4,7 @@
 //! 并将 RuntimeEvents 转换为 UI 更新。
 //! Polish F2/F4/F6/F8: 中文 placeholder + 思考 loading + 5 原子 (Button / Textarea) + aria-label。
 
-import { createSignal, createEffect, For, Show, onCleanup } from "solid-js";
+import { createSignal, createEffect, For, Show, onCleanup, onMount } from "solid-js";
 import { Effect, Exit, Stream } from "effect";
 import { Send, X } from "lucide-solid";
 import { MessageBubble } from "./message-bubble";
@@ -24,6 +24,7 @@ import { AgentRuntime, RuntimeLayer } from "../lib/runtime";
 import { SettingsServiceLive } from "../../../shared/lib/tauri";
 import { Button } from "../../../shared/components/ui/button";
 import { Textarea } from "../../../shared/components/ui/textarea";
+import { startThemeSync } from "../../../shared/stores/theme";
 
 export function ChatView() {
   const [input, setInput] = createSignal("");
@@ -31,6 +32,12 @@ export function ChatView() {
   const [streamingMessageId, setStreamingMessageId] = createSignal<string | null>(null);
   let abortController: AbortController | null = null;
   let messagesEndRef: HTMLDivElement | undefined;
+
+  // 启动 theme store 的 5s 轮询 — 把 Settings.theme 桥接到 <html class="dark">。
+  // 没这个调用,theme store 是死代码,用户改了 Settings.theme 后 html class 不切。
+  onMount(() => {
+    startThemeSync();
+  });
 
   // 每当活跃会话变更时加载消息。
   createEffect(() => {
@@ -75,6 +82,16 @@ export function ChatView() {
       return;
     }
     const userMsg = messages$()[messages$().length - 1];
+    if (!userMsg) {
+      console.error(
+        "[ChatView] 运行错误：userMsg 是 undefined — appendUserMessage 可能没成功,convId=",
+        convId,
+        "messagesLen=",
+        messages$().length,
+      );
+      setRunning(false);
+      return;
+    }
 
     try {
       const program = Effect.gen(function* () {
@@ -172,7 +189,19 @@ export function ChatView() {
             </Button>
           }
         >
-          <Button type="submit" disabled={!input().trim()} aria-label="发送消息">
+          <Button
+            type="submit"
+            // 直接 onClick 也调 send — 双重保险。Form onSubmit 在某些 webview
+            // (WebView2) + Solid 组合下不可靠(诊断验证 submit event 派发了
+            // 但 Solid onSubmit listener 没反应)。加 onClick 让 button click
+            // 链独立工作,跟 form submit 解耦。
+            onClick={(e) => {
+              e.preventDefault();
+              void send();
+            }}
+            disabled={!input().trim()}
+            aria-label="发送消息"
+          >
             发送
             <Send class="h-4 w-4" />
           </Button>

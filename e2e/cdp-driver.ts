@@ -1,4 +1,4 @@
-//! e2e/cdp-driver.ts — 直接通过 Chrome DevTools Protocol 驱动 WebView2。
+﻿//! e2e/cdp-driver.ts — 直接通过 Chrome DevTools Protocol 驱动 WebView2。
 //!
 //! 背景：Playwright 的 `chromium.connectOverCDP` 在连接 WebView2 时会调用
 //! `Browser.setDownloadBehavior`，但 WebView2 的 CDP 服务响应 "Browser
@@ -15,8 +15,8 @@ import { setTimeout as sleep } from "node:timers/promises";
 const CDP_HOST = "127.0.0.1";
 const CDP_PORT = 9333;
 
-/** 注入到页面的工具对象。所有 Locator 操作最终调它。 */
-const INJECT = `
+/** 注入到页面的工具对象。所有 Locator 操作最终调它。导出供 helpers 在 page reload 后 re-inject。 */
+export const CDP_INJECT_SCRIPT = `
 window.__cdp = (() => {
   function resolveLocator(sel) {
     const parts = String(sel).split(/\\s+>>\\s+/);
@@ -143,6 +143,11 @@ export class TauriPage {
     readonly conn: CDPConnection,
     readonly sessionId: string,
   ) {}
+
+  /** 重新注入 __cdp helper(page reload 后 window.__cdp 会丢失)。 */
+  async reinjectCdp(): Promise<void> {
+    await this.evaluate(new Function(CDP_INJECT_SCRIPT) as any);
+  }
 
   /** 在页面里跑 JS。函数会被序列化后通过 Runtime.evaluate 传过去。 */
   async evaluate<T = unknown>(fn: (...args: any[]) => T | Promise<T>, ...args: any[]): Promise<T> {
@@ -384,7 +389,7 @@ export async function connectTauri(): Promise<TauriPage> {
   const page = new TauriPage(conn, sessionId);
 
   // 注入 __cdp 工具
-  await page.evaluate(new Function(INJECT) as any);
+  await page.evaluate(new Function(CDP_INJECT_SCRIPT) as any);
 
   // 转发 console / pageerror
   conn.on("Runtime.consoleAPICalled", (params) => {

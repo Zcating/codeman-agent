@@ -1,4 +1,4 @@
-//! e2e/global-teardown.ts — 杀死 global-setup 生成的 Tauri 进程。
+﻿//! e2e/global-teardown.ts — 杀死 global-setup 生成的 Tauri 进程。
 //!
 //! 皮带和背带：我们先杀死精确的子进程，然后扫掉 dev 端口上的任何遗留
 //! 进程。这样避免测试中途失败时留下僵尸 cargo / tauri / webview2 进程。

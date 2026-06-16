@@ -1,4 +1,4 @@
-//! 04 — 主题切换:light / dark / system。
+﻿//! 04 — 主题切换:light / dark / system。
 //!
 //! 设置页面没有专用主题切换 UI(主题通过与所有其他内容相同的
 //! Save 流程修改 Settings.theme,实际视觉切换发生在共享 theme store
@@ -25,7 +25,7 @@ async function setTheme(
 ) {
   const current = await invoke<Settings>("get_settings");
   const next: Settings = { ...current, theme };
-  await invoke<Settings>("update_settings", { new_settings: next });
+  await invoke<Settings>("update_settings", { newSettings: next });
 
   // store 每 5s 轮询 Settings;给它 7s 应用。
   // 我们在紧密循环中重新读取 html class,因为轮询是
@@ -74,6 +74,10 @@ test.describe("04 — 主题", () => {
 
     // 健全性:应用已启动且 html 元素可查询。
     await assert.attached(page.locator("html"));
+
+    // 切到 / 让 ChatLayout 挂载 → startThemeSync() 启动 5s 轮询。
+    // 否则页面在 /settings,theme store 没 start,setTheme 后 html class 不会切。
+    await page.goto("/");
 
     // Light。
     await setTheme(page, "light");

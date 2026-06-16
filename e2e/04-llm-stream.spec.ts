@@ -1,4 +1,4 @@
-//! 04 — 流式 LLM 非空文本验收。
+﻿//! 04 — 流式 LLM 非空文本验收。
 //!
 //! 验证 V1 chat 域的流式 LLM 输出。跟 spec 03 的"聊天循环活着"烟雾测试互补，
 //! spec 03 只验 bubble/Cancel 存在（哪怕空文本），spec 04 验 ≥5 char 非空 assistant 文本。
@@ -14,7 +14,15 @@
 //! 不会被 chat runtime 读到）。env 未设时 spec 保持 RED（与 K2 grill 决策兼容）。
 
 import { test, expect } from "@playwright/test";
-import { assert, clearAllHistory, disposeTauriPage, getTauriPage, invoke } from "./helpers";
+import {
+  assert,
+  clearAllHistory,
+  disposeTauriPage,
+  getTauriPage,
+  invoke,
+  submitForm,
+} from "./helpers";
+import { loadEnvFile } from "./env-loader";
 import type { Settings } from "../src/shared/lib/types";
 
 const USER_PROMPT = "用一句话介绍你自己";
@@ -24,14 +32,29 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     // 先 await getTauriPage() 触发 CDP 连接 + 等 chat 路由 mount（footer link
     // 出现 = SPA 挂载完成 = __TAURI_INTERNALS__ 已注入），再调 invoke。
     const page = await getTauriPage();
+    // 先把页面拉回 / — 前面的 spec 02 把 webview 留在 /settings,
+    // disposeTauriPage 只关 CDP,webview target 的 history 仍然停在 /settings,
+    // 那时 ChatLayout 已 unmount,footer 的 Settings 链接找不到,15s 超时。
+    await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
 
-    const envKey = process.env.MINIMAX_API_KEY;
+    const envFile = loadEnvFile();
+    const envKey = envFile.MINIMAX_CN_API_KEY ?? process.env.MINIMAX_CN_API_KEY;
+    const envBaseUrl = envFile.MINIMAX_CN_API_BASE_URL ?? process.env.MINIMAX_CN_API_BASE_URL;
     if (envKey && envKey.length > 0) {
       const current = await invoke<Settings>("get_settings");
       // 强制 default_llm_provider_id = "minimax"，覆盖用户之前手动配的值。
+      // 同时 override base_url 到 .env 里的端点（CN 端点,跟 V1 默认的
+      // global 端点不同 — .env 是真实测试场景,不是 V1 默认）。
+      const providers = current.llm_providers.map((p) =>
+        p.id === "minimax" ? { ...p, base_url: envBaseUrl ?? p.base_url } : p,
+      );
       await invoke("update_settings", {
-        new_settings: { ...current, default_llm_provider_id: "minimax" },
+        newSettings: {
+          ...current,
+          llm_providers: providers,
+          default_llm_provider_id: "minimax",
+        },
       });
       await invoke("set_llm_key", { providerId: "minimax", key: envKey });
     }
@@ -49,17 +72,25 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     const page = await getTauriPage();
 
     // 1. 创建新会话（ChatView 拒绝在无 activeId 时发送）。
-    const newConvButton = page.locator('button[title="New conversation"]');
+    const newConvButton = page.locator('button[title="新建会话"]');
     await assert.visible(newConvButton);
     await newConvButton.click();
 
     // 2. textarea 应启用。
-    const textarea = page.locator('textarea[placeholder="Type a message…"]');
+    const textarea = page.locator('textarea[placeholder="发条消息\u2026"]');
     await assert.enabled(textarea);
+
+    // 等 sidebar 的 active conversation 出现 — 避免 race condition:
+    // createConversation IPC 还没完成、activeId 还是 null 时 submit 会早 return。
+    const activeItem = page.locator("aside li.bg-primary").first();
+    await assert.visible(activeItem, { timeout: 5_000 });
 
     // 3. 输入并发送。
     await textarea.fill(USER_PROMPT);
-    await page.locator('button[type="submit"]').click();
+    // 用 form.requestSubmit() 替代 button click — 在 WebView2 + cdp-driver
+    // 组合下,submit button 的 click 事件不总是触发 form submit 默认动作。
+    // requestSubmit() 直接触发 submit 事件,经过 Solid 的 onSubmit listener。
+    await submitForm(page);
 
     // 4. 等待 8s 让消息处理完成（期间 LLM 调用失败/超时是预期的 RED 状态）。
     //    用户消息同步写入 store + DB，如果 app 正常工作，user bubble 应出现。
@@ -73,7 +104,7 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     const deadline = Date.now() + 30_000;
     let ok = false;
     while (Date.now() < deadline) {
-      const cancelCount = await page.getByRole("button", { name: /Cancel/i }).count();
+      const cancelCount = await page.getByRole("button", { name: /取消/i }).count();
       const cancelButtonVisible = cancelCount > 0;
 
       // Assistant bubble text：找 justify-start 容器内的 max-w-prose bubble
