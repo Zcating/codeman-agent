@@ -509,3 +509,40 @@ export async function clearAllHistoryBridge(): Promise<void> {
   }).pipe(Effect.provide(SettingsServiceLive));
   await Effect.runPromise(program);
 }
+
+// ─── Workspace Bridge Functions ────────────────────────────────
+
+export async function getWorkspacesBridge(): Promise<Workspace[]> {
+  const program = Effect.gen(function* () {
+    const svc = yield* WorkspaceService;
+    return yield* svc.list();
+  }).pipe(Effect.provide(WorkspaceServiceLive));
+  return Effect.runPromise(program);
+}
+
+export async function addWorkspaceBridge(workspace: Workspace): Promise<void> {
+  const program = Effect.gen(function* () {
+    const svc = yield* WorkspaceService;
+    yield* svc.add(workspace);
+  }).pipe(Effect.provide(WorkspaceServiceLive));
+  await Effect.runPromise(program);
+}
+
+export async function updateWorkspaceBridge(
+  id: string,
+  patch: Partial<Workspace>,
+): Promise<void> {
+  const program = Effect.gen(function* () {
+    const svc = yield* WorkspaceService;
+    yield* svc.update(id, patch);
+  }).pipe(Effect.provide(WorkspaceServiceLive));
+  await Effect.runPromise(program);
+}
+
+export async function removeWorkspaceBridge(id: string): Promise<void> {
+  const program = Effect.gen(function* () {
+    const svc = yield* WorkspaceService;
+    yield* svc.remove(id);
+  }).pipe(Effect.provide(WorkspaceServiceLive));
+  await Effect.runPromise(program);
+}

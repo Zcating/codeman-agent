@@ -8,7 +8,7 @@ import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, cleanup } from "@solidjs/testing-library";
 import { SettingsPage } from "./settings";
 import { mockState, SettingsV15 } from "../../../__mocks__/@tauri-apps/api/core";
-import type { Provider } from "../../../shared/lib/types";
+import type { Provider, Workspace } from "../../../shared/lib/types";
 
 vi.mock("@tanstack/solid-router", async () => {
   const actual = await vi.importActual("@tanstack/solid-router");
@@ -160,5 +160,96 @@ describe("SettingsPage — V1.5 provider rendering", () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
     const saveBtn = container.querySelector("footer button");
     expect(saveBtn?.textContent).toContain("Save");
+  });
+});
+
+describe("SettingsPage — workspaces section", () => {
+  const mockWorkspace1: Workspace = {
+    id: "ws-001",
+    label: "Project A",
+    root_path: "C:\\Projects\\A",
+    enabled: true,
+  };
+
+  const mockWorkspace2: Workspace = {
+    id: "ws-002",
+    label: "Project B",
+    root_path: "C:\\Projects\\B",
+    enabled: false,
+  };
+
+  beforeEach(() => {
+    mockState.settings = {
+      ...baseSettings,
+      providers: [mockMiniMaxProvider],
+      workspaces: [mockWorkspace1, mockWorkspace2],
+    };
+    mockState.resolved = undefined;
+    mockState.v0FixtureActive = false;
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("renders workspace section heading", async () => {
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(screen.getByText("Workspaces")).toBeInTheDocument();
+  });
+
+  it("renders 2 workspace cards when 2 workspaces exist", async () => {
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Both workspace labels visible
+    expect(screen.getByText("Project A")).toBeInTheDocument();
+    expect(screen.getByText("Project B")).toBeInTheDocument();
+    // IDs visible
+    expect(screen.getByText("ws-001")).toBeInTheDocument();
+    expect(screen.getByText("ws-002")).toBeInTheDocument();
+    // Root paths visible
+    expect(screen.getByDisplayValue("C:\\Projects\\A")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("C:\\Projects\\B")).toBeInTheDocument();
+  });
+
+  it("shows empty state when workspaces is empty", async () => {
+    mockState.settings.workspaces = [];
+
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(screen.getByText(/No workspaces configured/i)).toBeInTheDocument();
+  });
+
+  it("shows Add workspace button", async () => {
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(screen.getByText(/Add workspace/i)).toBeInTheDocument();
+  });
+
+  it("clicking Add workspace adds a new workspace card", async () => {
+    // Mock confirm to always return true
+    const originalConfirm = window.confirm;
+    window.confirm = vi.fn().mockReturnValue(true);
+
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Initially 2 workspaces
+    expect(screen.getByText("Project A")).toBeInTheDocument();
+    expect(screen.getByText("Project B")).toBeInTheDocument();
+
+    // Click "Add workspace"
+    screen.getByText(/Add workspace/i).click();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Should now have "New Workspace" card
+    expect(screen.getByText("New Workspace")).toBeInTheDocument();
+
+    window.confirm = originalConfirm;
   });
 });

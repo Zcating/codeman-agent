@@ -71,6 +71,13 @@ export interface SettingsV15 {
     refresh_interval_secs: number;
     api_key_ref: string;
   }>;
+  // V2: workspaces (added in ADR-0013)
+  workspaces?: Array<{
+    id: string;
+    label: string;
+    root_path: string;
+    enabled: boolean;
+  }>;
 }
 
 // V0 Settings shape (for migration testing)
