@@ -4,8 +4,11 @@
 //! 并将 RuntimeEvents 转换为 UI 更新。
 //! Polish F2/F4/F6/F8: 中文 placeholder + 思考 loading + 5 原子 (Button / Textarea) + aria-label。
 
+// V1.6+ ADR-0014 + feature/chat-streams 合并:加 Duration 用于打字机式
+// 微任务 yield (Effect.sleep(Duration.zero))。移除 onCleanup — V1.5 的
+// AbortController 在 V1.6+ 已废,取消走 AgentRuntime.cancel(activeId)。
 import { createSignal, createEffect, For, Show, onMount } from "solid-js";
-import { Effect, Exit, Stream } from "effect";
+import { Duration, Effect, Exit, Stream } from "effect";
 import { Send, X } from "lucide-solid";
 import { MessageBubble } from "./message-bubble";
 import {
@@ -110,49 +113,66 @@ export function ChatView() {
     try {
       const program = Effect.gen(function* () {
         const runtime = yield* AgentRuntime;
-        yield* Stream.runForEach(runtime.run(conversation, userMsg), (evt) => {
-          switch (evt.type) {
-            case "token": {
-              let msgId = streamingMessageId();
-              if (!msgId) {
-                msgId = crypto.randomUUID();
-                appendStreamingAssistantMessage(msgId, convId);
-                setStreamingMessageId(msgId);
+        // 每个事件处理后 yield 一次微任务边界,让 Solid signal 的 setMessages
+        // 触发 DOM patch 在下一个 microtask flush,实现打字机式增量渲染。
+        // 不加 yield 时 Stream.runForEach 同步排空所有事件,Solid 把 N 次
+        // setMessages 合并成 1 次 DOM 更新,UI 只看到最终文本。
+        yield* Stream.runForEach(runtime.run(conversation, userMsg), (evt) =>
+          Effect.gen(function* () {
+            switch (evt.type) {
+              case "token": {
+                let msgId = streamingMessageId();
+                if (!msgId) {
+                  msgId = crypto.randomUUID();
+                  appendStreamingAssistantMessage(msgId, convId);
+                  setStreamingMessageId(msgId);
+                }
+                appendAssistantMessageDelta(msgId, evt.content);
+                break;
               }
-              appendAssistantMessageDelta(msgId, evt.content);
-              break;
+              case "tool_call": {
+                const msgId = streamingMessageId();
+                if (msgId) appendToolCall(msgId, evt.toolCall);
+                break;
+              }
+              case "tool_result": {
+                const msgId = streamingMessageId();
+                if (msgId) finalizeToolResult(msgId, evt.toolCallId, evt.result, evt.error);
+                break;
+              }
+              case "done": {
+                // 复用 streamingMessageId 覆盖 runtime 生成的 UUID — 让
+                // finalizeAssistantMessage 能 in-place 替换 stub,DOM
+                // 始终只有 1 个 assistant bubble(否则 stub + done 两条
+                // 消息不同 id 同时存在,UI 渲染 2 个 bubble;e2e spec 06
+                // 严格断言 userCount=1 && assistantCount=1 会 fail)。
+                const stubId = streamingMessageId();
+                if (stubId) {
+                  finalizeAssistantMessage({ ...evt.message, id: stubId });
+                } else {
+                  // 无 streaming(LLM 立即返回 done 没产出 token) — 交给
+                  // finalizeAssistantMessage 的 upsert 语义追加,不再丢。
+                  finalizeAssistantMessage(evt.message);
+                }
+                // V1.5 修复 "切换对话后 AI 输出消失":persistAssistantMessage
+                // 把消息落库 → 切回时 loadMessages 能恢复。
+                void persistAssistantMessage(evt.message);
+                setStreamingMessageId(null);
+                break;
+              }
+              case "error": {
+                console.error("[ChatView] 代理错误：", evt.error);
+                break;
+              }
             }
-            case "tool_call": {
-              const msgId = streamingMessageId();
-              if (msgId) appendToolCall(msgId, evt.toolCall);
-              break;
-            }
-            case "tool_result": {
-              const msgId = streamingMessageId();
-              if (msgId) finalizeToolResult(msgId, evt.toolCallId, evt.result, evt.error);
-              break;
-            }
-            case "done": {
-              // V1.5 修复 "切换对话后 AI 输出消失"。
-              //
-              // 之前只调 finalizeAssistantMessage (in-memory only),切换对话后
-              // signal 被覆盖,DB 里没数据,切回时 AI 输出消失。
-              //
-              // 现在两步走:
-              // 1) finalizeAssistantMessage 保持原有 in-memory 替换意图(向后兼容)
-              // 2) persistAssistantMessage 把消息落库 → 切回时 loadMessages 能恢复
-              finalizeAssistantMessage(evt.message);
-              void persistAssistantMessage(evt.message);
-              setStreamingMessageId(null);
-              break;
-            }
-            case "error": {
-              console.error("[ChatView] 代理错误：", evt.error);
-              break;
-            }
-          }
-          return Effect.succeed(undefined);
-        });
+            // feature/chat-streams:每个事件后 yield 一次微任务边界,让 Solid signal
+            // 的 setMessages 触发 DOM patch 在下一个 microtask flush,实现打字机式
+            // 增量渲染。不加 yield 时 Stream.runForEach 同步排空所有事件,Solid 把
+            // N 次 setMessages 合并成 1 次 DOM 更新,UI 只看到最终文本。
+            yield* Effect.sleep(Duration.zero);
+            return undefined;
+          }),
+        );
       }).pipe(Effect.provide(RuntimeLayer), Effect.provide(SettingsServiceLive));
 
       const result = await Effect.runPromiseExit(program);

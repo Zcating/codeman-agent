@@ -110,9 +110,18 @@ export function appendAssistantMessageDelta(messageId: string, chunk: string): v
   );
 }
 
-/** 用最终持久化的消息替换进行中的 assistant 消息。 */
+/** 用最终持久化的消息替换进行中的 assistant 消息。
+ * 若 messages 里没有匹配 id(例如 LLM 立即返回 done 没产生任何 token → 没创建
+ * streaming stub),则 append 而不是 silently 丢掉 — 之前的 `map` 在找不到
+ * 匹配时只 setMessages(不增加) ,done 消息消失,solid 列表里只留个空 stub。
+ * 现在 `upsert` 语义:有则替换、无则追加,call site 不用关心是否预先有 stub。 */
 export function finalizeAssistantMessage(message: Message): void {
-  setMessages(messages().map((m) => (m.id === message.id ? message : m)));
+  setMessages((msgs) => {
+    if (msgs.some((m) => m.id === message.id)) {
+      return msgs.map((m) => (m.id === message.id ? message : m));
+    }
+    return [...msgs, message];
+  });
 }
 
 /** 追加工具调用到消息（仅本地）。 */
