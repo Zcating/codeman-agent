@@ -59,6 +59,8 @@ export interface Settings {
   llm_providers: LLMProvider[];
   /** @deprecated Use providers[].billing instead. Kept for V1 consumer backward-compatibility. */
   billing_providers: BillingProviderConfig[];
+  /** V2: workspaces list. V1→V2 migration defaults to empty array. */
+  workspaces?: Workspace[];
 }
 
 // ============================================================================
@@ -107,6 +109,24 @@ export interface SystemPromptSettings {
 export interface ConversationSettings {
   auto_archive_after_days: number; // default 30
   max_history: number; // default 1000
+}
+
+// ============================================================================
+// V2 File IO Tools (ADR-0013)
+// ============================================================================
+
+export interface Workspace {
+  id: string;
+  label: string;
+  root_path: string; // PathBuf in Rust, string in TS
+  enabled: boolean;
+}
+
+/** Mirror of Rust `FileMatch` struct from T9 */
+export interface FileMatch {
+  path: string;
+  line_number: number | null;
+  matched_line: string | null;
 }
 
 // ============================================================================
@@ -177,4 +197,5 @@ export type AppError =
   | { kind: "InvalidConfig"; message: string; field?: string }
   | { kind: "Database"; message: string; cause?: string }
   | { kind: "ToolCall"; tool_call_id: string; message: string }
+  | { kind: "SandboxViolation"; path: string; workspace_label: string }
   | { kind: "Unknown"; message: string };

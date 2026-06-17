@@ -175,6 +175,8 @@ pub enum AppError {
     Unauthorized { message: String },
     #[error("上游错误：{message}")]
     Upstream { message: String },
+    #[error("Sandbox violation: {path} is outside workspace {workspace_label}")]
+    SandboxViolation { path: String, workspace_label: String },
 }
 
 impl From<sqlx::Error> for AppError {
@@ -277,5 +279,32 @@ mod tests {
         let v: serde_json::Value = serde_json::to_value(&snap).unwrap();
         assert_eq!(v["kind"], "balance");
         assert_eq!(v["amount"], "87.42");
+    }
+
+    #[test]
+    fn sandbox_violation_display() {
+        let err = AppError::SandboxViolation {
+            path: "/etc/passwd".into(),
+            workspace_label: "default".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "Sandbox violation: /etc/passwd is outside workspace default"
+        );
+    }
+
+    #[test]
+    fn sandbox_violation_distinct_discriminant() {
+        let sandbox_err = AppError::SandboxViolation {
+            path: "/etc/passwd".into(),
+            workspace_label: "default".into(),
+        };
+        let not_found_err = AppError::NotFound {
+            message: "test".into(),
+        };
+        assert_ne!(
+            std::mem::discriminant(&sandbox_err),
+            std::mem::discriminant(&not_found_err)
+        );
     }
 }

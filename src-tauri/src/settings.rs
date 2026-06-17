@@ -6,6 +6,7 @@
 
 use crate::types::{BillingKind, ModelMeta, Provider, ProviderBilling, ProviderLlm};
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::time::Duration;
 
 const STORE_FILE: &str = "settings.json";
@@ -180,6 +181,15 @@ impl Default for ConversationSettings {
     }
 }
 
+/// V2 工作区配置（ADR-0013）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Workspace {
+    pub id: String,
+    pub label: String,
+    pub root_path: PathBuf,
+    pub enabled: bool,
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 设置
 // ─────────────────────────────────────────────────────────────────────────────
@@ -222,6 +232,11 @@ pub struct Settings {
     pub billing_providers: Vec<BillingProviderConfig>,
 
     pub conversations: ConversationSettings,
+
+    // ─── V2 新字段 ───────────────────────────────────────────────────────────
+    /// V2 工作区列表。V1→V2 迁移时若无此字段则默认空 Vec（用户 opt-in）。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub workspaces: Vec<Workspace>,
 }
 
 impl Default for Settings {
@@ -259,9 +274,19 @@ impl Default for Settings {
             theme: Theme::default(),
             start_at_login: true,
             window: WindowSettings::default(),
-            system_prompt: SystemPromptSettings::default(),
+            system_prompt: SystemPromptSettings {
+                default: "You are an AI assistant with access to billing tools and file system tools.\n\
+\n## Billing Tools\nYou can call get_balance and get_plan_quota to check provider billing state.\n\
+\n## File Tools\nYou have access to 5 file tools (read_file, write_file, edit_file, search_files, delete_file).\n\
+Each tool requires a workspace_id parameter — only operate within user-configured workspaces.\n\
+Paths outside any workspace will return a SandboxViolation error.\n\
+For edit_file, your old_text must match exactly once unless you set replace_all=true.\n\
+Files are limited to 10 MB. Binary files, .exe/.dll/.sys files, and paths outside workspaces are blocked.".into(),
+                user_can_edit: true,
+            },
             billing_providers: Vec::new(),
             conversations: ConversationSettings::default(),
+            workspaces: Vec::new(),
         }
     }
 }
@@ -716,6 +741,7 @@ mod tests {
             },
             billing_providers: Vec::new(),
             conversations: ConversationSettings::default(),
+            workspaces: Vec::new(),
         };
         let json = serde_json::to_string(&s).unwrap();
         let back: Settings = serde_json::from_str(&json).unwrap();
@@ -738,5 +764,55 @@ mod tests {
         let json = serde_json::to_string(&sz).unwrap();
         let back: Size = serde_json::from_str(&json).unwrap();
         assert_eq!(sz, back);
+    }
+
+    // ─── V2 工作区迁移测试 ────────────────────────────────────────────────
+
+    #[test]
+    fn v1_to_v2_workspace_default() {
+        // V1 JSON 序列化（无 workspaces 字段），反序列化后 workspaces 应为空
+        let v1_json = r#"{
+            "providers": [],
+            "schema_version": "1.5",
+            "llm_providers": [],
+            "billing_providers": [],
+            "user_language": "auto",
+            "theme": "system",
+            "start_at_login": true,
+            "window": {
+                "remember_position": true,
+                "remember_size": true,
+                "default_size": {"width": 1280, "height": 1280},
+                "min_size": {"width": 800, "height": 800}
+            },
+            "system_prompt": {"default": "", "user_can_edit": true},
+            "conversations": {"auto_archive_after_days": 30, "max_history": 1000}
+        }"#;
+        let loaded: Settings = serde_json::from_str(v1_json).unwrap();
+        let sanitized = loaded.sanitized();
+        assert!(
+            sanitized.workspaces.is_empty(),
+            "V1 settings should have empty workspaces, got {:?}",
+            sanitized.workspaces
+        );
+    }
+
+    #[test]
+    fn workspace_preserved_through_sanitization() {
+        let settings_with_workspace = Settings {
+            workspaces: vec![Workspace {
+                id: "w1".into(),
+                label: "test workspace".into(),
+                root_path: PathBuf::from(r"C:\test"),
+                enabled: true,
+            }],
+            ..Settings::default()
+        };
+        let sanitized = settings_with_workspace.sanitized();
+        assert_eq!(sanitized.workspaces.len(), 1);
+        assert_eq!(sanitized.workspaces[0].id, "w1");
+        assert_eq!(sanitized.workspaces[0].label, "test workspace");
+        assert_eq!(sanitized.workspaces[0].root_path, PathBuf::from(r"C:\test"));
+        assert!(sanitized.workspaces[0].enabled);
     }
 }

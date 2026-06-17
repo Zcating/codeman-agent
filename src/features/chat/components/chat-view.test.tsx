@@ -32,6 +32,24 @@ const mockMessages: Message[] = [
     output_tokens: null,
     created_at: 1710000001,
   },
+  {
+    id: "msg-3",
+    conversation_id: "conv-1",
+    role: "tool",
+    content: "file content here",
+    tool_calls: null,
+    tool_results: [
+      {
+        tool_call_id: "tc-read-1",
+        result: "const x = 1;\nconst y = 2;\nconsole.log(x + y);",
+        error: null,
+      },
+    ],
+    model: null,
+    input_tokens: null,
+    output_tokens: null,
+    created_at: 1710000002,
+  },
 ];
 
 vi.mock("../stores/conversations", () => ({
@@ -99,5 +117,22 @@ describe("ChatView", () => {
     // 我们可以验证结构是正确的 - 有一个带 fallback 的 Show 组件。
     const cancelBtn = container.querySelector('button:not([type="submit"])');
     expect(cancelBtn).toBeNull(); // 初始时无 cancel 按钮
+  });
+
+  it("tool 角色的消息渲染工具结果", () => {
+    const { container } = render(() => <ChatView />);
+    // 验证工具结果details存在
+    const details = container.querySelectorAll("details");
+    expect(details.length).toBeGreaterThan(0);
+    // 验证工具结果标签存在
+    const hasToolResult = Array.from(details).some((d) => d.textContent?.includes("工具结果"));
+    expect(hasToolResult).toBe(true);
+  });
+
+  it("tool 消息显示工具调用 ID 和结果", () => {
+    const { container } = render(() => <ChatView />);
+    const codeElements = container.querySelectorAll("code");
+    const hasToolCallId = Array.from(codeElements).some((code) => code.textContent === "tc-read-1");
+    expect(hasToolCallId).toBe(true);
   });
 });

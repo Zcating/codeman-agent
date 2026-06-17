@@ -92,6 +92,7 @@ Component tests 通过 `vi.mock("../stores/X")` mock store 模块（**路径从 
 ## 跨 feature 引用
 
 - **Billing tools**：`src/features/billing/lib/billing.ts` 导出 `billingTools`，本 feature `lib/runtime.ts` 注册到 `Agent`。
+- **File tools**：`src/features/file-tools/lib/file-tools.ts` 导出 `fileTools`（5 个：read / write / edit / search / delete），本 feature `lib/runtime.ts` 注册到 `Agent`（与 billingTools 并列）。
 - **跨域类型**：从 `src/shared/lib/types.ts` 导入（ADR-0010 后从 `shared/types/` 迁）。
 - **跨域 IPC**：从 `src/shared/lib/tauri.ts` 导入 Service Tags。
 

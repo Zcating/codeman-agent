@@ -9,12 +9,17 @@ import { createSignal, Show, For } from "solid-js";
 import { Link } from "@tanstack/solid-router";
 import { ArrowLeft, Plus, Trash2 } from "lucide-solid";
 import { ProviderCard } from "../components/provider-card";
+import { WorkspaceCard } from "../components/workspace-card";
 import {
   getSettingsBridge,
   updateSettingsBridge,
   clearAllHistoryBridge,
+  getWorkspacesBridge,
+  addWorkspaceBridge,
+  updateWorkspaceBridge,
+  removeWorkspaceBridge,
 } from "../../../shared/lib/tauri";
-import type { Provider, Settings } from "../../../shared/lib/types";
+import type { Provider, Settings, Workspace } from "../../../shared/lib/types";
 
 type Tab = "llm" | "app" | "window" | "billing" | "advanced";
 
@@ -22,6 +27,7 @@ export function SettingsPage() {
   const [tab, setTab] = createSignal<Tab>("llm");
   const [draft, setDraft] = createSignal<Settings | null>(null);
   const [confirmClear, setConfirmClear] = createSignal(false);
+  const [workspaces, setWorkspaces] = createSignal<Workspace[]>([]);
 
   // 挂载时加载设置 + providers。
   void (async () => {
@@ -30,6 +36,16 @@ export function SettingsPage() {
       setDraft(s);
     } catch (e) {
       console.error("[SettingsPage] 加载失败：", e);
+    }
+  })();
+
+  // 挂载时加载 workspaces。
+  void (async () => {
+    try {
+      const ws = await getWorkspacesBridge();
+      setWorkspaces(ws);
+    } catch (e) {
+      console.error("[SettingsPage] 加载 workspaces 失败：", e);
     }
   })();
 
@@ -66,6 +82,41 @@ export function SettingsPage() {
   const onAddProvider = () => {
     // V1.5+ 只有一个默认 MiniMax provider，用户可以配置但不能添加更多
     alert("Add provider: future work (V1.5+ has 1 pre-fill MiniMax)");
+  };
+
+  const onWorkspaceUpdate = async (id: string, patch: Partial<Workspace>) => {
+    try {
+      await updateWorkspaceBridge(id, patch);
+      setWorkspaces((prev) => prev.map((ws) => (ws.id === id ? { ...ws, ...patch } : ws)));
+    } catch (e) {
+      console.error("[SettingsPage] 更新 workspace 失败：", e);
+    }
+  };
+
+  const onWorkspaceRemove = async (id: string) => {
+    if (!confirm("Delete this workspace?")) return;
+    try {
+      await removeWorkspaceBridge(id);
+      setWorkspaces((prev) => prev.filter((ws) => ws.id !== id));
+    } catch (e) {
+      console.error("[SettingsPage] 删除 workspace 失败：", e);
+    }
+  };
+
+  const onAddWorkspace = async () => {
+    const id = crypto.randomUUID();
+    const newWs: Workspace = {
+      id,
+      label: "New Workspace",
+      root_path: "",
+      enabled: false,
+    };
+    try {
+      await addWorkspaceBridge(newWs);
+      setWorkspaces((prev) => [...prev, newWs]);
+    } catch (e) {
+      console.error("[SettingsPage] 添加 workspace 失败：", e);
+    }
   };
 
   const clearHistory = async () => {
@@ -151,6 +202,39 @@ export function SettingsPage() {
               <Plus class="h-4 w-4 inline mr-1" />
               Add provider
             </button>
+
+            {/* ── Workspaces section ── */}
+            <div class="mt-6 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+              <h3 class="text-base font-semibold mb-3 text-zinc-900 dark:text-zinc-100">
+                Workspaces
+              </h3>
+              <Show
+                when={workspaces().length > 0}
+                fallback={
+                  <p class="text-sm text-muted-foreground py-4 text-center">
+                    No workspaces configured.
+                  </p>
+                }
+              >
+                <For each={workspaces()}>
+                  {(ws) => (
+                    <WorkspaceCard
+                      workspace={ws}
+                      onUpdate={(patch) => onWorkspaceUpdate(ws.id, patch)}
+                      onRemove={() => onWorkspaceRemove(ws.id)}
+                    />
+                  )}
+                </For>
+              </Show>
+              <button
+                type="button"
+                onClick={onAddWorkspace}
+                class="mt-2 px-3 py-1.5 text-sm border border-input bg-background text-zinc-700 dark:text-zinc-300 rounded-md hover:bg-accent hover:text-accent-foreground"
+              >
+                <Plus class="h-4 w-4 inline mr-1" />
+                Add workspace
+              </button>
+            </div>
           </section>
         </Show>
         <Show when={tab() === "app" && draft()}>

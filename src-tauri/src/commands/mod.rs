@@ -1,5 +1,9 @@
-﻿//! Tauri IPC 命令。每个命令都是围绕 `AppState` 方法的薄包装，
+//! Tauri IPC 命令。每个命令都是围绕 `AppState` 方法的薄包装，
 //! 以便布线保持集中。
+
+pub mod filesystem;
+
+use tauri_plugin_dialog::DialogExt;
 
 use crate::db::conversations;
 use crate::db::messages;
@@ -251,3 +255,20 @@ pub async fn delete_provider_keys(
     Ok(())
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// dialog IPC（T22: pick_workspace_path）
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn pick_workspace_path(app: tauri::AppHandle) -> Result<Option<String>, AppError> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_title("Select workspace root")
+        .pick_folder(move |path: Option<tauri_plugin_dialog::FilePath>| {
+            let _ = tx.send(path.map(|p| p.to_string()));
+        });
+    rx.await.map_err(|e| AppError::Upstream {
+        message: format!("Dialog error: {}", e),
+    })
+}

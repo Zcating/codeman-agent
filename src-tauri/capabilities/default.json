@@ -23,6 +23,8 @@
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
     "log:default",
-    "window-state:default"
+    "window-state:default",
+    "dialog:default",
+    "dialog:allow-open"
   ]
 }
