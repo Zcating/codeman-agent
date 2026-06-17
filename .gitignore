@@ -51,6 +51,7 @@ coverage/
 .omo/
 .agents/
 .claude/
+.playwright-mcp/
 
 # Worktrees
 .worktrees/

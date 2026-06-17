@@ -6,7 +6,14 @@
 import { describe, it, expect, beforeEach } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { ConversationService } from "../../../shared/lib/tauri";
-import type { AppError, Conversation } from "../../../shared/lib/types";
+import type { AppError, Conversation, Message } from "../../../shared/lib/types";
+import {
+  shouldSkipNewConversation,
+  startNewConversation,
+  selectConversation,
+} from "./conversations";
+import { clearMessages } from "./messages";
+import { mockState } from "../../../__mocks__/@tauri-apps/api/core";
 
 // 测试 fixture
 const fixtureA: Conversation = {
@@ -125,4 +132,69 @@ describe("ConversationService 桥接层", () => {
       expect(deleteCalls).toEqual(["conv-a"]);
     }).pipe(Effect.provide(MockConversationServiceLive)),
   );
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// TDD for "新对话: 当前活跃会话为空则不新增" 守卫
+//
+// 这个守卫从 sidebar 组件提到 conversations store ——
+// UI 不再做这个判断,直接调 startNewConversation。
+//
+// 测试分两层:
+// 1. shouldSkipNewConversation 纯函数 (4 组合,table-driven)
+// 2. startNewConversation 桥接函数 (集成测试,验 IPC 没被调用)
+// ─────────────────────────────────────────────────────────────────────
+
+/** 最小 Message 构造 — 守卫只读 length,完整字段不必要。 */
+const msg = (id: string): Message => ({
+  id,
+  conversation_id: "conv-x",
+  role: "user",
+  content: "x",
+  tool_calls: null,
+  tool_results: null,
+  model: null,
+  input_tokens: null,
+  output_tokens: null,
+  created_at: 0,
+});
+
+describe("shouldSkipNewConversation 守卫（纯函数）", () => {
+  it.each([
+    // [activeId, messages.length, expected, scenario]
+    [null, 0, false, "无 active + 无 messages → 不跳过,要创建"],
+    [null, 1, false, "无 active + 有 messages → 不跳过,要创建"],
+    ["conv-1", 0, true, "有 active + 无 messages → 跳过,已在空白画布"],
+    ["conv-1", 1, false, "有 active + 有 messages → 不跳过,要开新画布"],
+  ] as const)("%s (active=%s, msgs=%i) → %s", (activeId, msgCount, expected, _label) => {
+    const messages = Array.from({ length: msgCount }, (_, i) => msg(`m${i}`));
+    expect(shouldSkipNewConversation(activeId, messages)).toBe(expected);
+  });
+});
+
+describe("startNewConversation 桥接（空画布守卫集成）", () => {
+  beforeEach(() => {
+    // Reset IPC mock state — 这样 mockState.calls 不会带前一个测试的调用
+    mockState.calls = [];
+    // 默认给 create_conversation 提供一个合理的 Conversation 返回,
+    // 避免 bridge 走"创建"分支时 mock 报 "Unknown IPC command"。
+    mockState.resolved = {
+      ...fixtureA,
+      id: "new-conv-from-test",
+      title: "新会话",
+    };
+  });
+
+  it("active 会话为空 → 跳过,不调 create_conversation IPC", async () => {
+    // Setup: 模拟"刚点完新对话"的场景 ——
+    // activeId 已设,messages 为空(没发任何消息)
+    selectConversation("conv-empty");
+    clearMessages();
+
+    // Action
+    await startNewConversation("新会话");
+
+    // Assert: 守卫拦截,create_conversation IPC 一次都没调
+    expect(mockState.calls).not.toContain("create_conversation");
+  });
 });

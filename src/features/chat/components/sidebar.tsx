@@ -1,45 +1,32 @@
-﻿//! Sidebar — 带搜索的会话列表。
+﻿//! Sidebar — 会话列表（无搜索,新对话走 store 的空守卫）。
 //!
 //! 消费来自 Effect→Solid 桥接层（`../store/conversations`）。
 //! 本文件任何位置都**不**导入 'effect'。
-//! Polish F3/F5/F7/F8: inline confirm 替代 confirm() + 完整键盘导航 (ArrowUp/Down/Enter/Delete) + Input 5 原子 + aria-label。
+//! Polish F3/F7: inline confirm 替代 confirm() + 完整键盘导航 (ArrowUp/Down/Enter/Delete) + aria-label。
+//!
+//! "新对话" 的"空画布"守卫放在 store (`startNewConversation`) ——
+/*! UI 不再判断 active 是否空,只调 store 入口。 */
+//! 这样业务规则单点,未来加 "n 消息内自动跳过" 之类的规则只动 store 不动组件。
 
-import { createSignal, createEffect, For, onMount, onCleanup, Show } from "solid-js";
+import { createSignal, createEffect, For, onMount, Show } from "solid-js";
 import { Plus, Trash2 } from "lucide-solid";
 import {
   conversations$,
   activeId$,
   loadConversations,
-  createConversation,
+  startNewConversation,
   selectConversation,
   deleteConversation,
 } from "../stores/conversations";
-import type { Conversation } from "../../../shared/lib/types";
-import { Input } from "../../../shared/components/ui/input";
 import { Button } from "../../../shared/components/ui/button";
 
 export function Sidebar() {
-  const [query, setQuery] = createSignal("");
-  const [debouncedQuery, setDebouncedQuery] = createSignal("");
   // Polish F3: inline confirm — null 表示不在 confirm 模式,string 表示正在 confirm 该会话 id
   const [confirmingId, setConfirmingId] = createSignal<string | null>(null);
-  let debounceTimer: ReturnType<typeof setTimeout> | undefined;
-  let searchInputRef: HTMLInputElement | undefined;
   let listRef: HTMLUListElement | undefined;
 
   onMount(() => {
     void loadConversations(false);
-  });
-
-  onCleanup(() => {
-    if (debounceTimer) clearTimeout(debounceTimer);
-  });
-
-  // 防抖搜索输入（200ms）。
-  createEffect(() => {
-    const q = query();
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => setDebouncedQuery(q), 200);
   });
 
   // Polish F3: 任何其它地方点击或会话变化时,退出 confirm 模式
@@ -48,16 +35,9 @@ export function Sidebar() {
     setConfirmingId(null);
   });
 
-  const filtered = (): Conversation[] => {
-    const all = conversations$();
-    const q = debouncedQuery().trim().toLowerCase();
-    if (!q) return all;
-    return all.filter((c) => c.title.toLowerCase().includes(q));
-  };
-
   // Polish F5: 完整键盘导航 — ArrowUp/Down 在会话间移动 focus,Enter 选中,Delete 进入 confirm,Escape 取消 confirm
   const handleListKeyDown = (e: KeyboardEvent) => {
-    const items = filtered();
+    const items = conversations$();
     if (items.length === 0) return;
     const currentIdx = items.findIndex((c) => c.id === activeId$());
 
@@ -96,32 +76,29 @@ export function Sidebar() {
     setConfirmingId(null);
   };
 
+  // 新对话: 直接调 store 入口。
+  // "空画布跳过" 守卫在 `startNewConversation` 内部（看 conversations.ts）,
+  // UI 不再做这个判断 —— 业务规则单点,不在每个调用方重复实现。
+  const handleNewConversation = () => {
+    void startNewConversation("新会话");
+  };
+
   return (
     <aside
       class="flex w-60 h-full flex-col bg-card border-r border-border p-2"
       aria-label="会话侧栏"
     >
-      <div class="flex gap-2 p-2 border-b border-border mb-2">
-        <Input
-          ref={searchInputRef}
-          type="search"
-          class="h-8 text-sm"
-          placeholder="搜索会话…"
-          value={query()}
-          onInput={(e) => setQuery(e.currentTarget.value)}
-          aria-label="搜索会话"
-        />
+      <div class="p-2 border-b border-border mb-2">
         <Button
           type="button"
           variant="default"
-          class="w-8 h-8"
-          onClick={() => {
-            void createConversation("新会话");
-          }}
+          class="w-full h-8 justify-start"
+          onClick={handleNewConversation}
           aria-label="新建会话"
           title="新建会话"
         >
           <Plus class="h-4 w-4" />
+          新对话
         </Button>
       </div>
       <ul
@@ -132,7 +109,7 @@ export function Sidebar() {
         onKeyDown={handleListKeyDown}
       >
         <For
-          each={filtered()}
+          each={conversations$()}
           fallback={
             <li class="p-3 text-sm text-muted-foreground text-center italic" role="status">
               暂无会话

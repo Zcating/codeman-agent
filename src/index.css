@@ -21,6 +21,12 @@
   --color-primary-900: oklch(0.37 0.13 230);
   --color-primary-950: oklch(0.27 0.1 230);
 
+  /* Singular 主色 — Tailwind v4 的 `bg-primary` / `text-primary` / `ring-primary`
+     查的是 `--color-primary` (无数字后缀),而 5 ui 原子 (Button/Input/Textarea/
+     Checkbox/Card) 的 cva variant 也只引用 singular 形式。补这一行把色阶 500
+     暴露为默认主色,这样 bg-primary 才会解析到 sky-500 蓝,不再透明。 */
+  --color-primary: var(--color-primary-500);
+
   /* Shadcn-style semantic tokens (light mode defaults)
      命名对齐 DESIGN.md: background = Cool Paper, foreground = Lab Graphite 等等。
      5 ui 原子 (Button / Input / Textarea / Checkbox / Card) 的 cva variant
