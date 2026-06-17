@@ -35,6 +35,7 @@ walkdir = "2"
 globset = "0.4"
 uuid = { version = "1.10", features = ["v4", "serde"] }
 keyring = { version = "3", features = ["windows-native"] }
+trash = "5"
 rust_decimal = { version = "1", features = ["serde-with-str"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = "1"

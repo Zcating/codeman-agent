@@ -542,13 +542,80 @@ pub async fn search_files(
     search_files_impl(&settings, &workspace_id, &glob, content_pattern.as_deref())
 }
 
+/// Pure logic for delete_file. Testable without AppState.
+pub(crate) fn delete_file_impl(
+    settings: &Settings,
+    workspace_id: &str,
+    path: &str,
+) -> Result<(), AppError> {
+    // 1. Find workspace
+    let workspace = settings
+        .workspaces
+        .iter()
+        .find(|w| w.id == workspace_id)
+        .ok_or_else(|| AppError::NotFound {
+            message: format!("Workspace not found: {}", workspace_id),
+        })?;
+
+    // 2. Check enabled
+    if !workspace.enabled {
+        return Err(AppError::InvalidConfig {
+            message: "Workspace disabled".into(),
+        });
+    }
+
+    // 3. Check blocked extensions
+    let path_lower = path.to_lowercase();
+    let blocked = ["exe", "dll", "sys", "ini"];
+    if let Some(last) = path_lower.rsplit('/').next() {
+        if let Some(ext) = last.rsplit('.').next() {
+            if blocked.contains(&ext) {
+                return Err(AppError::Upstream {
+                    message: format!("Blocked file type: .{}", ext),
+                });
+            }
+        }
+    }
+
+    // 4. Sandbox check — canonicalize and verify containment
+    let canonical_path =
+        validate_path_in_workspace(Path::new(path), &workspace.root_path)?;
+
+    // 5. Reject directory (V2: file-only)
+    let metadata = std::fs::metadata(&canonical_path).map_err(|e| {
+        AppError::Upstream { message: e.to_string() }
+    })?;
+    if metadata.is_dir() {
+        return Err(AppError::Upstream {
+            message: "Path is a directory, not a file".into(),
+        });
+    }
+
+    // 6. Move to recycle bin
+    trash::delete(&canonical_path).map_err(|e| {
+        AppError::Upstream {
+            message: format!("Failed to move to recycle bin: {}", e),
+        }
+    })?;
+
+    // 7. Sanity check: file should no longer exist at canonical path
+    if canonical_path.exists() {
+        return Err(AppError::Upstream {
+            message: "Trash succeeded but file still exists".into(),
+        });
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn delete_file(
-    _state: State<'_, AppState>,
-    _workspace_id: String,
-    _path: String,
+    state: State<'_, AppState>,
+    workspace_id: String,
+    path: String,
 ) -> Result<(), AppError> {
-    Err(AppError::Upstream { message: "not yet implemented".into() })
+    let settings = state.get_settings();
+    delete_file_impl(&settings, &workspace_id, &path)
 }
 
 #[cfg(test)]
@@ -951,5 +1018,95 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(matches!(err, AppError::SandboxViolation { .. }));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // delete_file tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn delete_file_happy_path() {
+        let tempdir = TempDir::new().unwrap();
+        let file_path = tempdir.path().join("doomed.txt");
+        std::fs::write(&file_path, "farewell").unwrap();
+
+        // Canonicalize before delete so we can check existence after
+        let canonical = std::fs::canonicalize(&file_path).unwrap();
+
+        let settings = make_settings("ws1", tempdir.path(), true);
+        let absolute_path = file_path.to_string_lossy().to_string();
+
+        let result = delete_file_impl(&settings, "ws1", &absolute_path);
+
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+        assert!(
+            !canonical.exists(),
+            "File should be gone from recycle bin"
+        );
+    }
+
+    #[test]
+    fn delete_file_sandbox_violation() {
+        let tempdir_a = TempDir::new().unwrap();
+        let tempdir_b = TempDir::new().unwrap();
+        let outside_file = tempdir_b.path().join("target.txt");
+        std::fs::write(&outside_file, "secret").unwrap();
+
+        let settings = make_settings("ws1", tempdir_a.path(), true);
+        let absolute_outside_path = outside_file.to_string_lossy().to_string();
+
+        let result = delete_file_impl(&settings, "ws1", &absolute_outside_path);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::SandboxViolation { .. }));
+        // File must NOT be deleted
+        let content = std::fs::read_to_string(&outside_file).unwrap();
+        assert_eq!(content, "secret", "Sandbox should have blocked the delete");
+    }
+
+    #[test]
+    fn delete_file_directory_rejected() {
+        let tempdir = TempDir::new().unwrap();
+        let subdir = tempdir.path().join("subdir");
+        std::fs::create_dir(&subdir).unwrap();
+
+        let settings = make_settings("ws1", tempdir.path(), true);
+        let absolute_path = subdir.to_string_lossy().to_string();
+
+        let result = delete_file_impl(&settings, "ws1", &absolute_path);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, AppError::Upstream { ref message } if message == "Path is a directory, not a file"),
+            "Expected Upstream 'Path is a directory, not a file', got {:?}",
+            err
+        );
+        // Directory must be preserved
+        assert!(subdir.exists(), "Directory should be preserved");
+    }
+
+    #[test]
+    fn delete_file_blocked_extension() {
+        let tempdir = TempDir::new().unwrap();
+        let file_path = tempdir.path().join("malware.exe");
+        std::fs::write(&file_path, "MZ...").unwrap();
+
+        let settings = make_settings("ws1", tempdir.path(), true);
+        let absolute_path = file_path.to_string_lossy().to_string();
+
+        let result = delete_file_impl(&settings, "ws1", &absolute_path);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, AppError::Upstream { ref message } if message.contains("Blocked file type: .exe")),
+            "Expected Upstream blocked extension error, got {:?}",
+            err
+        );
+        // File must be preserved
+        let content = std::fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "MZ...", "File should be preserved");
     }
 }
