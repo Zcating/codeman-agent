@@ -226,16 +226,164 @@ pub async fn write_file(
     write_file_impl(&settings, &workspace_id, &path, &content)
 }
 
+/// Pure logic for edit_file. Testable without AppState.
+pub(crate) fn edit_file_impl(
+    settings: &Settings,
+    workspace_id: &str,
+    path: &str,
+    old_text: &str,
+    new_text: &str,
+    replace_all: bool,
+) -> Result<(), AppError> {
+    // 1. Find workspace
+    let workspace = settings
+        .workspaces
+        .iter()
+        .find(|w| w.id == workspace_id)
+        .ok_or_else(|| AppError::NotFound {
+            message: format!("Workspace not found: {}", workspace_id),
+        })?;
+
+    // 2. Check enabled
+    if !workspace.enabled {
+        return Err(AppError::InvalidConfig {
+            message: "Workspace disabled".into(),
+        });
+    }
+
+    // 3. Check blocked extensions BEFORE sandbox
+    let path_lower = path.to_lowercase();
+    let blocked = ["exe", "dll", "sys", "ini"];
+    if let Some(last) = path_lower.rsplit('/').next() {
+        if let Some(ext) = last.rsplit('.').next() {
+            if blocked.contains(&ext) {
+                return Err(AppError::Upstream {
+                    message: format!("Blocked file type: .{}", ext),
+                });
+            }
+        }
+    }
+
+    // 4. Canonicalize workspace root
+    let canonical_root = std::fs::canonicalize(&workspace.root_path).map_err(|e| {
+        AppError::Upstream {
+            message: format!("Cannot canonicalize workspace root: {}", e),
+        }
+    })?;
+
+    // 5. Determine absolute target path and validate sandbox
+    let absolute_target: std::path::PathBuf = if Path::new(path).is_absolute() {
+        let canonical = validate_path_in_workspace(Path::new(path), &workspace.root_path)?;
+        canonical
+    } else {
+        let joined = canonical_root.join(path);
+        if !joined.starts_with(&canonical_root) {
+            return Err(AppError::SandboxViolation {
+                path: path.into(),
+                workspace_label: workspace.label.clone(),
+            });
+        }
+        joined
+    };
+
+    // 6. File must exist (NotFound if missing)
+    std::fs::metadata(&absolute_target).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::NotFound {
+            AppError::NotFound {
+                message: format!("File not found: {}", path),
+            }
+        } else {
+            AppError::Upstream { message: e.to_string() }
+        }
+    })?;
+
+    // 7. Canonicalize for read/write operations
+    let canonical_path =
+        std::fs::canonicalize(&absolute_target).map_err(|e| AppError::Upstream {
+            message: e.to_string(),
+        })?;
+
+    // 8. Size check (10 MB cap)
+    let metadata =
+        std::fs::metadata(&canonical_path).map_err(|e| AppError::Upstream {
+            message: e.to_string(),
+        })?;
+    if metadata.len() > MAX_FILE_SIZE {
+        return Err(AppError::Upstream {
+            message: format!("File exceeds maximum size (10 MB): {}", path),
+        });
+    }
+
+    // 9. Read current content
+    let content =
+        std::fs::read_to_string(&canonical_path).map_err(|_| AppError::Upstream {
+            message: format!("Non-UTF-8 or binary file: {}", path),
+        })?;
+
+    // 10. Count occurrences
+    let count = content.matches(old_text).count();
+
+    // 11. Apply replacement logic
+    let new_content = if replace_all {
+        if count == 0 {
+            return Err(AppError::Upstream {
+                message: "old_text not found".into(),
+            });
+        }
+        content.replace(old_text, new_text)
+    } else {
+        if count == 0 {
+            return Err(AppError::Upstream {
+                message: "old_text not found".into(),
+            });
+        }
+        if count > 1 {
+            return Err(AppError::Upstream {
+                message: format!("old_text must match exactly once (got {})", count),
+            });
+        }
+        content.replacen(old_text, new_text, 1)
+    };
+
+    // 12. Atomic write: temp file in same directory + rename
+    let parent = absolute_target.parent().ok_or_else(|| AppError::Upstream {
+        message: format!("Invalid path (no parent): {}", path),
+    })?;
+    let temp_filename = format!(
+        "{}.tmp.{}.{}",
+        absolute_target.file_name().unwrap_or_default().to_string_lossy(),
+        uuid::Uuid::new_v4(),
+        std::process::id()
+    );
+    let temp_path = parent.join(&temp_filename);
+
+    std::fs::write(&temp_path, new_content.as_bytes()).map_err(|e| {
+        AppError::Upstream {
+            message: format!("Failed to write temp file: {}", e),
+        }
+    })?;
+
+    if let Err(rename_err) = std::fs::rename(&temp_path, &absolute_target) {
+        let _ = std::fs::remove_file(&temp_path);
+        return Err(AppError::Upstream {
+            message: format!("Failed to rename temp file to target: {}", rename_err),
+        });
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn edit_file(
-    _state: State<'_, AppState>,
-    _workspace_id: String,
-    _path: String,
-    _old_text: String,
-    _new_text: String,
-    _replace_all: bool,
+    state: State<'_, AppState>,
+    workspace_id: String,
+    path: String,
+    old_text: String,
+    new_text: String,
+    replace_all: bool,
 ) -> Result<(), AppError> {
-    Err(AppError::Upstream { message: "not yet implemented".into() })
+    let settings = state.get_settings();
+    edit_file_impl(&settings, &workspace_id, &path, &old_text, &new_text, replace_all)
 }
 
 #[tauri::command]
@@ -461,5 +609,107 @@ mod tests {
             .filter(|n| n.contains(".tmp."))
             .collect();
         assert!(entries.is_empty(), "Leftover temp files after rollback: {:?}", entries);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // edit_file tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn edit_file_unique_replace() {
+        let tempdir = TempDir::new().unwrap();
+        let file_path = tempdir.path().join("target.txt");
+        std::fs::write(&file_path, "foo bar").unwrap();
+
+        let settings = make_settings("ws1", tempdir.path(), true);
+        let absolute_path = file_path.to_string_lossy().to_string();
+
+        let result = edit_file_impl(&settings, "ws1", &absolute_path, "foo", "baz", false);
+
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+        let content = std::fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "baz bar");
+    }
+
+    #[test]
+    fn edit_file_zero_matches_errors() {
+        let tempdir = TempDir::new().unwrap();
+        let file_path = tempdir.path().join("target.txt");
+        std::fs::write(&file_path, "hello").unwrap();
+
+        let settings = make_settings("ws1", tempdir.path(), true);
+        let absolute_path = file_path.to_string_lossy().to_string();
+
+        let result = edit_file_impl(&settings, "ws1", &absolute_path, "xyz", "abc", false);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, AppError::Upstream { ref message } if message == "old_text not found"),
+            "Expected Upstream 'old_text not found', got {:?}",
+            err
+        );
+        // File unchanged
+        let content = std::fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "hello");
+    }
+
+    #[test]
+    fn edit_file_multiple_matches_errors() {
+        let tempdir = TempDir::new().unwrap();
+        let file_path = tempdir.path().join("target.txt");
+        std::fs::write(&file_path, "foo foo foo").unwrap();
+
+        let settings = make_settings("ws1", tempdir.path(), true);
+        let absolute_path = file_path.to_string_lossy().to_string();
+
+        let result = edit_file_impl(&settings, "ws1", &absolute_path, "foo", "baz", false);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, AppError::Upstream { ref message } if message == "old_text must match exactly once (got 3)"),
+            "Expected Upstream 'old_text must match exactly once (got 3)', got {:?}",
+            err
+        );
+        // File unchanged
+        let content = std::fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "foo foo foo");
+    }
+
+    #[test]
+    fn edit_file_replace_all() {
+        let tempdir = TempDir::new().unwrap();
+        let file_path = tempdir.path().join("target.txt");
+        std::fs::write(&file_path, "foo foo foo").unwrap();
+
+        let settings = make_settings("ws1", tempdir.path(), true);
+        let absolute_path = file_path.to_string_lossy().to_string();
+
+        let result = edit_file_impl(&settings, "ws1", &absolute_path, "foo", "baz", true);
+
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+        let content = std::fs::read_to_string(&file_path).unwrap();
+        assert_eq!(content, "baz baz baz");
+    }
+
+    #[test]
+    fn edit_file_sandbox_violation() {
+        let tempdir_a = TempDir::new().unwrap();
+        let tempdir_b = TempDir::new().unwrap();
+        let outside_file = tempdir_b.path().join("target.txt");
+        std::fs::write(&outside_file, "hello").unwrap();
+
+        let settings = make_settings("ws1", tempdir_a.path(), true);
+        let absolute_outside_path = outside_file.to_string_lossy().to_string();
+
+        let result = edit_file_impl(&settings, "ws1", &absolute_outside_path, "hello", "bye", false);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::SandboxViolation { .. }));
+        // File unchanged
+        let content = std::fs::read_to_string(&outside_file).unwrap();
+        assert_eq!(content, "hello");
     }
 }
