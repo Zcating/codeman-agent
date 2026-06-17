@@ -195,6 +195,9 @@ export const mockState = {
   resolved: undefined as unknown,
   rejected: undefined as Error | undefined,
   calls: [] as string[],
+  // TDD 增强：跟踪每次 IPC 调用的 (command, args) 用于桥接函数参数断言。
+  // 增量为追加数组，每条 = `{ name, args }`；旧 `calls` 保留向后兼容。
+  callArgs: [] as Array<{ name: string; args: Record<string, unknown> | undefined }>,
   // V1.5+ settings store
   settings: { ...defaultSettingsV15 } as SettingsV15,
   // Tauri store mock (namespace -> key -> value)
@@ -429,6 +432,7 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
 
 export const invoke = vi.fn().mockImplementation((name: string, args?: IPCArgs) => {
   mockState.calls.push(name);
+  mockState.callArgs.push({ name, args: args as Record<string, unknown> | undefined });
 
   if (mockState.rejected) {
     return Promise.reject(mockState.rejected);

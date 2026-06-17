@@ -58,6 +58,7 @@ vi.mock("../stores/messages", () => ({
   appendUserMessage: vi.fn(),
   appendAssistantMessageDelta: vi.fn(),
   finalizeAssistantMessage: vi.fn(),
+  persistAssistantMessage: vi.fn(),
   appendToolCall: vi.fn(),
   finalizeToolResult: vi.fn(),
   clearMessages: vi.fn(),

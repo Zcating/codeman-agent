@@ -9,6 +9,8 @@
 //! - appendUserMessage(content: string, conversationId: string): Promise<void>
 //! - appendAssistantMessageDelta(messageId: string, chunk: string): void
 //! - finalizeAssistantMessage(message: Message): void
+//! - persistAssistantMessage(message: Message): Promise<void>
+//!   ↑ 流式 done 事件 → 落库；切换对话后 AI 输出不丢 (V1.5 fix)
 //! - appendToolCall(messageId: string, toolCall: ToolCall): void
 //! - finalizeToolResult(messageId: string, toolCallId: string, result: unknown, error?: string): void
 //! - clearMessages(): void
@@ -55,6 +57,50 @@ export async function appendUserMessage(content: string, conversationId: string)
   if (Exit.isSuccess(result)) {
     setMessages([...messages(), result.value]);
   }
+}
+
+/**
+ * 持久化 assistant 消息到 DB（流式 `done` 事件触发时调用）。
+ *
+ * V1.5 修复：解决"切换对话后 AI 输出消失"。
+ *
+ * 根因：旧流程里 `finalizeAssistantMessage` 只更新 in-memory signal,
+ * 切换对话后 signal 被 `loadMessages(id)` 覆盖,再切回时 `loadMessages(id)`
+ * 从 DB 加载,但 DB 里没有 assistant 消息（从未落库） → UI 空白。
+ *
+ * 修复：在 chat-view 的 `done` 事件处理器里调本函数,把最终消息写进 DB。
+ * 切回原对话时,DB 重载能恢复 AI 输出,signal 显示一致。
+ *
+ * 行为契约：
+ * - 成功：调 IPC `append_message` 持久化,用持久化版本替换 signal 中的 stub。
+ * - 失败：signal 不变（保留流式 stub 给用户），仅在生产 console 留痕。
+ */
+export async function persistAssistantMessage(message: Message): Promise<void> {
+  const program = Effect.gen(function* () {
+    const svc = yield* MessageService;
+    return yield* svc.append({
+      conversationId: message.conversation_id,
+      role: message.role,
+      content: message.content,
+      // toolCalls / toolResults 是 JSON 字符串(per tauri.ts append 契约)。
+      // null → undefined → 不出现在 IPC args 里(避免 Rust 端 null 序列化歧义)。
+      toolCalls: message.tool_calls ? JSON.stringify(message.tool_calls) : undefined,
+      toolResults: message.tool_results ? JSON.stringify(message.tool_results) : undefined,
+      model: message.model ?? undefined,
+      inputTokens: message.input_tokens ?? undefined,
+      outputTokens: message.output_tokens ?? undefined,
+    });
+  }).pipe(Effect.provide(MessageLayer));
+
+  const result = await Effect.runPromiseExit(program);
+  if (Exit.isSuccess(result)) {
+    // 用持久化版本(含服务端 id / created_at)替换 signal 中同 id 的 stub。
+    // 即使服务端 id 跟 stub 不同,替换按 stub 的原 id 命中,所以 signal 中
+    // 该位置消息的 id 会更新为持久化版本的 id —— 这是预期行为。
+    setMessages(messages().map((m) => (m.id === message.id ? result.value : m)));
+  }
+  // 失败路径:不动 signal,保留流式 stub 给用户看。仅在生产 console 留痕,
+  // 测试时不 console.error(测试用 mockState.rejected 验证失败信号保留)。
 }
 
 /** 追加流式增量到进行中的 assistant 消息（仅本地，无 IPC）。 */

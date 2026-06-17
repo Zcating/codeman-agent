@@ -14,6 +14,7 @@ import {
   appendUserMessage,
   appendAssistantMessageDelta,
   finalizeAssistantMessage,
+  persistAssistantMessage,
   appendToolCall,
   finalizeToolResult,
   clearMessages,
@@ -119,7 +120,16 @@ export function ChatView() {
               break;
             }
             case "done": {
+              // V1.5 修复 "切换对话后 AI 输出消失"。
+              //
+              // 之前只调 finalizeAssistantMessage (in-memory only),切换对话后
+              // signal 被覆盖,DB 里没数据,切回时 AI 输出消失。
+              //
+              // 现在两步走:
+              // 1) finalizeAssistantMessage 保持原有 in-memory 替换意图(向后兼容)
+              // 2) persistAssistantMessage 把消息落库 → 切回时 loadMessages 能恢复
               finalizeAssistantMessage(evt.message);
+              void persistAssistantMessage(evt.message);
               setStreamingMessageId(null);
               break;
             }

@@ -181,6 +181,7 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockImplementation((name: string, args?: IPCArgs) => {
     mockState.calls.push(name);
+    mockState.callArgs.push({ name, args: args as Record<string, unknown> | undefined });
 
     if (mockState.rejected) {
       return Promise.reject(mockState.rejected);
