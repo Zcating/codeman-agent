@@ -1,11 +1,21 @@
-//! Tests for V1.5 ProviderService and BillingService in shared/lib/tauri.ts
+//! Tests for V1.5 ProviderService + BillingService + V2 WorkspaceService + FileService
 //! Uses Layer.succeed for mock implementations with it.effect pattern
 
 import { it, expect } from "@effect/vitest";
 import { describe } from "vitest";
 import { Effect, Layer, Exit } from "effect";
-import { ProviderService, BillingService, TauriError, BillingError } from "./tauri";
-import type { Provider, Snapshot } from "./types";
+import { mockState } from "../../__mocks__/@tauri-apps/api/core";
+import {
+  ProviderService,
+  BillingService,
+  WorkspaceService,
+  FileService,
+  WorkspaceServiceLive,
+  FileServiceLive,
+  TauriError,
+  BillingError,
+} from "./tauri";
+import type { Provider, Snapshot, Workspace } from "./types";
 
 // ─── Mock Data ────────────────────────────────────────────────
 
@@ -205,5 +215,64 @@ describe("BillingService.fetchSnapshot", () => {
       const exit = yield* Effect.exit(svc.fetchSnapshot("nonexistent"));
       expect(Exit.isFailure(exit)).toBe(true);
     }).pipe(Effect.provide(MockProviderServiceLive), Effect.provide(MockBillingServiceLive)),
+  );
+});
+
+// ─── WorkspaceService Smoke Tests ─────────────────────────────────────────
+
+describe("WorkspaceService.list", () => {
+  it.effect("returns empty array when no workspaces in settings", () =>
+    Effect.gen(function* () {
+      const svc = yield* WorkspaceService;
+      const workspaces = yield* svc.list();
+      expect(workspaces).toEqual([]);
+    }).pipe(Effect.provide(WorkspaceServiceLive)),
+  );
+});
+
+// ─── FileService Smoke Tests ───────────────────────────────────────────────
+
+describe("FileService.readFile", () => {
+  it.effect("invokes read_file with correct camelCase args", () =>
+    Effect.gen(function* () {
+      // Clear any prior calls
+      mockState.calls.length = 0;
+      mockState.invokeCalls.length = 0;
+
+      const svc = yield* FileService;
+      yield* svc.readFile("ws1", "/tmp/x.txt");
+
+      const readCall = mockState.invokeCalls.find((c) => c.name === "read_file");
+      expect(readCall).toBeDefined();
+      expect(readCall?.args).toMatchObject({
+        workspace_id: "ws1",
+        path: "/tmp/x.txt",
+      });
+    }).pipe(Effect.provide(FileServiceLive)),
+  );
+});
+
+describe("FileService.editFile", () => {
+  it.effect("invokes edit_file with replace_all as boolean", () =>
+    Effect.gen(function* () {
+      // Clear any prior calls
+      mockState.calls.length = 0;
+      mockState.invokeCalls.length = 0;
+
+      const svc = yield* FileService;
+      yield* svc.editFile("ws1", "/tmp/x.txt", "old", "new", true);
+
+      const editCall = mockState.invokeCalls.find((c) => c.name === "edit_file");
+      expect(editCall).toBeDefined();
+      expect(editCall?.args).toMatchObject({
+        workspace_id: "ws1",
+        path: "/tmp/x.txt",
+        old_text: "old",
+        new_text: "new",
+        replace_all: true,
+      });
+      // Ensure replace_all is boolean, not string
+      expect(typeof editCall?.args?.replace_all).toBe("boolean");
+    }).pipe(Effect.provide(FileServiceLive)),
   );
 });

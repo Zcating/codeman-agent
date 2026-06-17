@@ -21,6 +21,8 @@ import type {
   Snapshot,
   Provider,
   ModelMeta,
+  Workspace,
+  FileMatch,
 } from "./types";
 
 // ─── Error Types ────────────────────────────────────────────
@@ -135,6 +137,50 @@ export class SettingsService extends Context.Tag("SettingsService")<
     readonly updateSettings: (patch: unknown) => Effect.Effect<Settings, AppError>;
     readonly clearAllHistory: () => Effect.Effect<void, AppError>;
     readonly getActiveLlmProvider: () => Effect.Effect<LLMProvider | null, AppError>;
+  }
+>() {}
+
+// ─── WorkspaceService (V2 File IO — ADR-0013) ─────────────────────────────
+
+export class WorkspaceService extends Context.Tag("WorkspaceService")<
+  WorkspaceService,
+  {
+    /** Returns all workspaces from settings */
+    readonly list: () => Effect.Effect<Workspace[], AppError>;
+    /** Adds a new workspace to settings */
+    readonly add: (workspace: Workspace) => Effect.Effect<void, AppError>;
+    /** Updates an existing workspace by id */
+    readonly update: (id: string, patch: Partial<Workspace>) => Effect.Effect<void, AppError>;
+    /** Removes a workspace by id */
+    readonly remove: (id: string) => Effect.Effect<void, AppError>;
+  }
+>() {}
+
+// ─── FileService (V2 File IO — ADR-0013) ──────────────────────────────────
+
+export class FileService extends Context.Tag("FileService")<
+  FileService,
+  {
+    readonly readFile: (workspaceId: string, path: string) => Effect.Effect<string, AppError>;
+    readonly writeFile: (
+      workspaceId: string,
+      path: string,
+      content: string,
+    ) => Effect.Effect<void, AppError>;
+    readonly editFile: (
+      workspaceId: string,
+      path: string,
+      oldText: string,
+      newText: string,
+      replaceAll: boolean,
+    ) => Effect.Effect<void, AppError>;
+    // Note: IPC layer uses string | null for contentPattern (Option.None = null)
+    readonly searchFiles: (
+      workspaceId: string,
+      glob: string,
+      contentPattern: string | null,
+    ) => Effect.Effect<FileMatch[], AppError>;
+    readonly deleteFile: (workspaceId: string, path: string) => Effect.Effect<void, AppError>;
   }
 >() {}
 
@@ -361,6 +407,82 @@ export const SettingsServiceImpl = {
       );
     }),
 } as const;
+
+// WorkspaceServiceLive
+export const WorkspaceServiceLive = Layer.effect(
+  WorkspaceService,
+  Effect.gen(function* () {
+    const settingsSvc = yield* SettingsService;
+
+    return {
+      list: () =>
+        Effect.gen(function* () {
+          const settings = yield* settingsSvc.getSettings();
+          return settings.workspaces ?? [];
+        }),
+
+      add: (workspace) =>
+        Effect.gen(function* () {
+          const settings = yield* settingsSvc.getSettings();
+          const workspaces = [...(settings.workspaces ?? []), workspace];
+          yield* settingsSvc.updateSettings({ workspaces });
+        }),
+
+      update: (id, patch) =>
+        Effect.gen(function* () {
+          const settings = yield* settingsSvc.getSettings();
+          const workspaces = (settings.workspaces ?? []).map((ws) =>
+            ws.id === id ? { ...ws, ...patch } : ws,
+          );
+          yield* settingsSvc.updateSettings({ workspaces });
+        }),
+
+      remove: (id) =>
+        Effect.gen(function* () {
+          const settings = yield* settingsSvc.getSettings();
+          const workspaces = (settings.workspaces ?? []).filter((ws) => ws.id !== id);
+          yield* settingsSvc.updateSettings({ workspaces });
+        }),
+    };
+  }),
+);
+
+// FileServiceLive — thin IPC wrappers, no Effect.gen needed since no deps
+export const FileServiceLive = Layer.fromEffect(
+  FileService,
+  Effect.succeed({
+    readFile: (workspaceId: string, path: string) =>
+      invoke<string>("read_file", { workspace_id: workspaceId, path }),
+
+    writeFile: (workspaceId: string, path: string, content: string) =>
+      invoke<void>("write_file", { workspace_id: workspaceId, path, content }),
+
+    editFile: (
+      workspaceId: string,
+      path: string,
+      oldText: string,
+      newText: string,
+      replaceAll: boolean,
+    ) =>
+      invoke<void>("edit_file", {
+        workspace_id: workspaceId,
+        path,
+        old_text: oldText,
+        new_text: newText,
+        replace_all: replaceAll,
+      }),
+
+    searchFiles: (workspaceId: string, glob: string, contentPattern: string | null) =>
+      invoke<FileMatch[]>("search_files", {
+        workspace_id: workspaceId,
+        glob,
+        content_pattern: contentPattern,
+      }),
+
+    deleteFile: (workspaceId: string, path: string) =>
+      invoke<void>("delete_file", { workspace_id: workspaceId, path }),
+  }),
+);
 
 // ─── 桥接函数（基于 Promise，用于 Solid UI） ──────────────────────────
 

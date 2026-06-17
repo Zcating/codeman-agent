@@ -195,6 +195,8 @@ export const mockState = {
   resolved: undefined as unknown,
   rejected: undefined as Error | undefined,
   calls: [] as string[],
+  // Captures full invoke calls: { name, args }
+  invokeCalls: [] as { name: string; args?: Record<string, unknown> }[],
   // V1.5+ settings store
   settings: { ...defaultSettingsV15 } as SettingsV15,
   // Tauri store mock (namespace -> key -> value)
@@ -429,6 +431,7 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
 
 export const invoke = vi.fn().mockImplementation((name: string, args?: IPCArgs) => {
   mockState.calls.push(name);
+  mockState.invokeCalls.push({ name, args: args as Record<string, unknown> | undefined });
 
   if (mockState.rejected) {
     return Promise.reject(mockState.rejected);
