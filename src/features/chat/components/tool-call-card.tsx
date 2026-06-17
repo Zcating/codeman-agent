@@ -4,10 +4,31 @@
 //! 纯 UI。不导入 effect。
 //! Polish C3: 中文 labels (参数 / 结果) + 走 shadcn 语义 token。
 
-import { Show } from "solid-js";
+import { Show, type Component } from "solid-js";
+import {
+  FileText,
+  FilePlus,
+  FileEdit,
+  FileSearch,
+  FileX,
+  Wallet,
+  Clock,
+  Wrench,
+} from "lucide-solid";
 import type { ToolCall, ToolResult } from "../../../shared/lib/types";
 
 type Status = "running" | "success" | "error";
+
+// File tool icon mapping
+const TOOL_ICONS: Record<string, Component<{ class?: string }>> = {
+  read_file: FileText,
+  write_file: FilePlus,
+  edit_file: FileEdit,
+  search_files: FileSearch,
+  delete_file: FileX,
+  get_balance: Wallet,
+  get_plan_quota: Clock,
+};
 
 export function ToolCallCard(props: { toolCall: ToolCall; result?: ToolResult }) {
   const status = (): Status => {
@@ -24,20 +45,40 @@ export function ToolCallCard(props: { toolCall: ToolCall; result?: ToolResult })
     return `${base} border-destructive/40 bg-destructive/5`;
   };
 
-  const iconClass = () => {
+  const statusIcon = () => {
     const s = status();
-    if (s === "running") return "text-muted-foreground";
-    if (s === "success") return "text-success";
-    return "text-destructive";
+    if (s === "running") return "⏳";
+    if (s === "success") return "✓";
+    return "✗";
+  };
+
+  const Icon = () => {
+    const ToolIcon = TOOL_ICONS[props.toolCall.name] ?? Wrench;
+    return <ToolIcon class="h-4 w-4" />;
+  };
+
+  const pathLabel = () => {
+    if (props.toolCall.name === "read_file" && props.toolCall.args.path) {
+      return String(props.toolCall.args.path);
+    }
+    return null;
   };
 
   return (
     <div class={outerClass()}>
       <div class="flex items-center gap-2 flex-wrap">
-        <span class={iconClass()} aria-hidden="true">
-          {status() === "running" ? "⏳" : status() === "success" ? "✓" : "✗"}
+        <span class="text-muted-foreground" aria-hidden="true">
+          {statusIcon()}
+        </span>
+        <span class="text-muted-foreground" aria-hidden="true">
+          <Icon />
         </span>
         <code class="text-sm font-mono font-semibold text-foreground">{props.toolCall.name}</code>
+        <Show when={pathLabel()}>
+          <span class="text-xs text-primary font-mono bg-primary/10 px-1.5 py-0.5 rounded">
+            {pathLabel()}
+          </span>
+        </Show>
         <code class="text-xs text-muted-foreground font-mono ml-auto">{props.toolCall.id}</code>
       </div>
       <details class="text-sm border-t border-border pt-2 mt-2" open={status() === "error"}>

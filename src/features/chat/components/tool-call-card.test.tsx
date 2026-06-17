@@ -82,4 +82,45 @@ describe("ToolCallCard", () => {
     expect(argsDetails?.textContent).toContain("deepseek");
     expect(argsDetails?.textContent).toContain("cn");
   });
+
+  it("read_file 工具显示文件路径标签", () => {
+    const toolCall: ToolCall = {
+      id: "tc-read-1",
+      name: "read_file",
+      args: { path: "/workspace/src/index.ts" },
+    };
+    const { container } = render(() => <ToolCallCard toolCall={toolCall} />);
+    const card = container.querySelector("[class*='border-border']");
+    expect(card).toBeTruthy();
+    // 验证路径标签存在
+    const pathLabel = card?.querySelector("[class*='bg-primary/10']");
+    expect(pathLabel?.textContent).toBe("/workspace/src/index.ts");
+  });
+
+  it("read_file 工具渲染 SVG 图标", () => {
+    const toolCall: ToolCall = {
+      id: "tc-read-2",
+      name: "read_file",
+      args: { path: "/workspace/src/app.ts" },
+    };
+    const { container } = render(() => <ToolCallCard toolCall={toolCall} />);
+    // 验证有 SVG 图标渲染（FileText for read_file）
+    const svgIcons = container.querySelectorAll("svg");
+    expect(svgIcons.length).toBeGreaterThan(0);
+    // 验证工具名称
+    const name = container.querySelector("code");
+    expect(name?.textContent).toBe("read_file");
+  });
+
+  it("未知工具回退到通用图标", () => {
+    const toolCall: ToolCall = {
+      id: "tc-unknown",
+      name: "unknown_tool",
+      args: {},
+    };
+    const { container } = render(() => <ToolCallCard toolCall={toolCall} />);
+    // 应该仍然渲染 SVG 图标（Wrench 回退）
+    const svgIcons = container.querySelectorAll("svg");
+    expect(svgIcons.length).toBeGreaterThan(0);
+  });
 });

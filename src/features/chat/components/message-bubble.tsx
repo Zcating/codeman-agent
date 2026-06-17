@@ -5,7 +5,7 @@
 
 import { Show, For } from "solid-js";
 import { marked } from "marked";
-import type { Message, ToolCall, ToolResult } from "../../../shared/lib/types";
+import type { Message, ToolCall, ToolResult, FileMatch } from "../../../shared/lib/types";
 
 /** 转义用户提供的文本以防止 XSS。 */
 function escapeHtml(s: string): string {
@@ -64,7 +64,46 @@ export function MessageBubble(props: { message: Message }) {
               {(tr: ToolResult) => (
                 <div class={`mt-1 text-xs ${tr.error ? "text-destructive" : "text-success"}`}>
                   <code>{tr.tool_call_id}</code>: {tr.error ? "❌" : "✓"}{" "}
-                  <code>{JSON.stringify(tr.result)}</code>
+                  <Show
+                    when={
+                      typeof tr.result === "string" &&
+                      tr.result.length > 200
+                    }
+                    fallback={
+                      <code class="text-foreground">{JSON.stringify(tr.result)}</code>
+                    }
+                  >
+                    <details class="mt-1 border border-border rounded p-2 bg-muted">
+                      <summary class="cursor-pointer hover:text-primary font-medium select-none">
+                        文件内容 ({tr.result && typeof tr.result === "string" ? tr.result.split("\n").length : 0} 行)
+                      </summary>
+                      <pre class="mt-2 p-2 bg-card rounded text-xs font-mono overflow-auto max-h-96 whitespace-pre-wrap border border-border">
+                        {String(tr.result)}
+                      </pre>
+                    </details>
+                  </Show>
+                  {/* search_files result: render match list */}
+                  <Show when={Array.isArray(tr.result) && (tr.result as unknown[]).length > 0}>
+                    <div class="mt-2 space-y-1">
+                      <For each={tr.result as FileMatch[]}>
+                        {(match: FileMatch) => (
+                          <div class="flex gap-2 text-xs font-mono">
+                            <Show when={match.line_number !== null}>
+                              <span class="text-muted-foreground">
+                                {match.line_number}:
+                              </span>
+                            </Show>
+                            <code class="text-primary">{match.path}</code>
+                            <Show when={match.matched_line}>
+                              <span class="text-foreground truncate max-w-xs">
+                                {match.matched_line}
+                              </span>
+                            </Show>
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
                 </div>
               )}
             </For>
