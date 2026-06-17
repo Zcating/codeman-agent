@@ -83,14 +83,147 @@ pub async fn read_file(
     read_file_impl(&settings, &workspace_id, &path)
 }
 
+/// Pure logic for write_file. Testable without AppState.
+pub(crate) fn write_file_impl(
+    settings: &Settings,
+    workspace_id: &str,
+    path: &str,
+    content: &str,
+) -> Result<(), AppError> {
+    // 1. Find workspace
+    let workspace = settings
+        .workspaces
+        .iter()
+        .find(|w| w.id == workspace_id)
+        .ok_or_else(|| AppError::NotFound {
+            message: format!("Workspace not found: {}", workspace_id),
+        })?;
+
+    // 2. Check enabled
+    if !workspace.enabled {
+        return Err(AppError::InvalidConfig {
+            message: "Workspace disabled".into(),
+        });
+    }
+
+    // 3. Check blocked extensions BEFORE sandbox
+    let path_lower = path.to_lowercase();
+    let blocked = ["exe", "dll", "sys", "ini"];
+    if let Some(last) = path_lower.rsplit('/').next() {
+        if let Some(ext) = last.rsplit('.').next() {
+            if blocked.contains(&ext) {
+                return Err(AppError::Upstream {
+                    message: format!("Blocked file type: .{}", ext),
+                });
+            }
+        }
+    }
+
+    // 4. Sandbox check — handle non-existent target paths (write case)
+    // Canonicalize workspace root (always exists), then:
+    // - For relative paths: use starts_with on the joined path (no re-canonicalize needed)
+    // - For absolute paths: use the same sandbox validate_path_in_workspace
+    let canonical_root = std::fs::canonicalize(&workspace.root_path).map_err(|e| {
+        AppError::Upstream {
+            message: format!("Cannot canonicalize workspace root: {}", e),
+        }
+    })?;
+
+    let path_lower = path.to_lowercase();
+
+    // Reject \\?\ prefix and NTFS streams (before any path operations)
+    if path_lower.starts_with(r"\\?\") {
+        return Err(AppError::SandboxViolation {
+            path: path.into(),
+            workspace_label: workspace.label.clone(),
+        });
+    }
+    if path_lower.contains("::data") {
+        return Err(AppError::SandboxViolation {
+            path: path.into(),
+            workspace_label: workspace.label.clone(),
+        });
+    }
+
+    // Determine the target path for validation and for the atomic write operation
+    // For relative paths: use starts_with on the joined path (Path::starts_with handles
+    // short/long path name mismatches on Windows). The parent must exist.
+    // For absolute paths: use validate_path_in_workspace (requires file to exist).
+    let absolute_target: std::path::PathBuf =
+        if Path::new(path).is_absolute() {
+            // Absolute path: canonicalize and validate via sandbox
+            let canonical = validate_path_in_workspace(Path::new(path), &workspace.root_path)?;
+            // Use the canonical path for the atomic write
+            canonical
+        } else {
+            // Relative path: join with canonical workspace root, check prefix
+            let joined = canonical_root.join(path);
+
+            // Path::starts_with handles short/long path name mismatches on Windows
+            if !joined.starts_with(&canonical_root) {
+                return Err(AppError::SandboxViolation {
+                    path: path.into(),
+                    workspace_label: workspace.label.clone(),
+                });
+            }
+
+            // Ensure parent directory exists (required for writes)
+            let parent = joined.parent().ok_or_else(|| AppError::Upstream {
+                message: format!("Invalid path (no parent): {}", path),
+            })?;
+            if !parent.exists() {
+                return Err(AppError::Upstream {
+                    message: format!("Parent directory does not exist: {}", parent.display()),
+                });
+            }
+
+            joined
+        };
+
+    // 5. Size check
+    let content_bytes = content.as_bytes();
+    if content_bytes.len() > MAX_FILE_SIZE as usize {
+        return Err(AppError::Upstream {
+            message: "Content exceeds maximum size (10 MB)".into(),
+        });
+    }
+
+    // 6. Atomic write: temp file in same directory + rename
+    let parent = absolute_target.parent().ok_or_else(|| AppError::Upstream {
+        message: format!("Invalid path (no parent): {}", path),
+    })?;
+    let temp_filename = format!(
+        "{}.tmp.{}.{}",
+        absolute_target.file_name().unwrap_or_default().to_string_lossy(),
+        uuid::Uuid::new_v4(),
+        std::process::id()
+    );
+    let temp_path = parent.join(&temp_filename);
+
+    std::fs::write(&temp_path, content_bytes).map_err(|e| AppError::Upstream {
+        message: format!("Failed to write temp file: {}", e),
+    })?;
+
+    // Rename to target; on failure, remove temp file and propagate error
+    if let Err(rename_err) = std::fs::rename(&temp_path, &absolute_target) {
+        let _ = std::fs::remove_file(&temp_path);
+        return Err(AppError::Upstream {
+            message: format!("Failed to rename temp file to target: {}", rename_err),
+        });
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn write_file(
-    _state: State<'_, AppState>,
-    _workspace_id: String,
-    _path: String,
-    _content: String,
+    state: State<'_, AppState>,
+    workspace_id: String,
+    path: String,
+    content: String,
 ) -> Result<(), AppError> {
-    Err(AppError::Upstream { message: "not yet implemented".into() })
+    let settings = state.get_settings();
+    write_file_impl(&settings, &workspace_id, &path, &content)
 }
 
 #[tauri::command]
@@ -218,5 +351,115 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(matches!(err, AppError::InvalidConfig { .. }));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // write_file tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn write_file_happy_path() {
+        let tempdir = TempDir::new().unwrap();
+        let settings = make_settings("ws1", tempdir.path(), true);
+        // Use relative path so sandbox canonicalizes to a path inside workspace
+        let relative_path = "out.txt";
+
+        let result = write_file_impl(&settings, "ws1", relative_path, "new content");
+
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+        let file_path = tempdir.path().join("out.txt");
+        let read_back = std::fs::read_to_string(&file_path).unwrap();
+        assert_eq!(read_back, "new content");
+
+        // No leftover *.tmp.* files
+        let entries: Vec<_> = std::fs::read_dir(tempdir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .filter(|n| n.contains(".tmp."))
+            .collect();
+        assert!(entries.is_empty(), "Leftover temp files: {:?}", entries);
+    }
+
+    #[test]
+    fn write_file_sandbox_violation() {
+        let tempdir_a = TempDir::new().unwrap();
+        let tempdir_b = TempDir::new().unwrap();
+        let outside_file = tempdir_b.path().join("target.txt");
+        std::fs::write(&outside_file, "secret").unwrap();
+
+        let settings = make_settings("ws1", tempdir_a.path(), true);
+        let absolute_outside_path = outside_file.to_string_lossy().to_string();
+
+        let result = write_file_impl(&settings, "ws1", &absolute_outside_path, "content");
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::SandboxViolation { .. }));
+        // File content must NOT be modified (sandbox blocked the write)
+        let content = std::fs::read_to_string(&outside_file).unwrap();
+        assert_eq!(content, "secret", "Sandbox should have blocked the write");
+    }
+
+    #[test]
+    fn write_file_content_too_large() {
+        let tempdir = TempDir::new().unwrap();
+        let settings = make_settings("ws1", tempdir.path(), true);
+        let relative_path = "big.txt";
+        let content: Vec<u8> = vec![b'a'; 11 * 1024 * 1024];
+
+        let result = write_file_impl(&settings, "ws1", relative_path, &String::from_utf8_lossy(&content));
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, AppError::Upstream { ref message } if message.contains("exceeds maximum size")),
+            "Expected Upstream with size error, got {:?}",
+            err
+        );
+        let file_path = tempdir.path().join("big.txt");
+        assert!(!file_path.exists(), "File should not be created");
+    }
+
+    #[test]
+    fn write_file_blocked_extension() {
+        let tempdir = TempDir::new().unwrap();
+        let settings = make_settings("ws1", tempdir.path(), true);
+
+        let result = write_file_impl(&settings, "ws1", "malware.exe", "MZ...");
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(
+            matches!(err, AppError::Upstream { ref message } if message.contains("Blocked file type: .exe")),
+            "Expected Upstream blocked extension error, got {:?}",
+            err
+        );
+        let file_path = tempdir.path().join("malware.exe");
+        assert!(!file_path.exists(), "File should not be created");
+    }
+
+    #[test]
+    fn write_file_atomic_rollback() {
+        let tempdir = TempDir::new().unwrap();
+        let target_path = tempdir.path().join("target.txt");
+        // Make target a directory so rename fails
+        std::fs::create_dir(&target_path).unwrap();
+
+        let settings = make_settings("ws1", tempdir.path(), true);
+        let relative_path = "target.txt";
+
+        let result = write_file_impl(&settings, "ws1", relative_path, "content");
+
+        assert!(result.is_err(), "Expected Err due to rename failure, got {:?}", result);
+
+        // No leftover temp files
+        let entries: Vec<_> = std::fs::read_dir(tempdir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .filter(|n| n.contains(".tmp."))
+            .collect();
+        assert!(entries.is_empty(), "Leftover temp files after rollback: {:?}", entries);
     }
 }
