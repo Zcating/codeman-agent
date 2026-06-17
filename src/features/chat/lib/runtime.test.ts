@@ -14,7 +14,12 @@ import { it, expect, vi } from "@effect/vitest";
 import { describe, beforeEach } from "vitest";
 import { Effect, Layer, Stream } from "effect";
 import { AgentRuntime, AgentRuntimeLive } from "./runtime";
-import { SettingsService, BillingService } from "../../../shared/lib/tauri";
+import {
+  SettingsService,
+  BillingService,
+  FileService,
+  WorkspaceService,
+} from "../../../shared/lib/tauri";
 import { LLMProviderService } from "../../settings/lib/llm-providers";
 import { mockState, type SettingsV15 } from "../../../__mocks__/@tauri-apps/api/core";
 import type { Conversation, Message, LLMProvider } from "../../../shared/lib/types";
@@ -98,12 +103,30 @@ const MockLLMProviderServiceLive = Layer.succeed(LLMProviderService, {
   setActive: () => Effect.succeed(undefined),
 });
 
+const MockFileServiceLive = Layer.succeed(FileService, {
+  readFile: () => Effect.succeed(""),
+  writeFile: () => Effect.succeed(undefined),
+  editFile: () => Effect.succeed(undefined),
+  searchFiles: () => Effect.succeed([]),
+  deleteFile: () => Effect.succeed(undefined),
+});
+
+const MockWorkspaceServiceLive = Layer.succeed(WorkspaceService, {
+  list: () => Effect.succeed([]),
+  add: () => Effect.succeed(undefined),
+  update: () => Effect.succeed(undefined),
+  remove: () => Effect.succeed(undefined),
+});
+
 // AgentRuntimeLive 现在 yield* SettingsService + LLMProviderService 在 layer 内部,
-// 所以 MockRuntimeDeps 必须包含这俩 + BillingService 才能 build layer。
+// 所以 MockRuntimeDeps 必须包含这俩 + BillingService 才能 build layer.
+// V2: 加上 FileService + WorkspaceService (ADR-0013)
 const MockRuntimeDeps = Layer.mergeAll(
   MockSettingsServiceLive,
   MockBillingServiceLive,
   MockLLMProviderServiceLive,
+  MockFileServiceLive,
+  MockWorkspaceServiceLive,
 );
 
 // ─── Setup ──────────────────────────────────────────────────────

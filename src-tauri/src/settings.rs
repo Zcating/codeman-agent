@@ -274,7 +274,16 @@ impl Default for Settings {
             theme: Theme::default(),
             start_at_login: true,
             window: WindowSettings::default(),
-            system_prompt: SystemPromptSettings::default(),
+            system_prompt: SystemPromptSettings {
+                default: "You are an AI assistant with access to billing tools and file system tools.\n\
+\n## Billing Tools\nYou can call get_balance and get_plan_quota to check provider billing state.\n\
+\n## File Tools\nYou have access to 5 file tools (read_file, write_file, edit_file, search_files, delete_file).\n\
+Each tool requires a workspace_id parameter — only operate within user-configured workspaces.\n\
+Paths outside any workspace will return a SandboxViolation error.\n\
+For edit_file, your old_text must match exactly once unless you set replace_all=true.\n\
+Files are limited to 10 MB. Binary files, .exe/.dll/.sys files, and paths outside workspaces are blocked.".into(),
+                user_can_edit: true,
+            },
             billing_providers: Vec::new(),
             conversations: ConversationSettings::default(),
             workspaces: Vec::new(),

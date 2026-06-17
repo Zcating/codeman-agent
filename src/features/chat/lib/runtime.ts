@@ -23,11 +23,16 @@ import {
   SettingsService,
   SettingsServiceLive,
   BillingServiceLive,
+  FileService,
+  FileServiceLive,
+  WorkspaceService,
+  WorkspaceServiceLive,
 } from "../../../shared/lib/tauri";
 import { LLMProviderService, LLMProviderServiceLive } from "../../settings/lib/llm-providers";
 import { AnthropicTransport } from "./anthropic-transport";
 import type { AppError, Conversation, Message } from "../../../shared/lib/types";
 import { getBalanceTool, getPlanQuotaTool } from "../../billing/lib/billing";
+import { fileTools } from "../../file-tools/lib/file-tools";
 
 // ─── Runtime 事件类型 ─────────────────────────────────────────────
 
@@ -53,14 +58,15 @@ export class AgentRuntime extends Context.Tag("AgentRuntime")<
     readonly run: (
       conversation: Conversation,
       userMessage: Message,
-    ) => Stream.Stream<RuntimeEvent, AppError | RuntimeError, SettingsService | LLMProviderService>;
+    ) => Stream.Stream<RuntimeEvent, AppError | RuntimeError, SettingsService | LLMProviderService | FileService | WorkspaceService>;
     readonly cancel: () => Effect.Effect<void, never, never>;
   }
 >() {}
 
 // ─── 工具注册（AgentTool[] — pi-agent 自动调度） ─────────────────
 
-const tools: any[] = [getBalanceTool, getPlanQuotaTool];
+// V2: 5 file tools alongside 2 billing tools (ADR-0013)
+const tools: any[] = [getBalanceTool, getPlanQuotaTool, ...fileTools];
 
 // ─── Live Layer ─────────────────────────────────────────────────────
 
@@ -310,6 +316,8 @@ export const RuntimeDeps = Layer.mergeAll(
   SettingsServiceLive,
   BillingServiceLive,
   LLMProviderServiceLive,
+  FileServiceLive,
+  WorkspaceServiceLive,
 );
 
 // AgentRuntimeLive 在 yield* Ref.make 时无外部 requirements,SettingsService 等
