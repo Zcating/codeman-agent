@@ -76,6 +76,27 @@ message 保持一致。
 - **Plan Quota (用量)** — 套餐附带的固定、不可充值的配额。随使用
   减少，周期重置，不可充值。
 
+### File IO (V2 路线图, via ADR-0013)
+
+V1 Non-goal "无文件系统" 由 [ADR-0013](./docs/adr/0013-file-io-tools.md)
+(V2 启动时) 解除。本节术语仅在 V2 实施后生效, V1.5 仍锁 Non-goal。
+
+- **Workspace (工作区)** — 用户在 Settings (`Settings.workspaces: Array<{ id, label, root_path, enabled }>`)
+  中配置的根目录, agent 的 file tool 仅在该目录树下操作。Agent
+  越界 (canonical path 不在 workspace root 内) 由 Tauri command
+  拒绝 (返回 `SandboxViolation` 错误)。Shape 同 ADR-0013。
+  _避免_: sandbox、root directory、project root。
+- **File Tool (文件工具)** — pi-agent 工具族, V2 内置 5 个:
+  `read_file` (读全文) / `write_file` (覆盖写) / `edit_file` (语义
+  待 V2 实施时定) / `search_files` (glob + content) /
+  `delete_file` (移至回收站)。所有工具通过 Tauri command 调 Rust
+  `std::fs`, 沙箱由 workspace 边界约束, 不绕过 Tauri permission
+  system。_避免_: fs tool、file operation (过载)。
+- **Sandbox Violation (越界错误)** — Tauri command 在
+  `canonicalize(path)` 后检测到 `path` 不在任何已启用 workspace
+  目录下时返回的错误。Agent 收到后必须重新规划 (改路径 / 让用户
+  加 workspace) 而非重试原路径。
+
 ### 架构
 
 - **Runtime (运行时)** — 包装 pi-mono agent loop 的 Effect-TS 层。
