@@ -45,6 +45,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             // V0 removed per ADR-0012 T7
             commands::get_settings,
@@ -71,6 +72,8 @@ pub fn run() {
             commands::get_llm_key,
             // Metis #9
             commands::delete_provider_keys,
+            // T22: dialog
+            commands::pick_workspace_path,
             // T6–T10: filesystem
             commands::filesystem::read_file,
             commands::filesystem::write_file,

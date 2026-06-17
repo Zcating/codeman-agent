@@ -3,6 +3,8 @@
 
 pub mod filesystem;
 
+use tauri_plugin_dialog::DialogExt;
+
 use crate::db::conversations;
 use crate::db::messages;
 use crate::secrets_llm;
@@ -251,4 +253,22 @@ pub async fn delete_provider_keys(
     // 删除计费密钥（billing/<id>/api_key）
     secrets_llm::delete_billing_key(&app, &provider_id)?;
     Ok(())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// dialog IPC（T22: pick_workspace_path）
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn pick_workspace_path(app: tauri::AppHandle) -> Result<Option<String>, AppError> {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog()
+        .file()
+        .set_title("Select workspace root")
+        .pick_folder(move |path: Option<tauri_plugin_dialog::FilePath>| {
+            let _ = tx.send(path.map(|p| p.to_string()));
+        });
+    rx.await.map_err(|e| AppError::Upstream {
+        message: format!("Dialog error: {}", e),
+    })
 }

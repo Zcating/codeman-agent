@@ -28,8 +28,8 @@ export interface WorkspaceCardProps {
  */
 async function pickWorkspacePath(): Promise<string | null> {
   try {
-    // TODO: Add `pick_workspace_path` Tauri command via tauri-plugin-dialog
-    // or via a custom command in src-tauri/src/commands/dialog.rs
+    // pick_workspace_path Tauri command (src-tauri/src/commands/mod.rs)
+    // uses tauri-plugin-dialog to open a folder picker
     const path = await invoke<string | null>("pick_workspace_path");
     return path;
   } catch {
