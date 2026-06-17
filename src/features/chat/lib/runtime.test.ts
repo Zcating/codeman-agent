@@ -10,14 +10,48 @@
 //! E2E fix: 改用 SettingsService + LLMProviderService (跟 runtime.ts 实际
 //! 用的 service 一致),master 的 ProviderService 模式没接 pi-agent。
 
-import { it, expect, vi } from "@effect/vitest";
-import { describe, beforeEach } from "vitest";
+import { it, expect } from "@effect/vitest";
+import { describe, beforeEach, vi } from "vitest";
 import { Effect, Layer, Stream } from "effect";
 import { AgentRuntime, AgentRuntimeLive } from "./runtime";
-import { SettingsService, BillingService } from "../../../shared/lib/tauri";
+import { SettingsService, BillingService, MessageService } from "../../../shared/lib/tauri";
 import { LLMProviderService } from "../../settings/lib/llm-providers";
 import { mockState, type SettingsV15 } from "../../../__mocks__/@tauri-apps/api/core";
 import type { Conversation, Message, LLMProvider } from "../../../shared/lib/types";
+
+const sseChunks = [
+  `event: message_start\ndata: {"type":"message_start","message":{"id":"m1","content":[],"model":"deepseek-chat","stopReason":null,"role":"assistant"}}\n\n`,
+  `event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}\n\n`,
+  `event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hello"}}\n\n`,
+  `event: content_block_stop\ndata: {"type":"content_block_stop","index":0}\n\n`,
+  `event: message_stop\ndata: {"type":"message_stop"}\n\n`,
+];
+
+const installFetchMock = () => {
+  const fetchSpy = vi.fn(async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        const encoder = new TextEncoder();
+        for (const chunk of sseChunks) {
+          controller.enqueue(encoder.encode(chunk));
+        }
+        controller.close();
+      },
+    });
+    return new Response(stream, {
+      status: 200,
+      headers: { "Content-Type": "text/event-stream" },
+    });
+  });
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = fetchSpy as unknown as typeof fetch;
+  return {
+    fetchSpy,
+    restore: () => {
+      globalThis.fetch = originalFetch;
+    },
+  };
+};
 
 // ─── Test Fixtures ─────────────────────────────────────────────
 
@@ -98,12 +132,21 @@ const MockLLMProviderServiceLive = Layer.succeed(LLMProviderService, {
   setActive: () => Effect.succeed(undefined),
 });
 
-// AgentRuntimeLive 现在 yield* SettingsService + LLMProviderService 在 layer 内部,
-// 所以 MockRuntimeDeps 必须包含这俩 + BillingService 才能 build layer。
+// V1.6+ per-conversation Agent (ADR-0014 D4):AgentRuntimeLive 内部 yield* MessageService
+// 用于首次 run() 拉历史消息。测试不真正关心 history 内容,空数组即可。
+const MockMessageServiceLive = Layer.succeed(MessageService, {
+  list: () => Effect.succeed([]),
+  append: () => Effect.succeed({ ...testMessage, id: "new", content: "test" }),
+  search: () => Effect.succeed([]),
+});
+
+// AgentRuntimeLive 现在 yield* SettingsService + LLMProviderService + MessageService 在
+// layer 内部,所以 MockRuntimeDeps 必须包含这三者 + BillingService 才能 build layer。
 const MockRuntimeDeps = Layer.mergeAll(
   MockSettingsServiceLive,
   MockBillingServiceLive,
   MockLLMProviderServiceLive,
+  MockMessageServiceLive,
 );
 
 // ─── Setup ──────────────────────────────────────────────────────
@@ -142,9 +185,16 @@ describe("AgentRuntime V1.5+", () => {
   it.effect("token events are emitted from agent message updates", () =>
     Effect.gen(function* () {
       const runtime = yield* AgentRuntime;
-      // Stream.take(1) 触发 Agent 构造（取首元素后 cancel）
-      yield* runtime.run(testConversation, testMessage).pipe(Stream.take(1), Stream.runDrain);
-      // 验证 getApiKey 被调用，参数是 activeProvider.id ("deepseek")
+      // Mock fetch 让 AnthropicTransport 拿到一个最小 SSE 流(一个 text delta
+      // + 立即终止),避免真实 DNS / network round-trip hang 测试。副作用:
+      // (1) runtime 收到 token event → take(1) 拿到;(2) llmSvc.getApiKey 被调。
+      const { fetchSpy, restore } = installFetchMock();
+      try {
+        yield* runtime.run(testConversation, testMessage).pipe(Stream.take(1), Stream.runDrain);
+      } finally {
+        restore();
+      }
+      expect(fetchSpy).toHaveBeenCalled();
       expect(apiKeySpy).toHaveBeenCalledWith("deepseek");
     }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps)),
   );
@@ -153,15 +203,17 @@ describe("AgentRuntime V1.5+", () => {
     Effect.gen(function* () {
       const runtime = yield* AgentRuntime;
 
-      // Test that cancel() can be called even if agent is not running
-      // This verifies the runtime doesn't crash on cancel
-      yield* runtime.cancel();
-      yield* runtime.cancel(); // Calling cancel twice should be safe
+      // V1.6+ per ADR-0014 D6:cancel 现在需要 convId 参数(per-conversation 路由)。
+      // 这里用 non-existent convId 验证 cancel 在无 Agent 状态下也是安全 no-op,
+      // 跟 ADR-0014 描述的 "不存在的 convId 静默 no-op" 契约一致。
+      yield* runtime.cancel("nonexistent");
+      yield* runtime.cancel("nonexistent"); // 第二次仍幂等
 
       // Also verify runtime is properly constructed
       expect(runtime).toBeDefined();
       expect(typeof runtime.run).toBe("function");
       expect(typeof runtime.cancel).toBe("function");
+      expect(typeof runtime.destroy).toBe("function");
     }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps)),
   );
 
@@ -180,6 +232,7 @@ describe("AgentRuntime V1.5+", () => {
         EmptySettingsServiceLive,
         MockBillingServiceLive,
         MockLLMProviderServiceLive,
+        MockMessageServiceLive,
       );
       // Use Stream.take(0) to avoid hanging on the failing stream
       const exit = yield* Effect.exit(
@@ -191,6 +244,54 @@ describe("AgentRuntime V1.5+", () => {
       // take(0) collects 0 elements then completes, so we may not see the error
       // Just verify the call didn't crash
       expect(exit).toBeDefined();
+    }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps)),
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// TDD for ADR-0014 per-conversation Agent 架构变更
+//
+// D1+D2+D6: Ref<Agent | null> → Ref<Map<ConvId, Agent>>,
+// 新增 cancel(convId) / destroy(convId) 路由方法。
+// D4: 首次 run() 拉历史消息 (lazy create)。
+// D5: 多 conv 可并行 (Map 数据结构本身保证)。
+//
+// 测试策略:不实际跑 Agent(避免 5s 超时 + 真实 LLM 调用),
+// 只测 API surface + 路由 + no-op 行为。
+// ─────────────────────────────────────────────────────────────────────
+
+describe("AgentRuntime per-conversation (ADR-0014)", () => {
+  it.effect("cancel(convId) 是 1 参函数,签名变更后调用不抛", () =>
+    Effect.gen(function* () {
+      const runtime = yield* AgentRuntime;
+      // 签名:D6 — cancel 现在需要 convId (per-conversation 路由)
+      expect(typeof runtime.cancel).toBe("function");
+      expect(runtime.cancel.length).toBe(1); // 期望 1 个形参
+      // 调 non-existent convId 不 crash (Map.get 返回 undefined, abort 跳过)
+      yield* runtime.cancel("nonexistent-conv-id");
+    }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps)),
+  );
+
+  it.effect("destroy(convId) 是新方法,可调用且对不存在的 convId 不抛", () =>
+    Effect.gen(function* () {
+      const runtime = yield* AgentRuntime;
+      // D2: destroy 是新公开方法,用于 archiveConversation/deleteConversation
+      expect(typeof runtime.destroy).toBe("function");
+      expect(runtime.destroy.length).toBe(1); // 期望 1 个形参
+      // 调 non-existent convId 不 crash
+      yield* runtime.destroy("nonexistent-conv-id");
+    }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps)),
+  );
+
+  it.effect("多次 cancel / destroy 同一 convId 是幂等的", () =>
+    Effect.gen(function* () {
+      const runtime = yield* AgentRuntime;
+      // 安全保证: store 入口 (archive / delete) 可能在无 Agent 的 conv 上调,
+      // 不能 throw, 不能 crash。
+      yield* runtime.cancel("conv-x");
+      yield* runtime.cancel("conv-x"); // 第二次仍幂等
+      yield* runtime.destroy("conv-x");
+      yield* runtime.destroy("conv-x"); // destroy 之后 cancel 仍安全
     }).pipe(Effect.provide(AgentRuntimeLive), Effect.provide(MockRuntimeDeps)),
   );
 });

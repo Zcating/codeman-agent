@@ -6,11 +6,14 @@
 import { describe, it, expect, beforeEach } from "@effect/vitest";
 import { Effect, Layer } from "effect";
 import { ConversationService } from "../../../shared/lib/tauri";
+import { AgentRuntime } from "../lib/runtime";
 import type { AppError, Conversation, Message } from "../../../shared/lib/types";
 import {
   shouldSkipNewConversation,
   startNewConversation,
   selectConversation,
+  archiveConversationEffect,
+  deleteConversationEffect,
 } from "./conversations";
 import { clearMessages } from "./messages";
 import { mockState } from "../../../__mocks__/@tauri-apps/api/core";
@@ -196,5 +199,98 @@ describe("startNewConversation 桥接（空画布守卫集成）", () => {
 
     // Assert: 守卫拦截,create_conversation IPC 一次都没调
     expect(mockState.calls).not.toContain("create_conversation");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// TDD for ADR-0014 D7: archiveConversationEffect / deleteConversationEffect
+// 必须先 AgentRuntime.cancel(convId) + destroy(convId),再调 ConversationService。
+//
+// 触发条件: 用户在 conversation streaming 期间点删除。
+// 旧实现只调 svc.delete,Agent 实例泄漏(SSE 连接 + EventSource 不会被 GC)。
+// 修复: store 入口在删 DB 之前 cancel + destroy,语义干净。
+//
+// 测试策略: 调 production effect program (archiveConversationEffect / deleteConversationEffect),
+// mock AgentRuntime + ConversationService 记录调用顺序,断言 cancel → destroy → svc.X。
+// ─────────────────────────────────────────────────────────────────────
+
+describe("archiveConversationEffect / deleteConversationEffect cancel-before-delete (ADR-0014 D7)", () => {
+  // call order tracker — 每次 push 描述字符串
+  let callOrder: string[] = [];
+
+  // Mock AgentRuntime: 记录 cancel / destroy 调用顺序与参数
+  const MockAgentRuntimeLive = Layer.succeed(AgentRuntime, {
+    run: ((_conv: Conversation, _msg: Message) => {
+      throw new Error("run not expected in D7 tests");
+    }) as any,
+    cancel: (convId: string) => {
+      callOrder.push(`cancel(${convId})`);
+      return Effect.succeed(undefined);
+    },
+    destroy: (convId: string) => {
+      callOrder.push(`destroy(${convId})`);
+      return Effect.succeed(undefined);
+    },
+  });
+
+  // Mock ConversationService: 记录 archive / delete 调用顺序与参数
+  const MockConversationServiceForD7 = Layer.succeed(ConversationService, {
+    list: () => Effect.succeed([fixtureA, fixtureB]),
+    get: (id) =>
+      id === fixtureA.id
+        ? Effect.succeed(fixtureA)
+        : Effect.fail({ kind: "NotFound" as const, message: `not found: ${id}` } as AppError),
+    create: (title, _systemPrompt) => Effect.succeed({ ...fixtureA, id: "new-conv", title }),
+    archive: (id) => {
+      callOrder.push(`svc.archive(${id})`);
+      return Effect.succeed(undefined);
+    },
+    delete: (id) => {
+      callOrder.push(`svc.delete(${id})`);
+      return Effect.succeed(undefined);
+    },
+  });
+
+  const MockD7Layer = Layer.merge(MockAgentRuntimeLive, MockConversationServiceForD7);
+
+  beforeEach(() => {
+    callOrder = [];
+    // 重置 IPC mock state 防止上一个测试残留污染
+    mockState.calls = [];
+    mockState.resolved = undefined;
+    mockState.rejected = undefined;
+  });
+
+  it("archiveConversationEffect 调用顺序: cancel → destroy → svc.archive", async () => {
+    // Action: 调 production effect program
+    await Effect.runPromiseExit(
+      archiveConversationEffect("conv-b").pipe(Effect.provide(MockD7Layer)),
+    );
+
+    // Assert: 顺序严格。cancel 必须先于 svc.archive,destroy 必须先于 svc.archive
+    // (delete 边界 = 用户 streaming 期间点删除,Agent 实例必须先清理再删 DB)
+    expect(callOrder).toEqual(["cancel(conv-b)", "destroy(conv-b)", "svc.archive(conv-b)"]);
+  });
+
+  it("deleteConversationEffect 调用顺序: cancel → destroy → svc.delete", async () => {
+    await Effect.runPromiseExit(
+      deleteConversationEffect("conv-a").pipe(Effect.provide(MockD7Layer)),
+    );
+
+    expect(callOrder).toEqual(["cancel(conv-a)", "destroy(conv-a)", "svc.delete(conv-a)"]);
+  });
+
+  it("archive / delete 顺序不可调换: cancel 必须在 svc.archive 之前", async () => {
+    // 额外断言: 验证 cancel 出现位置 < svc.archive 出现位置
+    // (防止有人把顺序改成 svc.archive → cancel 这种"先删后清理"反模式)
+    await Effect.runPromiseExit(
+      archiveConversationEffect("conv-b").pipe(Effect.provide(MockD7Layer)),
+    );
+
+    const cancelIdx = callOrder.findIndex((s) => s.startsWith("cancel"));
+    const archiveIdx = callOrder.findIndex((s) => s.startsWith("svc.archive"));
+    expect(cancelIdx).toBeGreaterThanOrEqual(0);
+    expect(archiveIdx).toBeGreaterThanOrEqual(0);
+    expect(cancelIdx).toBeLessThan(archiveIdx);
   });
 });

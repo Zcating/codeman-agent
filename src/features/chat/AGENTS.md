@@ -47,10 +47,16 @@ src/features/chat/
 ## 硬性规则
 
 - **UI 组件（`components/*.tsx`）禁止导入 `effect`。** 它们是纯 Solid signal 消费者。逻辑层在 `stores/*.ts` 和 `lib/*.ts` 中。
-- **`AgentRuntime` 是单例。** `AgentRuntimeLive` 持有 `Ref<Agent | null>`。同一时间只有一个 `run()`。`cancel()` 调用 `agent.abort()`。
+- **`AgentRuntime` service 是单例，但托管 per-conversation Agent 映射表。**（V1.6 起，按 [ADR-0014](../../docs/adr/0014-per-conversation-agent.md) 修订。）
+  - `AgentRuntimeLive` 持有 `Ref<Map<ConversationId, Agent>>`。
+  - 每个 Conversation 至多 1 个 active 流；多 Conversation 可并行 streaming（见 ADR-0014 D5）。
+  - `run(conv, msg)`：按 `conv.id` 在 Map 中查找/创建 Agent；首次创建时从 `MessageService.list(convId)` 拉历史消息一次性回填（见 D4）。
+  - `cancel(convId)`：从 Map 拿对应 Agent 调 `agent.abort()`；in-flight partial 保留在 Agent state，不落库。
+  - `destroy(convId)`：从 Map 移除该 Agent 实例（用于 `archiveConversation` / `deleteConversation` 入口）。
+  - `archiveConversation` / `deleteConversation` store 入口在调 DB 删之前**必须**先 `AgentRuntime.cancel(convId)`，再 `AgentRuntime.destroy(convId)`，确保 SSE 连接被显式清理（避免 JS GC 不可预测）。
 - **Store 是唯一的桥接层。** `stores/*.ts` 通过 `Effect.runPromiseExit` 将 Effect 结果转换为 Solid signals。组件永远不直接调用 `Effect.runPromise`。
 - **组件不调 IPC。** 所有 Tauri IPC 走 `src/shared/lib/tauri.ts` Service Tags。
-- **`Sidebar` 用 `createSignal` 做局部状态。** `query` / `debouncedQuery` / `setQuery/setDebouncedQuery` signals 是组件局部的，不与 store 导出冲突。
+- **`Sidebar` 用 `createSignal` 做局部状态。** `query` / `debouncedQuery` / `setQuery/setDebouncedQuery` signals 是组件局部的，不与 store 导出冲突。streaming 状态点（per-conv 反馈）走 `streaming$` store accessor（来自 `conversations` 或独立 streaming store）。
 
 ## Runtime 事件（5 变体）
 

@@ -13,14 +13,22 @@
 //! - deleteConversation(id: string): Promise<void>
 
 import { createSignal, type Accessor } from "solid-js";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Layer } from "effect";
 import { ConversationService, ConversationServiceLive } from "../../../shared/lib/tauri";
+import { AgentRuntime, AgentRuntimeLive } from "../lib/runtime";
 import { messages$ } from "./messages";
-import type { Conversation, Message } from "../../../shared/lib/types";
+import type { AppError, Conversation, Message } from "../../../shared/lib/types";
 
-// ConversationService 的 runtime layer。在更完整的实现中，
-// 这会与 app-level layer 中的其他服务 layer 组合。
+// ConversationService 的 runtime layer。R = never,适合不需要 AgentRuntime 的函数
+// (loadConversations / createConversation / selectConversation)。
+// 在更完整的实现中,这会与 app-level layer 中的其他服务 layer 组合。
 const ConversationLayer = ConversationServiceLive;
+
+// V1.6+ per ADR-0014 D7:archive / delete 在调 DB 删之前需 AgentRuntime.cancel +
+// destroy 清理 SSE 连接,ConversationLayer 必须提供 AgentRuntime。
+// AgentRuntimeLive 的 R = MessageService | SettingsService | LLMProviderService,
+// 这个 layer 仅供 archiveConversationEffect / deleteConversationEffect 用。
+const DestructiveLayer = Layer.merge(AgentRuntimeLive, ConversationServiceLive);
 
 // Signals 持有纯数据，绝不是 Effect 实例。
 const [conversations, setConversations] = createSignal<Conversation[]>([]);
@@ -100,12 +108,31 @@ export function selectConversation(id: string): void {
   setActiveId(id);
 }
 
-/** 归档（软删除）会话。 */
-export async function archiveConversation(id: string): Promise<void> {
-  const program = Effect.gen(function* () {
+/**
+ * 归档（软删除）会话。
+ *
+ * V1.6+ per ADR-0014 D7:删除前必须先 `AgentRuntime.cancel(convId)` 清理 SSE
+ * 连接,再 `AgentRuntime.destroy(convId)` 释放 Agent 实例,最后才调 DB 删。
+ * 调用顺序不可调换 ——
+ *   cancel 在前:防止 in-flight fetch 还在向已不存在的 conv 写数据;
+ *   destroy 居中:从 Map 移除引用,避免 JS GC 不可预测;
+ *   svc.archive 在后:DB 是 source of truth,删完不回来。
+ */
+export const archiveConversationEffect = (id: string) =>
+  Effect.gen(function* () {
+    const runtime = yield* AgentRuntime;
+    yield* runtime.cancel(id);
+    yield* runtime.destroy(id);
     const svc = yield* ConversationService;
     yield* svc.archive(id);
-  }).pipe(Effect.provide(ConversationLayer));
+  });
+
+export async function archiveConversation(id: string): Promise<void> {
+  // Explicit type annotation:Effect.provide 后 R 应该 = never (Layer 提供所有 service),
+  // 但 TS 推断保留 R 让 runPromiseExit 拒绝。显式标注强制窄化。
+  const program: Effect.Effect<void, AppError, never> = archiveConversationEffect(id).pipe(
+    Effect.provide(DestructiveLayer),
+  ) as Effect.Effect<void, AppError, never>;
 
   const result = await Effect.runPromiseExit(program);
   if (Exit.isSuccess(result)) {
@@ -114,12 +141,25 @@ export async function archiveConversation(id: string): Promise<void> {
   }
 }
 
-/** 硬删除会话。 */
-export async function deleteConversation(id: string): Promise<void> {
-  const program = Effect.gen(function* () {
+/**
+ * 硬删除会话。
+ *
+ * V1.6+ per ADR-0014 D7:同 archiveConversation 顺序 (cancel → destroy → svc.delete)。
+ */
+export const deleteConversationEffect = (id: string) =>
+  Effect.gen(function* () {
+    const runtime = yield* AgentRuntime;
+    yield* runtime.cancel(id);
+    yield* runtime.destroy(id);
     const svc = yield* ConversationService;
     yield* svc.delete(id);
-  }).pipe(Effect.provide(ConversationLayer));
+  });
+
+/** 硬删除会话。 */
+export async function deleteConversation(id: string): Promise<void> {
+  const program: Effect.Effect<void, AppError, never> = deleteConversationEffect(id).pipe(
+    Effect.provide(DestructiveLayer),
+  ) as Effect.Effect<void, AppError, never>;
 
   const result = await Effect.runPromiseExit(program);
   if (Exit.isSuccess(result)) {

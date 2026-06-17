@@ -4,12 +4,22 @@ import solid from "vite-plugin-solid";
 import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "path";
 
+// `vite-plugin-solid` injects an `import { $$registry } from "solid-refresh"`
+// in dev/test HMR mode (its babel plugin rewriter at transform time). The
+// alias `solid-refresh` → `/@solid-refresh` is virtual, and vitest 4's
+// module-runner hands that id to `createRequire` as `file:///@solid-refresh`
+// — Node rejects the bare shape. We disable HMR only when vitest is the
+// command, so unit tests run without the injected virtual import while
+// `pnpm tauri:dev` keeps full HMR.
+const isVitest = !!process.env.VITEST;
+const solidOptions = isVitest ? { hot: false } : undefined;
+
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [solid(), tailwindcss()],
+  plugins: [solid(solidOptions), tailwindcss()],
 
   // `vp staged` runs on `git commit` (see `.vite-hooks/pre-commit`, installed
   // by `vp config`). The wrapper script consumes vp-staged's positional file

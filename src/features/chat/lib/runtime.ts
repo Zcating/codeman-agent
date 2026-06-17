@@ -14,6 +14,14 @@
 //! pi-ai 版本漂移:transport 类型来自 pi-ai@0.9.4,本地 import 是 pi-ai@0.73.1,
 //! 两版本 AssistantMessage 字段不一致,运行时用 cast `as unknown as AgentTransport` 桥接,
 //! event handler 只读 evt.message.content (与版本无关) 所以行为正确。
+//!
+//! V1.6+ per-conversation Agent (ADR-0014):
+//! - `agentRef` 从 `Ref<Agent | null>` 改为 `Ref<Map<ConvId, Agent>>`。
+//! - 每个 Conversation 对应一个 pi-mono `Agent` 实例,生命周期跟随 conversation。
+//! - 切换 conversation 时 in-flight Agent 不被 cancel(切走 partial 状态保留)。
+//! - `cancel(convId)` 按 conversation 路由;`destroy(convId)` 移除。
+//! - D4 history feed:首次 run() 创建 Agent 时从 `MessageService.list(convId)` 拉历史
+//!   一次性回填,后续 run() 复用 Agent + appendMessage,Messages 累积。
 
 import { Effect, Stream, Layer, Context, Ref } from "effect";
 import type { Message as PiMessage, Model } from "@mariozechner/pi-ai";
@@ -23,11 +31,16 @@ import {
   SettingsService,
   SettingsServiceLive,
   BillingServiceLive,
+  MessageService,
+  MessageServiceLive,
 } from "../../../shared/lib/tauri";
 import { LLMProviderService, LLMProviderServiceLive } from "../../settings/lib/llm-providers";
 import { AnthropicTransport } from "./anthropic-transport";
 import type { AppError, Conversation, Message } from "../../../shared/lib/types";
 import { getBalanceTool, getPlanQuotaTool } from "../../billing/lib/billing";
+
+/** Conversation ID — 字符串,镜像 src-tauri/src/types.rs Conversation.id。 */
+type ConversationId = string;
 
 // ─── Runtime 事件类型 ─────────────────────────────────────────────
 
@@ -53,8 +66,13 @@ export class AgentRuntime extends Context.Tag("AgentRuntime")<
     readonly run: (
       conversation: Conversation,
       userMessage: Message,
-    ) => Stream.Stream<RuntimeEvent, AppError | RuntimeError, SettingsService | LLMProviderService>;
-    readonly cancel: () => Effect.Effect<void, never, never>;
+    ) => Stream.Stream<
+      RuntimeEvent,
+      AppError | RuntimeError,
+      SettingsService | LLMProviderService | MessageService
+    >;
+    readonly cancel: (conversationId: string) => Effect.Effect<void, never, never>;
+    readonly destroy: (conversationId: string) => Effect.Effect<void, never, never>;
   }
 >() {}
 
@@ -67,15 +85,19 @@ const tools: any[] = [getBalanceTool, getPlanQuotaTool];
 export const AgentRuntimeLive = Layer.effect(
   AgentRuntime,
   Effect.gen(function* () {
-    const agentRef = yield* Ref.make<Agent | null>(null);
-    // 在 layer 内部 yield SettingsService + LLMProviderService — 它们的 context
-    // 来自 layer 的 R (SettingsService | LLMProviderService),call site 提供这些
-    // services 后 layer 才会成功 build。得到的 settingsSvc / llmSvc 通过闭包
-    // 传给 run(),inner Stream effect 不需要 yield* 任何 service — 这避免了
-    // "Service not found" 的 issue(之前 yield* SettingsService 在 inner Stream
-    // effect 里找不到,因为 Stream.create 的 context 不从 outer Effect 继承)。
+    // V1.6+ per-conversation Agent (ADR-0014 D1): Ref<Agent | null> → Ref<Map<ConvId, Agent>>。
+    // 每个 conversation 一个 pi-mono Agent 实例,生命周期跟随 conversation;
+    // 仅 delete/archive 时通过 `destroy(convId)` 移除 (D2 + D7)。
+    const agentRef = yield* Ref.make<Map<ConversationId, Agent>>(new Map());
+    // 在 layer 内部 yield SettingsService + LLMProviderService + MessageService
+    // — 它们的 context 来自 layer 的 R,call site 提供这些 services 后 layer 才会
+    // 成功 build。得到的 services 通过闭包传给 run(),inner Stream effect 不需要
+    // yield* 任何 service — 这避免了 "Service not found" 的 issue (之前 yield*
+    // SettingsService 在 inner Stream effect 里找不到,因为 Stream.create 的 context
+    // 不从 outer Effect 继承)。
     const settingsSvc = yield* SettingsService;
     const llmSvc = yield* LLMProviderService;
+    const messageSvc = yield* MessageService;
 
     const run = (
       conversation: Conversation,
@@ -144,23 +166,49 @@ export const AgentRuntimeLive = Layer.effect(
             // 替代 ProviderTransport (Anthropic SDK + x-api-key)。
             // 原因：api.minimaxi.com 的 CORS preflight whitelist 没有 x-api-key,
             // 只有 Authorization,所以 ProviderTransport 在 webview 里 fetch 必失败。
-            const apiKey = yield* llmSvc.getApiKey(activeProvider.id);
-            const transport: AgentTransport = new AnthropicTransport({
-              getApiKey: async () => apiKey ?? undefined,
-            }) as unknown as AgentTransport;
+            // V1.6+ per-conversation (ADR-0014 D1+D4):仅在 lazy create 新 Agent 时
+            // 构建 transport;已存在的 Agent 复用其原 transport,API key 也在
+            // Agent 构造时闭包捕获(后续 API key rotation 不影响 in-flight stream)。
+            const convId = conversation.id;
+            let agent: Agent | undefined = (yield* Ref.get(agentRef)).get(convId);
 
-            const agent = new Agent({
-              transport,
-              initialState: {
-                systemPrompt: conversation.system_prompt ?? settings.system_prompt.default,
-                model,
-                tools,
-                messages: [],
-              },
-            });
+            if (!agent) {
+              // 首次 run() 该 conv:创建 Agent + 从 DB 拉历史消息一次性回填 (D4)。
+              // 后续 run() 复用同一个 Agent,Messages 累积。
+              const apiKey = yield* llmSvc.getApiKey(activeProvider.id);
+              const transport: AgentTransport = new AnthropicTransport({
+                getApiKey: async () => apiKey ?? undefined,
+              }) as unknown as AgentTransport;
 
-            // 存储 agent ref 以便 cancel() 可以中止此次运行
-            yield* Ref.set(agentRef, agent);
+              agent = new Agent({
+                transport,
+                initialState: {
+                  systemPrompt: conversation.system_prompt ?? settings.system_prompt.default,
+                  model,
+                  tools,
+                  messages: [],
+                },
+              });
+
+              // D4: 一次性回填历史消息 — 让多轮对话 LLM 看到跨轮 context。
+              // ts-rs / specta codegen 未上线,类型差异在 pi-mono (TS) 与 Message (serde snake_case)
+              // 之间用 `as any` 桥接,等升级 pi-ai 后清理。
+              const history = yield* messageSvc.list(convId);
+              for (const msg of history) {
+                agent.appendMessage({
+                  role: msg.role,
+                  content: msg.content,
+                  timestamp: msg.created_at,
+                } as any);
+              }
+
+              // 存入 Map:D1 — Map<ConvId, Agent>,Agent 生命周期 = conversation 生命周期。
+              yield* Ref.update(agentRef, (m) => {
+                const next = new Map(m);
+                next.set(convId, agent!);
+                return next;
+              });
+            }
 
             // 订阅 pi-agent 事件并映射到 RuntimeEvent
             const eventQueue: RuntimeEvent[] = [];
@@ -282,8 +330,10 @@ export const AgentRuntimeLive = Layer.effect(
               eventQueue.push({ type: "done", message: doneMessage });
             }
 
-            // 清除 agent ref
-            yield* Ref.set(agentRef, null);
+            // V1.6+: 不再清空 Map。Agent 实例在 conv 存活期内常驻 (D2);
+            // 销毁由 conversations store 在 archive/delete 时调 destroy(convId) (D7)。
+            // in-flight partial assistant message 保留在 Agent state,
+            // 同 conv 下次 run() appendMessage 时累积。
 
             return Stream.fromIterable(eventQueue);
           }),
@@ -292,24 +342,45 @@ export const AgentRuntimeLive = Layer.effect(
       );
     };
 
-    const cancel = (): Effect.Effect<void, never, never> =>
+    // V1.6+ per-conversation cancel (ADR-0014 D6):按 convId 路由到对应 Agent。
+    // 不存在的 convId 静默 no-op (Map.get → undefined → 跳过 abort)。
+    const cancel = (conversationId: string): Effect.Effect<void, never, never> =>
       Effect.gen(function* () {
-        const agent = yield* Ref.get(agentRef);
+        const map = yield* Ref.get(agentRef);
+        const agent = map.get(conversationId);
         if (agent) {
           agent.abort();
         }
       });
 
-    return AgentRuntime.of({ run, cancel });
+    // V1.6+ per-conversation destroy (ADR-0014 D2+D7):从 Map 移除 Agent 实例。
+    // 调用方:archiveConversation / deleteConversation store 入口在 DB 删除之前。
+    // 移除前 cancel(convId) 是 caller 责任,本方法只清 Map (不强依赖 cancel)。
+    // 不存在的 convId 静默 no-op。
+    const destroy = (conversationId: string): Effect.Effect<void, never, never> =>
+      Effect.gen(function* () {
+        yield* Ref.update(agentRef, (m) => {
+          if (!m.has(conversationId)) return m;
+          const next = new Map(m);
+          next.delete(conversationId);
+          return next;
+        });
+      });
+
+    return AgentRuntime.of({ run, cancel, destroy });
   }),
 );
 
 // ─── 组合所有 runtime 依赖的 Layer ────────────────────────────────
 
+// V1.6+ per-conversation Agent (ADR-0014 D4):首次 run() 从 MessageService.list(convId)
+// 拉历史消息一次性回填。MessageServiceLive 加入 RuntimeDeps 让 layer build 满足
+// AgentRuntimeLive 内部 yield* MessageService 的 requirement。
 export const RuntimeDeps = Layer.mergeAll(
   SettingsServiceLive,
   BillingServiceLive,
   LLMProviderServiceLive,
+  MessageServiceLive,
 );
 
 // AgentRuntimeLive 在 yield* Ref.make 时无外部 requirements,SettingsService 等

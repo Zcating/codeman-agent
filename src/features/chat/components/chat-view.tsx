@@ -4,7 +4,7 @@
 //! 并将 RuntimeEvents 转换为 UI 更新。
 //! Polish F2/F4/F6/F8: 中文 placeholder + 思考 loading + 5 原子 (Button / Textarea) + aria-label。
 
-import { createSignal, createEffect, For, Show, onCleanup, onMount } from "solid-js";
+import { createSignal, createEffect, For, Show, onMount } from "solid-js";
 import { Effect, Exit, Stream } from "effect";
 import { Send, X } from "lucide-solid";
 import { MessageBubble } from "./message-bubble";
@@ -31,7 +31,6 @@ export function ChatView() {
   const [input, setInput] = createSignal("");
   const [running, setRunning] = createSignal(false);
   const [streamingMessageId, setStreamingMessageId] = createSignal<string | null>(null);
-  let abortController: AbortController | null = null;
   let messagesEndRef: HTMLDivElement | undefined;
 
   // 启动 theme store 的 5s 轮询 — 把 Settings.theme 桥接到 <html class="dark">。
@@ -58,13 +57,26 @@ export function ChatView() {
     }
   });
 
-  onCleanup(() => {
-    abortController?.abort();
-  });
-
+  /**
+   * 取消当前 active conversation 的流。
+   *
+   * V1.5 实现:`abortController?.abort()` + `setRunning(false)`。
+   * BUG:AbortController 从未传给 pi-mono 的 fetch,实际什么都不发生,stream 继续跑,
+   * done 事件照常落库。"Cancel"按钮只是把 running 改 false,骗用户说"已取消"。
+   *
+   * V1.6+ per ADR-0014 D6:走 `AgentRuntime.cancel(activeId)` 真正 abort pi-mono fetch;
+   * in-flight partial 保留在 Agent state,不落库。`setRunning(false)` 由 run() 的
+   * finally 块在 stream 终止后自行设置,所以这里不需要显式 setRunning。
+   */
   const cancel = async () => {
-    abortController?.abort();
-    setRunning(false);
+    const convId = activeId$();
+    if (!convId) return;
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const runtime = yield* AgentRuntime;
+        yield* runtime.cancel(convId);
+      }).pipe(Effect.provide(RuntimeLayer), Effect.provide(SettingsServiceLive)),
+    );
   };
 
   const send = async () => {
@@ -73,7 +85,8 @@ export function ChatView() {
     if (!text || !convId || running()) return;
     setInput("");
     setRunning(true);
-    abortController = new AbortController();
+    // V1.6+ per ADR-0014 D5:每 conv 至多 1 active 流,这里假定 send 入口已用
+    // activeId$ + running 串行化(用户同一 conv 上点两次 Send 第二次被 running() 守卫挡)。
 
     await appendUserMessage(text, convId);
 

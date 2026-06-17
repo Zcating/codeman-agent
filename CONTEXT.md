@@ -13,7 +13,11 @@ message 保持一致。
   Windows 桌面窗口中。完全替代旧的"widget"框架。_避免_：widget、
   app、client。
 - **Conversation (会话)** — 用户拥有的持久聊天线程。线性消息
-  序列；V1 不支持分支。
+  序列；V1 不支持分支。**V1.6+ 每 Conversation 至多 1 个 active
+  流**（per-conversation Agent 约束），多 Conversation 可并行
+  streaming。active 流定义：`run()` 已调用且 `done` / `error`
+  / `cancel` 之一尚未触发。active 流的取消走
+  `AgentRuntime.cancel(conversationId)`。
 - **Message (消息)** — 会话中的单轮消息。角色为 `user`、`assistant`、
   `tool` 或 `system` 之一。可能内联携带 tool call 与 tool result
   （JSON 形式）。
@@ -100,8 +104,28 @@ V1 Non-goal "无文件系统" 由 [ADR-0013](./docs/adr/0013-file-io-tools.md)
 ### 架构
 
 - **Runtime (运行时)** — 包装 pi-mono agent loop 的 Effect-TS 层。
-  掌控 agent 生命周期、工具注册表、Stream 订阅。_避免_：agent
-  core、agent loop。
+  掌控 per-conversation Agent 生命周期（见下）、工具注册表、
+  Stream 订阅。V1.5 之前为单 `Ref<Agent | null>`；V1.6 起改为
+  `Ref<Map<ConversationId, Agent>>`（per-conversation Agent
+  机制详见 ADR-0014）。_避免_：agent core、agent loop。
+- **Per-Conversation Agent (会话级 Agent 实例)** — 每个
+  Conversation 对应一个 pi-mono `Agent` 实例。生命周期跟随
+  Conversation：lazy 创建于该 conv 首次 `run()`，销毁于
+  Conversation 被 delete / archive。Agent 实例在 `run()`
+  之间复用、累积 `messages: PiMessage[]`；首次创建时从
+  `MessageService.list(convId)` 一次性拉历史消息回填。同一
+  Conversation 至多 1 个 active 流；多 Conversation 可并行
+  streaming。设计动机：切换 Conversation 时 in-flight 流保留
+  状态、不被 cancel；Agent state 不被 GC，partial assistant
+  消息可被后续 `run()` 累积（"per-conversation 后台"）。
+  _避免_：singleton Agent（V1.5 旧语义）、per-request Agent
+  （每 `run()` 新建、跨流不复用，V1.5 旧语义）。
+- **Agent Map (Agent 映射表)** — `AgentRuntimeLive` 持有的
+  `Ref<Map<ConversationId, Agent>>`。Service 本身仍是
+  `Context.Tag` 单例（每进程 1 个 service），但 service 内部
+  状态按 ConversationId 索引。Service 公开 `run(conv, msg)`、
+  `cancel(convId)`、`destroy(convId)` 三个方法；不暴露
+  内部 Map（封装边界）。
 - **Bridge (桥接层)** — 将 Effect Service 的 `Effect` / `Stream`
   输出翻译为 Solid signal 的层。UI 组件不 `import 'effect'`。
   _避免_：adapter（过载）。
