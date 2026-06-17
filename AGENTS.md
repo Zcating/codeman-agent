@@ -67,6 +67,10 @@ codeman-agent/
 │           ├── AGENTS.md
 │           ├── index.ts
 │           └── lib/               # billing.ts（从 tools/ 迁入）
+│       └── file-tools/           # 文件工具域 — lib（无 UI，V2 新增）
+│           ├── AGENTS.md
+│           ├── index.ts
+│           └── lib/               # file-tools.ts + file-tools.test.ts
 │
 ├── src-tauri/                     # Rust 后端（详见 src-tauri/AGENTS.md）
 ├── docs/adr/                      # 10 个 ADR（0001-0010，见下方索引）
@@ -99,6 +103,7 @@ codeman-agent/
 | **0010** | **前端 5+1 子目录白名单 + 跨域类型/lib 收口 + mockState 单一源**           | **本期新加**：feature 5 子目录（stores/components/routes/hooks/lib）+ shared 5+1（stores/components/ui/components/internal/hooks/lib）；feature 根级只允许 index.ts + AGENTS.md；store→stores、state→stores、subsystems/tools→lib、types→lib/types.ts、ui→components/ui、mocks→**mocks** 唯一源；llm_providers→llm-providers 命名修复 |
 | **0011** | **V1 chat 域走 anthropic-messages-only 协议**                              | **本期新加**（via grill-with-docs 配测试 provider 触发）：推翻 ADR-0002 的多 provider 假设；`api_type` 字段字面量 = `"anthropic-messages"` 单值；V1 唯一内置 LLM provider = MiniMax（官方 anthropic 兼容端点 `https://api.minimaxi.com/anthropic` + model `MiniMax-M2.5-highspeed`）；`Settings::Default` 预置 |
 | **0012** | **Unified Provider schema + Billing moved to TypeScript**                 | **本期新加**（via grill-with-docs 把项目分拆/合并讨论触发）：V1 双数组（`llm_providers[]` + `billing_providers[]`）合并为单 `providers[]`；`llm` 必选 + `billing` 可选；`ModelMeta[]` 用户可编辑；`models_endpoint` per-provider 可配置 + `fetchModels()` 动态拉取；DeepSeek 补 LLM config（`https://api.deepseek.com/anthropic` + `https://api.deepseek.com/models`）；`api_type` 仍锁单值（ADR-0011 不变）；**Billing 端 ~300 行 Rust 死代码全删**（V0 scheduler + adapter + 8 个 V0 IPC），billing 迁 TS webview，key 改存 Tauri store（同 LLM key 档）；CORS 验证通过（DeepSeek `/user/balance` 200 + MiniMax `/anthropic/v1/messages` 200）；CONTEXT.md 词汇表更新（LLM Provider / Billing Provider superseded by Provider.llm / Provider.billing） |
+| **0013** | **V2 file IO tools + workspace sandbox**                                    | V2 新增 5 个文件工具（read/write/edit/search/delete），workspace 沙箱隔离，Rust 端强制 path validation，10MB 上限，UTF-8 编码，系统文件（.exe/.dll 等）阻塞；Settings UI 新增 WorkspaceCard；工具在 `src/features/file-tools/lib/file-tools.ts` |
 
 > **新决策**先写 ADR 再动代码。`docs/adr/` 用 `NNNN-kebab-title.md` 命名；格式见 `.agents/skills/grill-with-docs/ADR-FORMAT.md`。
 

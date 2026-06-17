@@ -91,7 +91,7 @@ import type { FileMatch } from "@/features/file-tools";
 
 ## ADR 参考
 
-- [ADR-0013](./docs/adr/0013-v2-file-io-tools.md)：V2 文件工具决策纪要
+- [ADR-0013](./docs/adr/0013-file-io-tools.md)：V2 文件工具决策纪要
 - [ADR-0010](./docs/adr/0010-frontend-5-1-folder-whitelist.md)：5+1 文件夹白名单
 - [ADR-0003](./docs/adr/0003-effect-ts-logic-layer.md)：Effect-TS 逻辑层规范
 - [ADR-0009](./docs/adr/0009-chinese-developer-language-strategy.md)：中文开发文档策略

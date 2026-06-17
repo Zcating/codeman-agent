@@ -11,7 +11,8 @@ src/features/settings/
 │
 ├── components/
 │   ├── provider-card.tsx  # LLM provider 编辑卡片（用 Card 7 子件）
-│   └── provider-card.test.tsx
+│   ├── provider-card.test.tsx
+│   └── workspace-card.tsx # Workspace 管理卡片（workspace CRUD，V2 新增）
 │
 ├── lib/                   # Effect-TS 服务层（从旧 subsystems/ 合并；纯函数，不直接调 IPC）
 │   ├── llm-providers.ts   # LLMProviderService（CRUD + API key 管理）
@@ -116,6 +117,7 @@ it("renders all controls", () => {
 ## 与外层关系
 
 - **ProviderCard 被 settings/routes/settings.tsx 引用**（作为 `<ProviderCard />`）
+- **WorkspaceCard 被 settings/routes/settings.tsx 引用**（V2 新增，作为 `<WorkspaceCard />`）
 - **LLMProviderService / SystemPromptService 被 ProviderCard 调用**（via bridge 函数或直接 pipe provide）
 - **settings/routes/settings.tsx 使用 bridge functions**：`getSettingsBridge`, `updateSettingsBridge`, `clearAllHistoryBridge`
 - **Settings 类型**来自 `src/shared/lib/types.ts`（**路径从 `shared/types/` 改为 `shared/lib/types.ts`**——ADR-0010，类型镜像合并到 `lib/`）
