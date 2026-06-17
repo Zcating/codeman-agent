@@ -386,14 +386,160 @@ pub async fn edit_file(
     edit_file_impl(&settings, &workspace_id, &path, &old_text, &new_text, replace_all)
 }
 
+/// Pure logic for search_files. Testable without AppState.
+pub(crate) fn search_files_impl(
+    settings: &Settings,
+    workspace_id: &str,
+    glob_pattern: &str,
+    content_pattern: Option<&str>,
+) -> Result<Vec<crate::filesystem::types::FileMatch>, AppError> {
+    // 1. Find workspace
+    let workspace = settings
+        .workspaces
+        .iter()
+        .find(|w| w.id == workspace_id)
+        .ok_or_else(|| AppError::NotFound {
+            message: format!("Workspace not found: {}", workspace_id),
+        })?;
+
+    // 2. Check enabled
+    if !workspace.enabled {
+        return Err(AppError::InvalidConfig {
+            message: "Workspace disabled".into(),
+        });
+    }
+
+    // 3. Validate workspace root exists (sanity check via sandbox)
+    let _canonical_root =
+        validate_path_in_workspace(workspace.root_path.as_path(), workspace.root_path.as_path())
+            .map_err(|_| AppError::SandboxViolation {
+                path: workspace.root_path.display().to_string(),
+                workspace_label: workspace.label.clone(),
+            })?;
+
+    // 4. Build glob matcher
+    // globset Glob requires ** for recursive matching; we add ** prefix if not present
+    // so that "*.txt" behaves as "**/*.txt" (matches subdirectories)
+    let effective_pattern = if glob_pattern.contains("**") {
+        glob_pattern.to_string()
+    } else if glob_pattern.starts_with("**") {
+        glob_pattern.to_string()
+    } else {
+        format!("**/{}", glob_pattern)
+    };
+    let matcher = globset::GlobSetBuilder::new()
+        .add(globset::Glob::new(&effective_pattern).map_err(|e| AppError::InvalidConfig {
+            message: format!("Invalid glob pattern '{}': {}", glob_pattern, e),
+        })?)
+        .build()
+        .map_err(|e| AppError::InvalidConfig {
+            message: format!("Invalid glob pattern '{}': {}", glob_pattern, e),
+        })?;
+
+    let workspace_root = &workspace.root_path;
+    let mut results: Vec<crate::filesystem::types::FileMatch> = Vec::new();
+
+    // 5. Walk workspace
+    // min_depth(1) skips the root dir itself (important: tempdirs start with .tmp)
+    // filter_entry skips hidden/node_modules/.git subdirectories during descent
+    let walker = walkdir::WalkDir::new(workspace_root)
+        .follow_links(false)
+        .min_depth(1)
+        .into_iter()
+        .filter_entry(|e| !is_skipped(e));
+
+    for entry in walker.flatten() {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+
+        let entry_path = entry.path();
+
+        // Compute relative path from workspace root
+        let relative_path = match entry_path.strip_prefix(workspace_root) {
+            Ok(rel) => rel,
+            Err(_) => continue,
+        };
+
+        // Normalize to forward slashes for glob matching (globset uses / as separator)
+        let match_path = relative_path
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        // Check glob match
+        if !matcher.is_match(&match_path) {
+            continue;
+        }
+
+        // If no content pattern, add with no line info
+        let content_pattern = match content_pattern {
+            None => {
+                results.push(crate::filesystem::types::FileMatch {
+                    path: match_path,
+                    line_number: 0,
+                    line_content: String::new(),
+                });
+                continue;
+            }
+            Some(pat) => pat,
+        };
+
+        // Content search: read file, find matching lines
+        let metadata = match std::fs::metadata(entry_path) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        // Skip files > 10 MB
+        if metadata.len() > MAX_FILE_SIZE {
+            continue;
+        }
+
+        let file_content = match std::fs::read_to_string(entry_path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        let mut found = false;
+        for (line_idx, line) in file_content.lines().enumerate() {
+            if line.contains(content_pattern) {
+                results.push(crate::filesystem::types::FileMatch {
+                    path: match_path.clone(),
+                    line_number: (line_idx + 1) as u32,
+                    line_content: line.to_string(),
+                });
+                found = true;
+                break; // only first matching line per file
+            }
+        }
+        if found {
+            continue;
+        }
+    }
+
+    // Cap at 100 results
+    results.truncate(100);
+
+    Ok(results)
+}
+
+fn is_skipped(entry: &walkdir::DirEntry) -> bool {
+    entry
+        .file_name()
+        .to_str()
+        .map(|s| s.starts_with('.') || s == "node_modules" || s == ".git")
+        .unwrap_or(false)
+}
+
 #[tauri::command]
 pub async fn search_files(
-    _state: State<'_, AppState>,
-    _workspace_id: String,
-    _glob: String,
-    _content_pattern: Option<String>,
+    state: State<'_, AppState>,
+    workspace_id: String,
+    glob: String,
+    content_pattern: Option<String>,
 ) -> Result<Vec<crate::filesystem::types::FileMatch>, AppError> {
-    Err(AppError::Upstream { message: "not yet implemented".into() })
+    let settings = state.get_settings();
+    search_files_impl(&settings, &workspace_id, &glob, content_pattern.as_deref())
 }
 
 #[tauri::command]
@@ -711,5 +857,99 @@ mod tests {
         // File unchanged
         let content = std::fs::read_to_string(&outside_file).unwrap();
         assert_eq!(content, "hello");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // search_files tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn search_files_glob_match() {
+        let tempdir = TempDir::new().unwrap();
+        std::fs::write(tempdir.path().join("a.txt"), "hello").unwrap();
+        std::fs::write(tempdir.path().join("b.md"), "world").unwrap();
+        std::fs::create_dir(tempdir.path().join("sub")).unwrap();
+        std::fs::write(tempdir.path().join("sub/c.txt"), "nested").unwrap();
+
+        let settings = make_settings("ws1", tempdir.path(), true);
+
+        let result = search_files_impl(&settings, "ws1", "*.txt", None);
+
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+        let matches = result.unwrap();
+        let paths: Vec<_> = matches.iter().map(|m| m.path.as_str()).collect();
+        assert!(
+            paths.contains(&"a.txt") && paths.contains(&"sub/c.txt"),
+            "Expected a.txt and sub/c.txt, got {:?}",
+            paths
+        );
+        assert!(!paths.contains(&"b.md"), "b.md should not match *.txt");
+    }
+
+    #[test]
+    fn search_files_content_match() {
+        let tempdir = TempDir::new().unwrap();
+        std::fs::write(tempdir.path().join("a.txt"), "TODO: fix\nOK").unwrap();
+        std::fs::write(tempdir.path().join("b.md"), "no issue").unwrap();
+
+        let settings = make_settings("ws1", tempdir.path(), true);
+
+        let result = search_files_impl(&settings, "ws1", "*", Some("TODO"));
+
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+        let matches = result.unwrap();
+        assert_eq!(matches.len(), 1, "Expected 1 match, got {:?}", matches);
+        let m = &matches[0];
+        assert_eq!(m.path, "a.txt");
+        assert_eq!(m.line_number, 1);
+        assert_eq!(m.line_content, "TODO: fix");
+    }
+
+    #[test]
+    fn search_files_combined() {
+        let tempdir = TempDir::new().unwrap();
+        std::fs::write(tempdir.path().join("a.ts"), "TODO: fix bug").unwrap();
+        std::fs::write(tempdir.path().join("b.ts"), "no issue").unwrap();
+        std::fs::write(tempdir.path().join("c.rs"), "TODO: elsewhere").unwrap();
+
+        let settings = make_settings("ws1", tempdir.path(), true);
+
+        let result = search_files_impl(&settings, "ws1", "*.ts", Some("TODO"));
+
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+        let matches = result.unwrap();
+        assert_eq!(matches.len(), 1, "Expected 1 match, got {:?}", matches);
+        assert_eq!(matches[0].path, "a.ts");
+        assert_eq!(matches[0].line_content, "TODO: fix bug");
+    }
+
+    #[test]
+    fn search_files_no_matches() {
+        let tempdir = TempDir::new().unwrap();
+        std::fs::write(tempdir.path().join("a.txt"), "hello").unwrap();
+        std::fs::write(tempdir.path().join("b.md"), "world").unwrap();
+
+        let settings = make_settings("ws1", tempdir.path(), true);
+
+        let result = search_files_impl(&settings, "ws1", "*.json", None);
+
+        assert!(result.is_ok(), "Expected Ok, got {:?}", result);
+        let matches = result.unwrap();
+        assert!(matches.is_empty(), "Expected empty, got {:?}", matches);
+    }
+
+    #[test]
+    fn search_files_sandbox_violation() {
+        // Workspace root does not exist — canonicalize fails → SandboxViolation
+        let tempdir = TempDir::new().unwrap();
+        let nonexistent = tempdir.path().join("does_not_exist");
+
+        let settings = make_settings("ws1", &nonexistent, true);
+
+        let result = search_files_impl(&settings, "ws1", "*", None);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(matches!(err, AppError::SandboxViolation { .. }));
     }
 }
