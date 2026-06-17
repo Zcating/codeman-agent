@@ -5,6 +5,7 @@ mod db;
 mod events;
 mod secrets_llm;
 mod settings;
+mod filesystem;
 mod state;
 mod types;
 
@@ -70,6 +71,12 @@ pub fn run() {
             commands::get_llm_key,
             // Metis #9
             commands::delete_provider_keys,
+            // T6–T10: filesystem
+            commands::filesystem::read_file,
+            commands::filesystem::write_file,
+            commands::filesystem::edit_file,
+            commands::filesystem::search_files,
+            commands::filesystem::delete_file,
         ])
         .setup(|app| {
             let handle = app.handle().clone();

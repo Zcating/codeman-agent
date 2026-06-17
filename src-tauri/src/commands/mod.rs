@@ -1,5 +1,7 @@
-﻿//! Tauri IPC 命令。每个命令都是围绕 `AppState` 方法的薄包装，
+//! Tauri IPC 命令。每个命令都是围绕 `AppState` 方法的薄包装，
 //! 以便布线保持集中。
+
+pub mod filesystem;
 
 use crate::db::conversations;
 use crate::db::messages;
@@ -250,4 +252,3 @@ pub async fn delete_provider_keys(
     secrets_llm::delete_billing_key(&app, &provider_id)?;
     Ok(())
 }
-
