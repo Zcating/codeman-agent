@@ -10,12 +10,13 @@ import {
   BillingService,
   WorkspaceService,
   FileService,
+  SettingsServiceLive,
   WorkspaceServiceLive,
   FileServiceLive,
   TauriError,
   BillingError,
 } from "./tauri";
-import type { Provider, Snapshot, Workspace } from "./types";
+import type { Provider, Snapshot } from "./types";
 
 // ─── Mock Data ────────────────────────────────────────────────
 
@@ -226,7 +227,11 @@ describe("WorkspaceService.list", () => {
       const svc = yield* WorkspaceService;
       const workspaces = yield* svc.list();
       expect(workspaces).toEqual([]);
-    }).pipe(Effect.provide(WorkspaceServiceLive)),
+    }).pipe(
+      // WorkspaceServiceLive depends on SettingsService (reads workspaces from settings store)
+      Effect.provide(WorkspaceServiceLive),
+      Effect.provide(SettingsServiceLive),
+    ),
   );
 });
 

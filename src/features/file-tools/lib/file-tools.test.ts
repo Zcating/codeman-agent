@@ -210,8 +210,8 @@ describe("searchFilesTool", () => {
 
   it("happy path returns matches with line numbers", async () => {
     mockState.resolved = [
-      { path: "src/main.ts", line_number: 10, matched_line: "TODO: fix" },
-      { path: "src/main.ts", line_number: 42, matched_line: "TODO: test" },
+      { path: "src/main.ts", line_number: 10, line_content: "TODO: fix" },
+      { path: "src/main.ts", line_number: 42, line_content: "TODO: test" },
     ];
 
     const result = await searchFilesTool.execute("c1", {
@@ -235,7 +235,7 @@ describe("searchFilesTool", () => {
   });
 
   it("happy path with no content_pattern (glob only)", async () => {
-    mockState.resolved = [{ path: "src/main.ts", line_number: null, matched_line: null }];
+    mockState.resolved = [{ path: "src/main.ts", line_number: null, line_content: null }];
 
     const result = await searchFilesTool.execute("c1", {
       workspace_id: "ws1",

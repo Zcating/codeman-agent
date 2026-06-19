@@ -120,8 +120,40 @@ export class TauriLocator {
     return new TauriLocator(this.page, `${this.selector} >> __filterText__${re}`);
   }
 
-  async click(): Promise<void> {
-    await this.page.evaluate(__cdpClick, this.selector);
+  async click(): Promise<void>;
+  async click(opts: { timeout?: number }): Promise<void>;
+  async click(opts: { timeout?: number } = {}): Promise<void> {
+    const timeout = opts.timeout ?? 5_000;
+    const deadline = Date.now() + timeout;
+    let lastErr: unknown;
+    while (Date.now() < deadline) {
+      try {
+        await this.page.evaluate(__cdpClick, this.selector);
+        return;
+      } catch (e) {
+        lastErr = e;
+        await sleep(50);
+      }
+    }
+    throw new Error(
+      `click timed out after ${timeout}ms: ${this.selector} (last error: ${String(lastErr)})`,
+    );
+  }
+
+  async waitFor(opts: { state?: "visible" | "hidden"; timeout?: number } = {}): Promise<void> {
+    const state = opts.state ?? "visible";
+    const timeout = opts.timeout ?? 5_000;
+    const fnName = state === "visible" ? "isVisibleFor" : "isHiddenFor";
+    await waitFor(
+      async () =>
+        await this.page.evaluate(
+          (args: { sel: string; fn: string }) =>
+            (window as unknown as Record<string, (s: string) => boolean>)[args.fn](args.sel),
+          { sel: this.selector, fn: fnName },
+        ),
+      timeout,
+      `waitFor(${state}): ${this.selector}`,
+    );
   }
 
   async fill(value: string): Promise<void> {

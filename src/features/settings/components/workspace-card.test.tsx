@@ -1,7 +1,7 @@
 //! WorkspaceCard component tests.
 //! Tests rendering, toggle, path input, browse button, and delete.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen, cleanup } from "@solidjs/testing-library";
 import { WorkspaceCard } from "./workspace-card";
 import type { Workspace } from "../../../shared/lib/types";
@@ -14,8 +14,8 @@ const mockWorkspace: Workspace = {
 };
 
 describe("WorkspaceCard", () => {
-  let onUpdate: ReturnType<typeof vi.fn>;
-  let onRemove: ReturnType<typeof vi.fn>;
+  let onUpdate: Mock<(patch: Partial<Workspace>) => void>;
+  let onRemove: Mock<() => void>;
 
   beforeEach(() => {
     onUpdate = vi.fn();

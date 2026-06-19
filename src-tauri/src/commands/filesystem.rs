@@ -476,8 +476,8 @@ pub(crate) fn search_files_impl(
             None => {
                 results.push(crate::filesystem::types::FileMatch {
                     path: match_path,
-                    line_number: 0,
-                    line_content: String::new(),
+                    line_number: None,
+                    line_content: None,
                 });
                 continue;
             }
@@ -505,8 +505,8 @@ pub(crate) fn search_files_impl(
             if line.contains(content_pattern) {
                 results.push(crate::filesystem::types::FileMatch {
                     path: match_path.clone(),
-                    line_number: (line_idx + 1) as u32,
-                    line_content: line.to_string(),
+                    line_number: Some((line_idx + 1) as u32),
+                    line_content: Some(line.to_string()),
                 });
                 found = true;
                 break; // only first matching line per file
@@ -968,8 +968,8 @@ mod tests {
         assert_eq!(matches.len(), 1, "Expected 1 match, got {:?}", matches);
         let m = &matches[0];
         assert_eq!(m.path, "a.txt");
-        assert_eq!(m.line_number, 1);
-        assert_eq!(m.line_content, "TODO: fix");
+        assert_eq!(m.line_number, Some(1));
+        assert_eq!(m.line_content.as_deref(), Some("TODO: fix"));
     }
 
     #[test]
@@ -987,7 +987,7 @@ mod tests {
         let matches = result.unwrap();
         assert_eq!(matches.len(), 1, "Expected 1 match, got {:?}", matches);
         assert_eq!(matches[0].path, "a.ts");
-        assert_eq!(matches[0].line_content, "TODO: fix bug");
+        assert_eq!(matches[0].line_content.as_deref(), Some("TODO: fix bug"));
     }
 
     #[test]

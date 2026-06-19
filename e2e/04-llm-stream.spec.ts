@@ -16,6 +16,7 @@
 import { test, expect } from "@playwright/test";
 import {
   assert,
+  cancelRunningAgent,
   clearAllHistory,
   disposeTauriPage,
   getTauriPage,
@@ -37,6 +38,10 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     // 那时 ChatLayout 已 unmount,footer 的 Settings 链接找不到,15s 超时。
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
+
+    // 取消任何 in-flight LLM(03-billing-tool 可能留下 running=true —
+    // 没有这一步,新的 "新建会话" 点击后 textarea 会保持 disabled)
+    await cancelRunningAgent();
 
     const envFile = loadEnvFile();
     const envKey = envFile.MINIMAX_CN_API_KEY ?? process.env.MINIMAX_CN_API_KEY;

@@ -1,7 +1,7 @@
 //! File Tools — 5 个 AgentTool 定义（V2 文件 IO，ADR-0013）。
 //!
 //! T11-T15：read_file / write_file / edit_file / search_files / delete_file。
-//! 每个工具调用 FileService 方法，FileService 通过 Effect.provideService 提供。
+//! 每个工具调用 FileService 方法，FileService 通过 Effect.provide(Layer) 提供（Effect v3 API）。
 
 import { Type, type Static } from "@sinclair/typebox";
 import type { AgentTool } from "@mariozechner/pi-ai";
@@ -82,7 +82,14 @@ async function runFileEffect<T>(
     }
     return {
       content: [
-        { type: "text", text: `Error: ${"message" in err ? err.message : JSON.stringify(err)}` },
+        {
+          type: "text",
+          // 含 kind 标签:让 SandboxViolation / NotFound / Unknown 等错误种类在
+          // text payload 里可见(tool 消费方通常只看 text 不看 details)。
+          text: `Error${"kind" in err ? ` (${(err as { kind: string }).kind})` : ""}: ${
+            "message" in err ? err.message : JSON.stringify(err)
+          }`,
+        },
       ],
       details: err,
     };
@@ -109,7 +116,7 @@ export const readFileTool: AgentTool<typeof ReadFileSchema, string | AppError> =
     const program = Effect.gen(function* () {
       const svc = yield* FileService;
       return yield* svc.readFile(args.workspace_id, args.path);
-    }).pipe(Effect.provideService(FileService, FileServiceLive));
+    }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, (content) => `Content:\n${content}`);
   },
 };
@@ -124,7 +131,7 @@ export const writeFileTool: AgentTool<typeof WriteFileSchema, void | AppError> =
     const program = Effect.gen(function* () {
       const svc = yield* FileService;
       return yield* svc.writeFile(args.workspace_id, args.path, args.content);
-    }).pipe(Effect.provideService(FileService, FileServiceLive));
+    }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, () => "Done: file written successfully.");
   },
 };
@@ -146,7 +153,7 @@ export const editFileTool: AgentTool<typeof EditFileSchema, void | AppError> = {
         args.new_text,
         args.replace_all,
       );
-    }).pipe(Effect.provideService(FileService, FileServiceLive));
+    }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, () =>
       args.replace_all ? "Done: all occurrences replaced." : "Done: text replaced.",
     );
@@ -158,20 +165,20 @@ export const searchFilesTool: AgentTool<typeof SearchFilesSchema, FileMatch[] | 
   name: "search_files",
   description:
     "Find files in workspace by glob pattern, optionally filtered by content substring (≤100 results). " +
-    "Returns array of matches with path, line_number, and matched_line.",
+    "Returns array of matches with path, line_number, and line_content.",
   parameters: SearchFilesSchema,
   execute: async (_toolCallId, args: SearchFilesArgs) => {
     const program = Effect.gen(function* () {
       const svc = yield* FileService;
       return yield* svc.searchFiles(args.workspace_id, args.glob, args.content_pattern ?? null);
-    }).pipe(Effect.provideService(FileService, FileServiceLive));
+    }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, (matches: FileMatch[]) => {
       if (matches.length === 0) return "No matches found.";
       return `Found ${matches.length} match(es):\n${matches
         .map(
           (m) =>
             `  ${m.path}${m.line_number != null ? `:${m.line_number}` : ""}${
-              m.matched_line != null ? ` — ${m.matched_line}` : ""
+              m.line_content != null ? ` — ${m.line_content}` : ""
             }`,
         )
         .join("\n")}`;
@@ -190,7 +197,7 @@ export const deleteFileTool: AgentTool<typeof DeleteFileSchema, void | AppError>
     const program = Effect.gen(function* () {
       const svc = yield* FileService;
       return yield* svc.deleteFile(args.workspace_id, args.path);
-    }).pipe(Effect.provideService(FileService, FileServiceLive));
+    }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, () => "Done: file moved to recycle bin.");
   },
 };

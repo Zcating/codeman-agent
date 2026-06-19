@@ -33,9 +33,7 @@ import {
   BillingServiceLive,
   MessageService,
   MessageServiceLive,
-  FileService,
   FileServiceLive,
-  WorkspaceService,
   WorkspaceServiceLive,
 } from "../../../shared/lib/tauri";
 import { LLMProviderService, LLMProviderServiceLive } from "../../settings/lib/llm-providers";
@@ -183,7 +181,12 @@ export const AgentRuntimeLive = Layer.effect(
             agent = new Agent({
               transport,
               initialState: {
-                systemPrompt: conversation.system_prompt ?? settings.system_prompt.default,
+                // 用 `||` 不是 `??`:V1.5 后端 `Default for SystemPromptSettings` 是
+                // 空串,只有 `Default for Settings` 才填长 prompt。如果 DB 存的
+                // settings.system_prompt.default 是空串(fallback 或用户清空),
+                // `??` 不触发,LLM 收到 0 字符 system field,无法遵循工具使用指引。
+                // `||` 触发空串 fallback,确保 LLM 总有非空系统提示。
+                systemPrompt: conversation.system_prompt || settings.system_prompt.default,
                 model,
                 tools,
                 messages: [],

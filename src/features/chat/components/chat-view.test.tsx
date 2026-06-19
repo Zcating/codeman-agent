@@ -94,8 +94,10 @@ describe("ChatView", () => {
   it("从 messages$ 渲染消息列表", () => {
     const { container } = render(() => <ChatView />);
     // MessageBubble 外层包装有 class `mb-3 flex w-full`（Tailwind utilities）
+    // mock 数据含 3 条消息(user / assistant / tool),全 role 都走同一 wrapper,
+    // 所以 querySelectorAll("div.mb-3") 应得 3。
     const bubbles = container.querySelectorAll("div.mb-3");
-    expect(bubbles.length).toBe(2);
+    expect(bubbles.length).toBe(3);
   });
 
   it("输入为空时 Send 按钮禁用", () => {

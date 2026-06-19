@@ -233,6 +233,13 @@ export class AnthropicTransport {
 
     try {
       while (true) {
+        // 显式检查 abort signal — pi-agent 0.9.0 的 `agent.abort()` 不能可靠地
+        // 终止 SSE 循环(在 AnthropicTransport 的 fetch signal + reader.read()
+        // 链路上),这里强制检查让 cancel 路径在 ~1 reader.read() 周期内退出,
+        // stream 终止后 chat-view run() 的 finally 块 setRunning(false) 才跑。
+        if (signal?.aborted) {
+          throw new DOMException("Aborted", "AbortError");
+        }
         const { value, done } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
