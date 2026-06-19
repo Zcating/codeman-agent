@@ -114,10 +114,6 @@ export function MessageBubble(props: { message: Message }) {
           {props.message.content}
         </div>
       </Show>
-      <Show when={props.message.model}>
-        {/* Polish C6: metadata 走 muted-foreground token,4.5:1 对比度 */}
-        <div class="mt-1 text-xs text-muted-foreground">{props.message.model}</div>
-      </Show>
     </div>
   );
 }
