@@ -1,219 +1,72 @@
 ﻿# codeman-agent — 项目语境
 
-独立 Windows 桌面 AI 智能体，基于 Tauri 2 (Rust) + Solid.js + Effect-TS，
-运行时采用 pi-mono。V1 版本发布通用 LLM 聊天代理 + 两个计费工具
-（DeepSeek、MiniMax）。本文档固定词汇表，确保 plan、code 与 commit
-message 保持一致。
+独立 Windows 桌面 AI 智能体，基于 Tauri 2 (Rust) + Solid.js + TypeScript + Effect-TS，运行时采用 pi-mono (`@mariozechner/pi-ai` + `@mariozechner/pi-agent`)。主窗口是 LLM 对话 (`/`)，设置走 `/settings` 路由（TanStack Router），内置 2 个计费工具（`get_balance`、`get_plan_quota`，覆盖 DeepSeek 与 MiniMax）和 5 个文件工具（`read_file` / `write_file` / `edit_file` / `search_files` / `delete_file`）。本文档固定词汇表，确保 plan、code 与 commit message 保持一致。
 
 ## 词汇表
 
 ### 领域
 
-- **Agent (代理)** — 产品本体。通用 LLM 驱动的助手，运行在独立
-  Windows 桌面窗口中。完全替代旧的"widget"框架。_避免_：widget、
-  app、client。
-- **Conversation (会话)** — 用户拥有的持久聊天线程。线性消息
-  序列；V1 不支持分支。**V1.6+ 每 Conversation 至多 1 个 active
-  流**（per-conversation Agent 约束），多 Conversation 可并行
-  streaming。active 流定义：`run()` 已调用且 `done` / `error`
-  / `cancel` 之一尚未触发。active 流的取消走
-  `AgentRuntime.cancel(conversationId)`。
-- **Message (消息)** — 会话中的单轮消息。角色为 `user`、`assistant`、
-  `tool` 或 `system` 之一。可能内联携带 tool call 与 tool result
-  （JSON 形式）。
-- **Tool (工具)** — Agent 可调用的类型化函数。V1 内置 2 个计费
-  工具（`get_balance`、`get_plan_quota`）；注册表可扩展。
-- **Tool Call (工具调用)** — LLM 请求调用工具的指令。携带工具
-  名与 JSON 参数。
-- **Tool Result (工具结果)** — 工具调用的返回值。可能携带类型化
-  错误。
-- **Snapshot (快照)** — 计费提供方状态的时点视图。判别联合
-  类型：`Balance { amount, currency, auto_recharge }` 或
-  `PlanQuota { remaining, total, expires_at?, daily_avg? }`。由
-  计费工具返回。
+- **Agent (代理)** — 产品本体。LLM 驱动的助手，运行在独立 Windows 桌面窗口中。_避免_：widget、app、client。
+- **Conversation (会话)** — 用户拥有的持久聊天线程。线性消息序列；不支持分支。每 Conversation 至多 1 个 active 流，多 Conversation 可并行 streaming。active 流定义：`run()` 已调用且 `done` / `error` / `cancel` 之一尚未触发。active 流的取消走 `AgentRuntime.cancel(conversationId)`。
+- **Message (消息)** — 会话中的单轮消息。角色为 `user`、`assistant`、`tool` 或 `system` 之一。可能内联携带 tool call 与 tool result（JSON 形式）。
+- **Tool (工具)** — Agent 可调用的类型化函数。内置 2 个计费工具 + 5 个文件工具；注册表可扩展。
+- **Tool Call (工具调用)** — LLM 请求调用工具的指令。携带工具名与 JSON 参数。
+- **Tool Result (工具结果)** — 工具调用的返回值。可能携带类型化错误。
+- **Snapshot (快照)** — 计费提供方状态的时点视图。判别联合类型：`Balance { amount, currency, auto_recharge }` 或 `PlanQuota { remaining, total, expires_at?, daily_avg? }`。由计费工具返回。
 
-### Providers (V1.5+)
+### Providers
 
-- **Provider (提供商)** — 公司维度的统一记录，承载一种或多种
-  "对外能力"。一条记录 = 一家公司。shape 详情见
-  [ADR-0012](./docs/adr/0012-unified-provider-schema.md)。
-  V1.5+ schema: `{ id, label, enabled, llm: {...}, billing?: {...} }`。
-  `llm` 必选，`billing` 可选。
-  _避免_：client、vendor、service。
-- **Provider.llm (LLM 能力)** — Provider 必选子对象。shape:
-  `{ default_model, base_url, api_type, llm_api_key_ref, models, models_endpoint }`。
-  `api_type` 锁 `"anthropic-messages"`（V1，见 ADR-0011）；
-  `models: ModelMeta[]` 用户在 Settings 中可编辑；
-  `models_endpoint: string` provider 维度的模型列表拉取 URL。
-  Agent 的"燃料"。
-  _避免_：model provider、API provider、AI provider、model provider。
-- **Provider.billing (计费能力)** — Provider 可选子对象。shape:
-  `{ kind, billing_api_key_ref }`。
-  `kind` = `"balance" | "plan_quota"`。Agent 的一级工具目标。
-  `refresh_interval_secs` 字段在 V1.5+ 移除（V0 scheduler 已死，
-  on-demand 模式下无意义）。
-  _避免_：billing source、计费源。
-- **Protocol (协议)** — LLM 上游调用的 HTTP/SSE 形态。
-  V1 锁定 anthropic-messages（Anthropic Messages API 的请求/响应
-  形状）；pi-ai 按 `api` 字段路由到对应 transport 实现。
-  _避免_：API format、API type（实现细节）、wire format。
-- **Adapter (适配器)** — 每个计费提供方的 HTTP 客户端与响应解析器，
-  将 `Secret` 转换为 `Snapshot`。**V1.5+ 跑在 TS 端**（V0 跑 Rust 端，
-  V1.5 统一迁 TS 以便 tool dispatch 同进程；详见 ADR-0012）。
-  _避免_：HTTP client（过载）。
-- **ModelMeta (模型元数据)** — `Provider.llm.models[]` 元素。
-  shape: `{ id, label, context_window?, deprecated?, thinking? }`。
-  V1.5+ 用户在 Settings 中可增删编辑；
-  `ProviderService.getModels(id)` 静态读出此列表（读 settings）；
-  `ProviderService.fetchModels(id)` 调 `models_endpoint` 拉最新
-  （OpenAI-compatible `/v1/models` 格式，`label` 默认 = `id`，
-  用户可在 Settings 编辑）。_避免_：model config、model info。
-- **Models Endpoint (模型列表端点)** — `Provider.llm.models_endpoint`。
-  per-provider 可配置 URL，用于 `fetchModels()` 拉模型列表。
-  V1.5+ 预置：
-  - DeepSeek → `https://api.deepseek.com/models`
-  - MiniMax → `https://api.minimaxi.com/anthropic/v1/models`
-- ~~**LLM Provider**~~ (V1 deprecated) — superseded by `Provider.llm`。
-- ~~**Billing Provider**~~ (V1 deprecated) — superseded by `Provider.billing`。
-- **Balance (余额)** — 计费提供方持有的可充值信用池。时点状态，
-  可充值。
-- **Plan Quota (用量)** — 套餐附带的固定、不可充值的配额。随使用
-  减少，周期重置，不可充值。
+- **Provider (提供商)** — 公司维度的统一记录，承载一种或多种"对外能力"。一条记录 = 一家公司。shape: `{ id, label, enabled, llm: {...}, billing?: {...} }`。`llm` 必选，`billing` 可选。_避免_：client、vendor、service。
+- **Provider.llm (LLM 能力)** — Provider 必选子对象。shape: `{ default_model, base_url, api_type, llm_api_key_ref, models, models_endpoint }`。`api_type` 锁 `"anthropic-messages"`；`models: ModelMeta[]` 用户在 Settings 中可编辑；`models_endpoint: string` provider 维度的模型列表拉取 URL。Agent 的"燃料"。_避免_：model provider、API provider、AI provider。
+- **Provider.billing (计费能力)** — Provider 可选子对象。shape: `{ kind, billing_api_key_ref }`。`kind` = `"balance" | "plan_quota"`。Agent 的一级工具目标。_避免_：billing source、计费源。
+- **Protocol (协议)** — LLM 上游调用的 HTTP/SSE 形态。锁定 anthropic-messages（Anthropic Messages API 的请求/响应形状）；pi-ai 按 `api` 字段路由到对应 transport 实现。_避免_：API format、API type（实现细节）、wire format。
+- **Adapter (适配器)** — 每个计费提供方的 HTTP 客户端与响应解析器，将 API key 转换为 `Snapshot`。位于 TS 端 (`src/features/billing/lib/adapters/`)：deepseek 仅实现 `balance`，minimax 实现 `plan_quota`（balance 端点未公开验证）。_避免_：HTTP client（过载）。
+- **ModelMeta (模型元数据)** — `Provider.llm.models[]` 元素。shape: `{ id, label, context_window?, deprecated?, thinking? }`；用户在 Settings 中可增删编辑。`ProviderService.getModels(id)` 静态读出此列表（读 settings）；`ProviderService.fetchModels(id)` 调 `models_endpoint` 拉最新（OpenAI-compatible `/v1/models` 格式，`label` 默认 = `id`）。_避免_：model config、model info。
+- **Models Endpoint (模型列表端点)** — `Provider.llm.models_endpoint`。per-provider 可配置 URL，用于 `fetchModels()` 拉模型列表。
+- **Balance (余额)** — 计费提供方持有的可充值信用池。时点状态，可充值。
+- **Plan Quota (用量)** — 套餐附带的固定、不可充值的配额。随使用减少，周期重置，不可充值。
 
-### File IO (V2 路线图, via ADR-0013)
+### File IO
 
-V1 Non-goal "无文件系统" 由 [ADR-0013](./docs/adr/0013-file-io-tools.md)
-(V2 启动时) 解除。本节术语仅在 V2 实施后生效, V1.5 仍锁 Non-goal。
-
-- **Workspace (工作区)** — 用户在 Settings (`Settings.workspaces: Array<{ id, label, root_path, enabled }>`)
-  中配置的根目录, agent 的 file tool 仅在该目录树下操作。Agent
-  越界 (canonical path 不在 workspace root 内) 由 Tauri command
-  拒绝 (返回 `SandboxViolation` 错误)。Shape 同 ADR-0013。
-  _避免_: sandbox、root directory、project root。
-- **File Tool (文件工具)** — pi-agent 工具族, V2 内置 5 个:
-  `read_file` (读全文) / `write_file` (覆盖写) / `edit_file` (语义
-  待 V2 实施时定) / `search_files` (glob + content) /
-  `delete_file` (移至回收站)。所有工具通过 Tauri command 调 Rust
-  `std::fs`, 沙箱由 workspace 边界约束, 不绕过 Tauri permission
-  system。_避免_: fs tool、file operation (过载)。
-- **Sandbox Violation (越界错误)** — Tauri command 在
-  `canonicalize(path)` 后检测到 `path` 不在任何已启用 workspace
-  目录下时返回的错误。Agent 收到后必须重新规划 (改路径 / 让用户
-  加 workspace) 而非重试原路径。
+- **Workspace (工作区)** — 用户在 Settings (`Settings.workspaces: Array<{ id, label, root_path, enabled }>`) 中配置的根目录，agent 的 file tool 仅在该目录树下操作。Agent 越界 (canonical path 不在 workspace root 内) 由 Tauri command 拒绝 (返回 `SandboxViolation` 错误)。_避免_: sandbox、root directory、project root。
+- **File Tool (文件工具)** — pi-agent 工具族，内置 5 个: `read_file` (读全文) / `write_file` (覆盖写) / `edit_file` (替换文本，支持 `replace_all`) / `search_files` (glob + content 搜索) / `delete_file` (移至回收站)。所有工具通过 Tauri command 调 Rust `std::fs`，沙箱由 workspace 边界约束。_避免_: fs tool、file operation (过载)。
+- **Sandbox Violation (越界错误)** — Tauri command 在 `canonicalize(path)` 后检测到 `path` 不在任何已启用 workspace 目录下时返回的错误。Agent 收到后必须重新规划 (改路径 / 让用户加 workspace) 而非重试原路径。
 
 ### 架构
 
-- **Runtime (运行时)** — 包装 pi-mono agent loop 的 Effect-TS 层。
-  掌控 per-conversation Agent 生命周期（见下）、工具注册表、
-  Stream 订阅。V1.5 之前为单 `Ref<Agent | null>`；V1.6 起改为
-  `Ref<Map<ConversationId, Agent>>`（per-conversation Agent
-  机制详见 ADR-0014）。_避免_：agent core、agent loop。
-- **Per-Conversation Agent (会话级 Agent 实例)** — 每个
-  Conversation 对应一个 pi-mono `Agent` 实例。生命周期跟随
-  Conversation：lazy 创建于该 conv 首次 `run()`，销毁于
-  Conversation 被 delete / archive。Agent 实例在 `run()`
-  之间复用、累积 `messages: PiMessage[]`；首次创建时从
-  `MessageService.list(convId)` 一次性拉历史消息回填。同一
-  Conversation 至多 1 个 active 流；多 Conversation 可并行
-  streaming。设计动机：切换 Conversation 时 in-flight 流保留
-  状态、不被 cancel；Agent state 不被 GC，partial assistant
-  消息可被后续 `run()` 累积（"per-conversation 后台"）。
-  _避免_：singleton Agent（V1.5 旧语义）、per-request Agent
-  （每 `run()` 新建、跨流不复用，V1.5 旧语义）。
-- **Agent Map (Agent 映射表)** — `AgentRuntimeLive` 持有的
-  `Ref<Map<ConversationId, Agent>>`。Service 本身仍是
-  `Context.Tag` 单例（每进程 1 个 service），但 service 内部
-  状态按 ConversationId 索引。Service 公开 `run(conv, msg)`、
-  `cancel(convId)`、`destroy(convId)` 三个方法；不暴露
-  内部 Map（封装边界）。
-- **Bridge (桥接层)** — 将 Effect Service 的 `Effect` / `Stream`
-  输出翻译为 Solid signal 的层。UI 组件不 `import 'effect'`。
-  _避免_：adapter（过载）。
-- **Effect Service (Effect 服务)** — 类型化异步模块，暴露
-  `Effect<A, E, R>` 或 `Stream<A, E, R>`。通过 Effect layer 组合；
-  通过 mock layer 测试（`@effect/vitest`）。
-- **IPC** — Tauri 命令桥接。Rust 端拥有 `commands.rs`；TS 端
-  包装在 `src/shared/lib/tauri.ts`。V1.5+ Tool handler **不再跨 IPC
-  调用 Rust Adapter**（billing 移 TS 后同进程），仅 LLM key 拉取
-  / settings 持久化 / SQLite 访问走 IPC。
+- **Runtime (运行时)** — 包装 pi-mono agent loop 的 Effect-TS 层。掌控 per-conversation Agent 生命周期、工具注册表、Stream 订阅。_避免_：agent core、agent loop。
+- **Per-Conversation Agent (会话级 Agent 实例)** — 每个 Conversation 对应一个 pi-mono `Agent` 实例。生命周期跟随 Conversation：lazy 创建于该 conv 首次 `run()`，销毁于 Conversation 被 delete / archive。Agent 实例在 `run()` 之间复用、累积 `messages: PiMessage[]`；首次创建时从 `MessageService.list(convId)` 一次性拉历史消息回填。同一 Conversation 至多 1 个 active 流；多 Conversation 可并行 streaming。切换 Conversation 时 in-flight 流保留状态、不被 cancel。_避免_：singleton Agent、per-request Agent。
+- **Agent Map (Agent 映射表)** — `AgentRuntimeLive` 持有的 `Ref<Map<ConversationId, Agent>>`。Service 本身仍是 `Context.Tag` 单例（每进程 1 个 service），但 service 内部状态按 ConversationId 索引。Service 公开 `run(conv, msg)`、`cancel(convId)`、`destroy(convId)` 三个方法；不暴露内部 Map（封装边界）。
+- **Bridge (桥接层)** — 将 Effect Service 的 `Effect` / `Stream` 输出翻译为 Solid signal 的层。UI 组件不 `import 'effect'`。_避免_：adapter（过载）。
+- **Effect Service (Effect 服务)** — 类型化异步模块，暴露 `Effect<A, E, R>` 或 `Stream<A, E, R>`。通过 Effect layer 组合；通过 mock layer 测试（`@effect/vitest`）。
+- **IPC** — Tauri 命令桥接。Rust 端命令注册在 `src-tauri/src/lib.rs::invoke_handler!`；TS 端包装在 `src/shared/lib/tauri.ts`（Service Tag + Live Layer）。`invoke` 在该文件之外不出现。
 
 ### 密钥
 
-- **LLM API Key (LLM API 密钥)** — LLM Provider 的认证凭据。
-  存储在 **Tauri store** 路径 `llm_providers/<id>/api_key` 下。
-  Webview 可读；V1.5+ 与 Billing API Key 同档（统一为 Tauri store，
-  详见 ADR-0012）。
-- **Billing API Key (计费 API 密钥)** — Billing Provider 的认证
-  凭据。**V1.5+ 存 Tauri store**（`billing/<id>/api_key` 命名空间），
-  与 LLM API Key 同档。**V0 存 Windows Credential Manager**（`keyring`
-  crate），V1.5+ 迁移到 Tauri store；key 经 IPC 跨到 webview 供
-  TS adapter 用 fetch 调 billing 端点。
-- **Secret** — V0 Rust 端 `Secret<String>` newtype，`Debug` /
-  `Display` 打印 `Secret(***)`。**V1.5+ billing 移 TS 后**，
-  计费密钥走 Effect-TS `Secret` 包装（同样打码）；Adapter 层
-  （V1.5+ 在 TS）调用 `.expose()` 喂 fetch header。Rust 端
-  LLM secret 处理保留（`secrets_llm.rs`）。
-  _避免_：对任何凭据使用裸 `String`。
+- **LLM API Key (LLM API 密钥)** — LLM Provider 的认证凭据。存储在 Tauri store 路径 `llm_providers/<id>/api_key` 下。Webview 可读。
+- **Billing API Key (计费 API 密钥)** — Billing Provider 的认证凭据。存储在 Tauri store 路径 `billing/<id>/api_key` 下，与 LLM API Key 同档。key 经 IPC 跨到 webview 供 TS adapter 用 fetch 调 billing 端点。
+- **Secret** — Rust 端 `Secret<String>` newtype，`Debug` / `Display` 打印 `Secret(***)` / `***`。TS 端由 Effect / adapter 层使用 `secret.expose()` 喂 fetch header。_避免_：对任何凭据使用裸 `String`。
 
 ### Settings 与状态
 
-- **Settings (设置)** — 通过 `tauri-plugin-store` 持久化的 JSON
-  文档，位于 OS app-data 目录。覆盖 7 个分类共约 17 个字段。
-  **不含任何 API 密钥**（密钥分命名空间存于 Tauri store 或
-  keyring）。
-- **Hotkeys (全局热键)** —— V1.5 已移除：V1 无热键，V1.5 同样
-  不带全局热键。`tauri-plugin-global-shortcut` 已不再是依赖。
-- **Stale (过期)** — `Snapshot` 时间戳超过 Billing Provider 的
-  `stale_after_seconds`；传统的"过期徽标"语义在 tool result 缓存
-  场景保留。
+- **Settings (设置)** — 通过 `tauri-plugin-store` 持久化的 JSON 文档，位于 OS app-data 目录。包含统一 `providers[]` 数组（含 `schema_version` 标记），以及 window / theme / system_prompt / conversations / workspaces / user_language / start_at_login 等字段。**不含任何 API 密钥**（密钥分命名空间存于 Tauri store）。
+- **Stale (过期)** — `Snapshot` 时间戳超过 Billing Provider 的 `stale_after_seconds`；传统的"过期徽标"语义在 tool result 缓存场景保留。
 
 ### 样式
 
-- **Utility Class (工具类)** — Tailwind v4 utility-first CSS 类
-  （例如 `flex h-screen bg-zinc-50`）。V1 唯一的视觉层；每个
-  组件的外观都通过 utility class 表达。_避免_：BEM class、
-  atomic CSS、scoped CSS。
-- **Theme (主题)** — 用户在 Settings 中选择的三态视觉模式
-  （`light` / `dark` / `system`）；通过 `<html class="dark">`
-  切换（无 `prefers-color-scheme` 媒体查询 —— `system` 模式由
-  `agent/store/theme.ts` 中的 Solid effect 读取）。_避免_：
-  color scheme、appearance、mode。
-- **Style Token (样式令牌)** — 在 `@theme` 块中定义的语义名
-  （例如 `primary-500`、`zinc-900`），组件引用而非裸 hex。
-  _避免_：design token（与 Material / Apple / IBM 词汇过载）、
-  CSS variable（实现细节）。
+- **Utility Class (工具类)** — Tailwind v4 utility-first CSS 类（例如 `flex h-screen bg-zinc-50`）。唯一的视觉层；每个组件的外观都通过 utility class 表达。_避免_：BEM class、atomic CSS、scoped CSS。
+- **Theme (主题)** — 用户在 Settings 中选择的三态视觉模式（`light` / `dark` / `system`）；通过 `<html class="dark">` 切换（无 `prefers-color-scheme` 媒体查询 —— `system` 模式由 `src/shared/stores/theme.ts` 中的 Solid effect 读取）。_避免_：color scheme、appearance、mode。
+- **Style Token (样式令牌)** — 在 `@theme` 块中定义的语义名（例如 `primary-500`、`zinc-900`），组件引用而非裸 hex。_避免_：design token（与 Material / Apple / IBM 词汇过载）、CSS variable（实现细节）。
 
 ### Localization
 
-- **Developer Language (开发者语言)** — 标识符、注释、治理文档的
-  语言。V1.6+ 分层：identifier 保持英文（与 Tauri / Solid /
-  Effect-TS / pi-mono / Tailwind / Vite / Vitest / Playwright 生态
-  对齐），prose 与注释走中文。Canonical 词汇表是 `CONTEXT.md`。
-  _避免_：bilingual inline annotations、翻译 identifier。
-- **User Language (用户语言)** — UI 字符串（按钮 / 错误 / 提示）
-  的语言。通过 `Settings.user_language: "zh" | "en" | "auto"`
-  配置。V1 没有 i18n runtime；UI 字符串硬编码英文，与该设置
-  解耦。_避免_：作为代码注释翻译的副作用改动 UI 字符串。
-- **Test Description (测试描述)** — `it("xxx")` / `test("xxx")`
-  中描述测试目标的可读字符串。出现在测试报告中。V1.6+ 约定：
-  **中文**（例如 `it("可以保存 LLM API key")`）。_避免_：新测试
-  使用英文 test description。
-- **Assertion (断言)** — 测试体内的 runtime 检查，例如
-  `expect(x).toBe(y)`。**锚定 UI 字符串时英文**（必须与 UI 完
-  全一致），**fixture 数据时中文**（例如
-  `toHaveBeenCalledWith({ content: '你好' })`）。_避免_：当
-  底层值是 UI 字符串时使用中文断言字符串（运行时会失败）。
-- **UI String (UI 字符串)** — 渲染 UI 中展示的文本（按钮标签、
-  placeholder、错误信息、aria-label）。V1 始终输出英文 UI
-  字符串，与 `user_language` 无关。在 V1.6 注释翻译工作中**不
-  在范围**；未来 i18n 工作独立追踪。
-- **Developer String (开发者字符串)** — 写入日志、console、panic
-  消息或 `Result::Err` 变体（不向用户展示）的字符串字面量。
-  V1.6+ 约定：**中文**。_避免_：新代码使用英文 log message
-  （破坏 grep 一致性）。
-- **Translation Rules (翻译规则)** — 操作手册，位于
-  `docs/translation-rules.md`。包含品牌名保留、术语映射表、标点
-  规则、注释格式。5 路并行工作流以此文档为一致性约束。
+- **Developer Language (开发者语言)** — 标识符、注释、治理文档的语言。分层：identifier 保持英文（与 Tauri / Solid / Effect-TS / pi-mono / Tailwind / Vite / Vitest / Playwright 生态对齐），prose 与注释走中文。Canonical 词汇表是 `CONTEXT.md`。_避免_：bilingual inline annotations、翻译 identifier。
+- **User Language (用户语言)** — UI 字符串（按钮 / 错误 / 提示）的语言。通过 `Settings.user_language: "zh" | "en" | "auto"` 配置。没有 i18n runtime；UI 字符串硬编码英文，与该设置解耦。_避免_：作为代码注释翻译的副作用改动 UI 字符串。
+- **Test Description (测试描述)** — `it("xxx")` / `test("xxx")` 中描述测试目标的可读字符串。出现在测试报告中。约定：**中文**（例如 `it("可以保存 LLM API key")`）。_避免_：新测试使用英文 test description。
+- **Assertion (断言)** — 测试体内的 runtime 检查，例如 `expect(x).toBe(y)`。**锚定 UI 字符串时英文**（必须与 UI 完全一致），**fixture 数据时中文**（例如 `toHaveBeenCalledWith({ content: '你好' })`）。_避免_：当底层值是 UI 字符串时使用中文断言字符串（运行时会失败）。
+- **UI String (UI 字符串)** — 渲染 UI 中展示的文本（按钮标签、placeholder、错误信息、aria-label）。始终输出英文 UI 字符串，与 `user_language` 无关。注释翻译工作不动 UI 字符串；未来 i18n 工作独立追踪。
+- **Developer String (开发者字符串)** — 写入日志、console、panic 消息或 `Result::Err` 变体（不向用户展示）的字符串字面量。约定：**中文**。_避免_：新代码使用英文 log message（破坏 grep 一致性）。
+- **Translation Rules (翻译规则)** — 操作手册，位于 `docs/translation-rules.md`。包含品牌名保留、术语映射表、标点规则、注释格式。翻译工作流以此文档为一致性约束。
 
 ## Domain shape
 
@@ -221,11 +74,16 @@ V1 Non-goal "无文件系统" 由 [ADR-0013](./docs/adr/0013-file-io-tools.md)
 Agent
   ├── runtime          (Effect-TS layer wrapping pi-mono)
   ├── bridge           (Effect → Solid signal 翻译器)
-  └── tools[]          (类型化函数；计费工具由 Rust adapter 支撑)
-        ├── get_balance(billing_provider_id)  → Snapshot
-        └── get_plan_quota(billing_provider_id) → Snapshot
+  └── tools[]          (类型化函数；计费 + 文件工具)
+        ├── get_balance(provider_id)             → Snapshot
+        ├── get_plan_quota(provider_id)          → Snapshot
+        ├── read_file(workspace_id, path)        → string
+        ├── write_file(workspace_id, path, text) → void
+        ├── edit_file(workspace_id, path, old, new, replace_all) → void
+        ├── search_files(workspace_id, glob, pattern?) → FileMatch[]
+        └── delete_file(workspace_id, path)      → void
 
-Conversation          (src/shared/types/index.ts)
+Conversation          (src/shared/lib/types.ts)
   ├── id, title, system_prompt?, created_at, updated_at, archived_at?
   └── messages[]       (线性)
         ├── id, role, content
@@ -234,45 +92,34 @@ Conversation          (src/shared/types/index.ts)
         ├── model, input_tokens, output_tokens
         └── created_at
 
-LLM Provider             Billing Provider
-  (Settings.llm_providers) (Settings.billing_providers)
-  ├── id                  ├── id
-  ├── label               ├── label
-  ├── enabled             ├── enabled
-  ├── default_model       ├── adapter (Rust trait impl)
-  ├── base_url?           └── refresh_interval_secs
-  └── api_key_ref
-        (Tauri store)              (keyring)
+Provider              (Settings.providers[].llm 必选 + .billing 可选)
+  ├── id, label, enabled
+  ├── llm: { default_model, base_url, api_type, llm_api_key_ref, models[], models_endpoint }
+  └── billing?: { kind: "balance" | "plan_quota", billing_api_key_ref }
 ```
 
-两类 Provider 故意保持区分 —— 它们由不同的代码路径和存储层
-处理。**不要**合并为单一类型。
+## Settings
 
-## Settings (V1.5+ 形态)
-
-通过 `tauri-plugin-store` 持久化（JSON 文件位于 app-data 目录）。
-完整 schema 位于 `src-tauri/src/settings.rs`；canonical TS 镜像
-位于 `src/shared/lib/types.ts`。V1 → V1.5 自动迁移由
-`Settings::sanitized()` 完成（V1 双数组合并 → V1.5 单数组）。
+通过 `tauri-plugin-store` 持久化（JSON 文件位于 app-data 目录）。完整 schema 位于 `src-tauri/src/settings.rs`；canonical TS 镜像位于 `src/shared/lib/types.ts`。`Settings::sanitized()` 钳制不变量（`auto_archive_after_days >= 1`、`max_history >= 10` 等）。
 
 ```ts
 interface Settings {
   // A. Providers (统一记录：llm 必选，billing 可选)
   providers: Array<{
-    id: string;             // V1.5 预置 "minimax" + "deepseek"
+    id: string;             // 预置 "minimax"
     label: string;          // 人类可读名
     enabled: boolean;
     llm: {                  // 必选
       default_model: string;
       base_url: string;
-      api_type: "anthropic-messages";  // V1 锁定；见 ADR-0011
+      api_type: "anthropic-messages";
       llm_api_key_ref: string;         // 指向 Tauri store
       models: ModelMeta[];             // 用户可编辑的模型列表
       models_endpoint: string;         // 拉取模型列表的 URL（per-provider 可配置）
     };
     billing?: {             // 可选
       kind: "balance" | "plan_quota";
-      billing_api_key_ref: string;     // 指向 Tauri store (V1.5+)
+      billing_api_key_ref: string;     // 指向 Tauri store
     };
   }>;
 
@@ -303,67 +150,53 @@ interface Settings {
     auto_archive_after_days: number; // 默认 30
     max_history: number; // 默认 1000
   };
+
+  // G. File IO workspaces
+  workspaces: Array<{
+    id: string;
+    label: string;
+    root_path: string;
+    enabled: boolean;
+  }>;
 }
 
 interface ModelMeta {
-  id: string;               // "MiniMax-M2.5-highspeed" | "deepseek-v4-pro" | ...
-  label: string;            // "M2.5 Highspeed" | "V4 Pro" | ...
+  id: string;               // "MiniMax-M2.5-highspeed" | ...
+  label: string;            // "M2.5 Highspeed" | ...
   context_window?: number;  // token 上限
   deprecated?: boolean;     // UI 标灰
   thinking?: boolean;       // 是否支持 extended thinking
 }
 ```
 
-API 密钥**永不**进入此文件。**V1.5+ LLM 密钥和计费密钥都存
-Tauri store**（分别走 `llm_providers/<id>/api_key` 和
-`billing/<id>/api_key` 命名空间），两套独立、同档安全等级。
-同一家公司可有两个独立 key。
+API 密钥**永不**进入此文件。**LLM 密钥和计费密钥都存 Tauri store**（分别走 `llm_providers/<id>/api_key` 和 `billing/<id>/api_key` 命名空间），两套独立、同档安全等级。同一家公司可有两个独立 key。
 
-**V1 预置**：`Settings::Default` 编译时预置一条 LLM provider 记录
-（`id: "minimax"` / `default_model: "MiniMax-M2.5-highspeed"` /
-`base_url: "https://api.minimaxi.com/anthropic"` /
-`api_type: "anthropic-messages"`），并把 `default_llm_provider_id`
-设为 `"minimax"`。首次启动即可用，用户只需在 Settings UI 填 MiniMax
-API key。
+**默认预填**：`Settings::Default` 编译时预置一条 LLM provider 记录（`id: "minimax"` / `default_model: "MiniMax-M2.5-highspeed"` / `base_url: "https://api.minimaxi.com/anthropic"` / `api_type: "anthropic-messages"`），并预填对应 billing 子对象（`kind: PlanQuota`）。首次启动即可用，用户只需在 Settings UI 填 MiniMax API key。
 
 ## 认证约定
 
-- **LLM providers** 通过 pi-mono 标准机制认证（因 provider 而异：
-  OpenAI Bearer、Anthropic `x-api-key`、OpenAI 兼容自定义 header）。
-  `pi-ai` 负责构造 header；密钥值来自 Tauri store。
-- **Billing providers** 使用 `Authorization: Bearer <key>`。header
-  在 Rust adapter 内部用 `Secret<String>` 构造；密钥值来自
-  keyring。密钥永不出 Rust 进程；前端永远只看到 `has_key: boolean`
-  标志。
+- **LLM providers** 通过 pi-mono 标准机制认证（因 provider 而异：OpenAI Bearer、Anthropic `x-api-key`、OpenAI 兼容自定义 header）。`pi-ai` 负责构造 header；密钥值来自 Tauri store。
+- **Billing providers** 使用 `Authorization: Bearer <key>`。header 在 TS adapter 内部构造；密钥值来自 Tauri store。密钥永不出 webview 进程外；前端只能通过 `has_key: boolean` 探测存在性。
 
 ## MiniMax 端点
 
-MiniMax plan-quota 端点在规划时**待定**。adapter 按可配置 URL
-绑定（默认占位返回结构化错误），直到已验证的端点被记录到本文件。
-一旦确认，已验证的 URL + 响应 schema 将在同一 commit 中记录并
-切换默认。
+MiniMax `plan_quota` 端点（`https://api.minimaxi.com/anthropic/v1/quota/plan`）当前有效。`balance` 端点尚未公开验证，调用时 adapter 返回 `Upstream` 错误。DeepSeek balance 端点 `https://api.deepseek.com/user/balance` 当前有效；DeepSeek 不支持 `plan_quota`，调用时 adapter 返回 `Upstream` 错误。
 
 ## Logging
 
-- 日志位于 `%LocalAppData%\codeman-agent\logs\`，按日轮转，容量
-  上限。
-- `log` + `tauri-plugin-log`；默认 `info` 级，通过环境变量启用
-  `debug`。
-- API 密钥材料在 Rust 端包成 `Secret<String>`，在 TS 端包成
-  Effect-TS `Secret`，二者在 `Debug` / `Display` 中打码；log
-  语句避免格式化完整 secret（任一语言）。
-- LLM API 密钥（Tauri store）与 Billing API 密钥（Tauri store，
-  V1.5+）在日志中同等对待：均仅通过 `api_key_ref` 引用，
-  **绝不**打印原值。V0 keyring 时代的差异化处理作废。
+- 日志位于 `%LocalAppData%\codeman-agent\logs\`，按日轮转，容量上限。
+- `log` + `tauri-plugin-log`；默认 `info` 级，通过环境变量启用 `debug`。
+- API 密钥材料在 Rust 端包成 `Secret<String>`，在 TS 端由 adapter 层使用前才 `expose()`；log 语句避免格式化完整 secret（任一语言）。
+- LLM API 密钥（Tauri store）与 Billing API 密钥（Tauri store）在日志中同等对待：均仅通过 `api_key_ref` 引用，**绝不**打印原值。
 
-## Non-goals (V1)
+## Non-goals
 
 - 单 provider 多账号
 - 历史图表 / 时序数据
 - 分支会话
-- 跨会话用户事实的自动记忆 / 跨 session 持久化（M2 会话除外）
-- 计费之外的通用工具（无 shell、无文件系统、无 IDE 集成）
-- 无鼠标操作（V1 无热键、无键盘快捷键）
-- 跨平台打包（Tauri 保持可移植；V1 仅 Windows）
+- 跨会话用户事实的自动记忆 / 跨 session 持久化
+- 计费与文件工具之外的通用工具（无 shell、无 IDE 集成）
+- 无鼠标操作（无热键、无键盘快捷键）
+- 跨平台打包（Tauri 保持可移植；仅 Windows）
 - 自动更新、代码签名
 - 点击穿透透明区域

@@ -376,8 +376,6 @@ fn migrate_to_v1_5(mut settings: Settings) -> Settings {
     }
 
     // V0/V1 schema 迁移
-    let llm_by_id: std::collections::HashMap<&str, &LLMProvider> =
-        settings.llm_providers.iter().map(|p| (p.id.as_str(), p)).collect();
     let billing_by_id: std::collections::HashMap<&str, &BillingProviderConfig> =
         settings.billing_providers.iter().map(|p| (p.id.as_str(), p)).collect();
 

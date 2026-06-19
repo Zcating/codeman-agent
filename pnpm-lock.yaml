@@ -54,7 +54,7 @@ importers:
         specifier: ^2.1.1
         version: 2.1.1
       effect:
-        specifier: ^3.0.0
+        specifier: ^3.21.3
         version: 3.21.3
       lucide-solid:
         specifier: ^1.18.0

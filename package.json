@@ -42,7 +42,7 @@
     "@tauri-apps/plugin-window-state": "^2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "effect": "^3.0.0",
+    "effect": "^3.21.3",
     "lucide-solid": "^1.18.0",
     "marked": "^15.0.0",
     "solid-js": "^1.9.3",
