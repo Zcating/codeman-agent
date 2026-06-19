@@ -12,6 +12,7 @@
 import { test, expect } from "@playwright/test";
 import {
   assert,
+  cancelRunningAgent,
   clearAllHistory,
   clickNewConversationAndWait,
   disposeTauriPage,
@@ -49,11 +50,39 @@ test.describe("05 — 文件工具 (e2e)", () => {
       const providers = current.llm_providers.map((p) =>
         p.id === "minimax" ? { ...p, base_url: envBaseUrl ?? p.base_url } : p,
       );
+      // 显式覆盖 system_prompt:之前测试在 SQLite 留的 settings 可能 default=""
+      // (rust `Default for SystemPromptSettings` 是空串,只有 `Default for Settings`
+      // 才填长 prompt — 但只有 system_prompt 字段缺失时才用 Settings::default())。
+      // 这里硬写,保证 LLM 收到工具使用指引。
       await invoke("update_settings", {
         newSettings: {
           ...current,
           llm_providers: providers,
           default_llm_provider_id: "minimax",
+          system_prompt: {
+            default: [
+              "You are a tool-calling AI assistant. You MUST always invoke the appropriate tool to complete user requests — never respond with text-only greetings or explanations.",
+              "",
+              "## Tool-Use Contract",
+              "- When the user asks about a file (read/write/edit/search/delete), IMMEDIATELY call the matching file tool with the correct arguments.",
+              "- All 5 file tools require a `workspace_id` parameter. The user has exactly one configured workspace; pass the string 'main' (the test fixture's only workspace).",
+              "- Do NOT greet the user. Do NOT explain what you will do. Just call the tool.",
+              "",
+              "## Available Tools",
+              "- get_balance / get_plan_quota: billing queries",
+              "- read_file: read a file (path can be absolute inside the workspace)",
+              "- write_file: write content to a file (relative or absolute path inside the workspace)",
+              "- edit_file: replace old_text with new_text (must match exactly once unless replace_all=true)",
+              "- search_files: glob pattern + optional content substring",
+              "- delete_file: move to recycle bin",
+              "",
+              "## Error Semantics",
+              "- Paths outside the workspace return SandboxViolation — that's expected; pass it through to the user verbatim.",
+              "- edit_file with N>1 matches errors with 'must match exactly once (got N)'. Pass the error through.",
+              "- Files > 10 MB, binary, or blocked extensions (.exe/.dll/.sys/.ini) return Upstream errors.",
+            ].join("\n"),
+            user_can_edit: true,
+          },
         },
       });
       await invoke("set_llm_key", { providerId: "minimax", key: envKey });
@@ -69,6 +98,9 @@ test.describe("05 — 文件工具 (e2e)", () => {
     page.on("pageerror", (err: Error) => {
       consoleErrors.push(`pageerror: ${err.message}`);
     });
+    // 取消 03-billing-tool / 04-llm-stream / 前 05 测试可能留下的 in-flight LLM,
+    // 避免 "新建会话" 之后 textarea 因 running=true 仍 disabled。
+    await cancelRunningAgent();
     await clearAllHistory();
     await clickNewConversationAndWait(page);
   });
@@ -89,7 +121,9 @@ test.describe("05 — 文件工具 (e2e)", () => {
 
     // 1. 在 /settings 创建 workspace
     await page.goto("/settings");
-    await assert.visible(page.locator('a[href="/settings"]'), { timeout: 10_000 });
+    // 验证已到达 /settings (chat footer 的 /settings 链接在 /settings 路由上不存在,
+    // 所以用 URL 匹配代替 link visibility)
+    await assert.urlMatches(page, /\/settings$/);
 
     // 确保 LLM tab 激活（workspace 在 LLM tab 内）
     const llmTab = page.locator("button").filter({ hasText: /^LLM$/ });

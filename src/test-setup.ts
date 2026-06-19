@@ -176,12 +176,41 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
     const provider = mockState.settings.providers.find((p: any) => p.id === providerId);
     return provider?.llm.models ?? [];
   },
+
+  // ─── V2 File IO (ADR-0013) ───────────────────────────────────
+  // Mirror of __mocks__/@tauri-apps/api/core.ts handlers.
+  // test-setup.ts runs at vitest setup phase and intercepts the real
+  // @tauri-apps/api/core module via vi.mock, so this is the live command
+  // table at test runtime. Tests set mockState.resolved to control return
+  // value, or mockState.rejected to simulate SandboxViolation / NotFound.
+  read_file(): unknown {
+    return mockState.resolved;
+  },
+
+  write_file(): unknown {
+    return mockState.resolved;
+  },
+
+  edit_file(): unknown {
+    return mockState.resolved;
+  },
+
+  search_files(): unknown {
+    return mockState.resolved;
+  },
+
+  delete_file(): unknown {
+    return mockState.resolved;
+  },
 };
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockImplementation((name: string, args?: IPCArgs) => {
     mockState.calls.push(name);
     mockState.callArgs.push({ name, args: args as Record<string, unknown> | undefined });
+    // BUG fix: 之前漏 push 到 invokeCalls,导致 test.find((c) => c.name === "read_file") 返回 undefined。
+    // 同步 __mocks__/@tauri-apps/api/core.ts 里的行为,所有 IPC 调用都进 invokeCalls 供测试断言。
+    mockState.invokeCalls.push({ name, args: args as Record<string, unknown> | undefined });
 
     if (mockState.rejected) {
       return Promise.reject(mockState.rejected);

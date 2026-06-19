@@ -70,10 +70,18 @@ export function ChatView() {
    * V1.6+ per ADR-0014 D6:走 `AgentRuntime.cancel(activeId)` 真正 abort pi-mono fetch;
    * in-flight partial 保留在 Agent state,不落库。`setRunning(false)` 由 run() 的
    * finally 块在 stream 终止后自行设置,所以这里不需要显式 setRunning。
+   *
+   * 实际上 pi-agent 0.9.0 的 `agent.abort()` 不能可靠地把 signal 传到
+   * AnthropicTransport 的 SSE 循环 — stream 不会自然结束,setRunning 不会跑。
+   * 这里额外显式 setRunning(false) 作为 safety net:UI 立刻可交互,后续 send()
+   * 不会被 running 守卫挡。in-flight LLM 调用在后台继续直到自然完成(消息
+   * 会落库但被 streamingMessageId finalize 流程忽略,不会污染 UI)。
    */
   const cancel = async () => {
     const convId = activeId$();
     if (!convId) return;
+    setRunning(false);
+    setStreamingMessageId(null);
     await Effect.runPromise(
       Effect.gen(function* () {
         const runtime = yield* AgentRuntime;

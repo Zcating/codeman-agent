@@ -91,9 +91,9 @@ export function MessageBubble(props: { message: Message }) {
                               <span class="text-muted-foreground">{match.line_number}:</span>
                             </Show>
                             <code class="text-primary">{match.path}</code>
-                            <Show when={match.matched_line}>
+                            <Show when={match.line_content}>
                               <span class="text-foreground truncate max-w-xs">
-                                {match.matched_line}
+                                {match.line_content}
                               </span>
                             </Show>
                           </div>

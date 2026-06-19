@@ -42,9 +42,10 @@ interface MessageRow {
 
 test.describe("05 — agent 页面输入 → 用户气泡", () => {
   test.beforeEach(async () => {
-    // 取消任何 in-flight LLM(04-llm-stream / 03 / 04-theme 可能留下
-    // running=true 状态 — 取消 button 替代 Send,后续 submit 全失败)
-    await cancelRunningAgent();
+    // 彻底重置 chat 域 — cancelRunningAgent 单靠 click 取消 button 不一定
+    // 能清掉 running$ signal(取消 button handler 是 best-effort),硬 reload
+    // 才能保证下一个 spec 的 "新建会话" 之后 textarea 是 enabled 的。
+    await resetChatState();
     // 清除会话使这个 spec 是密封的。我们还在下一次 "new" 点击时
     //    重置 store 中的 active conversation 指针。
     await clearAllHistory();

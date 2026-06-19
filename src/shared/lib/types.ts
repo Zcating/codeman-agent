@@ -126,7 +126,7 @@ export interface Workspace {
 export interface FileMatch {
   path: string;
   line_number: number | null;
-  matched_line: string | null;
+  line_content: string | null;
 }
 
 // ============================================================================

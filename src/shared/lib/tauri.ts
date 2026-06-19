@@ -52,7 +52,14 @@ export const invoke = <T>(
 ): Effect.Effect<T, AppError> =>
   Effect.tryPromise({
     try: () => tauriInvoke<T>(name, args),
-    catch: (e) => ({ kind: "Unknown" as const, message: String(e) }),
+    catch: (e) => {
+      // 保留上游 AppError 形状(若有 kind 字段),否则退化为 Unknown。
+      // 否则 sandbox 错误会被 `String(e)` 打成 "[object Object]",错误种类丢失。
+      if (e && typeof e === "object" && "kind" in e) {
+        return e as AppError;
+      }
+      return { kind: "Unknown" as const, message: String(e) };
+    },
   });
 
 // ─── Service 标签 ──────────────────────────────────────────
@@ -447,42 +454,41 @@ export const WorkspaceServiceLive = Layer.effect(
   }),
 );
 
-// FileServiceLive — thin IPC wrappers, no Effect.gen needed since no deps
-export const FileServiceLive = Layer.fromEffect(
-  FileService,
-  Effect.succeed({
-    readFile: (workspaceId: string, path: string) =>
-      invoke<string>("read_file", { workspace_id: workspaceId, path }),
+// FileServiceLive — thin IPC wrappers, no Effect.gen needed since no deps.
+// Use Layer.succeed (Effect v3 API) with the static service value; Layer.fromEffect
+// was removed in v3 (renamed to Layer.effect, which takes an Effect<Service, E, R>).
+export const FileServiceLive = Layer.succeed(FileService, {
+  readFile: (workspaceId: string, path: string) =>
+    invoke<string>("read_file", { workspace_id: workspaceId, path }),
 
-    writeFile: (workspaceId: string, path: string, content: string) =>
-      invoke<void>("write_file", { workspace_id: workspaceId, path, content }),
+  writeFile: (workspaceId: string, path: string, content: string) =>
+    invoke<void>("write_file", { workspace_id: workspaceId, path, content }),
 
-    editFile: (
-      workspaceId: string,
-      path: string,
-      oldText: string,
-      newText: string,
-      replaceAll: boolean,
-    ) =>
-      invoke<void>("edit_file", {
-        workspace_id: workspaceId,
-        path,
-        old_text: oldText,
-        new_text: newText,
-        replace_all: replaceAll,
-      }),
+  editFile: (
+    workspaceId: string,
+    path: string,
+    oldText: string,
+    newText: string,
+    replaceAll: boolean,
+  ) =>
+    invoke<void>("edit_file", {
+      workspace_id: workspaceId,
+      path,
+      old_text: oldText,
+      new_text: newText,
+      replace_all: replaceAll,
+    }),
 
-    searchFiles: (workspaceId: string, glob: string, contentPattern: string | null) =>
-      invoke<FileMatch[]>("search_files", {
-        workspace_id: workspaceId,
-        glob,
-        content_pattern: contentPattern,
-      }),
+  searchFiles: (workspaceId: string, glob: string, contentPattern: string | null) =>
+    invoke<FileMatch[]>("search_files", {
+      workspace_id: workspaceId,
+      glob,
+      content_pattern: contentPattern,
+    }),
 
-    deleteFile: (workspaceId: string, path: string) =>
-      invoke<void>("delete_file", { workspace_id: workspaceId, path }),
-  }),
-);
+  deleteFile: (workspaceId: string, path: string) =>
+    invoke<void>("delete_file", { workspace_id: workspaceId, path }),
+});
 
 // ─── 桥接函数（基于 Promise，用于 Solid UI） ──────────────────────────
 
@@ -511,12 +517,15 @@ export async function clearAllHistoryBridge(): Promise<void> {
 }
 
 // ─── Workspace Bridge Functions ────────────────────────────────
+// 注意:WorkspaceServiceLive 内部依赖 SettingsService(workspace 存于 settings store),
+// Effect.runPromise 要求 R=never,所以必须把 SettingsServiceLive 一并串到 provide 链里。
+// 否则运行时报 "Service not found: SettingsService"。
 
 export async function getWorkspacesBridge(): Promise<Workspace[]> {
   const program = Effect.gen(function* () {
     const svc = yield* WorkspaceService;
     return yield* svc.list();
-  }).pipe(Effect.provide(WorkspaceServiceLive));
+  }).pipe(Effect.provide(WorkspaceServiceLive.pipe(Layer.provide(SettingsServiceLive))));
   return Effect.runPromise(program);
 }
 
@@ -524,7 +533,7 @@ export async function addWorkspaceBridge(workspace: Workspace): Promise<void> {
   const program = Effect.gen(function* () {
     const svc = yield* WorkspaceService;
     yield* svc.add(workspace);
-  }).pipe(Effect.provide(WorkspaceServiceLive));
+  }).pipe(Effect.provide(WorkspaceServiceLive.pipe(Layer.provide(SettingsServiceLive))));
   await Effect.runPromise(program);
 }
 
@@ -532,7 +541,7 @@ export async function updateWorkspaceBridge(id: string, patch: Partial<Workspace
   const program = Effect.gen(function* () {
     const svc = yield* WorkspaceService;
     yield* svc.update(id, patch);
-  }).pipe(Effect.provide(WorkspaceServiceLive));
+  }).pipe(Effect.provide(WorkspaceServiceLive.pipe(Layer.provide(SettingsServiceLive))));
   await Effect.runPromise(program);
 }
 
@@ -540,6 +549,6 @@ export async function removeWorkspaceBridge(id: string): Promise<void> {
   const program = Effect.gen(function* () {
     const svc = yield* WorkspaceService;
     yield* svc.remove(id);
-  }).pipe(Effect.provide(WorkspaceServiceLive));
+  }).pipe(Effect.provide(WorkspaceServiceLive.pipe(Layer.provide(SettingsServiceLive))));
   await Effect.runPromise(program);
 }

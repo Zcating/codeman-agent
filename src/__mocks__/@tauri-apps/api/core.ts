@@ -435,6 +435,29 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
     const provider = mockState.settings.providers.find((p) => p.id === providerId);
     return provider?.llm.models ?? [];
   },
+
+  // ─── V2 File IO (ADR-0013) ───────────────────────────────────
+  // Mock handlers for file_tools service; tests set mockState.resolved
+  // to control return value, or mockState.rejected to simulate errors.
+  read_file(): unknown {
+    return mockState.resolved;
+  },
+
+  write_file(): unknown {
+    return mockState.resolved;
+  },
+
+  edit_file(): unknown {
+    return mockState.resolved;
+  },
+
+  search_files(): unknown {
+    return mockState.resolved;
+  },
+
+  delete_file(): unknown {
+    return mockState.resolved;
+  },
 };
 
 // ─── Invoke Mock ────────────────────────────────────────────────
