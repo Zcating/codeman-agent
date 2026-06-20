@@ -1,9 +1,14 @@
-﻿//! ProviderCard — V1.5 unified provider card.
+//! ProviderCard — V1.7+ ADR-0015 unified provider card.
 //! 1 card per provider with LLM subform (always) + Billing subform (if provider.billing).
+//! All writes go through appStore (debounced 500ms auto-flush); no direct invoke for settings.
+//! LLM API Key + Billing API Key collapsed to single Provider.api_key field.
 //! Uses Tailwind v4 utility classes only (ADR-0006). No BEM, no <style> blocks.
 
 import { createSignal, Show, For } from "solid-js";
-import { invoke } from "@tauri-apps/api/core";
+import { Effect } from "effect";
+import { invoke } from "../../../shared/lib/tauri";
+import { appStore } from "../../../shared/stores/app.store";
+import { settingsSaver } from "../lib/settings-saver";
 import type { Provider, ModelMeta } from "../../../shared/lib/types";
 import { Button } from "../../../shared/components/ui/button";
 import { Input } from "../../../shared/components/ui/input";
@@ -31,33 +36,43 @@ export function ProviderCard(props: ProviderCardProps) {
   const [isRefreshing, setIsRefreshing] = createSignal(false);
   const [refreshMsg, setRefreshMsg] = createSignal<string | null>(null);
   const [isDeleting, setIsDeleting] = createSignal(false);
-  const [llmApiKey, setLlmApiKey] = createSignal("");
-  const [billingApiKey, setBillingApiKey] = createSignal("");
 
   // ─── Handlers ───────────────────────────────────────────────
 
-  const handleEnabledToggle = async (enabled: boolean) => {
+  const handleEnabledToggle = (enabled: boolean) => {
     const updated: Provider = { ...props.provider, enabled };
-    await invoke("update_settings", { new_settings: { providers: [updated] } });
+    const providers = appStore.state.value.providers!.map((p) =>
+      p.id === updated.id ? updated : p,
+    );
+    appStore.set({ providers });
+    settingsSaver.scheduleSave();
     props.onUpdate(updated);
   };
 
-  const handleModelChange = async (modelId: string) => {
+  const handleModelChange = (modelId: string) => {
     setSelectedModel(modelId);
     const updated: Provider = {
       ...props.provider,
       llm: { ...props.provider.llm, default_model: modelId },
     };
-    await invoke("update_settings", { new_settings: { providers: [updated] } });
+    const providers = appStore.state.value.providers!.map((p) =>
+      p.id === updated.id ? updated : p,
+    );
+    appStore.set({ providers });
+    settingsSaver.scheduleSave();
     props.onUpdate(updated);
   };
 
-  const handleBaseUrlChange = async (base_url: string) => {
+  const handleBaseUrlChange = (base_url: string) => {
     const updated: Provider = {
       ...props.provider,
       llm: { ...props.provider.llm, base_url },
     };
-    await invoke("update_settings", { new_settings: { providers: [updated] } });
+    const providers = appStore.state.value.providers!.map((p) =>
+      p.id === updated.id ? updated : p,
+    );
+    appStore.set({ providers });
+    settingsSaver.scheduleSave();
     props.onUpdate(updated);
   };
 
@@ -65,12 +80,18 @@ export function ProviderCard(props: ProviderCardProps) {
     setIsRefreshing(true);
     setRefreshMsg(null);
     try {
-      const models = await invoke<ModelMeta[]>("fetch_models", { providerId: props.provider.id });
+      const models = await Effect.runPromise(
+        invoke<ModelMeta[]>("fetch_models", { providerId: props.provider.id }),
+      );
       const updated: Provider = {
         ...props.provider,
         llm: { ...props.provider.llm, models },
       };
-      await invoke("update_settings", { new_settings: { providers: [updated] } });
+      const providers = appStore.state.value.providers!.map((p) =>
+        p.id === updated.id ? updated : p,
+      );
+      appStore.set({ providers });
+      settingsSaver.scheduleSave();
       props.onUpdate(updated);
       setRefreshMsg(`Loaded ${models.length} model(s)`);
     } catch (e) {
@@ -80,40 +101,27 @@ export function ProviderCard(props: ProviderCardProps) {
     }
   };
 
-  const handleLlmKeySave = async () => {
-    const key = llmApiKey();
-    if (!key) return;
-    await invoke("set_llm_key", { providerId: props.provider.id, key });
-    setLlmApiKey("");
-  };
-
-  const handleBillingKindChange = async (kind: "balance" | "plan_quota") => {
+  const handleBillingKindChange = (kind: "balance" | "plan_quota") => {
     if (!props.provider.billing) return;
     const updated: Provider = {
       ...props.provider,
       billing: { ...props.provider.billing, kind },
     };
-    await invoke("update_settings", { new_settings: { providers: [updated] } });
+    const providers = appStore.state.value.providers!.map((p) =>
+      p.id === updated.id ? updated : p,
+    );
+    appStore.set({ providers });
+    settingsSaver.scheduleSave();
     props.onUpdate(updated);
   };
 
-  const handleBillingKeySave = async () => {
-    const key = billingApiKey();
-    if (!key || !props.provider.billing) return;
-    await invoke("set_billing_key", { providerId: props.provider.id, api_key: key });
-    setBillingApiKey("");
-  };
-
   const handleDelete = async () => {
-    if (!confirm(`Delete provider "${props.provider.label}"? This wipes its Tauri store keys.`))
-      return;
+    if (!confirm(`Delete provider "${props.provider.label}"?`)) return;
     setIsDeleting(true);
     try {
-      // Metis #9: wipe keys FIRST, then remove from settings
-      await invoke("delete_provider_keys", { id: props.provider.id });
-      await invoke("update_settings", {
-        new_settings: { providers: [] },
-      });
+      const providers = appStore.state.value.providers!.filter((p) => p.id !== props.provider.id);
+      appStore.set({ providers });
+      settingsSaver.scheduleSave();
       props.onDelete(props.provider.id);
     } finally {
       setIsDeleting(false);
@@ -196,23 +204,21 @@ export function ProviderCard(props: ProviderCardProps) {
           {/* LLM API Key */}
           <div class="flex flex-col gap-1">
             <label class="text-xs text-muted-foreground">LLM API Key</label>
-            <div class="flex gap-2">
-              <Input
-                type="password"
-                value={llmApiKey()}
-                onInput={(e) => setLlmApiKey(e.currentTarget.value)}
-                placeholder="sk-…"
-                class="flex-1"
-              />
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={handleLlmKeySave}
-                disabled={!llmApiKey()}
-              >
-                Save
-              </Button>
-            </div>
+            <Input
+              type="password"
+              value={props.provider.api_key}
+              onInput={(e) => {
+                const updated: Provider = { ...props.provider, api_key: e.currentTarget.value };
+                const providers = appStore.state.value.providers!.map((p) =>
+                  p.id === updated.id ? updated : p,
+                );
+                appStore.set({ providers });
+                settingsSaver.scheduleSave();
+                props.onUpdate(updated);
+              }}
+              placeholder="sk-…"
+              class="flex-1"
+            />
           </div>
         </div>
 
@@ -241,23 +247,24 @@ export function ProviderCard(props: ProviderCardProps) {
             {/* Billing API Key */}
             <div class="flex flex-col gap-1">
               <label class="text-xs text-muted-foreground">Billing API Key</label>
-              <div class="flex gap-2">
-                <Input
-                  type="password"
-                  value={billingApiKey()}
-                  onInput={(e) => setBillingApiKey(e.currentTarget.value)}
-                  placeholder="sk-…"
-                  class="flex-1"
-                />
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={handleBillingKeySave}
-                  disabled={!billingApiKey()}
-                >
-                  Save
-                </Button>
-              </div>
+              <Input
+                type="password"
+                value={props.provider.api_key}
+                onInput={(e) => {
+                  const updated: Provider = { ...props.provider, api_key: e.currentTarget.value };
+                  const providers = appStore.state.value.providers!.map((p) =>
+                    p.id === updated.id ? updated : p,
+                  );
+                  appStore.set({ providers });
+                  settingsSaver.scheduleSave();
+                  props.onUpdate(updated);
+                }}
+                placeholder="sk-…"
+                class="flex-1"
+              />
+              <p class="text-xs text-muted-foreground">
+                Same key used for LLM and billing (ADR-0015)
+              </p>
             </div>
           </div>
         </Show>

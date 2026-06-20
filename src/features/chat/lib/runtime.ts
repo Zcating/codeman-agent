@@ -36,7 +36,6 @@ import {
   FileServiceLive,
   WorkspaceServiceLive,
 } from "../../../shared/lib/tauri";
-import { LLMProviderService, LLMProviderServiceLive } from "../../settings/lib/llm-providers";
 import { AnthropicTransport } from "./anthropic-transport";
 import type { AppError, Conversation, Message } from "../../../shared/lib/types";
 import { getBalanceTool, getPlanQuotaTool } from "../../billing/lib/billing";
@@ -69,11 +68,7 @@ export class AgentRuntime extends Context.Tag("AgentRuntime")<
     readonly run: (
       conversation: Conversation,
       userMessage: Message,
-    ) => Stream.Stream<
-      RuntimeEvent,
-      AppError | RuntimeError,
-      SettingsService | LLMProviderService | MessageService
-    >;
+    ) => Stream.Stream<RuntimeEvent, AppError | RuntimeError, SettingsService | MessageService>;
     readonly cancel: (conversationId: string) => Effect.Effect<void, never, never>;
     readonly destroy: (conversationId: string) => Effect.Effect<void, never, never>;
   }
@@ -100,7 +95,6 @@ export const AgentRuntimeLive = Layer.effect(
     // SettingsService 在 inner Stream effect 里找不到,因为 Stream.create 的 context
     // 不从 outer Effect 继承)。
     const settingsSvc = yield* SettingsService;
-    const llmSvc = yield* LLMProviderService;
     const messageSvc = yield* MessageService;
 
     const run = (
@@ -138,7 +132,7 @@ export const AgentRuntimeLive = Layer.effect(
                 default_model: found.llm.default_model,
                 base_url: found.llm.base_url,
                 api_type: found.llm.api_type,
-                api_key_ref: found.llm.llm_api_key_ref,
+                api_key: found.api_key,
               } as any;
             }
           }
@@ -173,7 +167,8 @@ export const AgentRuntimeLive = Layer.effect(
           if (!agent) {
             // 首次 run() 该 conv:创建 Agent + 从 DB 拉历史消息一次性回填 (D4)。
             // 后续 run() 复用同一个 Agent,Messages 累积。
-            const apiKey = yield* llmSvc.getApiKey(activeProvider.id);
+            // ADR-0015: API key 从 v15Provider.api_key 直接读取,不再走 LLMProviderService.getApiKey IPC
+            const apiKey = v15Provider?.api_key ?? null;
             const transport: AgentTransport = new AnthropicTransport({
               getApiKey: async () => apiKey ?? undefined,
             }) as unknown as AgentTransport;
@@ -400,7 +395,6 @@ export const AgentRuntimeLive = Layer.effect(
 export const RuntimeDeps = Layer.mergeAll(
   SettingsServiceLive,
   BillingServiceLive,
-  LLMProviderServiceLive,
   MessageServiceLive,
   FileServiceLive,
   WorkspaceServiceLive,

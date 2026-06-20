@@ -236,6 +236,8 @@ pub struct Provider {
     pub id: String,
     pub label: String,
     pub enabled: bool,
+    /// LLM API Key，明文，单字段，Settings JSON 一部分（ADR-0015）。
+    pub api_key: String,
     /// LLM 配置，必选。
     pub llm: ProviderLlm,
     /// 计费配置，可选（某些 provider 只有 LLM 没有 billing）。

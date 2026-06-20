@@ -6,6 +6,38 @@ import { render, screen, cleanup } from "@solidjs/testing-library";
 import { WorkspaceCard } from "./workspace-card";
 import type { Workspace } from "../../../shared/lib/types";
 
+// Mock solid-js/store — WorkspaceCard 导入 appStore, appStore 用 createStore。
+// jsdom 没有 Solid reactive context,需要这个 mock。
+// 必须支持 setStore 的 1-arg 和 2-arg 两种签名。
+vi.mock("solid-js/store", () => {
+  let store: { value: unknown } = { value: null };
+  const setStore = vi.fn((...args: unknown[]) => {
+    const updater = args.length === 2 ? args[1] : args[0];
+    if (typeof updater === "function") {
+      store.value = (updater as (prev: unknown) => unknown)(store.value);
+    } else {
+      store.value = updater;
+    }
+  });
+  const storeProxy = new Proxy(store, {
+    get(t, p) {
+      if (p === "value") return store.value;
+      return (t as any)[p];
+    },
+    set(t, p, v) {
+      if (p === "value") {
+        store.value = v;
+        return true;
+      }
+      (t as any)[p] = v;
+      return true;
+    },
+  });
+  return { createStore: () => [storeProxy, setStore] };
+});
+
+import { _resetAppStoreForTest } from "../../../shared/stores/app.store";
+
 const mockWorkspace: Workspace = {
   id: "ws-001",
   label: "My Project",
@@ -20,6 +52,8 @@ describe("WorkspaceCard", () => {
   beforeEach(() => {
     onUpdate = vi.fn();
     onRemove = vi.fn();
+    // 重置 appStore,确保 appStore.state.value 不为 null
+    _resetAppStoreForTest();
     cleanup();
     vi.clearAllMocks();
   });

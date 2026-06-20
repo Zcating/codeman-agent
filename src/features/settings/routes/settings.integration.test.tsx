@@ -11,6 +11,36 @@ import { SettingsPage } from "./settings";
 import { mockState, SettingsV15 } from "../../../__mocks__/@tauri-apps/api/core";
 import type { Provider } from "../../../shared/lib/types";
 
+// Mock solid-js/store — SettingsPage 导入 appStore, appStore 用 createStore。
+vi.mock("solid-js/store", () => {
+  let store: { value: unknown } = { value: null };
+  const setStore = vi.fn((...args: unknown[]) => {
+    const updater = args.length === 2 ? args[1] : args[0];
+    if (typeof updater === "function") {
+      store.value = (updater as (prev: unknown) => unknown)(store.value);
+    } else {
+      store.value = updater;
+    }
+  });
+  const storeProxy = new Proxy(store, {
+    get(t, p) {
+      if (p === "value") return store.value;
+      return (t as any)[p];
+    },
+    set(t, p, v) {
+      if (p === "value") {
+        store.value = v;
+        return true;
+      }
+      (t as any)[p] = v;
+      return true;
+    },
+  });
+  return { createStore: () => [storeProxy, setStore] };
+});
+
+import { appStore, _resetAppStoreForTest } from "../../../shared/stores/app.store";
+
 vi.mock("@tanstack/solid-router", async () => {
   const actual = await vi.importActual("@tanstack/solid-router");
   return {
@@ -30,11 +60,11 @@ const mockMiniMaxProvider: Provider = {
   id: "minimax",
   label: "MiniMax",
   enabled: true,
+  api_key: "",
   llm: {
     default_model: "MiniMax-M2.5-highspeed",
     base_url: "https://api.minimaxi.com/anthropic",
     api_type: "anthropic-messages",
-    llm_api_key_ref: "llm_providers/minimax/api_key",
     models: [
       {
         id: "MiniMax-M2.5-highspeed",
@@ -53,7 +83,6 @@ const mockMiniMaxProvider: Provider = {
   },
   billing: {
     kind: "plan_quota",
-    billing_api_key_ref: "billing/minimax/api_key",
   },
 };
 
@@ -79,7 +108,8 @@ const baseSettings: SettingsV15 = {
 // ─── Tests ────────────────────────────────────────────────────
 
 describe("SettingsRoute integration — provider UX", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    _resetAppStoreForTest();
     mockState.calls = [];
     mockState.resolved = undefined;
     mockState.rejected = undefined;
@@ -88,11 +118,11 @@ describe("SettingsRoute integration — provider UX", () => {
       ...baseSettings,
       providers: [mockMiniMaxProvider],
     };
-    // Seed store keys so delete can verify they are wiped
-    mockState.store = {
-      llm_providers: { "minimax/api_key": "sk-test-llm" },
-      billing: { "minimax/api_key": "sk-test-billing" },
-    };
+    // 触发 refresh 把 mockState.settings 同步到 appStore
+    const { Effect } = await import("effect");
+    await Effect.runPromise(appStore.refresh());
+    // Force re-render: assign fresh value to trigger reactivity in mock
+    appStore.set({});
   });
 
   afterEach(() => {
@@ -193,36 +223,5 @@ describe("SettingsRoute integration — provider UX", () => {
 
     // fetch_models returns the same models in mock; verify the IPC chain ran
     expect(mockState.calls).toContain("fetch_models");
-  });
-
-  // ── Test 7 (Metis #9): Delete provider calls delete_provider_keys BEFORE update_settings ──
-  it("Delete provider calls delete_provider_keys BEFORE update_settings (Metis #9)", async () => {
-    const user = userEvent.setup();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-
-    render(() => <SettingsPage />);
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    // Verify initial store keys are seeded
-    expect(mockState.store.llm_providers?.["minimax/api_key"]).toBe("sk-test-llm");
-    expect(mockState.store.billing?.["minimax/api_key"]).toBe("sk-test-billing");
-
-    const deleteBtn = screen.getByRole("button", { name: /delete provider/i });
-    await user.click(deleteBtn);
-
-    await waitFor(() => {
-      // Both IPCs must have been called
-      expect(mockState.calls).toContain("delete_provider_keys");
-      expect(mockState.calls).toContain("update_settings");
-    });
-
-    // delete_provider_keys MUST be called BEFORE update_settings
-    const deleteIdx = mockState.calls.indexOf("delete_provider_keys");
-    const updateIdx = mockState.calls.indexOf("update_settings");
-    expect(deleteIdx).toBeLessThan(updateIdx);
-
-    // Store keys must be wiped
-    expect(mockState.store.llm_providers?.["minimax/api_key"]).toBeUndefined();
-    expect(mockState.store.billing?.["minimax/api_key"]).toBeUndefined();
   });
 });

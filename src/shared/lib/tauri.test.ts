@@ -24,11 +24,11 @@ const mockProvider: Provider = {
   id: "minimax",
   label: "MiniMax",
   enabled: true,
+  api_key: "",
   llm: {
     default_model: "MiniMax-M2.5-highspeed",
     base_url: "https://api.minimaxi.com/anthropic",
     api_type: "anthropic-messages",
-    llm_api_key_ref: "llm_providers/minimax/api_key",
     models: [
       {
         id: "MiniMax-M2.5-highspeed",
@@ -42,7 +42,6 @@ const mockProvider: Provider = {
   },
   billing: {
     kind: "plan_quota",
-    billing_api_key_ref: "billing/minimax/api_key",
   },
 };
 

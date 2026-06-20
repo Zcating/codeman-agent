@@ -115,66 +115,6 @@ describe("Tauri API Mock - V1.5+ Schema", () => {
     });
   });
 
-  describe("set_billing_key / has_billing_key", () => {
-    it("set_billing_key stores under billing/<id>/api_key namespace", async () => {
-      await invoke("set_billing_key", { provider_id: "minimax", api_key: "sk-test-key" });
-
-      expect(mockState.store["billing"]).toBeDefined();
-      expect(mockState.store["billing"]["minimax/api_key"]).toBe("sk-test-key");
-    });
-
-    it("has_billing_key returns true when key exists", async () => {
-      mockState.store["billing"] = { "minimax/api_key": "sk-test-key" };
-
-      const result = await invoke("has_billing_key", { provider_id: "minimax" });
-
-      expect(result).toBe(true);
-    });
-
-    it("has_billing_key returns false when key does not exist", async () => {
-      const result = await invoke("has_billing_key", { provider_id: "nonexistent" });
-
-      expect(result).toBe(false);
-    });
-  });
-
-  describe("set_llm_key / has_llm_key / get_llm_key", () => {
-    it("set_llm_key stores under llm_providers/<id>/api_key namespace", async () => {
-      await invoke("set_llm_key", { providerId: "deepseek", key: "sk-deepseek" });
-
-      expect(mockState.store["llm_providers"]).toBeDefined();
-      expect(mockState.store["llm_providers"]["deepseek/api_key"]).toBe("sk-deepseek");
-    });
-
-    it("has_llm_key returns true when key exists", async () => {
-      mockState.store["llm_providers"] = { "deepseek/api_key": "sk-deepseek" };
-
-      const result = await invoke("has_llm_key", { providerId: "deepseek" });
-
-      expect(result).toBe(true);
-    });
-
-    it("has_llm_key returns false when key does not exist", async () => {
-      const result = await invoke("has_llm_key", { providerId: "nonexistent" });
-
-      expect(result).toBe(false);
-    });
-
-    it("get_llm_key returns stored key", async () => {
-      mockState.store["llm_providers"] = { "deepseek/api_key": "sk-deepseek" };
-
-      const result = await invoke("get_llm_key", { providerId: "deepseek" });
-
-      expect(result).toBe("sk-deepseek");
-    });
-
-    it("get_llm_key returns null when key does not exist", async () => {
-      const result = await invoke("get_llm_key", { providerId: "nonexistent" });
-
-      expect(result).toBeNull();
-    });
-  });
-
   describe("unknown IPC command", () => {
     it("throws helpful error with available commands list", async () => {
       await expect(invoke("nonexistent_command")).rejects.toThrow(
@@ -203,11 +143,11 @@ describe("Tauri API Mock - V1.5+ Schema", () => {
         id: "custom",
         label: "Custom",
         enabled: false,
+        api_key: "",
         llm: {
           default_model: "custom-model",
           base_url: "https://custom.example.com",
           api_type: "anthropic-messages",
-          llm_api_key_ref: "llm_providers/custom/api_key",
           models: [],
           models_endpoint: "https://custom.example.com/models",
         },
@@ -287,9 +227,9 @@ describe("Tauri API Mock - V1.5+ Schema", () => {
     it("records all IPC calls", async () => {
       await invoke("get_settings");
       await invoke("list_billing_providers");
-      await invoke("has_llm_key", { provider_id: "test" });
+      await invoke("fetch_models", { providerId: "minimax" });
 
-      expect(mockState.calls).toEqual(["get_settings", "list_billing_providers", "has_llm_key"]);
+      expect(mockState.calls).toEqual(["get_settings", "list_billing_providers", "fetch_models"]);
     });
   });
 });

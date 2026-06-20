@@ -18,7 +18,7 @@ export interface ModelMeta {
 
 export interface ProviderBilling {
   kind: BillingKind;
-  billing_api_key_ref: string;
+  // billing_api_key_ref removed (ADR-0015) — Provider.api_key reused
 }
 
 export interface ProviderLlm {
@@ -26,7 +26,6 @@ export interface ProviderLlm {
   base_url: string;
   /** ADR-0011: V1 only supports anthropic-messages protocol */
   api_type: "anthropic-messages";
-  llm_api_key_ref: string;
   models: ModelMeta[];
   models_endpoint: string;
 }
@@ -35,6 +34,7 @@ export interface Provider {
   id: string;
   label: string;
   enabled: boolean;
+  api_key: string; // ADR-0015: plaintext in Settings JSON
   llm: ProviderLlm;
   billing?: ProviderBilling;
 }

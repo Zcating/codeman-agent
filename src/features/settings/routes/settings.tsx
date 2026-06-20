@@ -1,81 +1,46 @@
 ﻿//! /settings  — 全页面设置（替换主内容；不是 modal）。
 //!
-//! V1.5: 使用统一 providers[] (Provider 类型)，不再使用 V1 llm_providers[]。
+//! V1.7+ (ADR-0015): 所有写操作通过 appStore.set()，debounced 500ms auto-flush；
+//! footer Save 按钮调用 appStore.forceFlush()。不再有 local draft signal。
 //! "app" 选项卡不再有 start_minimized / close_behavior / hotkeys
 //!（这些在 V1.5 后端重构中已移除 — 见 ADR-0007）。
 //! "window" 和 "billing" 选项卡保留为占位符存根。
 
-import { createSignal, Show, For } from "solid-js";
+import { createSignal, Show, For, onMount } from "solid-js";
+import { Effect } from "effect";
 import { Link } from "@tanstack/solid-router";
 import { ArrowLeft, Plus, Trash2 } from "lucide-solid";
 import { ProviderCard } from "../components/provider-card";
 import { WorkspaceCard } from "../components/workspace-card";
-import {
-  getSettingsBridge,
-  updateSettingsBridge,
-  clearAllHistoryBridge,
-  getWorkspacesBridge,
-  addWorkspaceBridge,
-  updateWorkspaceBridge,
-  removeWorkspaceBridge,
-} from "../../../shared/lib/tauri";
-import type { Provider, Settings, Workspace } from "../../../shared/lib/types";
+import { appStore } from "../../../shared/stores/app.store";
+import { settingsSaver } from "../lib/settings-saver";
+import { invoke } from "../../../shared/lib/tauri";
+import type { Provider, Workspace } from "../../../shared/lib/types";
 
 type Tab = "llm" | "app" | "window" | "billing" | "advanced";
 
 export function SettingsPage() {
   const [tab, setTab] = createSignal<Tab>("llm");
-  const [draft, setDraft] = createSignal<Settings | null>(null);
   const [confirmClear, setConfirmClear] = createSignal(false);
-  const [workspaces, setWorkspaces] = createSignal<Workspace[]>([]);
 
-  // 挂载时加载设置 + providers。
-  void (async () => {
-    try {
-      const s = await getSettingsBridge();
-      setDraft(s);
-    } catch (e) {
-      console.error("[SettingsPage] 加载失败：", e);
-    }
-  })();
+  // 挂载时确保从后端加载最新 Settings（main.tsx 已 eager refresh，此处保险再 refresh 一次）
+  onMount(() => {
+    void Effect.runPromise(appStore.refresh());
+  });
 
-  // 挂载时加载 workspaces。
-  void (async () => {
-    try {
-      const ws = await getWorkspacesBridge();
-      setWorkspaces(ws);
-    } catch (e) {
-      console.error("[SettingsPage] 加载 workspaces 失败：", e);
-    }
-  })();
+  // footer Save = force flush（跳过 debounce）
+  const save = () => void settingsSaver.flushNow();
 
-  const save = async () => {
-    const d = draft();
-    if (!d) return;
-    try {
-      await updateSettingsBridge(d);
-    } catch (e) {
-      console.error("[SettingsPage] 保存失败：", e);
-    }
-  };
-
-  // V1.5: 使用 Provider 类型 (不是 LLMProvider)
-  const onProviderChange = (next: Provider) => {
-    const d = draft();
-    if (!d) return;
-    setDraft({
-      ...d,
-      providers: (d.providers ?? []).map((p) => (p.id === next.id ? next : p)),
-    });
-  };
-
+  // ProviderCard 已直接调 appStore.set，父组件只需处理 delete
   const onProviderDelete = (id: string) => {
-    const d = draft();
-    if (!d) return;
-    setDraft({
-      ...d,
-      providers: (d.providers ?? []).filter((p) => p.id !== id),
-    });
+    const providers = appStore.state.value.providers!.filter((p) => p.id !== id);
+    appStore.set({ providers });
+  };
+
+  const onProviderChange = (next: Provider) => {
+    // 兜底：ProviderCard 已直接调 appStore.set，此处 idempotent 同步（防 race）
+    const providers = appStore.state.value.providers!.map((p) => (p.id === next.id ? next : p));
+    appStore.set({ providers });
   };
 
   // V1.5: Add provider 是未来工作，当前只 alert
@@ -84,44 +49,30 @@ export function SettingsPage() {
     alert("Add provider: future work (V1.5+ has 1 pre-fill MiniMax)");
   };
 
-  const onWorkspaceUpdate = async (id: string, patch: Partial<Workspace>) => {
-    try {
-      await updateWorkspaceBridge(id, patch);
-      setWorkspaces((prev) => prev.map((ws) => (ws.id === id ? { ...ws, ...patch } : ws)));
-    } catch (e) {
-      console.error("[SettingsPage] 更新 workspace 失败：", e);
-    }
+  const onWorkspaceUpdate = (id: string, patch: Partial<Workspace>) => {
+    const workspaces = appStore.state.value.workspaces!.map((ws) =>
+      ws.id === id ? { ...ws, ...patch } : ws,
+    );
+    appStore.set({ workspaces });
   };
 
-  const onWorkspaceRemove = async (id: string) => {
+  const onWorkspaceRemove = (id: string) => {
     if (!confirm("Delete this workspace?")) return;
-    try {
-      await removeWorkspaceBridge(id);
-      setWorkspaces((prev) => prev.filter((ws) => ws.id !== id));
-    } catch (e) {
-      console.error("[SettingsPage] 删除 workspace 失败：", e);
-    }
+    const workspaces = appStore.state.value.workspaces!.filter((ws) => ws.id !== id);
+    appStore.set({ workspaces });
   };
 
-  const onAddWorkspace = async () => {
+  const onAddWorkspace = () => {
     const id = crypto.randomUUID();
-    const newWs: Workspace = {
-      id,
-      label: "New Workspace",
-      root_path: "",
-      enabled: false,
-    };
-    try {
-      await addWorkspaceBridge(newWs);
-      setWorkspaces((prev) => [...prev, newWs]);
-    } catch (e) {
-      console.error("[SettingsPage] 添加 workspace 失败：", e);
-    }
+    const newWs: Workspace = { id, label: "New Workspace", root_path: "", enabled: false };
+    const workspaces = [...appStore.state.value.workspaces!, newWs];
+    appStore.set({ workspaces });
   };
 
   const clearHistory = async () => {
     try {
-      await clearAllHistoryBridge();
+      // SQLite 操作不走 Settings，走 IPC（clear_all_history 是 SQLite 操作，不是 Settings）
+      await Effect.runPromise(invoke<void>("clear_all_history"));
       setConfirmClear(false);
     } catch (e) {
       console.error("[SettingsPage] 清除失败：", e);
@@ -167,14 +118,14 @@ export function SettingsPage() {
         </For>
       </nav>
       <div class="flex-1 overflow-y-auto p-4 space-y-4">
-        <Show when={tab() === "llm" && draft()}>
+        <Show when={tab() === "llm"}>
           <section>
             <h2 class="text-lg font-semibold mb-2 text-zinc-900 dark:text-zinc-100">
               LLM Providers
             </h2>
             {/* V1.5: 空状态友好提示 */}
             <Show
-              when={(draft()!.providers ?? []).length > 0}
+              when={(appStore.state.value.providers ?? []).length > 0}
               fallback={
                 <div class="text-center py-12 space-y-2 border border-dashed border-zinc-300 dark:border-zinc-600 rounded-lg">
                   <p class="text-zinc-500 dark:text-zinc-400">No providers configured.</p>
@@ -184,7 +135,7 @@ export function SettingsPage() {
                 </div>
               }
             >
-              <For each={draft()!.providers ?? []}>
+              <For each={appStore.state.value.providers ?? []}>
                 {(p) => (
                   <ProviderCard
                     provider={p}
@@ -209,14 +160,14 @@ export function SettingsPage() {
                 Workspaces
               </h3>
               <Show
-                when={workspaces().length > 0}
+                when={(appStore.state.value.workspaces ?? []).length > 0}
                 fallback={
                   <p class="text-sm text-muted-foreground py-4 text-center">
                     No workspaces configured.
                   </p>
                 }
               >
-                <For each={workspaces()}>
+                <For each={appStore.state.value.workspaces ?? []}>
                   {(ws) => (
                     <WorkspaceCard
                       workspace={ws}
@@ -237,7 +188,7 @@ export function SettingsPage() {
             </div>
           </section>
         </Show>
-        <Show when={tab() === "app" && draft()}>
+        <Show when={tab() === "app"}>
           <section>
             <h2 class="text-lg font-semibold mb-2 text-zinc-900 dark:text-zinc-100">
               App behavior
@@ -245,8 +196,8 @@ export function SettingsPage() {
             <label class="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
               <input
                 type="checkbox"
-                checked={draft()!.start_at_login}
-                onChange={(e) => setDraft({ ...draft()!, start_at_login: e.currentTarget.checked })}
+                checked={appStore.state.value.start_at_login}
+                onChange={(e) => appStore.set({ start_at_login: e.currentTarget.checked })}
                 class="rounded text-primary-500 focus:ring-primary-500 w-4 h-4"
               />
               Start at login
@@ -311,7 +262,7 @@ export function SettingsPage() {
       <footer class="flex items-center justify-end gap-2 p-4 border-t border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
         <button
           type="button"
-          onClick={() => void save()}
+          onClick={save}
           class="px-4 py-2 text-sm bg-primary-500 text-white rounded-md font-medium hover:bg-primary-600 focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
         >
           Save

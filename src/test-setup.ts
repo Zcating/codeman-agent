@@ -25,11 +25,11 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
                 id: "minimax",
                 label: "MiniMax",
                 enabled: true,
+                api_key: "",
                 llm: {
                   default_model: "MiniMax-M2.5-highspeed",
                   base_url: "https://api.minimaxi.com/anthropic",
                   api_type: "anthropic-messages",
-                  llm_api_key_ref: "llm_providers/minimax/api_key",
                   models: [
                     {
                       id: "MiniMax-M2.5-highspeed",
@@ -43,7 +43,6 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
                 },
                 billing: {
                   kind: "plan_quota",
-                  billing_api_key_ref: "billing/minimax/api_key",
                 },
               },
             ],
@@ -125,50 +124,8 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
       }));
   },
 
-  has_billing_key(args?: IPCArgs): boolean {
-    const id = args?.provider_id as string;
-    const key = mockState.store["billing"]?.[`${id}/api_key`];
-    return key !== undefined && key.length > 0;
-  },
-
-  set_billing_key(args?: IPCArgs): void {
-    const id = args?.provider_id as string;
-    const key = args?.api_key as string;
-    if (id && key !== undefined) {
-      if (!mockState.store["billing"]) mockState.store["billing"] = {};
-      mockState.store["billing"][`${id}/api_key`] = key;
-    }
-  },
-
-  has_llm_key(args?: IPCArgs): boolean {
-    const id = (args?.providerId ?? args?.provider_id) as string;
-    const key = mockState.store["llm_providers"]?.[`${id}/api_key`];
-    return key !== undefined && key.length > 0;
-  },
-
-  set_llm_key(args?: IPCArgs): void {
-    const id = (args?.providerId ?? args?.provider_id) as string;
-    const key = (args?.key ?? args?.api_key) as string;
-    if (id && key !== undefined) {
-      if (!mockState.store["llm_providers"]) mockState.store["llm_providers"] = {};
-      mockState.store["llm_providers"][`${id}/api_key`] = key;
-    }
-  },
-
-  get_llm_key(args?: IPCArgs): string | null {
-    const id = (args?.providerId ?? args?.provider_id) as string;
-    return mockState.store["llm_providers"]?.[`${id}/api_key`] ?? null;
-  },
-
   clear_all_history(): void {
     // No-op in mock
-  },
-
-  delete_provider_keys(args?: IPCArgs): void {
-    const id = args?.id as string;
-    if (!id) return;
-    delete mockState.store["llm_providers"]?.[`${id}/api_key`];
-    delete mockState.store["billing"]?.[`${id}/api_key`];
   },
 
   fetch_models(args?: IPCArgs): unknown {

@@ -3,7 +3,6 @@
 mod commands;
 mod db;
 mod events;
-mod secrets_llm;
 mod settings;
 mod filesystem;
 mod state;
@@ -63,15 +62,8 @@ pub fn run() {
             // T13: billing
             commands::get_provider_snapshot,
             commands::list_billing_providers,
-            commands::has_billing_key,
-            commands::set_billing_key,
-            // T22: settings + secrets_llm
+            // T22: settings
             commands::clear_all_history,
-            commands::set_llm_key,
-            commands::has_llm_key,
-            commands::get_llm_key,
-            // Metis #9
-            commands::delete_provider_keys,
             // T22: dialog
             commands::pick_workspace_path,
             // T6–T10: filesystem

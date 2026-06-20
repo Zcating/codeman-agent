@@ -266,12 +266,8 @@ export const ProviderServiceLive = Layer.effect(
             return yield* Effect.fail(TauriError.IPC(`No models_endpoint for provider: ${id}`));
           }
 
-          // Fetch API key from Tauri store via IPC
-          const apiKey = yield* Effect.tryPromise({
-            try: () =>
-              tauriInvoke<string | null>("get_llm_key", { providerId: id }).then((k) => k ?? ""),
-            catch: (e) => TauriError.IPC(String(e)),
-          });
+          // API key is now part of Provider (ADR-0015)
+          const apiKey = provider.api_key;
 
           const response = yield* Effect.tryPromise({
             try: async () => {

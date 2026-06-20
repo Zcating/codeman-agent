@@ -2,11 +2,14 @@
 //!
 //! 重新导出：
 //!   - ProviderCard UI 组件
-//!   - LLMProviderService + LLMProviderServiceLive（Effect 服务）
-//!   - SystemPromptService + SystemPromptServiceLive（Effect 服务）
-//!   - LLMProvider, Settings 类型
+//!   - System prompt 函数（ADR-0015）
+//!   - Provider, Settings 类型
 
 export { ProviderCard } from "./components/provider-card";
-export { LLMProviderService, LLMProviderServiceLive } from "./lib/llm-providers";
-export { SystemPromptService, SystemPromptServiceLive } from "./lib/system-prompt";
-export type { LLMProvider, Settings } from "../../shared/lib/types";
+export {
+  getDefaultSystemPrompt,
+  getUserCanEdit,
+  updateDefaultSystemPrompt,
+  resolveSystemPromptForConversation,
+} from "./lib/system-prompt";
+export type { Provider, Settings } from "../../shared/lib/types";

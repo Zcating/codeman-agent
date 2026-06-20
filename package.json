@@ -43,6 +43,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "effect": "^3.21.3",
+    "es-toolkit": "^1.47.1",
     "lucide-solid": "^1.18.0",
     "marked": "^15.0.0",
     "solid-js": "^1.9.3",

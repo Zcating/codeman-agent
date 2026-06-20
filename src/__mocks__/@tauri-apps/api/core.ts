@@ -21,20 +21,19 @@ export interface ProviderLlm {
   default_model: string;
   base_url: string;
   api_type: "anthropic-messages";
-  llm_api_key_ref: string;
   models: ModelMeta[];
   models_endpoint: string;
 }
 
 export interface ProviderBilling {
   kind: "balance" | "plan_quota";
-  billing_api_key_ref: string;
 }
 
 export interface Provider {
   id: string;
   label: string;
   enabled: boolean;
+  api_key: string;
   llm: ProviderLlm;
   billing?: ProviderBilling;
 }
@@ -117,20 +116,17 @@ export interface SettingsV0 {
 export const mockProvider = (
   overrides: Partial<Provider> & { id: string; label: string },
 ): Provider => {
-  const billing =
-    "billing" in overrides
-      ? overrides.billing
-      : { kind: "plan_quota" as const, billing_api_key_ref: "billing/minimax/api_key" };
+  const billing = "billing" in overrides ? overrides.billing : { kind: "plan_quota" as const };
 
   return {
     id: overrides.id ?? "minimax",
     label: overrides.label ?? "MiniMax",
     enabled: overrides.enabled ?? true,
+    api_key: overrides.api_key ?? "",
     llm: overrides.llm ?? {
       default_model: "MiniMax-M2.5-highspeed",
       base_url: "https://api.minimaxi.com/anthropic",
       api_type: "anthropic-messages",
-      llm_api_key_ref: "llm_providers/minimax/api_key",
       models: [
         {
           id: "MiniMax-M2.5-highspeed",
@@ -149,16 +145,17 @@ export const mockProvider = (
 export const mockMinimaxProvider: Provider = mockProvider({
   id: "minimax",
   label: "MiniMax",
+  api_key: "",
 });
 
 export const mockDeepseekProvider: Provider = mockProvider({
   id: "deepseek",
   label: "DeepSeek",
+  api_key: "",
   llm: {
     default_model: "deepseek-chat",
     base_url: "https://api.deepseek.com/anthropic",
     api_type: "anthropic-messages",
-    llm_api_key_ref: "llm_providers/deepseek/api_key",
     models: [
       {
         id: "deepseek-chat",
@@ -172,7 +169,6 @@ export const mockDeepseekProvider: Provider = mockProvider({
   },
   billing: {
     kind: "balance",
-    billing_api_key_ref: "billing/deepseek/api_key",
   },
 });
 
@@ -209,24 +205,13 @@ export const mockState = {
   invokeCalls: [] as { name: string; args?: Record<string, unknown> }[],
   // V1.5+ settings store
   settings: { ...defaultSettingsV15 } as SettingsV15,
-  // Tauri store mock (namespace -> key -> value)
+  // ADR-0015: store is retained for test backward compat only.
+  // New code should read api_key from settings.providers[i].api_key.
+  // Legacy tests reading from store still work; new tests should NOT use it.
   store: {} as Record<string, Record<string, string>>,
   // V0 migration flag
   v0FixtureActive: false,
 };
-
-// ─── Store helpers ─────────────────────────────────────────────
-
-function getStoreValue(namespace: string, key: string): string | undefined {
-  return mockState.store[namespace]?.[key];
-}
-
-function setStoreValue(namespace: string, key: string, value: string): void {
-  if (!mockState.store[namespace]) {
-    mockState.store[namespace] = {};
-  }
-  mockState.store[namespace][key] = value;
-}
 
 // ─── V0 → V1.5 Migration ───────────────────────────────────────
 
@@ -235,11 +220,11 @@ const DEFAULT_MINIMAX_PROVIDER: Provider = {
   id: "minimax",
   label: "MiniMax",
   enabled: true,
+  api_key: "",
   llm: {
     default_model: "MiniMax-M2.5-highspeed",
     base_url: "https://api.minimaxi.com/anthropic",
     api_type: "anthropic-messages",
-    llm_api_key_ref: "llm_providers/minimax/api_key",
     models: [
       {
         id: "MiniMax-M2.5-highspeed",
@@ -253,7 +238,6 @@ const DEFAULT_MINIMAX_PROVIDER: Provider = {
   },
   billing: {
     kind: "plan_quota",
-    billing_api_key_ref: "billing/minimax/api_key",
   },
 };
 
@@ -286,18 +270,17 @@ function migrateV0toV15(v0: SettingsV0): SettingsV15 {
       id: llm.id,
       label: llm.label,
       enabled: llm.enabled,
+      api_key: llm.api_key_ref,
       llm: {
         default_model: llm.default_model ?? "auto",
         base_url: llm.base_url ?? "",
         api_type: "anthropic-messages",
-        llm_api_key_ref: llm.api_key_ref,
         models: [],
         models_endpoint: "",
       },
       billing: billing
         ? {
             kind: billingKind,
-            billing_api_key_ref: billing.api_key_ref,
           }
         : undefined,
     });
@@ -311,17 +294,16 @@ function migrateV0toV15(v0: SettingsV0): SettingsV15 {
         id: billing.id,
         label: billing.id === "deepseek" ? "DeepSeek" : "MiniMax",
         enabled: billing.enabled,
+        api_key: billing.api_key_ref,
         llm: {
           default_model: "",
           base_url: "",
           api_type: "anthropic-messages",
-          llm_api_key_ref: "",
           models: [],
           models_endpoint: "",
         },
         billing: {
           kind: billingKind,
-          billing_api_key_ref: billing.api_key_ref,
         },
       });
     }
@@ -384,49 +366,8 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
       }));
   },
 
-  has_billing_key(args?: IPCArgs): boolean {
-    const id = args?.provider_id as string;
-    const key = getStoreValue("billing", `${id}/api_key`);
-    return key !== undefined && key.length > 0;
-  },
-
-  set_billing_key(args?: IPCArgs): void {
-    const id = args?.provider_id as string;
-    const key = args?.api_key as string;
-    if (id && key !== undefined) {
-      setStoreValue("billing", `${id}/api_key`, key);
-    }
-  },
-
-  has_llm_key(args?: IPCArgs): boolean {
-    const id = (args?.providerId ?? args?.provider_id) as string;
-    const key = getStoreValue("llm_providers", `${id}/api_key`);
-    return key !== undefined && key.length > 0;
-  },
-
-  set_llm_key(args?: IPCArgs): void {
-    const id = (args?.providerId ?? args?.provider_id) as string;
-    const key = (args?.key ?? args?.api_key) as string;
-    if (id && key !== undefined) {
-      setStoreValue("llm_providers", `${id}/api_key`, key);
-    }
-  },
-
-  get_llm_key(args?: IPCArgs): string | null {
-    const id = (args?.providerId ?? args?.provider_id) as string;
-    return getStoreValue("llm_providers", `${id}/api_key`) ?? null;
-  },
-
   clear_all_history(): void {
     // No-op in mock
-  },
-
-  delete_provider_keys(args?: IPCArgs): void {
-    const id = args?.id as string;
-    if (!id) return;
-    // Wipe both LLM and billing keys from Tauri store mock
-    delete mockState.store["llm_providers"]?.[`${id}/api_key`];
-    delete mockState.store["billing"]?.[`${id}/api_key`];
   },
 
   fetch_models(args?: IPCArgs): unknown {

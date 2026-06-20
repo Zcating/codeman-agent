@@ -16,9 +16,9 @@
 
 ### Providers
 
-- **Provider (提供商)** — 公司维度的统一记录，承载一种或多种"对外能力"。一条记录 = 一家公司。shape: `{ id, label, enabled, llm: {...}, billing?: {...} }`。`llm` 必选，`billing` 可选。_避免_：client、vendor、service。
-- **Provider.llm (LLM 能力)** — Provider 必选子对象。shape: `{ default_model, base_url, api_type, llm_api_key_ref, models, models_endpoint }`。`api_type` 锁 `"anthropic-messages"`；`models: ModelMeta[]` 用户在 Settings 中可编辑；`models_endpoint: string` provider 维度的模型列表拉取 URL。Agent 的"燃料"。_避免_：model provider、API provider、AI provider。
-- **Provider.billing (计费能力)** — Provider 可选子对象。shape: `{ kind, billing_api_key_ref }`。`kind` = `"balance" | "plan_quota"`。Agent 的一级工具目标。_避免_：billing source、计费源。
+- **Provider (提供商)** — 公司维度的统一记录，承载一种或多种"对外能力"。一条记录 = 一家公司。shape: `{ id, label, enabled, api_key, llm: {...}, billing?: {...} }`。`api_key` 是该 provider 的对外调用凭据（明文存于 Settings JSON，见 ADR-0015）；`llm` 必选，`billing` 可选。_避免_：client、vendor、service。
+- **Provider.llm (LLM 能力)** — Provider 必选子对象。shape: `{ default_model, base_url, api_type, models, models_endpoint }`。`api_type` 锁 `"anthropic-messages"`；`models: ModelMeta[]` 用户在 Settings 中可编辑；`models_endpoint: string` provider 维度的模型列表拉取 URL。Agent 的"燃料"。pi-ai 调 LLM 时 `Authorization: Bearer <Provider.api_key>`。_避免_：model provider、API provider、AI provider。
+- **Provider.billing (计费能力)** — Provider 可选子对象。shape: `{ kind }`。`kind` = `"balance" | "plan_quota"`。Agent 的一级工具目标。billing adapter 调计费端点时复用 `Provider.api_key` 作 `Authorization: Bearer`。_避免_：billing source、计费源。
 - **Protocol (协议)** — LLM 上游调用的 HTTP/SSE 形态。锁定 anthropic-messages（Anthropic Messages API 的请求/响应形状）；pi-ai 按 `api` 字段路由到对应 transport 实现。_避免_：API format、API type（实现细节）、wire format。
 - **Adapter (适配器)** — 每个计费提供方的 HTTP 客户端与响应解析器，将 API key 转换为 `Snapshot`。位于 TS 端 (`src/features/billing/lib/adapters/`)：deepseek 仅实现 `balance`，minimax 实现 `plan_quota`（balance 端点未公开验证）。_避免_：HTTP client（过载）。
 - **ModelMeta (模型元数据)** — `Provider.llm.models[]` 元素。shape: `{ id, label, context_window?, deprecated?, thinking? }`；用户在 Settings 中可增删编辑。`ProviderService.getModels(id)` 静态读出此列表（读 settings）；`ProviderService.fetchModels(id)` 调 `models_endpoint` 拉最新（OpenAI-compatible `/v1/models` 格式，`label` 默认 = `id`）。_避免_：model config、model info。
@@ -43,13 +43,13 @@
 
 ### 密钥
 
-- **LLM API Key (LLM API 密钥)** — LLM Provider 的认证凭据。存储在 Tauri store 路径 `llm_providers/<id>/api_key` 下。Webview 可读。
-- **Billing API Key (计费 API 密钥)** — Billing Provider 的认证凭据。存储在 Tauri store 路径 `billing/<id>/api_key` 下，与 LLM API Key 同档。key 经 IPC 跨到 webview 供 TS adapter 用 fetch 调 billing 端点。
-- **Secret** — Rust 端 `Secret<String>` newtype，`Debug` / `Display` 打印 `Secret(***)` / `***`。TS 端由 Effect / adapter 层使用 `secret.expose()` 喂 fetch header。_避免_：对任何凭据使用裸 `String`。
+- **API Key (API 密钥)** — Provider 的对外调用凭据，shape 为 `Provider.api_key: string`。**明文存于 Settings JSON**（`%LocalAppData%\codeman-agent\settings.json`），与 Settings 其它字段同档；不再分 LLM / Billing 二分（ADR-0015）。LLM 调用和计费工具调端点都复用同一 key。V1 单机单用户威胁模型下接受明文；如未来需 OS 级密钥管理（keyring / Windows Credential Manager）需重做 ADR-0015。_避免_：把 key 单独存 Tauri store 再走 IPC（V1.7+ 前的设计，已废止）。
+- **Secret** — Rust 端 `Secret<String>` newtype，`Debug` / `Display` 打印 `Secret(***)` / `***`。V1.7+ 后 Settings JSON 明文存 key，`Secret` 主要用于 pi-agent 运行时构造 header 时临时包裹。_避免_：对任何凭据使用裸 `String`。
 
 ### Settings 与状态
 
-- **Settings (设置)** — 通过 `tauri-plugin-store` 持久化的 JSON 文档，位于 OS app-data 目录。包含统一 `providers[]` 数组（含 `schema_version` 标记），以及 window / theme / system_prompt / conversations / workspaces / user_language / start_at_login 等字段。**不含任何 API 密钥**（密钥分命名空间存于 Tauri store）。
+- **Settings (设置)** — 通过 `tauri-plugin-store` 持久化的 JSON 文档，位于 OS app-data 目录。包含统一 `providers[]` 数组（每条 `Provider` 含 `api_key` 明文字段，见 ADR-0015），以及 window / theme / system_prompt / conversations / workspaces / user_language / start_at_login 等字段。**API 密钥现在直接落在 Settings JSON 内**（V1.7+ 之前的"分 Tauri store 命名空间"模型已废止）。
+- **App Store (全局应用状态)** — `src/shared/stores/app.store.ts` 提供的 Settings reactive 桥接层（ADR-0015）。`createStore` 包装 settings；UI 通过 `appStore.state.value` 读，`appStore.set(patch)` 写（debounced 500ms auto-flush），`appStore.forceFlush()` 跳过 debounce（footer Save 调用），`appStore.refresh()` 重新加载。**所有**对 Settings 的读写都走 app-store，禁止组件直接 `invoke("update_settings")` 或 `invoke("get_settings")`（见 ADR-0003）。
 - **Stale (过期)** — `Snapshot` 时间戳超过 Billing Provider 的 `stale_after_seconds`；传统的"过期徽标"语义在 tool result 缓存场景保留。
 
 ### 样式
@@ -92,10 +92,11 @@ Conversation          (src/shared/lib/types.ts)
         ├── model, input_tokens, output_tokens
         └── created_at
 
-Provider              (Settings.providers[].llm 必选 + .billing 可选)
+Provider              (Settings.providers[].api_key + llm 必选 + .billing 可选, ADR-0015)
   ├── id, label, enabled
-  ├── llm: { default_model, base_url, api_type, llm_api_key_ref, models[], models_endpoint }
-  └── billing?: { kind: "balance" | "plan_quota", billing_api_key_ref }
+  ├── api_key: string                    ← 明文, 单一字段, LLM + billing 共用
+  ├── llm: { default_model, base_url, api_type, models[], models_endpoint }
+  └── billing?: { kind: "balance" | "plan_quota" }
 ```
 
 ## Settings
@@ -109,17 +110,16 @@ interface Settings {
     id: string;             // 预置 "minimax"
     label: string;          // 人类可读名
     enabled: boolean;
+    api_key: string;        // 明文；LLM + billing 共用 (ADR-0015)
     llm: {                  // 必选
       default_model: string;
       base_url: string;
       api_type: "anthropic-messages";
-      llm_api_key_ref: string;         // 指向 Tauri store
       models: ModelMeta[];             // 用户可编辑的模型列表
       models_endpoint: string;         // 拉取模型列表的 URL（per-provider 可配置）
     };
     billing?: {             // 可选
       kind: "balance" | "plan_quota";
-      billing_api_key_ref: string;     // 指向 Tauri store
     };
   }>;
 
@@ -169,14 +169,14 @@ interface ModelMeta {
 }
 ```
 
-API 密钥**永不**进入此文件。**LLM 密钥和计费密钥都存 Tauri store**（分别走 `llm_providers/<id>/api_key` 和 `billing/<id>/api_key` 命名空间），两套独立、同档安全等级。同一家公司可有两个独立 key。
+**API 密钥现在直接进 Settings JSON**（`Provider.api_key` 字段，明文存盘，见 ADR-0015）。**没有**单独的 Tauri store 命名空间或 keyring 隔离。V1.7+ 之前的 `llm_providers/<id>/api_key` 与 `billing/<id>/api_key` 两个 Tauri store 路径已删除。同一家公司 LLM 和 billing 调用复用**同一** key。
 
 **默认预填**：`Settings::Default` 编译时预置一条 LLM provider 记录（`id: "minimax"` / `default_model: "MiniMax-M2.5-highspeed"` / `base_url: "https://api.minimaxi.com/anthropic"` / `api_type: "anthropic-messages"`），并预填对应 billing 子对象（`kind: PlanQuota`）。首次启动即可用，用户只需在 Settings UI 填 MiniMax API key。
 
 ## 认证约定
 
-- **LLM providers** 通过 pi-mono 标准机制认证（因 provider 而异：OpenAI Bearer、Anthropic `x-api-key`、OpenAI 兼容自定义 header）。`pi-ai` 负责构造 header；密钥值来自 Tauri store。
-- **Billing providers** 使用 `Authorization: Bearer <key>`。header 在 TS adapter 内部构造；密钥值来自 Tauri store。密钥永不出 webview 进程外；前端只能通过 `has_key: boolean` 探测存在性。
+- **LLM providers** 通过 pi-mono 标准机制认证（因 provider 而异：OpenAI Bearer、Anthropic `x-api-key`、OpenAI 兼容自定义 header）。`pi-ai` 负责构造 header；密钥值来自 `Provider.api_key`（Settings JSON 字段，ADR-0015）。
+- **Billing providers** 使用 `Authorization: Bearer <Provider.api_key>`。header 在 TS adapter 内部构造；密钥值来自同一字段。密钥存 webview 进程内的 Settings JSON；前端可直接读取字符串值（V1.7+ 前的 `has_key: boolean` 探测已废止，因字段恒存在）。
 
 ## MiniMax 端点
 
@@ -187,7 +187,7 @@ MiniMax `plan_quota` 端点（`https://api.minimaxi.com/anthropic/v1/quota/plan`
 - 日志位于 `%LocalAppData%\codeman-agent\logs\`，按日轮转，容量上限。
 - `log` + `tauri-plugin-log`；默认 `info` 级，通过环境变量启用 `debug`。
 - API 密钥材料在 Rust 端包成 `Secret<String>`，在 TS 端由 adapter 层使用前才 `expose()`；log 语句避免格式化完整 secret（任一语言）。
-- LLM API 密钥（Tauri store）与 Billing API 密钥（Tauri store）在日志中同等对待：均仅通过 `api_key_ref` 引用，**绝不**打印原值。
+- V1.7+ 后 `Provider.api_key` 落在 Settings JSON 明文：**log 语句一律 redact `api_key` 字段**，用 `***` 替换；不能因"反正明文存盘"就放松 log 端 sanitization。Rust 端 logging 中遇到 `Provider` struct 时跳过 `api_key` 字段。
 
 ## Non-goals
 

@@ -1,60 +1,36 @@
-﻿//! System prompt Effect 服务。
+﻿//! System prompt 配置读取 (ADR-0015).
 //!
-//! Effect 签名：
-//!   SystemPromptService 暴露 4 个方法；每个返回
-//!   Effect<A, AppError, never>。
-//!
-//! System prompt 解析顺序（按 S1）：
-//!   1. Conversation 的 system_prompt 覆盖（如已设置）
-//!   2. Settings.system_prompt.default（全局）
-//!   3. 空字符串（或某个硬编码回退值）
+//! V1.7+ 后通过 appStore 直接读 Settings，不再走 Effect Service 层。
+//! Settings JSON 内 `system_prompt.default` 与 `system_prompt.user_can_edit` 字段。
 
-import { Effect, Context, Layer } from "effect";
-import { SettingsService } from "../../../shared/lib/tauri";
-import type { AppError, Conversation } from "../../../shared/lib/types";
+import { appStore } from "../../../shared/stores/app.store";
+import type { Conversation } from "../../../shared/lib/types";
 
-export class SystemPromptService extends Context.Tag("SystemPromptService")<
-  SystemPromptService,
-  {
-    readonly getDefault: () => Effect.Effect<string, AppError>;
-    readonly updateDefault: (newDefault: string) => Effect.Effect<void, AppError>;
-    readonly getUserCanEdit: () => Effect.Effect<boolean, AppError>;
-    readonly forConversation: (conversation: Conversation) => Effect.Effect<string, AppError>;
-  }
->() {}
+/** 读取全局默认系统提示词。 */
+export function getDefaultSystemPrompt(): string {
+  return appStore.state.value.system_prompt.default;
+}
 
-export const SystemPromptServiceLive = Layer.effect(
-  SystemPromptService,
-  Effect.gen(function* () {
-    const svc = yield* SettingsService;
+/** 读取 user_can_edit 标志。 */
+export function getUserCanEdit(): boolean {
+  return appStore.state.value.system_prompt.user_can_edit;
+}
 
-    return {
-      getDefault: () =>
-        Effect.gen(function* () {
-          const settings = yield* svc.getSettings();
-          return settings.system_prompt.default;
-        }),
+/** 更新全局默认系统提示词（写 appStore，由其 debounced flush 到后端）。 */
+export function updateDefaultSystemPrompt(newDefault: string): void {
+  const current = appStore.state.value.system_prompt;
+  appStore.set({
+    system_prompt: { ...current, default: newDefault },
+  });
+}
 
-      updateDefault: (newDefault) =>
-        Effect.gen(function* () {
-          const current = yield* svc.getSettings();
-          yield* svc.updateSettings({
-            system_prompt: { ...current.system_prompt, default: newDefault },
-          });
-        }),
-
-      getUserCanEdit: () =>
-        Effect.gen(function* () {
-          const settings = yield* svc.getSettings();
-          return settings.system_prompt.user_can_edit;
-        }),
-
-      forConversation: (conversation) =>
-        Effect.gen(function* () {
-          if (conversation.system_prompt) return conversation.system_prompt;
-          const settings = yield* svc.getSettings();
-          return settings.system_prompt.default;
-        }),
-    };
-  }),
-);
+/**
+ * 解析会话的系统提示词：
+ * 1. Conversation 的 system_prompt 覆盖（如已设置）
+ * 2. Settings.system_prompt.default（全局）
+ * 3. 空字符串
+ */
+export function resolveSystemPromptForConversation(conversation: Conversation): string {
+  if (conversation.system_prompt) return conversation.system_prompt;
+  return appStore.state.value.system_prompt.default;
+}

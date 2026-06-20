@@ -5,7 +5,7 @@
 //! 测试场景：
 //! 1. buildModel returns valid Model for valid provider and model id (positive)
 //! 2. buildModel throws on unknown model id (negative)
-//! 3. buildModel throws on missing llm_api_key_ref (negative)
+//! 3. buildModel throws on missing api_key (negative)
 
 import { describe, it, expect } from "vitest";
 import { buildModel, BuildModelError } from "./build-model";
@@ -17,11 +17,11 @@ const mockProvider: Provider = {
   id: "minimax",
   label: "MiniMax",
   enabled: true,
+  api_key: "test-api-key", // ADR-0015: top-level api_key
   llm: {
     default_model: "MiniMax-M2.5-highspeed",
     base_url: "https://api.minimaxi.com/anthropic",
     api_type: "anthropic-messages",
-    llm_api_key_ref: "llm_providers/minimax/api_key",
     models: [
       {
         id: "MiniMax-M2.5-highspeed",
@@ -114,13 +114,10 @@ describe("buildModel", () => {
     }
   });
 
-  it("throws BuildModelError on missing llm_api_key_ref", () => {
+  it("throws BuildModelError on missing api_key", () => {
     const noKeyProvider: Provider = {
       ...mockProvider,
-      llm: {
-        ...mockProvider.llm,
-        llm_api_key_ref: "",
-      },
+      api_key: "",
     };
 
     expect(() => buildModel(noKeyProvider, "MiniMax-M2.5-highspeed")).toThrow(BuildModelError);
@@ -129,10 +126,7 @@ describe("buildModel", () => {
   it("throws BuildModelError with provider id in message when key missing", () => {
     const noKeyProvider: Provider = {
       ...mockProvider,
-      llm: {
-        ...mockProvider.llm,
-        llm_api_key_ref: "",
-      },
+      api_key: "",
     };
 
     try {

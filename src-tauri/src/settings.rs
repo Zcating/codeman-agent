@@ -247,6 +247,7 @@ impl Default for Settings {
                 id: "minimax".into(),
                 label: "MiniMax".into(),
                 enabled: true,
+                api_key: String::new(),
                 llm: ProviderLlm {
                     default_model: "MiniMax-M2.5-highspeed".into(),
                     base_url: "https://api.minimaxi.com/anthropic".into(),
@@ -449,6 +450,7 @@ fn migrate_to_v1_5(mut settings: Settings) -> Settings {
             id: llm.id.clone(),
             label: llm.label.clone(),
             enabled: llm.enabled,
+            api_key: String::new(),
             llm: provider_llm,
             billing: provider_billing,
         });
@@ -707,6 +709,7 @@ mod tests {
                 id: "deepseek".into(),
                 label: "DeepSeek".into(),
                 enabled: true,
+                api_key: String::new(),
                 llm: ProviderLlm {
                     default_model: "deepseek-chat".into(),
                     base_url: "https://api.deepseek.com/anthropic".into(),

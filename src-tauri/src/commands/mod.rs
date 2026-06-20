@@ -7,7 +7,6 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::db::conversations;
 use crate::db::messages;
-use crate::secrets_llm;
 use crate::settings::Settings;
 use crate::state::{AppState, ProviderDescriptor};
 use crate::types::{AppError, ProviderId, SnapshotEnvelope};
@@ -149,30 +148,6 @@ pub async fn list_billing_providers(
 }
 
 #[tauri::command]
-pub async fn has_billing_key(
-    app: tauri::AppHandle,
-    provider_id: String,
-) -> Result<bool, AppError> {
-    Ok(secrets_llm::has_billing_key(&app, &provider_id))
-}
-
-#[tauri::command]
-pub async fn set_billing_key(
-    app: tauri::AppHandle,
-    provider_id: String,
-    value: String,
-) -> Result<(), AppError> {
-    if value.is_empty() {
-        secrets_llm::delete_billing_key(&app, &provider_id)
-            .map_err(|e| AppError::Unauthorized { message: e })?;
-    } else {
-        secrets_llm::set_billing_key(&app, &provider_id, &value)
-            .map_err(|e| AppError::Unauthorized { message: e })?;
-    }
-    Ok(())
-}
-
-#[tauri::command]
 pub async fn get_provider_snapshot(
     state: State<'_, AppState>,
     provider: ProviderId,
@@ -205,53 +180,6 @@ pub async fn clear_all_history(
         .await
         .map_err(AppError::from)?;
     tx.commit().await.map_err(AppError::from)?;
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn set_llm_key(
-    app: tauri::AppHandle,
-    provider_id: String,
-    key: String,
-) -> Result<(), AppError> {
-    secrets_llm::set_llm_key(&app, &provider_id, &key)
-        .map_err(|e| AppError::Unauthorized { message: e })
-}
-
-#[tauri::command]
-pub async fn has_llm_key(
-    app: tauri::AppHandle,
-    provider_id: String,
-) -> Result<bool, AppError> {
-    Ok(secrets_llm::has_llm_key(&app, &provider_id))
-}
-
-/// 读取指定 LLM provider 的 API 密钥。
-///
-/// `Secret::expose()` 是该 `Secret` 出 IPC 边界的唯一允许点。
-/// 已在 `secrets_llm.rs` / `types.rs` 论证，本函数遵循同一约定。
-#[tauri::command]
-pub async fn get_llm_key(
-    app: tauri::AppHandle,
-    provider_id: String,
-) -> Result<Option<String>, String> {
-    let secret = secrets_llm::get_llm_key(&app, &provider_id)?;
-    Ok(secret.map(|s| s.expose().to_string()))
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// delete_provider_keys IPC（Metis #9）
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[tauri::command]
-pub async fn delete_provider_keys(
-    provider_id: String,
-    app: tauri::AppHandle,
-) -> Result<(), String> {
-    // 删除 LLM provider 密钥（llm_providers/<id>/api_key）
-    secrets_llm::delete_llm_key(&app, &provider_id)?;
-    // 删除计费密钥（billing/<id>/api_key）
-    secrets_llm::delete_billing_key(&app, &provider_id)?;
     Ok(())
 }
 

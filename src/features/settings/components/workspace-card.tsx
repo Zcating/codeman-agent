@@ -1,10 +1,14 @@
-//! WorkspaceCard — Card-based UI for a single workspace entry.
+//! WorkspaceCard — Card-based UI for a single workspace entry (ADR-0015 V1.7+).
+//! All writes go through appStore (debounced 500ms auto-flush); no direct invoke for settings.
 //! Uses Tailwind v4 utility classes only (ADR-0006). No BEM, no <style> blocks.
 //! No `import { Effect }` — this is a pure Solid UI component.
 
 import { createSignal } from "solid-js";
-import { invoke } from "@tauri-apps/api/core";
+import { Effect } from "effect";
 import type { Workspace } from "../../../shared/lib/types";
+import { appStore } from "../../../shared/stores/app.store";
+import { settingsSaver } from "../lib/settings-saver";
+import { invoke } from "../../../shared/lib/tauri";
 import {
   Card,
   CardHeader,
@@ -22,32 +26,27 @@ export interface WorkspaceCardProps {
   onRemove: () => void;
 }
 
-/**
- * Pick a folder path via Tauri dialog plugin.
- * Falls back to null if the Tauri command is not yet implemented.
- */
-async function pickWorkspacePath(): Promise<string | null> {
-  try {
-    // pick_workspace_path Tauri command (src-tauri/src/commands/mod.rs)
-    // uses tauri-plugin-dialog to open a folder picker
-    const path = await invoke<string | null>("pick_workspace_path");
-    return path;
-  } catch {
-    return null;
-  }
-}
-
 export function WorkspaceCard(props: WorkspaceCardProps) {
   const [pathInput, setPathInput] = createSignal(props.workspace.root_path);
   const [isPicking, setIsPicking] = createSignal(false);
 
   const handleEnabledToggle = (checked: boolean) => {
+    const workspaces = (appStore.state.value.workspaces ?? []).map((ws) =>
+      ws.id === props.workspace.id ? { ...ws, enabled: checked } : ws,
+    );
+    appStore.set({ workspaces });
+    settingsSaver.scheduleSave();
     props.onUpdate({ enabled: checked });
   };
 
   const handlePathBlur = () => {
     const val = pathInput();
     if (val !== props.workspace.root_path) {
+      const workspaces = (appStore.state.value.workspaces ?? []).map((ws) =>
+        ws.id === props.workspace.id ? { ...ws, root_path: val } : ws,
+      );
+      appStore.set({ workspaces });
+      settingsSaver.scheduleSave();
       props.onUpdate({ root_path: val });
     }
   };
@@ -55,9 +54,14 @@ export function WorkspaceCard(props: WorkspaceCardProps) {
   const handleBrowse = async () => {
     setIsPicking(true);
     try {
-      const picked = await pickWorkspacePath();
+      const picked = await Effect.runPromise(invoke<string | null>("pick_workspace_path"));
       if (picked !== null) {
         setPathInput(picked);
+        const workspaces = (appStore.state.value.workspaces ?? []).map((ws) =>
+          ws.id === props.workspace.id ? { ...ws, root_path: picked } : ws,
+        );
+        appStore.set({ workspaces });
+        settingsSaver.scheduleSave();
         props.onUpdate({ root_path: picked });
       }
     } finally {

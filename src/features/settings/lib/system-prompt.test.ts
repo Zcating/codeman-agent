@@ -1,119 +1,95 @@
-﻿//! SystemPromptService Effect 服务测试。
-//!
-//! Effect 签名：
-//!   SystemPromptService.getDefault(): Effect<string, AppError>
-//!   SystemPromptService.updateDefault(newDefault): Effect<void, AppError>
-//!   SystemPromptService.getUserCanEdit(): Effect<boolean, AppError>
-//!   SystemPromptService.forConversation(conversation): Effect<string, AppError>
+﻿import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { Effect } from "effect";
+import { mockState } from "../../../__mocks__/@tauri-apps/api/core";
 
-import { it, expect, beforeEach } from "@effect/vitest";
-import { describe } from "vitest";
-import { Effect, Layer } from "effect";
-import { SystemPromptService, SystemPromptServiceLive } from "./system-prompt";
-import { SettingsService } from "../../../shared/lib/tauri";
-import type { Settings, Conversation } from "../../../shared/lib/types";
-
-const mockImpl: {
-  resolved: unknown;
-  rejected: Error | undefined;
-  currentSettings: Settings;
-} = {
-  resolved: undefined,
-  rejected: undefined,
-  currentSettings: null as unknown as Settings,
-};
-
-const baseSettings: Settings = {
-  llm_providers: [],
-  user_language: "en",
-  theme: "dark",
-  start_at_login: false,
-  window: {
-    remember_position: false,
-    remember_size: false,
-    default_size: { width: 800, height: 600 },
-    min_size: { width: 400, height: 300 },
-  },
-  system_prompt: { default: "You are a helpful assistant.", user_can_edit: true },
-  billing_providers: [],
-  conversations: { auto_archive_after_days: 30, max_history: 1000 },
-};
-
-let settingsState = { ...baseSettings };
-
-const MockSettingsServiceLive = Layer.succeed(SettingsService, {
-  getSettings: () => Effect.succeed({ ...settingsState }),
-  updateSettings: (patch: unknown) => {
-    settingsState = { ...settingsState, ...(patch as Partial<Settings>) };
-    return Effect.succeed({ ...settingsState });
-  },
-  clearAllHistory: () => Effect.succeed(undefined),
-  getActiveLlmProvider: () => Effect.succeed(null),
+// Mock solid-js/store before importing app.store (same as app.store.test.ts)
+// 必须支持 Solid setStore 的两种签名：
+//   - 1-arg: setStore(valueOrFn) — 整体替换
+//   - 2-arg: setStore("path", valueOrFn) — 路径更新（app.store.ts 用的就是这种）
+vi.mock("solid-js/store", () => {
+  let store: { value: unknown } = { value: null };
+  const setStore = vi.fn((...args: unknown[]) => {
+    // 取正确的 updater 参数：2-arg 时是 args[1]，1-arg 时是 args[0]
+    const updater = args.length === 2 ? args[1] : args[0];
+    if (typeof updater === "function") {
+      store.value = (updater as (prev: unknown) => unknown)(store.value);
+    } else {
+      store.value = updater;
+    }
+  });
+  const storeProxy = new Proxy(store, {
+    get(t, p) {
+      if (p === "value") return store.value;
+      return (t as any)[p];
+    },
+    set(t, p, v) {
+      if (p === "value") {
+        store.value = v;
+        return true;
+      }
+      (t as any)[p] = v;
+      return true;
+    },
+  });
+  return { createStore: () => [storeProxy, setStore] };
 });
 
-const convWithPrompt: Conversation = {
-  id: "conv-custom",
-  title: "Custom",
-  system_prompt: "Use Chinese.",
-  created_at: 0,
-  updated_at: 0,
-  archived_at: null,
-};
-const convWithoutPrompt: Conversation = {
-  id: "conv-plain",
-  title: "Plain",
-  system_prompt: null,
-  created_at: 0,
-  updated_at: 0,
-  archived_at: null,
-};
+import { appStore, _resetAppStoreForTest } from "../../../shared/stores/app.store";
+import {
+  getDefaultSystemPrompt,
+  getUserCanEdit,
+  updateDefaultSystemPrompt,
+  resolveSystemPromptForConversation,
+} from "./system-prompt";
 
-describe("SystemPromptService", () => {
-  beforeEach(() => {
-    settingsState = { ...baseSettings };
-    mockImpl.currentSettings = { ...baseSettings };
-    mockImpl.resolved = undefined;
-    mockImpl.rejected = undefined;
+describe("system-prompt (ADR-0015)", () => {
+  beforeEach(async () => {
+    _resetAppStoreForTest();
+    mockState.settings = {
+      ...mockState.settings,
+      system_prompt: { default: "You are a helpful assistant.", user_can_edit: true },
+    };
+    await Effect.runPromise(appStore.refresh());
   });
 
-  it.effect("getDefault 返回 system_prompt.default", () =>
-    Effect.gen(function* () {
-      const svc = yield* SystemPromptService;
-      const result = yield* svc.getDefault();
-      expect(result).toBe("You are a helpful assistant.");
-    }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive)),
-  );
+  afterEach(() => {
+    _resetAppStoreForTest();
+  });
 
-  it.effect("updateDefault 修改默认系统提示词", () =>
-    Effect.gen(function* () {
-      const svc = yield* SystemPromptService;
-      yield* svc.updateDefault("You are a pirate.");
-      const result = yield* svc.getDefault();
-      expect(result).toBe("You are a pirate.");
-    }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive)),
-  );
+  it("getDefaultSystemPrompt returns settings default", () => {
+    expect(getDefaultSystemPrompt()).toBe("You are a helpful assistant.");
+  });
 
-  it.effect("getUserCanEdit 返回 user_can_edit 标志", () =>
-    Effect.gen(function* () {
-      const svc = yield* SystemPromptService;
-      const result = yield* svc.getUserCanEdit();
-      expect(result).toBe(true);
-    }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive)),
-  );
+  it("getUserCanEdit returns settings flag", () => {
+    expect(getUserCanEdit()).toBe(true);
+  });
 
-  it.effect("forConversation 在设置覆盖时返回会话覆盖", () =>
-    Effect.gen(function* () {
-      const svc = yield* SystemPromptService;
-      const result = yield* svc.forConversation(convWithPrompt);
-      expect(result).toBe("Use Chinese.");
-    }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive)),
-  );
+  it("updateDefaultSystemPrompt writes via appStore", () => {
+    updateDefaultSystemPrompt("New prompt");
+    expect(getDefaultSystemPrompt()).toBe("New prompt");
+  });
 
-  it.effect("forConversation 在无覆盖时回退到 settings 默认值", () =>
-    Effect.gen(function* () {
-      const svc = yield* SystemPromptService;
-      const result = yield* svc.forConversation(convWithoutPrompt);
-      expect(result).toBe("You are a helpful assistant.");
-    }).pipe(Effect.provide(SystemPromptServiceLive), Effect.provide(MockSettingsServiceLive)),
-  );
+  it("resolveSystemPromptForConversation prefers conversation.system_prompt", () => {
+    const conv = {
+      id: "c1",
+      title: "T",
+      system_prompt: "Conv prompt",
+      created_at: 0,
+      updated_at: 0,
+      archived_at: null,
+    };
+    expect(resolveSystemPromptForConversation(conv)).toBe("Conv prompt");
+  });
+
+  it("resolveSystemPromptForConversation falls back to settings default", () => {
+    const conv = {
+      id: "c1",
+      title: "T",
+      system_prompt: null,
+      created_at: 0,
+      updated_at: 0,
+      archived_at: null,
+    };
+    expect(resolveSystemPromptForConversation(conv)).toBe("You are a helpful assistant.");
+  });
 });
