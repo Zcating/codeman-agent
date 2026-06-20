@@ -47,21 +47,23 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     const envKey = envFile.MINIMAX_CN_API_KEY ?? process.env.MINIMAX_CN_API_KEY;
     const envBaseUrl = envFile.MINIMAX_CN_API_BASE_URL ?? process.env.MINIMAX_CN_API_BASE_URL;
     if (envKey && envKey.length > 0) {
+      // ADR-0015: unified providers[] schema. api_key + base_url live on Provider directly.
       const current = await invoke<Settings>("get_settings");
       // 强制 default_llm_provider_id = "minimax"，覆盖用户之前手动配的值。
       // 同时 override base_url 到 .env 里的端点（CN 端点,跟 V1 默认的
       // global 端点不同 — .env 是真实测试场景,不是 V1 默认）。
-      const providers = current.llm_providers.map((p) =>
-        p.id === "minimax" ? { ...p, base_url: envBaseUrl ?? p.base_url } : p,
+      const providers = (current.providers ?? []).map((p) =>
+        p.id === "minimax"
+          ? {
+              ...p,
+              api_key: envKey,
+              llm: { ...p.llm, base_url: envBaseUrl ?? p.llm.base_url },
+            }
+          : p,
       );
       await invoke("update_settings", {
-        newSettings: {
-          ...current,
-          llm_providers: providers,
-          default_llm_provider_id: "minimax",
-        },
+        newSettings: { ...current, providers, default_llm_provider_id: "minimax" },
       });
-      await invoke("set_llm_key", { providerId: "minimax", key: envKey });
     }
   });
 

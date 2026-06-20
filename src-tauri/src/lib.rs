@@ -2,7 +2,6 @@
 
 mod commands;
 mod db;
-mod events;
 mod settings;
 mod filesystem;
 mod state;
@@ -61,7 +60,6 @@ pub fn run() {
             commands::search_messages,
             // T13: billing
             commands::get_provider_snapshot,
-            commands::list_billing_providers,
             // T22: settings
             commands::clear_all_history,
             // T22: dialog

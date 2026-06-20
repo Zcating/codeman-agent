@@ -208,9 +208,21 @@ describe("SettingsRoute integration — provider UX", () => {
     expect(screen.getByText("MiniMax")).toBeInTheDocument();
   });
 
-  // ── Test 6: Click 'Refresh models' calls fetch_models ──
-  it("Click 'Refresh models' calls fetch_models IPC and updates provider.llm.models", async () => {
+  // ── Test 6: Click 'Refresh models' calls ProviderService.fetchModels (HTTP) ──
+  it("Click 'Refresh models' fetches via ProviderService and updates provider.llm.models", async () => {
     const user = userEvent.setup();
+    // ProviderServiceLive.fetchModels does a direct HTTP fetch (ADR-0015);
+    // no Tauri IPC. We stub window.fetch to return a stable payload.
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [{ id: "refreshed-model", name: "Refreshed Model" }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    mockState.resolved = { providers: [mockMiniMaxProvider] };
+
     render(() => <SettingsPage />);
     await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -218,10 +230,16 @@ describe("SettingsRoute integration — provider UX", () => {
     await user.click(refreshBtn);
 
     await waitFor(() => {
-      expect(mockState.calls).toContain("fetch_models");
+      expect(fetchSpy).toHaveBeenCalledWith(
+        mockMiniMaxProvider.llm.models_endpoint,
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${mockMiniMaxProvider.api_key}`,
+          }),
+        }),
+      );
     });
 
-    // fetch_models returns the same models in mock; verify the IPC chain ran
-    expect(mockState.calls).toContain("fetch_models");
+    fetchSpy.mockRestore();
   });
 });

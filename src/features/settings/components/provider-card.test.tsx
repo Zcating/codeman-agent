@@ -142,15 +142,61 @@ describe("ProviderCard", () => {
     );
   });
 
-  // ── Test 3: Refresh models button calls fetch_models IPC ──
-  it("Refresh models button calls fetch_models IPC", async () => {
+  // ── Test 3: Refresh models button fetches models via ProviderService (HTTP) ──
+  it("Refresh models button fetches models via ProviderService.fetchModels", async () => {
     const user = userEvent.setup();
+    // Mock window.fetch — ProviderServiceLive.fetchModels does a direct HTTP fetch
+    // to provider.llm.models_endpoint with Bearer auth (ADR-0015). No Tauri IPC.
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            { id: "model-A", name: "Model A", context_window: 100_000 },
+            { id: "model-B", name: "Model B" },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    // get_settings returns the provider list — used by ProviderServiceLive
+    mockState.resolved = { providers: [mockProvider] };
+
     renderCard();
 
     const refreshBtn = screen.getByRole("button", { name: /refresh models/i });
     await user.click(refreshBtn);
 
-    expect(mockState.calls).toContain("fetch_models");
+    // ProviderServiceLive fetched the models_endpoint
+    expect(fetchSpy).toHaveBeenCalledWith(
+      mockProvider.llm.models_endpoint,
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${mockProvider.api_key}`,
+        }),
+      }),
+    );
+    // appStore.set was called with the new models list
+    const lastSet = getLastSetCall();
+    expect(lastSet).toBeTruthy();
+    const updated = lastSet.providers.find((p: any) => p.id === "minimax");
+    expect(updated.llm.models).toEqual([
+      {
+        id: "model-A",
+        label: "Model A",
+        context_window: 100_000,
+        deprecated: false,
+        thinking: false,
+      },
+      {
+        id: "model-B",
+        label: "Model B",
+        context_window: undefined,
+        deprecated: false,
+        thinking: false,
+      },
+    ]);
+
+    fetchSpy.mockRestore();
   });
 
   // ── Test 4: model dropdown calls appStore.set on change ──

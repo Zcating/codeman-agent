@@ -122,7 +122,7 @@ export class BillingService extends Context.Tag("BillingService")<
     readonly fetchSnapshot: (
       providerId: string,
       args?: { force_refresh?: boolean },
-    ) => Effect.Effect<Snapshot, BillingError>;
+    ) => Effect.Effect<Snapshot | null, BillingError>;
   }
 >() {}
 
@@ -324,8 +324,16 @@ export const BillingServiceLive = Layer.effect(
     return {
       list: () => getBillingProviders(),
 
-      fetchSnapshot: (providerId, args) =>
+      fetchSnapshot: (providerId) =>
         Effect.gen(function* () {
+          // Inline type for SnapshotEnvelope (mirror of Rust SnapshotEnvelope)
+          interface SnapshotEnvelope {
+            provider: string;
+            snapshot: Snapshot | null;
+            fetched_at: string;
+            error: string | null;
+          }
+
           // Get provider billing config
           const providers = yield* getBillingProviders();
           const provider = providers.find((p) => p.id === providerId);
@@ -337,18 +345,13 @@ export const BillingServiceLive = Layer.effect(
             } satisfies BillingError);
           }
 
-          // TypeScript needs this assignment to properly narrow the type
-          const billingConfig = provider.billing;
-
           // Call Rust adapter via IPC
-          let snapshot: Snapshot;
+          let envelope: SnapshotEnvelope;
           try {
-            snapshot = yield* Effect.tryPromise({
+            envelope = yield* Effect.tryPromise({
               try: () =>
-                tauriInvoke<Snapshot>("fetch_billing_snapshot", {
-                  provider_id: providerId,
-                  billing_kind: billingConfig.kind,
-                  force_refresh: args?.force_refresh ?? false,
+                tauriInvoke<SnapshotEnvelope>("get_provider_snapshot", {
+                  provider: providerId,
                 }),
               catch: (e) => {
                 const msg = String(e);
@@ -365,7 +368,7 @@ export const BillingServiceLive = Layer.effect(
             return yield* Effect.fail(e as BillingError);
           }
 
-          return snapshot;
+          return envelope.snapshot;
         }),
     };
   }),

@@ -46,9 +46,16 @@ test.describe("05 — 文件工具 (e2e)", () => {
     const envKey = envFile.MINIMAX_CN_API_KEY ?? process.env.MINIMAX_CN_API_KEY;
     const envBaseUrl = envFile.MINIMAX_CN_API_BASE_URL ?? process.env.MINIMAX_CN_API_BASE_URL;
     if (envKey && envKey.length > 0) {
+      // ADR-0015: unified providers[] schema. api_key + base_url live on Provider directly.
       const current = await invoke<Settings>("get_settings");
-      const providers = current.llm_providers.map((p) =>
-        p.id === "minimax" ? { ...p, base_url: envBaseUrl ?? p.base_url } : p,
+      const providers = (current.providers ?? []).map((p) =>
+        p.id === "minimax"
+          ? {
+              ...p,
+              api_key: envKey,
+              llm: { ...p.llm, base_url: envBaseUrl ?? p.llm.base_url },
+            }
+          : p,
       );
       // 显式覆盖 system_prompt:之前测试在 SQLite 留的 settings 可能 default=""
       // (rust `Default for SystemPromptSettings` 是空串,只有 `Default for Settings`
@@ -57,7 +64,7 @@ test.describe("05 — 文件工具 (e2e)", () => {
       await invoke("update_settings", {
         newSettings: {
           ...current,
-          llm_providers: providers,
+          providers,
           default_llm_provider_id: "minimax",
           system_prompt: {
             default: [
@@ -85,7 +92,6 @@ test.describe("05 — 文件工具 (e2e)", () => {
           },
         },
       });
-      await invoke("set_llm_key", { providerId: "minimax", key: envKey });
     }
   });
 

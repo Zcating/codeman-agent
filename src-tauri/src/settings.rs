@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
 
-const STORE_FILE: &str = "settings.json";
 const SCHEMA_VERSION_V15: &str = "1.5";
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -23,15 +23,15 @@ Windows 桌面 AI Agent，原生单窗口应用；主窗口是 LLM 对话 (`/`)�
 | 持久化       | SQLite + sqlx 0.8 + **FTS5** 全文搜索            | `sqlx 0.8`                                     |
 | 密钥         | Windows Credential Manager via `keyring` crate   | `keyring 3`                                    |
 | 路由         | **TanStack Router (code-based)**                 | `^1.170.15`                                    |
-| 包管理       | pnpm                                             | `11.5.3`                                       |
+| 包管理       | vite-plus                                             | `0.1.24`                                       |
 
-**包管理器强制用 pnpm**（`pnpm-lock.yaml` 存在）。不要混用 npm / yarn。
+**包管理器强制用 vp**（`pnpm-lock.yaml` 存在）。不要混用 npm / yarn。
 
 ## 目录布局 (Feature-Sliced V1.5 — 5+1 子目录白名单，2026-06-15)
 
 完整决策见 [ADR-0010](./docs/adr/0010-frontend-5-1-folder-whitelist.md)。
 
-```
+``` txt
 codeman-agent/
 ├── src/
 │   ├── index.tsx                  # Solid 入口（挂 <RouterProvider>，~6 行）
@@ -188,15 +188,16 @@ LLM Provider             Billing Provider
 ## 命令
 
 ```bash
-pnpm install
-pnpm tauri:dev         # 自动调 scripts/kill-port.mjs 1420 1421
-pnpm build             # 前端产物到 dist/
-pnpm tauri build       # 出 MSI + NSIS 安装包
-pnpm test              # 前端 vitest (jsdom)
-cd src-tauri && cargo test  # 后端（带 wiremock 集成测试）
-pnpm typecheck         # tsc --noEmit
-pnpm typecheck:e2e     # tsc --noEmit -p tsconfig.e2e.json
-pnpm e2e               # Playwright + 真 Tauri 端到端 (本地)
+vp run install
+vp run test              # 前端 vitest (jsdom)
+vp run build             # 前端产物到 dist/
+vp run dev
+vp run tauri:dev         # 自动调 scripts/kill-port.mjs 1420 1421
+vp run tauri:test        # 后端（带 wiremock 集成测试）
+vp run tauri:build       # 出 MSI + NSIS 安装包
+vp run typecheck         # tsc --noEmit
+vp run typecheck:e2e     # tsc --noEmit -p tsconfig.e2e.json
+vp run e2e               # Playwright + 真 Tauri 端到端 (本地)
 ```
 
 ## E2E 测试
@@ -205,12 +206,12 @@ V1 起引入 E2E 层，跑在 **真 webview + 真 Rust 后端** 上，不 mock I
 
 ### 目录布局
 
-```
+``` txt
 codeman-agent/
 ├── playwright.config.ts           # baseURL=1420, workers=1, retain-on-failure trace
 ├── tsconfig.e2e.json              # extends tsconfig.json + types:["node"]
 ├── e2e/
-│   ├── global-setup.ts            # spawn pnpm tauri:dev + wait 1420/9222
+│   ├── global-setup.ts            # spawn vp run tauri:dev + wait 1420/9222
 │   ├── global-teardown.ts         # kill child + sweep ports + taskkill tauri.exe
 │   ├── helpers.ts                 # getTauriPage() / invoke() / clearAllHistory()
 │   ├── 01-app-launch.spec.ts      # canary: 启动 + chat 布局 + 无 console error
@@ -220,24 +221,13 @@ codeman-agent/
 │   └── .gitignore                 # playwright-report/ test-results/
 ```
 
-### 跑通前置 (一次性)
-
-```bash
-cargo install tauri-driver --locked   # 二进制，与 src-tauri 共用 Rust 工具链
-npx playwright install msedge          # Edge WebDriver (Tauri WebView2 内核)
-# WebView2 Runtime: Win11 自带，Win10 需 https://developer.microsoft.com/microsoft-edge/webview2/
-pnpm add -D @playwright/test @types/node  # 项目 devDeps
-```
-
-> **Rust 预热已自动集成**: `e2e/global-setup.ts` 启动 `tauri:dev` 之前会先 `cd src-tauri && cargo build`（默认带 `RUSTFLAGS=-A dead_code` 静默 pre-existing warnings），把 5+ min 的首次编译从测试阶段挪到 setup 阶段。缓存命中 <1s，完全无感。
-
 ### 跑测试
 
 ```bash
-pnpm e2e               # 全跑 (~30-60s 测试阶段；首次含 5+ min 编译，在 setup 阶段)
-pnpm e2e:headed        # 有头模式看 UI
-pnpm e2e:debug         # Playwright Inspector
-pnpm e2e:report        # 看上一次 HTML 报告
+vp run e2e               # 全跑 (~30-60s 测试阶段；首次含 5+ min 编译，在 setup 阶段)
+vp run e2e:headed        # 有头模式看 UI
+vp run e2e:debug         # Playwright Inspector
+vp run e2e:report        # 看上一次 HTML 报告
 ```
 
 ### 当前覆盖的关键路径 (4 spec)

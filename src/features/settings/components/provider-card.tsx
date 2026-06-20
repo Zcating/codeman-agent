@@ -6,10 +6,10 @@
 
 import { createSignal, Show, For } from "solid-js";
 import { Effect } from "effect";
-import { invoke } from "../../../shared/lib/tauri";
+import { ProviderService, ProviderServiceLive } from "../../../shared/lib/tauri";
 import { appStore } from "../../../shared/stores/app.store";
 import { settingsSaver } from "../lib/settings-saver";
-import type { Provider, ModelMeta } from "../../../shared/lib/types";
+import type { Provider } from "../../../shared/lib/types";
 import { Button } from "../../../shared/components/ui/button";
 import { Input } from "../../../shared/components/ui/input";
 import { Checkbox } from "../../../shared/components/ui/checkbox";
@@ -81,7 +81,10 @@ export function ProviderCard(props: ProviderCardProps) {
     setRefreshMsg(null);
     try {
       const models = await Effect.runPromise(
-        invoke<ModelMeta[]>("fetch_models", { providerId: props.provider.id }),
+        Effect.gen(function* () {
+          const svc = yield* ProviderService;
+          return yield* svc.fetchModels(props.provider.id);
+        }).pipe(Effect.provide(ProviderServiceLive)),
       );
       const updated: Provider = {
         ...props.provider,

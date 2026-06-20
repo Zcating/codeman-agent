@@ -205,7 +205,7 @@ describe("BillingService.fetchSnapshot", () => {
     Effect.gen(function* () {
       const svc = yield* BillingService;
       const snapshot = yield* svc.fetchSnapshot("minimax");
-      expect(snapshot.kind).toBe("plan_quota");
+      expect(snapshot!.kind).toBe("plan_quota");
     }).pipe(Effect.provide(MockProviderServiceLive), Effect.provide(MockBillingServiceLive)),
   );
 

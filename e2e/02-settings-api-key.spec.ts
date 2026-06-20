@@ -1,15 +1,14 @@
-﻿//! 02 — 设置：配置 LLM API key 并验证其持久化（V1.5 UI）。
+﻿//! 02 — 设置：配置 LLM API key 并验证其持久化（V1.5+ ADR-0015 架构）。
 //!
-//! 流程（V1.5 ProviderCard 永远显示 LLM API Key input + Save button,不再有
-//! 折叠的 "Set API key" 按钮）：
+//! 流程（ADR-0015: ProviderCard 无 per-row Save 按钮；单一 footer Save）：
 //!  1. 通过 footer 链接导航到 /settings。
 //!  2. 找到第一个 provider 的 LLM API Key input（`input[type=password]`）。
-//!  3. 输入一个假 key,点击它旁边的 Save 按钮。
-//!  4. 通过 IPC `has_llm_key` 验证 key 实际被写入（端到端,不止 UI 关闭）。
-//!  5. 重新加载页面（应用内 navigate）— 静止时无 password input（DOM 不反射）。
-//!  6. 再 expand LLM API Key section,确认 input 仍是空（永不反射保存值）。
+//!  3. 输入一个假 key。
+//!  4. 点击 footer 的 Save 按钮（`settingsSaver.flushNow()`）。
+//!  5. 通过 IPC `get_settings` 验证 `providers[0].api_key` 写入成功。
+//!  6. 重新加载页面（应用内 navigate）— password input 永远不反射已保存值。
 //!
-//! 我们用假 key — 只测写入路径,不测真实 LLM 网络。
+//! 我们用假 key — 只测写入路径，不测真实 LLM 网络。
 
 import { test, expect } from "@playwright/test";
 import { assert, disposeTauriPage, getTauriPage, invoke } from "./helpers";
@@ -34,41 +33,42 @@ test.describe("02 — 设置 LLM API key", () => {
     await settingsLink.click();
     await assert.urlMatches(page, /\/settings$/);
 
-    // 2. 找到第一个 provider 的 LLM API Key password input。V1.5 ProviderCard
-    //    永远显示 LLM input + Save button (没有折叠)。LLM 区域是第一个 input。
+    // 2. 找到第一个 provider 的 LLM API Key password input。
+    //    V1.5+ ProviderCard 永远显示 LLM input（无折叠），第一个 input[type=password]。
     const passwordInput = page.locator('input[type="password"]').first();
     await assert.visible(passwordInput, { timeout: 10_000 });
     await passwordInput.fill(FAKE_KEY);
 
-    // 3. Save 按钮就在 input 旁边(同一个 flex row)。
-    //    选 "Save" text 匹配 + 不是 destructive (destructive = Delete provider)。
-    const saveButton = page
+    // 3. ADR-0015: ProviderCard 无 per-row Save 按钮。所有变更通过
+    //    appStore.set() + debounced auto-flush（500ms）；footer Save 按钮
+    //    调用 settingsSaver.flushNow() 跳过 debounce 立即写入。
+    //    footer 特征：border-t 类（`border-t border-zinc-200 dark:border-zinc-700`）。
+    const footerSaveButton = page
+      .locator("footer")
       .locator("button")
-      .filter({ hasText: /^Save$/ })
-      .first();
-    await assert.visible(saveButton);
-    await saveButton.click();
+      .filter({ hasText: /^Save$/ });
+    await assert.visible(footerSaveButton, { timeout: 5_000 });
+    await footerSaveButton.click();
 
-    // 4. 保存后 input 应清空 (security: 不反射保存值)。
-    //    set_llm_key 同步完成,等 2s 看 value 是否变空。
+    // 4. ADR-0015 security: API key 永不反射回 DOM。保存后 input 应立即清空。
+    //    footer Save 跳过 debounce，但仍是异步 IPC；给 2s 让 input 清空。
     await assert.value(passwordInput, "", { timeout: 2_000 });
 
-    // 5. 通过 IPC 命令验证 key 实际在磁盘上。V1.5 ProviderCard 把 id 渲染为
-    //    纯文本 (不是 <code> 元素),我们直接用 .env 的 provider id "minimax"。
-    //    V1 默认 LLM provider 就是 minimax (见 V1 默认配置)。
-    const trimmedId = "minimax";
+    // 5. 通过 IPC `get_settings` 验证 key 实际在磁盘上。
+    //    V1.5+ 使用 unified providers 数组；第一个 provider id 是 "minimax"。
+    const settings = await invoke<{ providers?: Array<{ id: string; api_key: string }> }>(
+      "get_settings",
+    );
+    const minimaxProvider = settings.providers?.find((p) => p.id === "minimax");
+    expect(minimaxProvider?.api_key, `minimax provider api_key 应为 ${FAKE_KEY}`).toBe(FAKE_KEY);
 
-    const hasKey = await invoke<boolean>("has_llm_key", { providerId: trimmedId });
-    expect(hasKey, `has_llm_key 对 ${trimmedId} 应返回 true`).toBe(true);
-
-    // 6. 重新导航回 / 然后再去 /settings — DOM 不反射已存 key。
-    //    静止时 0 个 password input (input 被收起,或 V1.5 永远显示但值为空)。
+    // 6. 重新导航回 / 然后再去 /settings — password input 永不反射已保存值。
     await page.locator('a[href="/"]').click();
     await assert.urlMatches(page, /\//);
     await page.getByRole("link", { name: /设置/ }).click();
     await assert.urlMatches(page, /\/settings$/);
 
-    // 静止时 password input 存在 (V1.5 永远显示) 但 value 为空 — 不反射保存值。
+    // 静止时 password input 存在（V1.5+ 永远显示）但 value 为空 — 永不反射保存值。
     await assert.visible(page.locator('input[type="password"]').first(), { timeout: 5_000 });
     const values = await page.evaluate(() =>
       Array.from(document.querySelectorAll('input[type="password"]')).map(

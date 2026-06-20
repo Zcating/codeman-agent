@@ -111,8 +111,12 @@ export default async function globalSetup(): Promise<void> {
   //    stdio is fully discarded — the test reporter owns the user-facing
   //    stdout. To watch the raw stream during a run, spawn tauri:dev
   //    manually in another terminal.
-  console.log("[e2e setup] step 2/4 — spawning pnpm tauri:dev (output discarded)");
-  const child: ChildProcess = spawn("pnpm", ["tauri:dev"], {
+  //
+  //    使用 vp (vite-plus) 而不是 pnpm — 项目包管理器已迁到 vp (V2+)。
+  //    Vite、Tauri、Cargo 走 vp run 链,但 beforeDevCommand / beforeBuildCommand
+  //    在 tauri.conf.json 里仍是 pnpm — 这是已知的迁移 gap,见下。
+  console.log("[e2e setup] step 2/4 — spawning vp run tauri:dev (output discarded)");
+  const child: ChildProcess = spawn("vp", ["run", "tauri:dev"], {
     env: {
       ...process.env,
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORTS.TAURI_DRIVER_PORT}`,

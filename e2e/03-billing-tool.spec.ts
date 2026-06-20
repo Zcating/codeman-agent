@@ -45,18 +45,20 @@ test.describe("03 — 聊天 → billing 工具", () => {
     const envKey = envFile.MINIMAX_CN_API_KEY ?? process.env.MINIMAX_CN_API_KEY;
     const envBaseUrl = envFile.MINIMAX_CN_API_BASE_URL ?? process.env.MINIMAX_CN_API_BASE_URL;
     if (envKey && envKey.length > 0) {
+      // ADR-0015: unified providers[] schema. api_key + base_url live on Provider directly.
       const current = await invoke<Settings>("get_settings");
-      const providers = current.llm_providers.map((p) =>
-        p.id === "minimax" ? { ...p, base_url: envBaseUrl ?? p.base_url } : p,
+      const providers = (current.providers ?? []).map((p) =>
+        p.id === "minimax"
+          ? {
+              ...p,
+              api_key: envKey,
+              llm: { ...p.llm, base_url: envBaseUrl ?? p.llm.base_url },
+            }
+          : p,
       );
       await invoke("update_settings", {
-        newSettings: {
-          ...current,
-          llm_providers: providers,
-          default_llm_provider_id: "minimax",
-        },
+        newSettings: { ...current, providers, default_llm_provider_id: "minimax" },
       });
-      await invoke("set_llm_key", { providerId: "minimax", key: envKey });
     }
   });
 

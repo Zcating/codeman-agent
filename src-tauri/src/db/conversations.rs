@@ -3,7 +3,7 @@
 //! 所有时间戳以 UNIX epoch 秒存储在 INTEGER 列中。
 //! Rust API 中使用 chrono DateTime<Utc>。
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::Utc;
 use serde::Serialize;
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -21,32 +21,7 @@ pub struct Conversation {
     pub archived_at: Option<i64>,
 }
 
-impl Conversation {
-    /// 将 `id` 解析为 Uuid。
-    pub fn id(&self) -> Uuid {
-        Uuid::parse_str(&self.id).expect("DB 中的有效 UUID")
-    }
-
-    /// 从 UNIX epoch 秒解析 `created_at`。
-    pub fn created_at_datetime(&self) -> DateTime<Utc> {
-        Utc.timestamp_opt(self.created_at, 0).unwrap()
-    }
-
-    /// 从 UNIX epoch 秒解析 `updated_at`。
-    pub fn updated_at_datetime(&self) -> DateTime<Utc> {
-        Utc.timestamp_opt(self.updated_at, 0).unwrap()
-    }
-
-    /// 从 UNIX epoch 秒解析 `archived_at`（如果设置）。
-    pub fn archived_at_datetime(&self) -> Option<DateTime<Utc>> {
-        self.archived_at.map(|ts| Utc.timestamp_opt(ts, 0).unwrap())
-    }
-
-    /// 会话被软删除（归档）时返回 true。
-    pub fn is_archived(&self) -> bool {
-        self.archived_at.is_some()
-    }
-}
+impl Conversation {}
 
 /// 插入新会话，返回完整行。
 pub async fn create_conversation(
@@ -107,24 +82,6 @@ pub async fn list_conversations(
     }
 }
 
-/// 仅更新现有会话的标题。
-pub async fn update_conversation_title(
-    pool: &SqlitePool,
-    id: &Uuid,
-    title: &str,
-) -> Result<(), sqlx::Error> {
-    let now = Utc::now().timestamp();
-    sqlx::query(
-        "UPDATE conversations SET title = $1, updated_at = $2 WHERE id = $3",
-    )
-    .bind(title)
-    .bind(now)
-    .bind(id.to_string())
-    .execute(pool)
-    .await?;
-    Ok(())
-}
-
 /// 软删除：将 `archived_at` 设为当前时间戳。
 pub async fn archive_conversation(pool: &SqlitePool, id: &Uuid) -> Result<(), sqlx::Error> {
     let now = Utc::now().timestamp();
@@ -169,10 +126,10 @@ mod tests {
             .expect("创建成功");
         assert_eq!(created.title, "Test Title");
         assert_eq!(created.system_prompt.as_deref(), Some("system prompt"));
-        assert!(!created.is_archived());
+        assert!(created.archived_at.is_none());
 
-        let id = created.id();
-        let fetched = get_conversation(&pool, &id)
+        let uuid = Uuid::parse_str(&created.id).unwrap();
+        let fetched = get_conversation(&pool, &uuid)
             .await
             .expect("获取成功")
             .expect("找到会话");
@@ -202,7 +159,8 @@ mod tests {
             .await
             .expect("创建成功");
 
-        archive_conversation(&pool, &created.id())
+        let uuid = Uuid::parse_str(&created.id).unwrap();
+        archive_conversation(&pool, &uuid)
             .await
             .expect("归档成功");
 
@@ -214,25 +172,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn update_title() {
-        let pool = make_pool().await;
-        let created = create_conversation(&pool, "Original Title", None)
-            .await
-            .expect("创建成功");
-        let id = created.id();
-
-        update_conversation_title(&pool, &id, "New Title")
-            .await
-            .expect("更新成功");
-
-        let fetched = get_conversation(&pool, &id)
-            .await
-            .expect("获取成功")
-            .expect("找到会话");
-        assert_eq!(fetched.title, "New Title");
-    }
-
-    #[tokio::test]
     async fn hard_delete_cascades_to_messages() {
         let pool = make_pool().await;
 
@@ -240,7 +179,7 @@ mod tests {
         let conv = create_conversation(&pool, "To Delete", None)
             .await
             .expect("创建会话");
-        let conv_id = conv.id();
+        let conv_uuid = Uuid::parse_str(&conv.id).unwrap();
 
         // 手动插入消息以验证级联删除。
         let msg_id = Uuid::new_v4().to_string();
@@ -249,7 +188,7 @@ mod tests {
             "INSERT INTO messages (id,conversation_id,role,content,created_at) VALUES (?,?,?,?,?)",
         )
         .bind(&msg_id)
-        .bind(conv_id.to_string())
+        .bind(conv.id.clone())
         .bind("user")
         .bind("hello world")
         .bind(now)
@@ -266,12 +205,12 @@ mod tests {
         assert!(before.is_some(), "删除前消息应存在");
 
         // 硬删除会话
-        hard_delete_conversation(&pool, &conv_id)
+        hard_delete_conversation(&pool, &conv_uuid)
             .await
             .expect("硬删除成功");
 
         // 验证会话已删除
-        let conv_after = get_conversation(&pool, &conv_id)
+        let conv_after = get_conversation(&pool, &conv_uuid)
             .await
             .expect("删除后获取会话");
         assert!(conv_after.is_none(), "会话应被删除");

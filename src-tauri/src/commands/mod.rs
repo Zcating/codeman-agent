@@ -8,7 +8,7 @@ use tauri_plugin_dialog::DialogExt;
 use crate::db::conversations;
 use crate::db::messages;
 use crate::settings::Settings;
-use crate::state::{AppState, ProviderDescriptor};
+use crate::state::AppState;
 use crate::types::{AppError, ProviderId, SnapshotEnvelope};
 use tauri::State;
 use uuid::Uuid;
@@ -139,13 +139,6 @@ pub async fn search_messages(
 // ─────────────────────────────────────────────────────────────────────────────
 // 计费快照 IPC（任务 13）
 // ─────────────────────────────────────────────────────────────────────────────
-
-#[tauri::command]
-pub async fn list_billing_providers(
-    state: State<'_, AppState>,
-) -> Result<Vec<ProviderDescriptor>, AppError> {
-    Ok(state.list_providers())
-}
 
 #[tauri::command]
 pub async fn get_provider_snapshot(

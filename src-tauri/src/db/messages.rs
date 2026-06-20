@@ -18,8 +18,6 @@
 //! 暴露的函数：
 //! - `append_message` – INSERT + FTS5 同步（单事务）
 //! - `list_messages`  – ORDER BY created_at ASC
-//! - `get_message`     – 按 UUID
-//! - `delete_message`  – 在同一事务中 DELETE FTS5 + message
 //! - `search_messages` – FTS5 MATCH 查询
 
 use chrono::{DateTime, TimeZone, Utc};
@@ -154,53 +152,6 @@ pub async fn list_messages(
     .await?;
 
     rows.iter().map(row_to_message).collect()
-}
-
-/// 按 id 获取单条消息。未找到时返回 `Ok(None)`。
-pub async fn get_message(pool: &SqlitePool, id: &Uuid) -> Result<Option<Message>, sqlx::Error> {
-    let row = sqlx::query(
-        r#"
-        SELECT id, conversation_id, role, content, tool_calls, tool_results,
-               model, input_tokens, output_tokens, created_at
-        FROM   messages
-        WHERE  id = ?
-        "#,
-    )
-    .bind(id.to_string())
-    .fetch_optional(pool)
-    .await?;
-
-    match row {
-        Some(r) => Ok(Some(row_to_message(&r)?)),
-        None => Ok(None),
-    }
-}
-
-/// 在同一事务中删除消息及其 FTS5 条目。
-pub async fn delete_message(pool: &SqlitePool, id: &Uuid) -> Result<(), sqlx::Error> {
-    let mut tx = pool.begin().await?;
-
-    // 删除前查找 rowid 以便清理 FTS5。
-    let row = sqlx::query("SELECT rowid FROM messages WHERE id = ?")
-        .bind(id.to_string())
-        .fetch_optional(&mut *tx)
-        .await?;
-
-    if let Some(r) = row {
-        let rowid: i64 = r.try_get("rowid")?;
-        sqlx::query("DELETE FROM messages_fts WHERE rowid = ?")
-            .bind(rowid)
-            .execute(&mut *tx)
-            .await?;
-    }
-
-    sqlx::query("DELETE FROM messages WHERE id = ?")
-        .bind(id.to_string())
-        .execute(&mut *tx)
-        .await?;
-
-    tx.commit().await?;
-    Ok(())
 }
 
 /// 使用 FTS5 MATCH 对消息内容进行全文搜索。
@@ -354,37 +305,6 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].content, "the quick brown fox");
-    }
-
-    #[tokio::test]
-    async fn append_delete_removes_from_fts() {
-        let pool = fresh_pool().await;
-        let conv_id = Uuid::new_v4();
-
-        sqlx::query("INSERT INTO conversations (id,title,created_at,updated_at) VALUES (?,?,?,?)")
-            .bind(conv_id.to_string())
-            .bind("delete test")
-            .bind(Utc::now().timestamp())
-            .bind(Utc::now().timestamp())
-            .execute(&pool)
-            .await
-            .unwrap();
-
-        let msg = append_message(
-            &pool, conv_id, "user", "secret password xyz123", None, None, None, None, None,
-        )
-        .await
-        .unwrap();
-
-        // 删除前验证它可被搜索
-        let before = search_messages(&pool, "password", 10).await.unwrap();
-        assert_eq!(before.len(), 1);
-
-        delete_message(&pool, &msg.id).await.unwrap();
-
-        // 删除后，FTS5 搜索应返回空
-        let after = search_messages(&pool, "password", 10).await.unwrap();
-        assert!(after.is_empty(), "删除的消息不应出现在 FTS5 结果中");
     }
 
     #[tokio::test]
