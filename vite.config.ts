@@ -40,7 +40,7 @@ export default defineConfig(async () => ({
     alias: [
       {
         find: /^solid-js$/,
-        replacement: resolve(__dirname, "node_modules/solid-js/dist/solid.js"),
+        replacement: resolve(__dirname, "node_modules/solid-js/dist/dev.js"),
       },
       {
         find: "solid-js/web",

@@ -61,14 +61,26 @@ test.describe("05 — 文件工具 (e2e)", () => {
       // (rust `Default for SystemPromptSettings` 是空串,只有 `Default for Settings`
       // 才填长 prompt — 但只有 system_prompt 字段缺失时才用 Settings::default())。
       // 这里硬写,保证 LLM 收到工具使用指引。
+      //
+      // 同步预置 id="main" 的 workspace 指向 e2eRoot。系统 prompt 告诉 LLM
+      // 使用 workspace_id="main";Add workspace 按钮用的是 crypto.randomUUID(),
+      // 跟 LLM 预期不匹配,工具调用会 NotFound。直接 IPC 注入保证 id 稳定。
+      const mainWorkspace = {
+        id: "main",
+        label: "E2E Test Workspace",
+        root_path: e2eRoot,
+        enabled: true,
+      };
       await invoke("update_settings", {
         newSettings: {
           ...current,
           providers,
           default_llm_provider_id: "minimax",
+          workspaces: [mainWorkspace],
           system_prompt: {
             default: [
               "You are a tool-calling AI assistant. You MUST always invoke the appropriate tool to complete user requests — never respond with text-only greetings or explanations.",
+              "After receiving tool_result, IMMEDIATELY respond with a final text answer (do NOT call the same tool again). If a tool fails, surface the error verbatim to the user instead of retrying.",
               "",
               "## Tool-Use Contract",
               "- When the user asks about a file (read/write/edit/search/delete), IMMEDIATELY call the matching file tool with the correct arguments.",
@@ -125,34 +137,9 @@ test.describe("05 — 文件工具 (e2e)", () => {
   test("workspace 创建 + 文件写入 + 读取", async () => {
     const page = await getTauriPage();
 
-    // 1. 在 /settings 创建 workspace
-    await page.goto("/settings");
-    // 验证已到达 /settings (chat footer 的 /settings 链接在 /settings 路由上不存在,
-    // 所以用 URL 匹配代替 link visibility)
-    await assert.urlMatches(page, /\/settings$/);
-
-    // 确保 LLM tab 激活（workspace 在 LLM tab 内）
-    const llmTab = page.locator("button").filter({ hasText: /^LLM$/ });
-    await llmTab.click();
-
-    // 点击 Add workspace
-    const addWsBtn = page.locator("button").filter({ hasText: /Add workspace/ });
-    await assert.visible(addWsBtn, { timeout: 5_000 });
-    await addWsBtn.click();
-
-    // 新 workspace 出现在列表，找第一个 text input（root_path）
-    const rootInput = page.locator('input[type="text"]').first();
-    await assert.visible(rootInput, { timeout: 5_000 });
-    await rootInput.fill(e2eRoot);
-
-    // 启用 workspace（勾选第一个 checkbox）
-    const wsCheckbox = page.locator('input[type="checkbox"]').first();
-    await wsCheckbox.click();
-
-    // Save 设置
-    const saveBtn = page.locator("footer button").filter({ hasText: /^Save$/ });
-    await saveBtn.click();
-    await new Promise((r) => setTimeout(r, 1_000));
+    // 1. workspace 已在 beforeAll 通过 IPC 预置 (id="main", root=e2eRoot, enabled=true)。
+    //    系统 prompt 告诉 LLM 使用 workspace_id="main",工具调用 workspace_id
+    //    跟实际配置匹配,不会 NotFound。
 
     // 2. 回到聊天页面
     await page.goto("/");
@@ -160,7 +147,7 @@ test.describe("05 — 文件工具 (e2e)", () => {
 
     // 3. 发消息写文件
     const textarea = page.locator('textarea[placeholder="发条消息\u2026"]');
-    await textarea.fill("Write 'hello e2e' to e2e-test.txt in workspace e2e-test");
+    await textarea.fill("Write 'hello e2e' to e2e-test.txt");
     await submitForm(page);
 
     // 4. 等待 write_file tool_result（最长 60s）

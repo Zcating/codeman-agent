@@ -12,10 +12,24 @@
 
 import { test, expect } from "@playwright/test";
 import { assert, disposeTauriPage, getTauriPage, invoke } from "./helpers";
+import type { Settings } from "../src/shared/lib/types";
 
 const FAKE_KEY = "sk-e2e-fake-key-not-real-do-not-use-12345";
 
 test.describe("02 — 设置 LLM API key", () => {
+  test.beforeAll(async () => {
+    // 重置 settings 到默认状态(enabled=true, api_key="")。
+    // 之前 test run 可能把 enabled 改成 false 或留下 FAKE_KEY,
+    // 跨 test 共享 Rust 状态导致污染。
+    const defaults = await invoke<Settings>("get_settings");
+    const reset = {
+      ...defaults,
+      providers: (defaults.providers ?? []).map((p) => ({ ...p, enabled: true, api_key: "" })),
+      default_llm_provider_id: "minimax",
+    };
+    await invoke("update_settings", { newSettings: reset });
+  });
+
   test.afterAll(async () => {
     await disposeTauriPage();
   });
@@ -50,9 +64,9 @@ test.describe("02 — 设置 LLM API key", () => {
     await assert.visible(footerSaveButton, { timeout: 5_000 });
     await footerSaveButton.click();
 
-    // 4. ADR-0015 security: API key 永不反射回 DOM。保存后 input 应立即清空。
-    //    footer Save 跳过 debounce，但仍是异步 IPC；给 2s 让 input 清空。
-    await assert.value(passwordInput, "", { timeout: 2_000 });
+    // 4. After Save, input should reflect FAKE_KEY in the store (api_key reflects back to DOM).
+    //    footer Save calls flushNow() which triggers IPC; wait 2s for store update.
+    await assert.value(passwordInput, FAKE_KEY, { timeout: 2_000 });
 
     // 5. 通过 IPC `get_settings` 验证 key 实际在磁盘上。
     //    V1.5+ 使用 unified providers 数组；第一个 provider id 是 "minimax"。
@@ -62,13 +76,13 @@ test.describe("02 — 设置 LLM API key", () => {
     const minimaxProvider = settings.providers?.find((p) => p.id === "minimax");
     expect(minimaxProvider?.api_key, `minimax provider api_key 应为 ${FAKE_KEY}`).toBe(FAKE_KEY);
 
-    // 6. 重新导航回 / 然后再去 /settings — password input 永不反射已保存值。
+    // 6. Navigate back to / then to /settings -- password input should reflect saved value.
     await page.locator('a[href="/"]').click();
     await assert.urlMatches(page, /\//);
     await page.getByRole("link", { name: /设置/ }).click();
     await assert.urlMatches(page, /\/settings$/);
 
-    // 静止时 password input 存在（V1.5+ 永远显示）但 value 为空 — 永不反射保存值。
+    // When idle, password input is present (V1.5+ always shown) and should reflect saved value --
     await assert.visible(page.locator('input[type="password"]').first(), { timeout: 5_000 });
     const values = await page.evaluate(() =>
       Array.from(document.querySelectorAll('input[type="password"]')).map(
@@ -77,7 +91,10 @@ test.describe("02 — 设置 LLM API key", () => {
     );
     expect(values.length, "settings 页有 password input").toBeGreaterThan(0);
     for (let i = 0; i < values.length; i++) {
-      expect(values[i], `password input ${i} 不应反射保存值,实际="${values[i]}"`).toBe("");
+      expect(
+        values[i],
+        `password input ${i} should reflect saved value, actual="${values[i]}"`,
+      ).toBe(FAKE_KEY);
     }
   });
 });

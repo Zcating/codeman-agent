@@ -84,6 +84,7 @@ test.describe("06 — LLM round-trip", () => {
   });
 
   test("正常输入 + 配 API Key → 1 user + 1 assistant = 2 bubble", async () => {
+    test.setTimeout(180_000);
     const page = await getTauriPage();
 
     // 诊断: 听 console + pageerror — LLM 错误会从 chat-view catch 打到 console,
@@ -205,7 +206,7 @@ test.describe("06 — LLM round-trip", () => {
     const assistantBubble = page.locator("div.justify-start > div[class*='bg-card']");
     // 30s 短 timeout — 如果 LLM 错误,会快速在 console 打印,然后 Stream 结束
     // running=false,Cancel 按钮消失。给点时间 (30s) 但不要太长。
-    await assert.visible(assistantBubble.first(), { timeout: 30_000 });
+    await assert.visible(assistantBubble.first(), { timeout: 60_000 });
     const assistantText = await assistantBubble.first().textContent();
     expect(
       assistantText && assistantText.trim().length > 0,

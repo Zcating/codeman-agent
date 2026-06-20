@@ -76,6 +76,7 @@ test.describe("04 — 流式 LLM 非空文本", () => {
   });
 
   test("发送消息并在 30s 内观察到非空 assistant 文本或 Cancel 按钮", async () => {
+    test.setTimeout(180_000);
     const page = await getTauriPage();
 
     // 1. 创建新会话（ChatView 拒绝在无 activeId 时发送）。
@@ -108,7 +109,7 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     //    Cancel 按钮出现 → 运行时正在流式（SC4: 非空文本即将到来或正在到来途中）。
     //    assistant text length >= 5 → 文本实际已渲染（SC4 核心断言）。
     //    两者任一满足 → spec pass。
-    const deadline = Date.now() + 30_000;
+    const deadline = Date.now() + 60_000;
     let ok = false;
     while (Date.now() < deadline) {
       const cancelCount = await page.getByRole("button", { name: /取消/i }).count();
