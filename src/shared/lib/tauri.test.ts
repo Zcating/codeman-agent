@@ -257,7 +257,7 @@ describe("FileService.readFile", () => {
       const readCall = mockState.invokeCalls.find((c) => c.name === "read_file");
       expect(readCall).toBeDefined();
       expect(readCall?.args).toMatchObject({
-        workspace_id: "ws1",
+        workspaceId: "ws1",
         path: "/tmp/x.txt",
       });
     }).pipe(Effect.provide(FileServiceLive)),
@@ -277,14 +277,14 @@ describe("FileService.editFile", () => {
       const editCall = mockState.invokeCalls.find((c) => c.name === "edit_file");
       expect(editCall).toBeDefined();
       expect(editCall?.args).toMatchObject({
-        workspace_id: "ws1",
+        workspaceId: "ws1",
         path: "/tmp/x.txt",
-        old_text: "old",
-        new_text: "new",
-        replace_all: true,
+        oldText: "old",
+        newText: "new",
+        replaceAll: true,
       });
-      // Ensure replace_all is boolean, not string
-      expect(typeof editCall?.args?.replace_all).toBe("boolean");
+      // Ensure replaceAll is boolean, not string
+      expect(typeof editCall?.args?.replaceAll).toBe("boolean");
     }).pipe(Effect.provide(FileServiceLive)),
   );
 });

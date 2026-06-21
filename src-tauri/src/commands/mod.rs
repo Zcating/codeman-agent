@@ -33,7 +33,7 @@ pub async fn update_settings(
 // 会话 / 消息 IPC（任务 12）
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 pub async fn list_conversations(
     pool: tauri::State<'_, sqlx::SqlitePool>,
     include_archived: bool,
@@ -56,7 +56,7 @@ pub async fn get_conversation(
         })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 pub async fn create_conversation(
     pool: tauri::State<'_, sqlx::SqlitePool>,
     title: String,
@@ -87,7 +87,7 @@ pub async fn delete_conversation(
     Ok(conversations::hard_delete_conversation(pool.inner(), &uuid).await?)
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 pub async fn list_messages(
     pool: tauri::State<'_, sqlx::SqlitePool>,
     conversation_id: String,
@@ -98,7 +98,7 @@ pub async fn list_messages(
     Ok(messages::list_messages(pool.inner(), &uuid).await?)
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 pub async fn append_message(
     pool: tauri::State<'_, sqlx::SqlitePool>,
     conversation_id: String,

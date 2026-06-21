@@ -73,7 +73,7 @@ pub(crate) fn read_file_impl(
     })
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 pub async fn read_file(
     state: State<'_, AppState>,
     workspace_id: String,
@@ -215,7 +215,7 @@ pub(crate) fn write_file_impl(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 pub async fn write_file(
     state: State<'_, AppState>,
     workspace_id: String,
@@ -373,7 +373,7 @@ pub(crate) fn edit_file_impl(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 pub async fn edit_file(
     state: State<'_, AppState>,
     workspace_id: String,
@@ -531,7 +531,7 @@ fn is_skipped(entry: &walkdir::DirEntry) -> bool {
         .unwrap_or(false)
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 pub async fn search_files(
     state: State<'_, AppState>,
     workspace_id: String,
@@ -608,7 +608,7 @@ pub(crate) fn delete_file_impl(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 pub async fn delete_file(
     state: State<'_, AppState>,
     workspace_id: String,

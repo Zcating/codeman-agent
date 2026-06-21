@@ -83,10 +83,18 @@ vi.mock("../stores/messages", () => ({
   appendStreamingAssistantMessage: vi.fn(),
 }));
 
-vi.mock("../lib/runtime", () => ({
-  AgentRuntime: { of: vi.fn() },
-  RuntimeLayer: {},
-}));
+vi.mock(import("../lib/runtime"), async (importOriginal) => {
+  // V1.7+ 的 mock 只覆盖 AgentRuntime / RuntimeLayer(组件测试不需要真 runtime),
+  // 但 commit 1fc33e7 之后 agent.ts 在模块加载时引用了 AgentRuntimeLive / RuntimeDeps
+  // / RuntimeError 来构建 fullLayer(ADR-0016 D6)。用 importOriginal spread 真模块
+  // 保留这些符号,避免 Layer.provide(AgentRuntimeLive, RuntimeDeps) 报
+  // "No AgentRuntimeLive export is defined"。
+  const actual = await importOriginal<typeof import("../lib/runtime")>();
+  return {
+    ...actual,
+    AgentRuntime: { of: vi.fn() } as never,
+  };
+});
 
 describe("ChatView", () => {
   afterEach(() => cleanup());
