@@ -20,13 +20,21 @@ import type { AgentRunConfig } from "@mariozechner/pi-agent";
 
 function parseSseLine(line: string): { event?: string; data?: string } {
   const trimmed = line.trim();
-  if (trimmed.length === 0) return {};
+  if (trimmed.length === 0) {
+    return {};
+  }
   const colonIdx = trimmed.indexOf(":");
-  if (colonIdx === -1) return {};
+  if (colonIdx === -1) {
+    return {};
+  }
   const field = trimmed.slice(0, colonIdx);
   const value = trimmed.slice(colonIdx + 1).replace(/^ /, "");
-  if (field === "event") return { event: value };
-  if (field === "data") return { data: value };
+  if (field === "event") {
+    return { event: value };
+  }
+  if (field === "data") {
+    return { data: value };
+  }
   return {};
 }
 
@@ -232,14 +240,18 @@ export class AnthropicTransport {
           throw new DOMException("Aborted", "AbortError");
         }
         const { value, done } = await reader.read();
-        if (done) break;
+        if (done) {
+          break;
+        }
         buffer += decoder.decode(value, { stream: true });
         let lineEnd: number;
         while ((lineEnd = buffer.indexOf("\n")) !== -1) {
           const line = buffer.slice(0, lineEnd);
           buffer = buffer.slice(lineEnd + 1);
           if (line.trim() === "") {
-            if (!sseDataBuf) continue;
+            if (!sseDataBuf) {
+              continue;
+            }
             let data: Record<string, unknown>;
             try {
               data = JSON.parse(sseDataBuf) as Record<string, unknown>;
@@ -324,7 +336,9 @@ export class AnthropicTransport {
             }
           } else {
             const parsed = parseSseLine(line);
-            if (parsed.data !== undefined) sseDataBuf += parsed.data;
+            if (parsed.data !== undefined) {
+              sseDataBuf += parsed.data;
+            }
           }
         }
       }
@@ -430,7 +444,9 @@ export class AnthropicTransport {
 
   /** Small async delay to simulate network/streaming latency. */
   private async simulateChunkDelay(signal: AbortSignal | undefined, ms: number): Promise<void> {
-    if (ms <= 0) return;
+    if (ms <= 0) {
+      return;
+    }
     return new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => {
         signal?.removeEventListener(`abort`, onAbort);

@@ -31,6 +31,8 @@ export function updateDefaultSystemPrompt(newDefault: string): void {
  * 3. 空字符串
  */
 export function resolveSystemPromptForConversation(conversation: Conversation): string {
-  if (conversation.system_prompt) return conversation.system_prompt;
+  if (conversation.system_prompt) {
+    return conversation.system_prompt;
+  }
   return appStore.state.value.system_prompt.default;
 }

@@ -77,7 +77,9 @@ export function ChatView() {
    */
   const cancel = async () => {
     const convId = activeId$();
-    if (!convId) return;
+    if (!convId) {
+      return;
+    }
     setRunning(false);
     setStreamingMessageId(null);
     await Effect.runPromiseExit(chatAgentStore.cancel(convId));
@@ -86,7 +88,9 @@ export function ChatView() {
   const send = async () => {
     const text = input().trim();
     const convId = activeId$();
-    if (!text || !convId || running()) return;
+    if (!text || !convId || running()) {
+      return;
+    }
     setInput("");
     setRunning(true);
     // V1.6+ per ADR-0014 D5:每 conv 至多 1 active 流,这里假定 send 入口已用
@@ -128,12 +132,16 @@ export function ChatView() {
           }
           case "tool_call": {
             const msgId = streamingMessageId();
-            if (msgId) appendToolCall(msgId, event.toolCall);
+            if (msgId) {
+              appendToolCall(msgId, event.toolCall);
+            }
             break;
           }
           case "tool_result": {
             const msgId = streamingMessageId();
-            if (msgId) finalizeToolResult(msgId, event.toolCallId, event.result, event.error);
+            if (msgId) {
+              finalizeToolResult(msgId, event.toolCallId, event.result, event.error);
+            }
             break;
           }
           case "done": {

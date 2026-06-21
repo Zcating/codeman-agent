@@ -128,7 +128,9 @@ export function finalizeAssistantMessage(message: Message): void {
 export function appendToolCall(messageId: string, toolCall: ToolCall): void {
   setMessages(
     messages().map((m) => {
-      if (m.id !== messageId) return m;
+      if (m.id !== messageId) {
+        return m;
+      }
       const existing = m.tool_calls ?? [];
       return { ...m, tool_calls: [...existing, toolCall] };
     }),
@@ -144,7 +146,9 @@ export function finalizeToolResult(
 ): void {
   setMessages(
     messages().map((m) => {
-      if (m.id !== messageId) return m;
+      if (m.id !== messageId) {
+        return m;
+      }
       const existing = m.tool_results ?? [];
       const entry: ToolResult =
         error !== undefined

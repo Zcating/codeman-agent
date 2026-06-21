@@ -102,7 +102,9 @@ function applyPatch(patch: Partial<Settings>): void {
 }
 
 function toAppError(e: unknown): AppError {
-  if (e && typeof e === "object" && "kind" in e) return e as AppError;
+  if (e && typeof e === "object" && "kind" in e) {
+    return e as AppError;
+  }
   return { kind: "Unknown", message: e instanceof Error ? e.message : String(e) };
 }
 
@@ -136,7 +138,9 @@ const refreshProviderModelsEffect = (id: string): Effect.Effect<ModelMeta[], App
     const models = yield* svc.fetchModels(id);
     setSettings("value", (prev) => {
       const providers = (prev.providers ?? []).map((p) => {
-        if (p.id !== id) return p;
+        if (p.id !== id) {
+          return p;
+        }
         const newLlm = { ...p.llm, models };
         if (models.length > 0 && !models.some((m) => m.id === p.llm.default_model)) {
           newLlm.default_model = models[0].id;

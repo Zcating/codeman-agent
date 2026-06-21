@@ -402,7 +402,9 @@ export const SettingsServiceLive = Layer.succeed(SettingsService, {
     Effect.gen(function* () {
       const settings = yield* invoke<Settings>("get_settings");
       const id = settings.default_llm_provider_id;
-      if (!id) return yield* Effect.succeed(null);
+      if (!id) {
+        return yield* Effect.succeed(null);
+      }
       return yield* Effect.succeed(
         settings.llm_providers.find((p) => p.id === id && p.enabled) ?? null,
       );
@@ -419,7 +421,9 @@ export const SettingsServiceImpl = {
     Effect.gen(function* () {
       const settings = yield* invoke<Settings>("get_settings");
       const id = settings.default_llm_provider_id;
-      if (!id) return yield* Effect.succeed(null);
+      if (!id) {
+        return yield* Effect.succeed(null);
+      }
       return yield* Effect.succeed(
         settings.llm_providers.find((p) => p.id === id && p.enabled) ?? null,
       );

@@ -57,7 +57,9 @@ export function SettingsPage() {
   };
 
   const onWorkspaceRemove = (id: string) => {
-    if (!confirm("Delete this workspace?")) return;
+    if (!confirm("Delete this workspace?")) {
+      return;
+    }
     const workspaces = appStore.state.value.workspaces!.filter((ws) => ws.id !== id);
     appStore.set({ workspaces });
   };

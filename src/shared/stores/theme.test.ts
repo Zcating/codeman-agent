@@ -65,7 +65,9 @@ describe("startThemeSync — .dark 类应用", () => {
         },
         removeEventListener: (_: string, listener: (e: MediaQueryListEvent) => void) => {
           const idx = listenerRegistry.indexOf(listener);
-          if (idx !== -1) listenerRegistry.splice(idx, 1);
+          if (idx !== -1) {
+            listenerRegistry.splice(idx, 1);
+          }
         },
       }),
     });

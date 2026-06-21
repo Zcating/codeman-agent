@@ -136,7 +136,9 @@ export async function archiveConversation(id: string): Promise<void> {
 
   const result = await Effect.runPromiseExit(program);
   if (Exit.isSuccess(result)) {
-    if (activeId() === id) setActiveId(null);
+    if (activeId() === id) {
+      setActiveId(null);
+    }
     await loadConversations();
   }
 }
@@ -163,7 +165,9 @@ export async function deleteConversation(id: string): Promise<void> {
 
   const result = await Effect.runPromiseExit(program);
   if (Exit.isSuccess(result)) {
-    if (activeId() === id) setActiveId(null);
+    if (activeId() === id) {
+      setActiveId(null);
+    }
     await loadConversations();
   }
 }

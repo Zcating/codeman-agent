@@ -27,8 +27,12 @@ interface AgentToolResult<T> {
 // says snake_case (workspace_id). Normalize to snake_case for the IPC layer.
 // ============================================================================
 function pickArgs<T extends Record<string, any>>(args: T, snake: string, camel?: string): any {
-  if (args[snake] !== undefined) return args[snake];
-  if (camel && args[camel] !== undefined) return args[camel];
+  if (args[snake] !== undefined) {
+    return args[snake];
+  }
+  if (camel && args[camel] !== undefined) {
+    return args[camel];
+  }
   return undefined;
 }
 
@@ -193,7 +197,9 @@ export const searchFilesTool: AgentTool<typeof SearchFilesSchema, FileMatch[] | 
       );
     }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, (matches: FileMatch[]) => {
-      if (matches.length === 0) return "No matches found.";
+      if (matches.length === 0) {
+        return "No matches found.";
+      }
       return `Found ${matches.length} match(es):\n${matches
         .map(
           (m) =>

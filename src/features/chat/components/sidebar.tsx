@@ -38,7 +38,9 @@ export function Sidebar() {
   // Polish F5: 完整键盘导航 — ArrowUp/Down 在会话间移动 focus,Enter 选中,Delete 进入 confirm,Escape 取消 confirm
   const handleListKeyDown = (e: KeyboardEvent) => {
     const items = conversations$();
-    if (items.length === 0) return;
+    if (items.length === 0) {
+      return;
+    }
     const currentIdx = items.findIndex((c) => c.id === activeId$());
 
     if (e.key === "ArrowDown") {
@@ -53,7 +55,9 @@ export function Sidebar() {
       focusItemAt(nextIdx);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (currentIdx >= 0) selectConversation(items[currentIdx].id);
+      if (currentIdx >= 0) {
+        selectConversation(items[currentIdx].id);
+      }
     } else if (e.key === "Delete") {
       if (currentIdx >= 0) {
         e.preventDefault();

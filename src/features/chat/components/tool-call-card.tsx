@@ -32,7 +32,9 @@ const TOOL_ICONS: Record<string, Component<{ class?: string }>> = {
 
 export function ToolCallCard(props: { toolCall: ToolCall; result?: ToolResult }) {
   const status = (): Status => {
-    if (!props.result) return "running";
+    if (!props.result) {
+      return "running";
+    }
     return props.result.error ? "error" : "success";
   };
 
@@ -40,15 +42,23 @@ export function ToolCallCard(props: { toolCall: ToolCall; result?: ToolResult })
     const s = status();
     // Polish: 严格遵守 "border + shadow 不同现",只 border 不用 shadow。
     const base = "p-3 border rounded-lg space-y-2 mb-2";
-    if (s === "running") return `${base} border-border bg-card`;
-    if (s === "success") return `${base} border-success/40 bg-success/5`;
+    if (s === "running") {
+      return `${base} border-border bg-card`;
+    }
+    if (s === "success") {
+      return `${base} border-success/40 bg-success/5`;
+    }
     return `${base} border-destructive/40 bg-destructive/5`;
   };
 
   const statusIcon = () => {
     const s = status();
-    if (s === "running") return "⏳";
-    if (s === "success") return "✓";
+    if (s === "running") {
+      return "⏳";
+    }
+    if (s === "success") {
+      return "✓";
+    }
     return "✗";
   };
 

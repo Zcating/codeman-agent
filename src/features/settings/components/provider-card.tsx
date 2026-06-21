@@ -93,7 +93,9 @@ export function ProviderCard(props: ProviderCardProps) {
   };
 
   const handleBillingKindChange = (kind: "balance" | "plan_quota") => {
-    if (!props.provider.billing) return;
+    if (!props.provider.billing) {
+      return;
+    }
     const updated: Provider = {
       ...props.provider,
       billing: { ...props.provider.billing, kind },
@@ -107,7 +109,9 @@ export function ProviderCard(props: ProviderCardProps) {
   };
 
   const handleDelete = async () => {
-    if (!confirm(`Delete provider "${props.provider.label}"?`)) return;
+    if (!confirm(`Delete provider "${props.provider.label}"?`)) {
+      return;
+    }
     setIsDeleting(true);
     // V1.8+ ADR-0016 D4: delete 走 appStore (含 state mutation + 后端 delete IPC)。
     const exit = await Effect.runPromiseExit(appStore.deleteProvider(props.provider.id));

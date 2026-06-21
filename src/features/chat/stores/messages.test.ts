@@ -47,7 +47,9 @@ let searchCalls: { query: string; limit: number }[] = [];
 const MockMessageServiceLive = Layer.succeed(MessageService, {
   list: (conversationId: string) => {
     listCalls.push(conversationId);
-    if (conversationId === "conv-1") return Effect.succeed([fixtureMsg, fixtureMsg2]);
+    if (conversationId === "conv-1") {
+      return Effect.succeed([fixtureMsg, fixtureMsg2]);
+    }
     return Effect.succeed([]);
   },
   append: (args) => {

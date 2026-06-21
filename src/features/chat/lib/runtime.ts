@@ -385,7 +385,9 @@ export const AgentRuntimeLive = Layer.effect(
     const destroy = (conversationId: string): Effect.Effect<void, never, never> =>
       Effect.gen(function* () {
         yield* Ref.update(agentRef, (m) => {
-          if (!m.has(conversationId)) return m;
+          if (!m.has(conversationId)) {
+            return m;
+          }
           const next = new Map(m);
           next.delete(conversationId);
           return next;

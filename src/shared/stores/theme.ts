@@ -42,7 +42,9 @@ function resolveTheme(themeSetting: "light" | "dark" | "system"): "light" | "dar
 
 /** 鏍规嵁宸茶В鏋愪富棰樺 <html> 搴旂敤 .dark class銆?*/
 function applyDarkClass(isDark: boolean): void {
-  if (typeof document === "undefined") return;
+  if (typeof document === "undefined") {
+    return;
+  }
   if (isDark) {
     document.documentElement.classList.add("dark");
   } else {
@@ -52,7 +54,9 @@ function applyDarkClass(isDark: boolean): void {
 
 /** 璁剧疆鍗曚釜 matchMedia listener 鐩戝惉绯荤粺涓婚銆傚箓绛?鈥?鍏堟竻鐞嗘棫 listener銆?*/
 function setupMediaQueryListener(): void {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return;
+  }
 
   // 娓呯悊涔嬪墠鐨?listener
   if (mediaQuery && mediaQueryListener) {
@@ -78,7 +82,9 @@ function setupMediaQueryListener(): void {
  * 鍙畨鍏ㄥ娆¤皟鐢?鈥?鍙湁棣栨璋冪敤鐢熸晥銆?
  */
 export function startThemeSync(): void {
-  if (started) return;
+  if (started) {
+    return;
+  }
   started = true;
 
   const applyTheme = async () => {

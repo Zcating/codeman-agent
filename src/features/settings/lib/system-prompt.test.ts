@@ -19,7 +19,9 @@ vi.mock("solid-js/store", () => {
   });
   const storeProxy = new Proxy(store, {
     get(t, p) {
-      if (p === "value") return store.value;
+      if (p === "value") {
+        return store.value;
+      }
       return (t as any)[p];
     },
     set(t, p, v) {

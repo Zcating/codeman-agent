@@ -50,7 +50,9 @@ const MockConversationServiceLive = Layer.succeed(ConversationService, {
   },
   get: (id: string) => {
     getCalls.push(id);
-    if (id === fixtureA.id) return Effect.succeed(fixtureA);
+    if (id === fixtureA.id) {
+      return Effect.succeed(fixtureA);
+    }
     return Effect.fail({ kind: "NotFound" as const, message: `not found: ${id}` } as AppError);
   },
   create: (title: string, systemPrompt?: string) => {
