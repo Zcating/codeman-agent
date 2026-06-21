@@ -1,62 +1,79 @@
-﻿//! Chat Agent 桥接层 (ADR-0016 D4 + D5 + D6).
+//! Chat Agent bridge layer (ADR-0016 D4 + D5 + D6).
 //!
-//! 把 `AgentRuntime` 的 service 操作包成 chat 域 store method,
-//! 组件层不再 import `AgentRuntime` / `RuntimeLayer`,只 import `chatAgentStore`。
+//! V1.8+ ADR-0016: The chat domain wraps AgentRuntime into a store so components
+//! do not import AgentRuntime or RuntimeLayer directly. Components call
+//!   - chatAgentStore.startRun(conv, msg) -> Stream<RuntimeEvent, AppError>
+//!   - chatAgentStore.cancel(convId) -> Effect<void, never>
+//!   - chatAgentStore.destroy(convId) -> Effect<void, never>
 //!
-//! D6: 沿用 `AgentRuntime.run` 已有的 Stream 形态 (`Stream<RuntimeEvent, AppError, ...>`),
-//! store 层只 wrap 一次 + bake `RuntimeLayer` 提供。组件用 `Stream.runForEach` 接 event handler。
-
-import { Effect, Stream } from "effect";
+//! **Layer provisioning pattern:** The runtime's run() method's stream type
+//! declares R = SettingsService | MessageService, but the actual implementation
+//! uses closure-captured services. To make the returned stream consumable by
+//! chat-view (which has no service in its context), we use Stream.unwrap +
+//! Effect.provide to bake the full layer into the stream wrapper.
+//!
+//! **Why this is tricky:** The runtime's `yield* settingsSvc.getSettings()` is
+//! in the inner Effect.gen (not the layer build), but Stream.unwrap creates
+//! a stream that, when consumed, runs the inner Effect. The consumer (chat-view)
+//! has no service in context. We use `Effect.runSync` to materialize the stream
+//! at the store level (where we control the context) and return the stream
+//! directly so the consumer does not need to provide anything.
+import { Effect, Stream, Layer } from "effect";
 import type { AppError, Conversation, Message } from "../../../shared/lib/types";
-import { AgentRuntime, RuntimeLayer, type RuntimeEvent } from "../lib/runtime";
+import {
+  AgentRuntime,
+  RuntimeDeps,
+  AgentRuntimeLive,
+  RuntimeError,
+  type RuntimeEvent,
+} from "../lib/runtime";
+
+/** Compose a layer that provides AgentRuntime + all runtime deps in one go. */
+const fullLayer = Layer.mergeAll(
+  Layer.provide(AgentRuntimeLive, RuntimeDeps),
+  RuntimeDeps,
+);
 
 /**
- * V1.8+ ADR-0016 D6: 启动 agent run，返回 RuntimeEvent 流。
- * 组件: `Stream.runForEach(chatAgentStore.startRun(conv, msg), (event) => Effect.gen(...))`
+ * V1.8+ ADR-0016 D6: start agent run, return RuntimeEvent stream.
+ *
+ * Build the stream with the full layer in scope. The resulting stream's
+ * internal Effect is run at the store level (via Effect.runSync) so the
+ * consumer's context is not required to have any service.
  */
 function startRunEffect(
   conversation: Conversation,
   userMessage: Message,
 ): Stream.Stream<RuntimeEvent, AppError> {
-  return Stream.unwrap(
-    Effect.gen(function* () {
-      const runtime = yield* AgentRuntime;
-      return runtime.run(conversation, userMessage);
-    }).pipe(Effect.provide(RuntimeLayer)),
-  ) as Stream.Stream<RuntimeEvent, AppError>;
+  const program = Effect.gen(function* () {
+    const runtime = yield* AgentRuntime;
+    return Stream.provideLayer(runtime.run(conversation, userMessage), RuntimeDeps);
+  }).pipe(Effect.provide(fullLayer));
+  return Effect.runSync(program as Effect.Effect<Stream.Stream<RuntimeEvent, AppError | RuntimeError, never>, never, never>) as Stream.Stream<RuntimeEvent, AppError>;
 }
 
-/** V1.8+ ADR-0016 D4 + D5: cancel 按 convId 路由。 */
 const cancelEffect = (conversationId: string): Effect.Effect<void, never> =>
   Effect.gen(function* () {
     const runtime = yield* AgentRuntime;
     yield* runtime.cancel(conversationId);
-  }).pipe(Effect.provide(RuntimeLayer)) as Effect.Effect<void, never>;
+  }).pipe(Effect.provide(fullLayer)) as Effect.Effect<void, never>;
 
-/** V1.8+ ADR-0016 D4 + D5: 从 per-conv Agent Map 移除。 */
 const destroyEffect = (conversationId: string): Effect.Effect<void, never> =>
   Effect.gen(function* () {
     const runtime = yield* AgentRuntime;
     yield* runtime.destroy(conversationId);
-  }).pipe(Effect.provide(RuntimeLayer)) as Effect.Effect<void, never>;
+  }).pipe(Effect.provide(fullLayer)) as Effect.Effect<void, never>;
 
 export const chatAgentStore = {
-  /**
-   * D6: 启动 run，返回 RuntimeEvent 流。组件用 `Stream.runForEach` 接 event handler。
-   */
   startRun(
     conversation: Conversation,
     userMessage: Message,
   ): Stream.Stream<RuntimeEvent, AppError> {
     return startRunEffect(conversation, userMessage);
   },
-
-  /** D4 + D5: cancel 按 convId 路由。不存在的 convId 静默 no-op。 */
   cancel(conversationId: string): Effect.Effect<void, never> {
     return cancelEffect(conversationId);
   },
-
-  /** D4 + D5: 从 per-conv Agent Map 移除。archive/delete conversation 前调用。 */
   destroy(conversationId: string): Effect.Effect<void, never> {
     return destroyEffect(conversationId);
   },
