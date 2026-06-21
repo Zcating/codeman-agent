@@ -1,4 +1,4 @@
-﻿//! Sidebar — 会话列表（无搜索,新对话走 store 的空守卫）。
+//! Sidebar — 会话列表（无搜索,新对话走 store 的空守卫）。
 //!
 //! 消费来自 Effect→Solid 桥接层（`../store/conversations`）。
 //! 本文件任何位置都**不**导入 'effect'。
@@ -17,7 +17,7 @@ import {
   startNewConversation,
   selectConversation,
   deleteConversation,
-} from "../stores/conversations";
+} from "../stores/conversations.store";
 import { Button } from "../../../shared/components/ui/button";
 
 export function Sidebar() {

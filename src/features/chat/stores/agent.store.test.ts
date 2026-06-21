@@ -20,7 +20,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Chunk, Effect, Stream, Layer, Context, Exit } from "effect";
 import type { Conversation, Message } from "../../../shared/lib/types";
-import { chatAgentStore } from "./agent";
+import { chatAgentStore } from "./agent.store";
 
 // ——— Runtime test double (ADR-0016 D6 layer-baking pattern) ——————
 //

@@ -16,9 +16,9 @@ src/features/chat/
 │   └── runtime.test.ts   # Runtime 单元测试
 │
 ├── stores/               # 反应式状态（Solid signal / store / Accessor）
-│   ├── conversations.ts  # Effect → Solid bridge: conversations$ + CRUD
+│   ├── conversations.store.ts  # Effect → Solid bridge: conversations$ + CRUD
 │   ├── conversations.test.ts
-│   ├── messages.ts       # Effect → Solid bridge: messages$ + stream callbacks
+│   ├── messages.store.ts       # Effect → Solid bridge: messages$ + stream callbacks
 │   └── messages.test.ts
 │
 ├── components/           # UI 组件

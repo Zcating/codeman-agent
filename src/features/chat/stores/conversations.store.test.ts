@@ -1,4 +1,4 @@
-﻿//! ConversationService Effect 桥接层测试。
+//! ConversationService Effect 桥接层测试。
 //!
 //! 测试 Effect → Solid 桥接函数（loadConversations、createConversation、selectConversation），
 //! 使用 mock ConversationService。
@@ -14,8 +14,8 @@ import {
   selectConversation,
   archiveConversationEffect,
   deleteConversationEffect,
-} from "./conversations";
-import { clearMessages } from "./messages";
+} from "./conversations.store";
+import { clearMessages } from "./messages.store";
 import { mockState } from "../../../__mocks__/@tauri-apps/api/core";
 
 // 测试 fixture

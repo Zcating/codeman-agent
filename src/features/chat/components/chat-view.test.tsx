@@ -1,4 +1,4 @@
-﻿//! ChatView 组件测试。
+//! ChatView 组件测试。
 //!
 //! Mocked: conversations store, messages store, runtime services.
 
@@ -52,7 +52,7 @@ const mockMessages: Message[] = [
   },
 ];
 
-vi.mock("../stores/conversations", () => ({
+vi.mock("../stores/conversations.store", () => ({
   conversations$: vi.fn(() => [
     {
       id: "conv-1",
@@ -70,7 +70,7 @@ vi.mock("../stores/conversations", () => ({
   deleteConversation: vi.fn(),
 }));
 
-vi.mock("../stores/messages", () => ({
+vi.mock("../stores/messages.store", () => ({
   messages$: vi.fn(() => mockMessages),
   loadMessages: vi.fn(),
   appendUserMessage: vi.fn(),

@@ -1,4 +1,4 @@
-﻿//! Effect → Solid 会话桥接层。
+//! Effect → Solid 会话桥接层。
 //!
 //! Effect 依赖（通过 layers 消费，**永不**重新导出）：
 //! - ConversationService（来自 src/shared/lib/tauri.ts 的 Effect.Context.Tag）
@@ -16,7 +16,7 @@ import { createSignal, type Accessor } from "solid-js";
 import { Effect, Exit, Layer } from "effect";
 import { ConversationService, ConversationServiceLive } from "../../../shared/lib/tauri";
 import { AgentRuntime, AgentRuntimeLive } from "../lib/runtime";
-import { messages$ } from "./messages";
+import { messages$ } from "./messages.store";
 import type { AppError, Conversation, Message } from "../../../shared/lib/types";
 
 // ConversationService 的 runtime layer。R = never,适合不需要 AgentRuntime 的函数

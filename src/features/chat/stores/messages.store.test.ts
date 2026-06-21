@@ -1,4 +1,4 @@
-﻿//! MessageService Effect 桥接层测试。
+//! MessageService Effect 桥接层测试。
 //!
 //! 测试 Effect → Solid 桥接函数（loadMessages、appendUserMessage、persistAssistantMessage），
 //! 使用 mock MessageService + IPC mockState。
@@ -13,7 +13,7 @@ import {
   clearMessages,
   messages$,
   appendStreamingAssistantMessage,
-} from "./messages";
+} from "./messages.store";
 
 const fixtureMsg: Message = {
   id: "msg-1",

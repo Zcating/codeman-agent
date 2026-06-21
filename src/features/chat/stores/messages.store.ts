@@ -1,4 +1,4 @@
-﻿//! Effect → Solid 消息桥接层（带 stream 集成点）。
+//! Effect → Solid 消息桥接层（带 stream 集成点）。
 //!
 //! 桥接函数返回 Promise，绝不是 Effect，因此 Solid 组件
 //! 依据 AGENTS.md 保持无 Effect。
