@@ -108,6 +108,8 @@ export class ProviderService extends Context.Tag("ProviderService")<
     readonly get: (id: string) => Effect.Effect<Provider, TauriError>;
     readonly getModels: (id: string) => Effect.Effect<ModelMeta[], TauriError>;
     readonly fetchModels: (id: string) => Effect.Effect<ModelMeta[], TauriError>;
+    /** 删除 provider (V1.8+ ADR-0016 D4) — 占位 IPC, 实际删除走 client state mutation */
+    readonly delete: (id: string) => Effect.Effect<void, TauriError>;
   }
 >() {}
 
@@ -160,6 +162,8 @@ export class WorkspaceService extends Context.Tag("WorkspaceService")<
     readonly update: (id: string, patch: Partial<Workspace>) => Effect.Effect<void, AppError>;
     /** Removes a workspace by id */
     readonly remove: (id: string) => Effect.Effect<void, AppError>;
+    /** 弹出 OS folder picker (V1.8+ ADR-0016 D4) — 返回选中路径或 null */
+    readonly pickPath: () => Effect.Effect<string | null, AppError>;
   }
 >() {}
 
@@ -294,6 +298,14 @@ export const ProviderServiceLive = Layer.effect(
             deprecated: false,
             thinking: false,
           }));
+        }),
+
+      // V1.8+ ADR-0016 D4: delete provider — 占位 IPC, 实际删除走 client state mutation
+      // (provider-card.tsx 不再直接 invoke, 改走 appStore.deleteProvider)。
+      delete: (id) =>
+        Effect.tryPromise({
+          try: () => tauriInvoke<void>("delete_provider", { id }).catch(() => undefined),
+          catch: (e) => TauriError.IPC(`delete_provider failed: ${String(e)}`),
         }),
     };
   }),
@@ -449,6 +461,9 @@ export const WorkspaceServiceLive = Layer.effect(
           const workspaces = (settings.workspaces ?? []).filter((ws) => ws.id !== id);
           yield* settingsSvc.updateSettings({ workspaces });
         }),
+
+      // V1.8+ ADR-0016 D4: pick workspace path — 弹 OS folder picker
+      pickPath: () => invoke<string | null>("pick_workspace_path"),
     };
   }),
 );
@@ -458,10 +473,10 @@ export const WorkspaceServiceLive = Layer.effect(
 // was removed in v3 (renamed to Layer.effect, which takes an Effect<Service, E, R>).
 export const FileServiceLive = Layer.succeed(FileService, {
   readFile: (workspaceId: string, path: string) =>
-    invoke<string>("read_file", { workspace_id: workspaceId, path }),
+    invoke<string>("read_file", { workspaceId, path }),
 
   writeFile: (workspaceId: string, path: string, content: string) =>
-    invoke<void>("write_file", { workspace_id: workspaceId, path, content }),
+    invoke<void>("write_file", { workspaceId, path, content }),
 
   editFile: (
     workspaceId: string,
@@ -471,22 +486,22 @@ export const FileServiceLive = Layer.succeed(FileService, {
     replaceAll: boolean,
   ) =>
     invoke<void>("edit_file", {
-      workspace_id: workspaceId,
+      workspaceId,
       path,
-      old_text: oldText,
-      new_text: newText,
-      replace_all: replaceAll,
+      oldText,
+      newText,
+      replaceAll,
     }),
 
   searchFiles: (workspaceId: string, glob: string, contentPattern: string | null) =>
     invoke<FileMatch[]>("search_files", {
-      workspace_id: workspaceId,
+      workspaceId,
       glob,
-      content_pattern: contentPattern,
+      contentPattern,
     }),
 
   deleteFile: (workspaceId: string, path: string) =>
-    invoke<void>("delete_file", { workspace_id: workspaceId, path }),
+    invoke<void>("delete_file", { workspaceId, path }),
 });
 
 // ─── 桥接函数（基于 Promise，用于 Solid UI） ──────────────────────────
@@ -551,3 +566,6 @@ export async function removeWorkspaceBridge(id: string): Promise<void> {
   }).pipe(Effect.provide(WorkspaceServiceLive.pipe(Layer.provide(SettingsServiceLive))));
   await Effect.runPromise(program);
 }
+
+
+

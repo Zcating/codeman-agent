@@ -17,12 +17,13 @@
 ### Providers
 
 - **Provider (提供商)** — 公司维度的统一记录，承载一种或多种"对外能力"。一条记录 = 一家公司。shape: `{ id, label, enabled, api_key, llm: {...}, billing?: {...} }`。`api_key` 是该 provider 的对外调用凭据（明文存于 Settings JSON，见 ADR-0015）；`llm` 必选，`billing` 可选。_避免_：client、vendor、service。
-- **Provider.llm (LLM 能力)** — Provider 必选子对象。shape: `{ default_model, base_url, api_type, models, models_endpoint }`。`api_type` 锁 `"anthropic-messages"`；`models: ModelMeta[]` 用户在 Settings 中可编辑；`models_endpoint: string` provider 维度的模型列表拉取 URL。Agent 的"燃料"。pi-ai 调 LLM 时 `Authorization: Bearer <Provider.api_key>`。_避免_：model provider、API provider、AI provider。
+- **Provider.llm (LLM 能力)** — Provider 必选子对象。shape: `{ default_model, base_url, api_type, models, models_endpoint }`。`api_type` 锁 `"anthropic-messages"`；`models: ModelMeta[]` 用户在 Settings 中可编辑；`models_endpoint: string` provider 维度的模型列表拉取 URL。**不变量**：`default_model` 始终是 `models` 数组中某个元素的 `id` 或 `""`（见 Default Model Invariant，ADR-0016）。Agent 的"燃料"。pi-ai 调 LLM 时 `Authorization: Bearer <Provider.api_key>`。_避免_：model provider、API provider、AI provider。
 - **Provider.billing (计费能力)** — Provider 可选子对象。shape: `{ kind }`。`kind` = `"balance" | "plan_quota"`。Agent 的一级工具目标。billing adapter 调计费端点时复用 `Provider.api_key` 作 `Authorization: Bearer`。_避免_：billing source、计费源。
 - **Protocol (协议)** — LLM 上游调用的 HTTP/SSE 形态。锁定 anthropic-messages（Anthropic Messages API 的请求/响应形状）；pi-ai 按 `api` 字段路由到对应 transport 实现。_避免_：API format、API type（实现细节）、wire format。
 - **Adapter (适配器)** — 每个计费提供方的 HTTP 客户端与响应解析器，将 API key 转换为 `Snapshot`。位于 TS 端 (`src/features/billing/lib/adapters/`)：deepseek 仅实现 `balance`，minimax 实现 `plan_quota`（balance 端点未公开验证）。_避免_：HTTP client（过载）。
 - **ModelMeta (模型元数据)** — `Provider.llm.models[]` 元素。shape: `{ id, label, context_window?, deprecated?, thinking? }`；用户在 Settings 中可增删编辑。`ProviderService.getModels(id)` 静态读出此列表（读 settings）；`ProviderService.fetchModels(id)` 调 `models_endpoint` 拉最新（OpenAI-compatible `/v1/models` 格式，`label` 默认 = `id`）。_避免_：model config、model info。
 - **Models Endpoint (模型列表端点)** — `Provider.llm.models_endpoint`。per-provider 可配置 URL，用于 `fetchModels()` 拉模型列表。
+- **Default Model Invariant (默认模型不变量)** — `Provider.llm.default_model` 始终是 `Provider.llm.models` 数组中某个元素的 `id`，或 `""`（models 为空时）。`appStore.refreshProviderModels` 在写 state 时强制执行：若 `default_model` 不在新数组中且数组非空，改成 `models[0].id`；若数组为空，改成 `""`（ADR-0016）。防止 UI dropdown 跳到默认第一项而 store 里 `default_model` 仍是无效值的"UI 看似 OK / store 不一致"的 bug。
 - **Balance (余额)** — 计费提供方持有的可充值信用池。时点状态，可充值。
 - **Plan Quota (用量)** — 套餐附带的固定、不可充值的配额。随使用减少，周期重置，不可充值。
 
@@ -49,7 +50,17 @@
 ### Settings 与状态
 
 - **Settings (设置)** — 通过 `tauri-plugin-store` 持久化的 JSON 文档，位于 OS app-data 目录。包含统一 `providers[]` 数组（每条 `Provider` 含 `api_key` 明文字段，见 ADR-0015），以及 window / theme / system_prompt / conversations / workspaces / user_language / start_at_login 等字段。**API 密钥现在直接落在 Settings JSON 内**（V1.7+ 之前的"分 Tauri store 命名空间"模型已废止）。
-- **App Store (全局应用状态)** — `src/shared/stores/app.store.ts` 提供的 Settings reactive 桥接层（ADR-0015）。`createStore` 包装 settings；UI 通过 `appStore.state.value` 读，`appStore.set(patch)` 写（debounced 500ms auto-flush），`appStore.forceFlush()` 跳过 debounce（footer Save 调用），`appStore.refresh()` 重新加载。**所有**对 Settings 的读写都走 app-store，禁止组件直接 `invoke("update_settings")` 或 `invoke("get_settings")`（见 ADR-0003）。
+- **App Store (全局应用状态)** — `src/shared/stores/app.store.ts` 提供的 Settings reactive 桥接层（ADR-0015 + ADR-0016）。`createStore` 包装 settings。公开 API（5 个）：
+  - `appStore.state.value` — reactive 读
+  - `appStore.set(patch)` — 写 state，**不**触发 IPC（debounce 由 `features/settings/lib/settings-saver` 触发）
+  - `appStore.forceFlush()` — 跳过 debounce 立即 IPC（footer Save 调用）
+  - `appStore.refresh()` — 从后端重载
+  - `appStore.refreshProviderModels(id)` — 调 `ProviderService.fetchModels` 拉新 models 列表并写 state（含 `default_model` 自动 fallback 不变量）
+  - `appStore.pickWorkspacePath()` — 调 OS folder picker，返回选中路径或 `null`
+  - `appStore.deleteProvider(id)` — 从 `providers[]` 移除指定记录
+  - `appStore.clearAllHistory()` — 清 SQLite conversation 表（settings 路由 advanced tab 调用）
+
+  **D4 硬规则（ADR-0016）**：**所有** service 操作（`Effect.gen(...yield* Service...)` / 裸 `invoke("...")` / 裸 `fetch`）只能在 Store 中出现。组件层 `.tsx` 文件**禁止**直接 import service 或调 IPC，全部走 `Effect.runPromiseExit(store.method(...))` + `Exit.match`。测试代码（`*.test.ts*`）不受 D4 约束。
 - **Stale (过期)** — `Snapshot` 时间戳超过 Billing Provider 的 `stale_after_seconds`；传统的"过期徽标"语义在 tool result 缓存场景保留。
 
 ### 样式
@@ -200,3 +211,4 @@ MiniMax `plan_quota` 端点（`https://api.minimaxi.com/anthropic/v1/quota/plan`
 - 跨平台打包（Tauri 保持可移植；仅 Windows）
 - 自动更新、代码签名
 - 点击穿透透明区域
+

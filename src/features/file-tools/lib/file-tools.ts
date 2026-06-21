@@ -22,6 +22,16 @@ interface AgentToolResult<T> {
   content: TextContent[];
   details: T;
 }
+// ============================================================================
+// Args normalizer — LLM may use camelCase (workspaceId) even though schema
+// says snake_case (workspace_id). Normalize to snake_case for the IPC layer.
+// ============================================================================
+function pickArgs<T extends Record<string, any>>(args: T, snake: string, camel?: string): any {
+  if (args[snake] !== undefined) return args[snake];
+  if (camel && args[camel] !== undefined) return args[camel];
+  return undefined;
+}
+
 
 // ============================================================================
 // Tool Schemas
@@ -115,7 +125,7 @@ export const readFileTool: AgentTool<typeof ReadFileSchema, string | AppError> =
   execute: async (_toolCallId, args: ReadFileArgs) => {
     const program = Effect.gen(function* () {
       const svc = yield* FileService;
-      return yield* svc.readFile(args.workspace_id, args.path);
+      return yield* svc.readFile(pickArgs(args, "workspace_id", "workspaceId"), pickArgs(args, "path"));
     }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, (content) => `Content:\n${content}`);
   },
@@ -130,7 +140,7 @@ export const writeFileTool: AgentTool<typeof WriteFileSchema, void | AppError> =
   execute: async (_toolCallId, args: WriteFileArgs) => {
     const program = Effect.gen(function* () {
       const svc = yield* FileService;
-      return yield* svc.writeFile(args.workspace_id, args.path, args.content);
+      return yield* svc.writeFile(pickArgs(args, "workspace_id", "workspaceId"), pickArgs(args, "path"), pickArgs(args, "content"));
     }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, () => "Done: file written successfully.");
   },
@@ -147,11 +157,11 @@ export const editFileTool: AgentTool<typeof EditFileSchema, void | AppError> = {
     const program = Effect.gen(function* () {
       const svc = yield* FileService;
       return yield* svc.editFile(
-        args.workspace_id,
-        args.path,
-        args.old_text,
-        args.new_text,
-        args.replace_all,
+        pickArgs(args, "workspace_id", "workspaceId"),
+        pickArgs(args, "path"),
+        pickArgs(args, "old_text", "oldText"),
+        pickArgs(args, "new_text", "newText"),
+        pickArgs(args, "replace_all", "replaceAll"),
       );
     }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, () =>
@@ -170,7 +180,7 @@ export const searchFilesTool: AgentTool<typeof SearchFilesSchema, FileMatch[] | 
   execute: async (_toolCallId, args: SearchFilesArgs) => {
     const program = Effect.gen(function* () {
       const svc = yield* FileService;
-      return yield* svc.searchFiles(args.workspace_id, args.glob, args.content_pattern ?? null);
+      return yield* svc.searchFiles(pickArgs(args, "workspace_id", "workspaceId"), pickArgs(args, "glob"), pickArgs(args, "content_pattern", "contentPattern") ?? null);
     }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, (matches: FileMatch[]) => {
       if (matches.length === 0) return "No matches found.";
@@ -196,7 +206,7 @@ export const deleteFileTool: AgentTool<typeof DeleteFileSchema, void | AppError>
   execute: async (_toolCallId, args: DeleteFileArgs) => {
     const program = Effect.gen(function* () {
       const svc = yield* FileService;
-      return yield* svc.deleteFile(args.workspace_id, args.path);
+      return yield* svc.deleteFile(pickArgs(args, "workspace_id", "workspaceId"), pickArgs(args, "path"));
     }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, () => "Done: file moved to recycle bin.");
   },

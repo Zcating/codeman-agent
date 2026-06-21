@@ -35,7 +35,7 @@ describe("readFileTool", () => {
       text: expect.stringContaining("hello world"),
     });
     expect(mockState.invokeCalls.find((c) => c.name === "read_file")).toMatchObject({
-      args: { workspace_id: "ws1", path: "/tmp/x.txt" },
+      args: { workspaceId: "ws1", path: "/tmp/x.txt" },
     });
   });
 
@@ -99,7 +99,7 @@ describe("writeFileTool", () => {
       text: expect.stringContaining("Done"),
     });
     expect(mockState.invokeCalls.find((c) => c.name === "write_file")).toMatchObject({
-      args: { workspace_id: "ws1", path: "/tmp/new.txt", content: "file content here" },
+      args: { workspaceId: "ws1", path: "/tmp/new.txt", content: "file content here" },
     });
   });
 
@@ -149,11 +149,11 @@ describe("editFileTool", () => {
     });
     expect(mockState.invokeCalls.find((c) => c.name === "edit_file")).toMatchObject({
       args: {
-        workspace_id: "ws1",
+        workspaceId: "ws1",
         path: "/tmp/x.txt",
-        old_text: "foo",
-        new_text: "bar",
-        replace_all: false,
+        oldText: "foo",
+        newText: "bar",
+        replaceAll: false,
       },
     });
   });
@@ -230,7 +230,7 @@ describe("searchFilesTool", () => {
       text: expect.stringContaining("src/main.ts:10"),
     });
     expect(mockState.invokeCalls.find((c) => c.name === "search_files")).toMatchObject({
-      args: { workspace_id: "ws1", glob: "**/*.ts", content_pattern: "TODO" },
+      args: { workspaceId: "ws1", glob: "**/*.ts", contentPattern: "TODO" },
     });
   });
 
@@ -244,7 +244,7 @@ describe("searchFilesTool", () => {
 
     expect(result.details).toHaveLength(1);
     expect(mockState.invokeCalls.find((c) => c.name === "search_files")).toMatchObject({
-      args: { workspace_id: "ws1", glob: "**/*.ts", content_pattern: null },
+      args: { workspaceId: "ws1", glob: "**/*.ts", contentPattern: null },
     });
   });
 
@@ -305,7 +305,7 @@ describe("deleteFileTool", () => {
       text: expect.stringContaining("recycle bin"),
     });
     expect(mockState.invokeCalls.find((c) => c.name === "delete_file")).toMatchObject({
-      args: { workspace_id: "ws1", path: "/tmp/old.txt" },
+      args: { workspaceId: "ws1", path: "/tmp/old.txt" },
     });
   });
 

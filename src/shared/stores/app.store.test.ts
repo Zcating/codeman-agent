@@ -1,11 +1,11 @@
-//! app.store 单测 (ADR-0015 V1.7+).
+﻿//! app.store 鍗曟祴 (ADR-0015 V1.7+).
 //!
-//! 测试覆盖：
-//! - set() 同步更新 state，不触发 IPC（debounce 逻辑在 settings-saver）
-//! - refresh() 返回 Effect，Effect.runPromise 后拿到 Settings
-//! - forceFlush() 返回 Effect，skip debounce 立即 IPC
+//! 娴嬭瘯瑕嗙洊锛?
+//! - set() 鍚屾鏇存柊 state锛屼笉瑙﹀彂 IPC锛坉ebounce 閫昏緫鍦?settings-saver锛?
+//! - refresh() 杩斿洖 Effect锛孍ffect.runPromise 鍚庢嬁鍒?Settings
+//! - forceFlush() 杩斿洖 Effect锛宻kip debounce 绔嬪嵆 IPC
 //!
-//! 关键约束：store 函数返回 `void` 或 `Effect<A, E, R>`，绝不 Promise。
+//! 鍏抽敭绾︽潫锛歴tore 鍑芥暟杩斿洖 `void` 鎴?`Effect<A, E, R>`锛岀粷涓?Promise銆?
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Effect } from "effect";
@@ -88,7 +88,141 @@ describe("appStore (ADR-0015 V1.7+ no debounce)", () => {
     expect(mockState.calls.filter((c) => c === "update_settings")).toHaveLength(0);
   });
 
-  it("forceFlush() returns Effect; Effect.runPromise triggers IPC immediately", async () => {
+  
+  // ─── V1.8+ ADR-0016 D1 + D2: refreshProviderModels ───
+
+  it("refreshProviderModels writes new models to state and returns them", async () => {
+    mockState.settings = {
+      ...mockState.settings,
+      providers: [{
+        id: "minimax",
+        label: "MiniMax",
+        enabled: true,
+        api_key: "",
+        llm: {
+          default_model: "old-model",
+          base_url: "https://api.example.com/v1",
+          api_type: "anthropic-messages" as const,
+          models: [{ id: "old-model", label: "Old", deprecated: false, thinking: false }],
+          models_endpoint: "https://api.example.com/v1/models",
+        },
+        billing: { kind: "plan_quota" as const },
+      }],
+    };
+    await Effect.runPromise(appStore.refresh());
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            { id: "new-model-A", name: "New A" },
+            { id: "new-model-B", name: "New B" },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const exit = await Effect.runPromiseExit(appStore.refreshProviderModels("minimax"));
+    expect(exit._tag).toBe("Success");
+    if (exit._tag === "Success") {
+      expect(exit.value.length).toBe(2);
+      expect(exit.value[0].id).toBe("new-model-A");
+    }
+    const provider = (appStore.state.value as any).providers.find((p: any) => p.id === "minimax");
+    expect(provider.llm.models.length).toBe(2);
+    expect(provider.llm.models[0].id).toBe("new-model-A");
+    fetchSpy.mockRestore();
+  });
+
+  it("refreshProviderModels auto-fallback when default_model not in new list", async () => {
+    mockState.settings = {
+      ...mockState.settings,
+      providers: [{
+        id: "minimax",
+        label: "MiniMax",
+        enabled: true,
+        api_key: "",
+        llm: {
+          default_model: "old-model",
+          base_url: "https://api.example.com/v1",
+          api_type: "anthropic-messages" as const,
+          models: [{ id: "old-model", label: "Old", deprecated: false, thinking: false }],
+          models_endpoint: "https://api.example.com/v1/models",
+        },
+        billing: { kind: "plan_quota" as const },
+      }],
+    };
+    await Effect.runPromise(appStore.refresh());
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ data: [{ id: "new-model-X", name: "New X" }] }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    await Effect.runPromiseExit(appStore.refreshProviderModels("minimax"));
+    const provider = (appStore.state.value as any).providers.find((p: any) => p.id === "minimax");
+    expect(provider.llm.default_model).toBe("new-model-X");
+    fetchSpy.mockRestore();
+  });
+
+  it("refreshProviderModels keeps default_model when already in new list", async () => {
+    mockState.settings = {
+      ...mockState.settings,
+      providers: [{
+        id: "minimax",
+        label: "MiniMax",
+        enabled: true,
+        api_key: "",
+        llm: {
+          default_model: "kept-model",
+          base_url: "https://api.example.com/v1",
+          api_type: "anthropic-messages" as const,
+          models: [{ id: "kept-model", label: "Kept", deprecated: false, thinking: false }],
+          models_endpoint: "https://api.example.com/v1/models",
+        },
+        billing: { kind: "plan_quota" as const },
+      }],
+    };
+    await Effect.runPromise(appStore.refresh());
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            { id: "kept-model", name: "Kept" },
+            { id: "new-model", name: "New" },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    await Effect.runPromiseExit(appStore.refreshProviderModels("minimax"));
+    const provider = (appStore.state.value as any).providers.find((p: any) => p.id === "minimax");
+    expect(provider.llm.default_model).toBe("kept-model");
+    fetchSpy.mockRestore();
+  });
+
+  it("refreshProviderModels fails for unknown provider (AppError)", async () => {
+    mockState.settings = {
+      ...mockState.settings,
+      providers: [{
+        id: "minimax",
+        label: "MiniMax",
+        enabled: true,
+        api_key: "",
+        llm: {
+          default_model: "x",
+          base_url: "https://api.example.com/v1",
+          api_type: "anthropic-messages" as const,
+          models: [],
+          models_endpoint: "https://api.example.com/v1/models",
+        },
+        billing: { kind: "plan_quota" as const },
+      }],
+    };
+    await Effect.runPromise(appStore.refresh());
+    const exit = await Effect.runPromiseExit(appStore.refreshProviderModels("nonexistent"));
+    expect(exit._tag).toBe("Failure");
+  });
+it("forceFlush() returns Effect; Effect.runPromise triggers IPC immediately", async () => {
     appStore.set({ theme: "light" });
     const effect = appStore.forceFlush();
     expect(effect).toBeDefined();
@@ -96,3 +230,4 @@ describe("appStore (ADR-0015 V1.7+ no debounce)", () => {
     expect(mockState.calls.filter((c) => c === "update_settings")).toHaveLength(1);
   });
 });
+
