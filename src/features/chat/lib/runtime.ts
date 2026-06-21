@@ -22,8 +22,22 @@
 //! - `cancel(convId)` 按 conversation 路由;`destroy(convId)` 移除。
 //! - D4 history feed:首次 run() 创建 Agent 时从 `MessageService.list(convId)` 拉历史
 //!   一次性回填,后续 run() 复用 Agent + appendMessage,Messages 累积。
+//!
+//! V1.9+ Queue-based runtime architecture (ADR-0017):
+//! - 替换原 `Stream.unwrap + Effect.gen + Stream.async` 三层 pattern 为
+//!   `Stream.unwrap + Effect.gen + Queue + Effect.fork + Stream.fromQueue`。
+//! - Queue.unbounded 作为 event bus,agent.subscribe 在 forked fiber 里跑,
+//!   事件通过 Queue.unsafeOffer 推入。
+//! - Stream.fromQueue(queue) 是 leaf operator,R = never,结构上不可能触发
+//!   "Service not found: SettingsService"(原 type-lie 在 ADR-0014 runtime
+//!   pattern 里残留,被 1fc33e7 fix 部分缓解但未完全消除)。
+//! - Fork 的 scope 自管 cleanup:addFinalizer 注册 queue.shutdown + sub release,
+//!   fiber 退出时(agent.prompt 完成 / reject / abort)自动跑。
+//! - Consumer cancel 走 chatAgentStore.cancel → runtime.cancel → agent.abort()
+//!   → AnthropicTransport signal.aborted 命中 → fetch abort → prompt reject
+//!   → fork 退出 → finalizers 跑 → queue.shutdown → stream 自动 end。
 
-import { Effect, Stream, Layer, Context, Ref } from "effect";
+import { Effect, Stream, Layer, Context, Ref, Queue } from "effect";
 import type { Model } from "@mariozechner/pi-ai";
 import { Agent, type AgentTransport } from "@mariozechner/pi-agent";
 import type { AgentEvent } from "@mariozechner/pi-agent";
@@ -68,7 +82,7 @@ export class AgentRuntime extends Context.Tag("AgentRuntime")<
     readonly run: (
       conversation: Conversation,
       userMessage: Message,
-    ) => Stream.Stream<RuntimeEvent, AppError | RuntimeError, SettingsService | MessageService>;
+    ) => Stream.Stream<RuntimeEvent, AppError | RuntimeError, never>;
     readonly cancel: (conversationId: string) => Effect.Effect<void, never, never>;
     readonly destroy: (conversationId: string) => Effect.Effect<void, never, never>;
   }
@@ -88,12 +102,11 @@ export const AgentRuntimeLive = Layer.effect(
     // 每个 conversation 一个 pi-mono Agent 实例,生命周期跟随 conversation;
     // 仅 delete/archive 时通过 `destroy(convId)` 移除 (D2 + D7)。
     const agentRef = yield* Ref.make<Map<ConversationId, Agent>>(new Map());
-    // 在 layer 内部 yield SettingsService + LLMProviderService + MessageService
-    // — 它们的 context 来自 layer 的 R,call site 提供这些 services 后 layer 才会
-    // 成功 build。得到的 services 通过闭包传给 run(),inner Stream effect 不需要
-    // yield* 任何 service — 这避免了 "Service not found" 的 issue (之前 yield*
-    // SettingsService 在 inner Stream effect 里找不到,因为 Stream.create 的 context
-    // 不从 outer Effect 继承)。
+    // 在 layer 内部 yield SettingsService + MessageService — 它们的 context 来自
+    // layer 的 R,call site 提供这些 services 后 layer 才会成功 build。得到的
+    // services 通过闭包传给 run(),inner Stream effect 不需要 yield* 任何 service
+    // — 这避免了 "Service not found" 的 issue (旧版本 yield* SettingsService 在
+    // inner Stream effect 里找不到)。
     const settingsSvc = yield* SettingsService;
     const messageSvc = yield* MessageService;
 
@@ -101,21 +114,15 @@ export const AgentRuntimeLive = Layer.effect(
       conversation: Conversation,
       userMessage: Message,
     ): Stream.Stream<RuntimeEvent, AppError | RuntimeError, never> => {
-      // Stream.unwrap + Stream.async 实现真正的增量流式输出：
-      //   - 旧实现把 events 推到数组里,等 agent.prompt() 完成后
-      //     才构造 Stream.fromIterable(eventQueue),stream 创建时所有事件
-      //     已攒齐,consumer 同步排空 → UI 看不到增量渲染,只能看到最终文本。
-      //   - 新实现用 Stream.async 把 events 通过 emit.single 推到 stream 内部
-      //     queue,每个 SSE delta 触发立即 emit,consumer 在事件到达时即拉取。
-      //   - chat-view.tsx 在 Stream.runForEach 回调里加 Effect.sleep(Duration.zero)
-      //     让 Solid signal 有 microtask 边界 flush DOM,实现真正的打字机效果。
       return Stream.unwrap(
         Effect.gen(function* () {
-          // settingsSvc + llmSvc 通过闭包从外层 layer scope 进来 — 不需要 yield。
+          const queue = yield* Queue.unbounded<RuntimeEvent>();
+
+          // ─── Provider / model / agent setup ───
+
           // 加载设置和活跃 provider。
           // E2E fix: 兼容 V1 (SettingsService.getActiveLlmProvider 返回 LLMProvider)
           //          跟 V1.5 (settings.providers[] 是 source of truth)。
-          //          V1 的 llm_providers 经常是空数组,所以 fallback 到 V1.5 providers[]。
           const settings = yield* settingsSvc.getSettings();
           let activeProvider = yield* settingsSvc.getActiveLlmProvider();
           if (!activeProvider && settings.providers && settings.providers.length > 0) {
@@ -137,11 +144,16 @@ export const AgentRuntimeLive = Layer.effect(
             }
           }
           if (!activeProvider) {
-            return Stream.fail(new RuntimeError("no active LLM provider"));
+            // Stream.fail 的默认 A=never,跟下面 Stream.fromQueue(queue) 的
+            // A=RuntimeEvent 不能 unify。显式 cast 让 TypeScript 把两者都
+            // 看成 Stream<RuntimeEvent, RuntimeError, never>。
+            return Stream.fail(new RuntimeError("no active LLM provider")) as Stream.Stream<
+              RuntimeEvent,
+              RuntimeError,
+              never
+            >;
           }
 
-          // 构造 Model 对象 — inline 替代 buildModel helper (V1.5 buildModel 签名需
-          // Provider + modelId,我们从 LLMProvider + settings.providers 拼数据)。
           // ADR-0011: api_type 固定为 "anthropic-messages"。
           const v15Provider = settings.providers?.find((p) => p.id === activeProvider.id);
           const modelId = activeProvider.default_model ?? "auto";
@@ -167,7 +179,7 @@ export const AgentRuntimeLive = Layer.effect(
           if (!agent) {
             // 首次 run() 该 conv:创建 Agent + 从 DB 拉历史消息一次性回填 (D4)。
             // 后续 run() 复用同一个 Agent,Messages 累积。
-            // ADR-0015: API key 从 v15Provider.api_key 直接读取,不再走 LLMProviderService.getApiKey IPC
+            // ADR-0015: API key 从 v15Provider.api_key 直接读取。
             const apiKey = v15Provider?.api_key ?? null;
             const transport: AgentTransport = new AnthropicTransport({
               getApiKey: async () => apiKey ?? undefined,
@@ -218,142 +230,139 @@ export const AgentRuntimeLive = Layer.effect(
             timestamp: userMessage.created_at,
           } as any);
 
-          // Stream.async(来自 feature/chat-streams):把 agent.subscribe 回调的
-          // events 实时推到 stream 内部 queue,每个 SSE delta 触发立即
-          // emit.single。consumer (chat-view 的 Stream.runForEach) 拉取时即时
-          // 拿到,无需等 agent.prompt() 结束。旧的 Stream.flatMap +
-          // Stream.fromIterable(eventQueue) 模式让所有事件先攒到数组,
-          // agent.prompt() 完成才构 stream,UI 看不到增量渲染只看到最终文本。
-          const stream = Stream.async<RuntimeEvent, RuntimeError>((emit) => {
-            // finished 哨兵:防御 agent_end 与 prompt().catch 双触发,
-            // 以及 emit.end() 之后的 stray emit 调用。
-            let finished = false;
+          // ─── Fork agent execution ───
+          // Fork scope 自管 cleanup:queue.shutdown + sub release 在 fiber 退出时
+          // 自动跑(normal / abort / interrupt 任何路径)。
+          // Consumer cancel 走 chatAgentStore.cancel → runtime.cancel →
+          // agent.abort() → fetch abort → prompt reject → fork 退出 →
+          // finalizers 跑 → queue.shutdown → Stream.fromQueue 自动 end。
+          yield* Effect.fork(
+            Effect.scoped(
+              Effect.gen(function* () {
+                // Finalizer 1:fiber 退出时关闭 queue → Stream.fromQueue 自动 end。
+                yield* Effect.addFinalizer(() => Effect.sync(() => Queue.shutdown(queue)));
 
-            const finishStream = (finalEvent?: RuntimeEvent): void => {
-              if (finished) return;
-              finished = true;
-              if (finalEvent) {
-                emit.single(finalEvent);
-              }
-              emit.end();
-            };
-
-            const unsub = agent!.subscribe((evt: AgentEvent) => {
-              if (finished) return;
-              try {
-                switch (evt.type) {
-                  case "message_update": {
-                    // 防御性 check:自定义 transport 的 message_update event 必须有
-                    // message 字段 + message.content 数组。如果 undefined 直接跳过,
-                    // 避免 [ChatView] 运行错误: Cannot read properties of undefined
-                    // (reading 'content')。
-                    const assistantMsg = (evt as { message?: { content?: unknown[] } }).message;
-                    if (!assistantMsg || !Array.isArray(assistantMsg.content)) {
-                      return;
-                    }
-                    for (const block of assistantMsg.content) {
-                      if (typeof block === "object" && block !== null && "type" in block) {
-                        const b = block as {
-                          type: string;
-                          text?: string;
-                          id?: string;
-                          name?: string;
-                          arguments?: Record<string, unknown>;
-                        };
-                        if (b.type === "text" && b.text !== undefined) {
-                          emit.single({ type: "token", content: b.text });
-                        } else if (b.type === "toolCall" && b.id !== undefined) {
-                          emit.single({
-                            type: "tool_call",
-                            toolCall: {
-                              id: b.id,
-                              name: b.name ?? "",
-                              args: b.arguments ?? {},
-                            },
-                          });
+                const handleAgentEvent = (evt: AgentEvent): void => {
+                  try {
+                    switch (evt.type) {
+                      case "message_update": {
+                        // 防御性 check:自定义 transport 的 message_update event 必须有
+                        // message 字段 + message.content 数组。如果 undefined 直接跳过,
+                        // 避免 [ChatView] 运行错误: Cannot read properties of undefined
+                        // (reading 'content')。
+                        const assistantMsg = (evt as { message?: { content?: unknown[] } }).message;
+                        if (!assistantMsg || !Array.isArray(assistantMsg.content)) {
+                          return;
                         }
+                        for (const block of assistantMsg.content) {
+                          if (typeof block === "object" && block !== null && "type" in block) {
+                            const b = block as {
+                              type: string;
+                              text?: string;
+                              id?: string;
+                              name?: string;
+                              arguments?: Record<string, unknown>;
+                            };
+                            if (b.type === "text" && b.text !== undefined) {
+                              Queue.unsafeOffer(queue, { type: "token", content: b.text });
+                            } else if (b.type === "toolCall" && b.id !== undefined) {
+                              Queue.unsafeOffer(queue, {
+                                type: "tool_call",
+                                toolCall: {
+                                  id: b.id,
+                                  name: b.name ?? "",
+                                  args: b.arguments ?? {},
+                                },
+                              });
+                            }
+                          }
+                        }
+                        break;
+                      }
+                      case "tool_execution_start": {
+                        break;
+                      }
+                      case "tool_execution_end": {
+                        Queue.unsafeOffer(queue, {
+                          type: "tool_result",
+                          toolCallId: evt.toolCallId,
+                          result: evt.result,
+                          error: evt.isError ? String(evt.result) : undefined,
+                        });
+                        break;
+                      }
+                      case "agent_end": {
+                        // 防御性 check:agent_end.events 必须有 messages 数组。
+                        const msgs = (evt as { messages?: unknown[] }).messages;
+                        const finalPiMsgs = (msgs ?? []) as Array<{
+                          content: Array<{
+                            type: string;
+                            text?: string;
+                            id?: string;
+                            name?: string;
+                            arguments?: Record<string, unknown>;
+                          }>;
+                        }>;
+                        if (finalPiMsgs.length > 0) {
+                          const lastPiMsg = finalPiMsgs[finalPiMsgs.length - 1];
+                          const textBlocks = lastPiMsg.content.filter(
+                            (b) => b.type === "text" && b.text !== undefined,
+                          );
+                          const toolBlocks = lastPiMsg.content.filter(
+                            (b) => b.type === "toolCall" && b.id !== undefined,
+                          );
+                          const doneMessage: Message = {
+                            id: crypto.randomUUID(),
+                            conversation_id: conversation.id,
+                            role: "assistant",
+                            content: textBlocks.map((b) => b.text ?? "").join(""),
+                            tool_calls:
+                              toolBlocks.length > 0
+                                ? toolBlocks.map((b) => ({
+                                    id: b.id!,
+                                    name: b.name ?? "",
+                                    args: b.arguments ?? {},
+                                  }))
+                                : null,
+                            tool_results: null,
+                            model: activeProvider.default_model ?? null,
+                            input_tokens: null,
+                            output_tokens: null,
+                            created_at: Date.now(),
+                          };
+                          Queue.unsafeOffer(queue, { type: "done", message: doneMessage });
+                        }
+                        break;
                       }
                     }
-                    break;
-                  }
-                  case "tool_execution_start": {
-                    break;
-                  }
-                  case "tool_execution_end": {
-                    emit.single({
-                      type: "tool_result",
-                      toolCallId: evt.toolCallId,
-                      result: evt.result,
-                      error: evt.isError ? String(evt.result) : undefined,
+                  } catch (e) {
+                    Queue.unsafeOffer(queue, {
+                      type: "error",
+                      error: { message: String(e) },
                     });
-                    break;
                   }
-                  case "agent_end": {
-                    // 防御性 check:agent_end.events 必须有 messages 数组。
-                    const msgs = (evt as { messages?: unknown[] }).messages;
-                    const finalPiMsgs = (msgs ?? []) as Array<{
-                      content: Array<{
-                        type: string;
-                        text?: string;
-                        id?: string;
-                        name?: string;
-                        arguments?: Record<string, unknown>;
-                      }>;
-                    }>;
-                    if (finalPiMsgs.length > 0) {
-                      const lastPiMsg = finalPiMsgs[finalPiMsgs.length - 1];
-                      const textBlocks = lastPiMsg.content.filter(
-                        (b) => b.type === "text" && b.text !== undefined,
-                      );
-                      const toolBlocks = lastPiMsg.content.filter(
-                        (b) => b.type === "toolCall" && b.id !== undefined,
-                      );
-                      const doneMessage: Message = {
-                        id: crypto.randomUUID(),
-                        conversation_id: conversation.id,
-                        role: "assistant",
-                        content: textBlocks.map((b) => b.text ?? "").join(""),
-                        tool_calls:
-                          toolBlocks.length > 0
-                            ? toolBlocks.map((b) => ({
-                                id: b.id!,
-                                name: b.name ?? "",
-                                args: b.arguments ?? {},
-                              }))
-                            : null,
-                        tool_results: null,
-                        model: activeProvider.default_model ?? null,
-                        input_tokens: null,
-                        output_tokens: null,
-                        created_at: Date.now(),
-                      };
-                      finishStream({ type: "done", message: doneMessage });
-                    } else {
-                      finishStream();
-                    }
-                    break;
-                  }
-                }
-              } catch (e) {
-                finishStream({ type: "error", error: { message: String(e) } });
-              }
-            });
+                };
 
-            // 启动 prompt — 若 reject 则 emit error event 后 end stream。
-            // 此时 unsub 已绑定,即便 emit 失败也会在 cleanup 阶段释放订阅。
-            agent!.prompt(userMessage.content).catch((e: unknown) => {
-              finishStream({ type: "error", error: { message: String(e) } });
-            });
+                const sub = agent!.subscribe(handleAgentEvent);
 
-            // Cleanup:stream 终止时(stream.end() / consumer cancel / error)
-            // 释放 pi-agent 订阅。ADR-0014:Map 条目不删,Agent 生命周期跟随
-            // conversation;destroy(convId) 才会从 Map 移除(in-flight 时先
-            // cancel 后 destroy 保证 SSE 连接显式释放,避免 JS GC 不可预测)。
-            return Effect.sync(() => {
-              unsub();
-            });
-          });
-          return stream;
+                // Finalizer 2:fiber 退出时释放 subscription(prompt reject 或
+                // consumer cancel 都会触发,保证不泄漏)。
+                yield* Effect.addFinalizer(() => Effect.sync(() => sub()));
+
+                yield* Effect.tryPromise({
+                  try: () => agent!.prompt(userMessage.content),
+                  catch: (e) => {
+                    Queue.unsafeOffer(queue, {
+                      type: "error",
+                      error: { message: String(e) },
+                    });
+                  },
+                }).pipe(Effect.ignore);
+              }),
+            ),
+          );
+
+          return Stream.fromQueue(queue);
         }),
       );
     };
@@ -403,6 +412,6 @@ export const RuntimeDeps = Layer.mergeAll(
 // AgentRuntimeLive 在 yield* Ref.make 时无外部 requirements,SettingsService 等
 // 是 AgentRuntime.run() 内部需要的 — 所以先用 Layer.provide 把 RuntimeDeps
 // 喂给 AgentRuntimeLive,然后 Layer.merge 把 deps 也对外暴露,这样
-// call site `Effect.provide(RuntimeLayer)` 才能满足 Stream.runForEach 内部
-// Effect 的 SettingsService | LLMProviderService requirements。
+// call site `Effect.provide(RuntimeLayer)` 才能满足 chat-view 内部
+// Effect 对 SettingsService 等的 requirement。
 export const RuntimeLayer = Layer.merge(Layer.provide(AgentRuntimeLive, RuntimeDeps), RuntimeDeps);

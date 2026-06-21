@@ -35,7 +35,7 @@
 
 ### 架构
 
-- **Runtime (运行时)** — 包装 pi-mono agent loop 的 Effect-TS 层。掌控 per-conversation Agent 生命周期、工具注册表、Stream 订阅。_避免_：agent core、agent loop。
+- **Runtime (运行时)** — 包装 pi-mono agent loop 的 Effect-TS 层。掌控 per-conversation Agent 生命周期、工具注册表、Stream 订阅。V1.9+ 改用 Queue-based Mailbox 架构（ADR-0017）：`Queue.unbounded` 作为 event bus，`Effect.fork` 在子 fiber 里跑 `agent.subscribe + agent.prompt`，事件通过 `Queue.unsafeOffer` 推入；consumer 端 `Stream.fromQueue(queue)` 是 leaf operator。`AgentRuntime.run` 的 declared R = `never`（truthful，无 type-lie），结构上不可能触发 `Service not found: SettingsService`。_避免_：agent core、agent loop。
 - **Per-Conversation Agent (会话级 Agent 实例)** — 每个 Conversation 对应一个 pi-mono `Agent` 实例。生命周期跟随 Conversation：lazy 创建于该 conv 首次 `run()`，销毁于 Conversation 被 delete / archive。Agent 实例在 `run()` 之间复用、累积 `messages: PiMessage[]`；首次创建时从 `MessageService.list(convId)` 一次性拉历史消息回填。同一 Conversation 至多 1 个 active 流；多 Conversation 可并行 streaming。切换 Conversation 时 in-flight 流保留状态、不被 cancel。_避免_：singleton Agent、per-request Agent。
 - **Agent Map (Agent 映射表)** — `AgentRuntimeLive` 持有的 `Ref<Map<ConversationId, Agent>>`。Service 本身仍是 `Context.Tag` 单例（每进程 1 个 service），但 service 内部状态按 ConversationId 索引。Service 公开 `run(conv, msg)`、`cancel(convId)`、`destroy(convId)` 三个方法；不暴露内部 Map（封装边界）。
 - **Bridge (桥接层)** — 将 Effect Service 的 `Effect` / `Stream` 输出翻译为 Solid signal 的层。UI 组件不 `import 'effect'`。_避免_：adapter（过载）。

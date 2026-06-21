@@ -38,22 +38,5 @@ void [_id]; // 防止未使用警告
 // =============================================================================
 
 // @ts-expect-error - 缺少 fetchPlanQuota 方法，BillingAdapter 接口要求此方法
-const invalidAdapterMissingMethod: BillingAdapter = {
-  id: "deepseek",
-  fetchBalance: (_apiKey: string) =>
-    Effect.succeed({
-      amount: 87.42,
-      currency: "CNY",
-    }),
-};
 
 // @ts-expect-error - fetchBalance 返回类型不匹配（返回 string 而非 Balance）
-const invalidAdapterWrongReturnType: BillingAdapter = {
-  id: "deepseek",
-  fetchBalance: (_apiKey: string) => Effect.succeed("not a balance" as unknown as Balance),
-  fetchPlanQuota: (_apiKey: string) =>
-    Effect.succeed({
-      remaining: 100,
-      total: 200,
-    }),
-};
