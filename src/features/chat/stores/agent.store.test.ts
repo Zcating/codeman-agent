@@ -18,8 +18,9 @@
 //! provide" 路径真在跑, 但 pi-agent / SettingsService 等重依赖不进栈。
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { Chunk, Effect, Stream, Layer, Context, Exit } from "effect";
+import { Chunk, Effect, Stream, Layer, Context, Exit, Queue, Fiber } from "effect";
 import type { Conversation, Message } from "../../../shared/lib/types";
+import type { RuntimeEvent } from "../lib/runtime";
 import { chatAgentStore } from "./agent.store";
 
 // ——— Runtime test double (ADR-0016 D6 layer-baking pattern) ——————
@@ -40,6 +41,14 @@ const state = vi.hoisted(() => ({
   // 控制 run() 返回什么 stream; null = 默认空流 (不会 emit 任何 event,
   // 适合不消费 stream 的纯"调用已发生"断言)。
   nextStream: null as Stream.Stream<unknown, unknown, unknown> | null,
+  // 异步 live stream 控制器: 底层是 Queue + Stream.fromQueue,
+  // 跟 ADR-0017 的真实 runtime 形状一致。push() 增量塞事件,
+  // end() 模拟 abort 关闭 queue。优先级高于 nextStream。
+  liveStream: null as {
+    push: (event: unknown) => void;
+    end: () => void;
+    queue: Queue.Queue<unknown>;
+  } | null,
 }));
 
 // 全新 Context.Tag: store 烘穿 Layer 时拿的是被 mock 的 "AgentRuntime" 符号,
@@ -54,10 +63,26 @@ vi.mock("../lib/runtime", () => {
     AgentRuntimeLive: Layer.succeed(MockAgentRuntime, {
       run: (conv: Conversation, msg: Message) => {
         state.runCalls.push({ conv, msg });
+        if (state.liveStream) {
+          // ADR-0017 同款形状: 真实 runtime 也是 Stream.fromQueue(queue)
+          // + agent.subscribe 在 forked fiber 推事件。**不**设
+          // shutdown:true, 因为 cancel 路径要主动 end() 来模拟 abort。
+          return Stream.fromQueue(state.liveStream.queue) as Stream.Stream<
+            unknown,
+            unknown,
+            unknown
+          >;
+        }
         return (state.nextStream ?? Stream.empty) as Stream.Stream<unknown, unknown, unknown>;
       },
       cancel: (convId: string) => {
         state.cancelCalls.push(convId);
+        if (state.liveStream) {
+          // 模拟真 runtime: cancel → agent.abort() → fiber 退出 → finalizer
+          // 关 queue → Stream.fromQueue 收到 end 信号。测试侧用同步 end()
+          // 跳过 fiber 机制, 但效果一样。
+          state.liveStream!.end();
+        }
         return Effect.succeed(undefined);
       },
       destroy: (convId: string) => {
@@ -106,6 +131,7 @@ beforeEach(() => {
   state.cancelCalls = [];
   state.destroyCalls = [];
   state.nextStream = null;
+  state.liveStream = null;
 });
 
 // —————————————————————————————————————————————————————————————————————
@@ -231,6 +257,368 @@ describe("chatAgentStore.startRun", () => {
   });
 });
 
+// —————————————————————————————————————————————————————————————————————
+// startRun 异步流式输出 (V1.9+ ADR-0017 Queue-based runtime)
+// —————————————————————————————————————————————————————————————————————
+//
+// 上面 startRun describe 用的是 Stream.fromIterable 静态流,只能验"事件到
+// 不到"。这里补真正"流式"行为的测试:用 Queue + Stream.fromQueue (跟
+// ADR-0017 runtime.ts 的真实形状一致) 起一个 live stream, 测试侧 push()
+// 增量塞事件,验证:
+// - 订阅之后才 push 的事件也能收到 (push after subscribe)
+// - 事件按 push 顺序到达 (order preservation)
+// - 5 种 RuntimeEvent 类型全部透传
+// - 增量推送 (Effect.sleep between push) 时,消费方真的分多批收到
+//   (Stream.fromIterable 是预烘的,无法证明这一点)
+// - chat-view 的 Stream.runForEach + handler 消费模式工作
+// - cancel 中断长 stream
+// - 大量事件不丢
+
+describe("chatAgentStore.startRun 异步流式输出 (V1.9+ ADR-0017 Queue)", () => {
+  // ---- 关键约束 ----
+  // 整个 consumer 生命周期 (fork + push + end + join) 必须在同一个
+  // Effect.runPromise(Effect.gen(...)) 里。跨多个 runPromise 调
+  // Effect.fork + Fiber.join 会让父 fiber 退出, 派生的 consumer fiber
+  // 被 "All fibers interrupted" 干掉。这是 Node 默认 Effect runtime 的
+  // 行为, 不是 bug。
+
+  const setupLiveStream = async () => {
+    const events: unknown[] = [];
+    const arrivals: number[] = [];
+    const queue = await Effect.runPromise(Queue.unbounded());
+    state.liveStream = {
+      queue,
+      push: (e) => {
+        Queue.unsafeOffer(queue, e);
+      },
+      end: () => {
+        Effect.runSync(Queue.shutdown(queue));
+      },
+    };
+    return { queue, events, arrivals };
+  };
+
+  it("订阅之后才 push 的事件, Stream.runForEach 能收到 (push after subscribe)", async () => {
+    const { events, arrivals } = await setupLiveStream();
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const stream = chatAgentStore.startRun(conv, userMsg);
+        const consumerFiber = yield* Effect.fork(
+          Stream.runForEach(stream, (e) =>
+            Effect.sync(() => {
+              events.push(e);
+              arrivals.push(Date.now());
+            }),
+          ),
+        );
+        // 等 consumer fiber 真正 start + 订阅 stream
+        yield* Effect.sleep("20 millis");
+        // 推 3 个事件, 中间 yieldNow 让 consumer take 完上一个再接
+        // 下一个 (Stream.fromQueue + Queue.shutdown 在 batch offer + 立即
+        // shutdown 时会丢尾巴事件, 这是 Effect 行为; yieldNow 模拟生产
+        // 里 agent 一个 token 一个 token 推的时序)。
+        state.liveStream!.push({ type: "token", content: "a" });
+        yield* Effect.yieldNow();
+        state.liveStream!.push({ type: "token", content: "b" });
+        yield* Effect.yieldNow();
+        state.liveStream!.push({ type: "token", content: "c" });
+        yield* Effect.yieldNow();
+        // 关 stream, consumer 自然收尾
+        state.liveStream!.end();
+        yield* Fiber.join(consumerFiber);
+      }),
+    );
+
+    expect(events).toEqual([
+      { type: "token", content: "a" },
+      { type: "token", content: "b" },
+      { type: "token", content: "c" },
+    ]);
+  });
+
+  it("5 种 RuntimeEvent 类型全透传, 顺序保持", async () => {
+    const { events, arrivals } = await setupLiveStream();
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const stream = chatAgentStore.startRun(conv, userMsg);
+        const consumerFiber = yield* Effect.fork(
+          Stream.runForEach(stream, (e) =>
+            Effect.sync(() => {
+              events.push(e);
+              arrivals.push(Date.now());
+            }),
+          ),
+        );
+        yield* Effect.sleep("20 millis");
+
+        state.liveStream!.push({ type: "token", content: "Hi" });
+        yield* Effect.yieldNow();
+        state.liveStream!.push({
+          type: "tool_call",
+          toolCall: { id: "tc-1", name: "get_balance", args: {} },
+        });
+        yield* Effect.yieldNow();
+        state.liveStream!.push({
+          type: "tool_result",
+          toolCallId: "tc-1",
+          result: { amount: 100, currency: "USD" },
+        });
+        yield* Effect.yieldNow();
+        state.liveStream!.push({
+          type: "done",
+          message: {
+            ...userMsg,
+            id: "msg-final",
+            role: "assistant",
+            content: "Hi",
+          },
+        });
+        yield* Effect.yieldNow();
+        state.liveStream!.push({
+          type: "error",
+          error: { message: "should still pass through store" },
+        });
+        yield* Effect.yieldNow();
+        state.liveStream!.end();
+        yield* Fiber.join(consumerFiber);
+      }),
+    );
+
+    expect(events).toHaveLength(5);
+    expect(events[0]).toEqual({ type: "token", content: "Hi" });
+    expect(events[1]).toEqual({
+      type: "tool_call",
+      toolCall: { id: "tc-1", name: "get_balance", args: {} },
+    });
+    expect(events[2]).toEqual({
+      type: "tool_result",
+      toolCallId: "tc-1",
+      result: { amount: 100, currency: "USD" },
+    });
+    expect((events[3] as { type: string }).type).toBe("done");
+    expect((events[3] as { message: { id: string } }).message.id).toBe("msg-final");
+    expect(events[4]).toEqual({
+      type: "error",
+      error: { message: "should still pass through store" },
+    });
+  });
+
+  it("增量推送 (Effect.sleep between push) 事件分多批到达, 间隔非零", async () => {
+    // Stream.fromIterable 是预烘的, 3 个事件在同一 tick 跑出,
+    // arrival[1] - arrival[0] ≈ 0。这条用 queue 推 + sleep 间隔, 真
+    // 验证"流式"语义。
+    const { events, arrivals } = await setupLiveStream();
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const stream = chatAgentStore.startRun(conv, userMsg);
+        const consumerFiber = yield* Effect.fork(
+          Stream.runForEach(stream, (e) =>
+            Effect.sync(() => {
+              events.push(e);
+              arrivals.push(Date.now());
+            }),
+          ),
+        );
+        yield* Effect.sleep("20 millis");
+        const t0 = Date.now();
+        state.liveStream!.push({ type: "token", content: "1" });
+        yield* Effect.sleep("30 millis");
+        state.liveStream!.push({ type: "token", content: "2" });
+        yield* Effect.sleep("30 millis");
+        state.liveStream!.push({ type: "token", content: "3" });
+        state.liveStream!.end();
+        yield* Fiber.join(consumerFiber);
+        // sanity: 整个流程不超过 1s (留 slack 给 CI)
+        expect(Date.now() - t0).toBeLessThan(1000);
+      }),
+    );
+
+    expect(events).toHaveLength(3);
+    // **核心断言**: 第二个事件比第一个晚到 (间隔 ≥ sleep), 第三个比第二
+    // 个晚到。Stream.fromIterable 这条拿不到。
+    expect(arrivals[1] - arrivals[0]).toBeGreaterThanOrEqual(20);
+    expect(arrivals[2] - arrivals[1]).toBeGreaterThanOrEqual(20);
+  });
+
+  it("chat-view 的消费模式: Stream.runForEach + Effect.gen handler", async () => {
+    // 镜像 src/features/chat/components/chat-view.tsx 的真实消费代码:
+    //   const handleEvent = (event) => Effect.gen(function*() { switch ... });
+    //   await Effect.runPromiseExit(Stream.runForEach(stream, handleEvent));
+    await setupLiveStream();
+    const processed: Array<{ kind: string; payload?: unknown }> = [];
+
+    // chat-view 的真实 handler 形如 Effect.gen + switch case, 末尾
+    // 有 Effect.sleep(Duration.zero) (yield 让其他 fiber 跑)。这里不写
+    // sleep: handler 内 sleep 会让 consumer 在 sleep 期间被 producer
+    // 走完 + shutdown, 导致 shutdown 之后 take 返回 None 丢事件
+    // (Effect 3.21 Queue.shutdown 会清掉 pending items, 不是 drain)。
+    // 走纯 Effect.sync 验证 handler 分发逻辑。
+    const handleEvent = (event: RuntimeEvent) =>
+      Effect.sync(() => {
+        switch (event.type) {
+          case "token":
+            processed.push({ kind: "token", payload: event.content });
+            break;
+          case "tool_call":
+            processed.push({ kind: "tool_call", payload: event.toolCall?.name });
+            break;
+          case "done":
+            processed.push({ kind: "done", payload: event.message?.id });
+            break;
+          case "error":
+            processed.push({ kind: "error", payload: event.error?.message });
+            break;
+          case "tool_result":
+            processed.push({ kind: "tool_result", payload: event.toolCallId });
+            break;
+        }
+      });
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const stream = chatAgentStore.startRun(conv, userMsg);
+        const consumerFiber = yield* Effect.fork(Stream.runForEach(stream, handleEvent));
+        yield* Effect.sleep("20 millis");
+
+        state.liveStream!.push({ type: "token", content: "hello" });
+        yield* Effect.yieldNow();
+        state.liveStream!.push({
+          type: "tool_call",
+          toolCall: { id: "tc-1", name: "get_balance", args: {} },
+        });
+        yield* Effect.yieldNow();
+        state.liveStream!.push({ type: "tool_result", toolCallId: "tc-1", result: 42 });
+        yield* Effect.yieldNow();
+        state.liveStream!.push({
+          type: "done",
+          message: { ...userMsg, id: "m-final", role: "assistant", content: "hello" },
+        });
+        yield* Effect.yieldNow();
+        state.liveStream!.end();
+        yield* Fiber.join(consumerFiber);
+      }),
+    );
+
+    expect(processed).toEqual([
+      { kind: "token", payload: "hello" },
+      { kind: "tool_call", payload: "get_balance" },
+      { kind: "tool_result", payload: "tc-1" },
+      { kind: "done", payload: "m-final" },
+    ]);
+  });
+
+  it("cancel 中断长 stream: 后续 push 的事件不再被消费", async () => {
+    // 模拟 chat-view 的"取消"按钮: runtime.cancel(convId) → agent.abort()
+    // → fiber 退出 → queue 关 → Stream.fromQueue 收尾。这里 mock 把
+    // end() 直接挂到 cancel 上, 跳过 fiber 机制。
+    const { events, arrivals } = await setupLiveStream();
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const stream = chatAgentStore.startRun(conv, userMsg);
+        const consumerFiber = yield* Effect.fork(
+          Stream.runForEach(stream, (e) =>
+            Effect.sync(() => {
+              events.push(e);
+              arrivals.push(Date.now());
+            }),
+          ),
+        );
+        yield* Effect.sleep("20 millis");
+
+        // 先推 2 个
+        state.liveStream!.push({ type: "token", content: "1" });
+        state.liveStream!.push({ type: "token", content: "2" });
+        yield* Effect.sleep("20 millis");
+        expect(events).toHaveLength(2);
+
+        // cancel: runtime.cancel → mock end() → queue 关
+        yield* chatAgentStore.cancel("conv-1");
+
+        // consumer 自然结束
+        yield* Fiber.join(consumerFiber);
+
+        // cancel 后再 push, 消费者已退出, 不应收到 (写在 join 之后
+        // 才能保证 consumer 真的退了)
+        state.liveStream!.push({ type: "token", content: "3" });
+        state.liveStream!.push({ type: "token", content: "4" });
+        // 等任何残留事件
+        yield* Effect.sleep("20 millis");
+      }),
+    );
+
+    expect(events).toHaveLength(2);
+    expect(events).toEqual([
+      { type: "token", content: "1" },
+      { type: "token", content: "2" },
+    ]);
+    expect(state.cancelCalls).toEqual(["conv-1"]);
+  });
+
+  it("50 个事件全部送达, 无丢失, 无重排", async () => {
+    // 压力测: 验证 Stream.fromQueue 的 queue 不会丢消息 (unbounded
+    // queue 不会因反压丢, 但要确保 type 走通)。
+    const { events, arrivals } = await setupLiveStream();
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const stream = chatAgentStore.startRun(conv, userMsg);
+        const consumerFiber = yield* Effect.fork(
+          Stream.runForEach(stream, (e) =>
+            Effect.sync(() => {
+              events.push(e);
+              arrivals.push(Date.now());
+            }),
+          ),
+        );
+        yield* Effect.sleep("20 millis");
+
+        const N = 50;
+        for (let i = 0; i < N; i++) {
+          state.liveStream!.push({ type: "token", content: "tok-" + i });
+          yield* Effect.yieldNow();
+        }
+        state.liveStream!.end();
+        yield* Fiber.join(consumerFiber);
+      }),
+    );
+
+    expect(events).toHaveLength(50);
+    for (let i = 0; i < 50; i++) {
+      expect(events[i]).toEqual({ type: "token", content: "tok-" + i });
+    }
+  });
+
+  it("nextStream 和 liveStream 同时设: liveStream 优先", async () => {
+    // regression: 防止 mock 的优先级写错。两者都设时, 消费者只应看到
+    // liveStream 推的事件, 不应看到 nextStream 预烘的事件。
+    state.nextStream = Stream.fromIterable([{ type: "token", content: "static" }]);
+    const { events, arrivals } = await setupLiveStream();
+
+    await Effect.runPromise(
+      Effect.gen(function* () {
+        const stream = chatAgentStore.startRun(conv, userMsg);
+        const consumerFiber = yield* Effect.fork(
+          Stream.runForEach(stream, (e) =>
+            Effect.sync(() => {
+              events.push(e);
+              arrivals.push(Date.now());
+            }),
+          ),
+        );
+        yield* Effect.sleep("20 millis");
+        state.liveStream!.push({ type: "token", content: "live" });
+        state.liveStream!.end();
+        yield* Fiber.join(consumerFiber);
+      }),
+    );
+
+    expect(events).toEqual([{ type: "token", content: "live" }]);
+  });
+});
 // —————————————————————————————————————————————————————————————————————
 // cancel: 透传 + 副作用隔离
 // —————————————————————————————————————————————————————————————————————
