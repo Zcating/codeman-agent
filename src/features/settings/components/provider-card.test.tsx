@@ -1,13 +1,14 @@
-//! ProviderCard V1.7+ tests — ADR-0015 appStore refactor.
+﻿//! ProviderCard V1.7+ tests 鈥?ADR-0015 appStore refactor.
 //! Tests for appStore integration, toggle, refresh, dropdown, billing subform,
 //! delete removes provider from appStore, API Key input, and no Save buttons.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, cleanup, screen } from "@solidjs/testing-library";
+import { render, cleanup, screen, waitFor } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
+import { Effect } from "effect";
 import { mockState } from "../../../__mocks__/@tauri-apps/api/core";
 
-// ─── Mock appStore — ALL variables inside factory to avoid hoisting issues ───────
+// 鈹€鈹€鈹€ Mock appStore 鈥?ALL variables inside factory to avoid hoisting issues 鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 // vi.mock is hoisted, so we must define everything inside the factory
 vi.mock("../../../shared/stores/app.store", () => {
@@ -30,6 +31,10 @@ vi.mock("../../../shared/stores/app.store", () => {
       }),
       forceFlush: vi.fn(),
       refresh: vi.fn(),
+      refreshProviderModels: vi.fn(),
+      deleteProvider: vi.fn(),
+      pickWorkspacePath: vi.fn(),
+      clearAllHistory: vi.fn(),
     },
     _resetAppStoreForTest: vi.fn(),
     // Expose internals for test assertions via module mocking
@@ -40,7 +45,7 @@ vi.mock("../../../shared/stores/app.store", () => {
   };
 });
 
-// ─── Fixtures ─────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ Fixtures 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 const mockProvider = {
   id: "minimax",
@@ -84,13 +89,13 @@ const mockProviderNoBilling = {
   },
 };
 
-// ─── Import provider-card AFTER mocking ─────────────────────────────────────────
+// 鈹€鈹€鈹€ Import provider-card AFTER mocking 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 import { ProviderCard } from "./provider-card";
 
 // We need to access the mock internals - import the module to get the exposed functions
 import * as appStoreMock from "../../../shared/stores/app.store";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ Helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 const renderCard = (provider = mockProvider) =>
   render(() => <ProviderCard provider={provider} onUpdate={vi.fn()} onDelete={vi.fn()} />);
@@ -98,7 +103,7 @@ const renderCard = (provider = mockProvider) =>
 const getLastSetCall = () => (appStoreMock as any).__getLastSetCall();
 const setProviders = (p: any[]) => (appStoreMock as any).__setProviders(p);
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ Tests 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 describe("ProviderCard", () => {
   beforeEach(() => {
@@ -113,14 +118,14 @@ describe("ProviderCard", () => {
     cleanup();
   });
 
-  // ── Test 1: renders 1 card with provider label ──
+  // 鈹€鈹€ Test 1: renders 1 card with provider label 鈹€鈹€
   it("renders 1 card with provider label and id", () => {
     renderCard();
     expect(screen.getByText("MiniMax")).toBeInTheDocument();
     expect(screen.getByText("minimax")).toBeInTheDocument(); // code element
   });
 
-  // ── Test 2: toggling enabled checkbox calls appStore.set ──
+  // 鈹€鈹€ Test 2: toggling enabled checkbox calls appStore.set 鈹€鈹€
   it("toggling enabled checkbox calls appStore.set and updates state", async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
@@ -142,44 +147,10 @@ describe("ProviderCard", () => {
     );
   });
 
-  // ── Test 3: Refresh models button fetches models via ProviderService (HTTP) ──
-  it("Refresh models button fetches models via ProviderService.fetchModels", async () => {
+  // ── Test 3 (V1.8+ ADR-0016 D1): Refresh models calls appStore.refreshProviderModels ──
+  it("Refresh models calls appStore.refreshProviderModels and shows success", async () => {
     const user = userEvent.setup();
-    // Mock window.fetch — ProviderServiceLive.fetchModels does a direct HTTP fetch
-    // to provider.llm.models_endpoint with Bearer auth (ADR-0015). No Tauri IPC.
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          data: [
-            { id: "model-A", name: "Model A", context_window: 100_000 },
-            { id: "model-B", name: "Model B" },
-          ],
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ),
-    );
-    // get_settings returns the provider list — used by ProviderServiceLive
-    mockState.resolved = { providers: [mockProvider] };
-
-    renderCard();
-
-    const refreshBtn = screen.getByRole("button", { name: /refresh models/i });
-    await user.click(refreshBtn);
-
-    // ProviderServiceLive fetched the models_endpoint
-    expect(fetchSpy).toHaveBeenCalledWith(
-      mockProvider.llm.models_endpoint,
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: `Bearer ${mockProvider.api_key}`,
-        }),
-      }),
-    );
-    // appStore.set was called with the new models list
-    const lastSet = getLastSetCall();
-    expect(lastSet).toBeTruthy();
-    const updated = lastSet.providers.find((p: any) => p.id === "minimax");
-    expect(updated.llm.models).toEqual([
+    const mockModels = [
       {
         id: "model-A",
         label: "Model A",
@@ -187,19 +158,34 @@ describe("ProviderCard", () => {
         deprecated: false,
         thinking: false,
       },
-      {
-        id: "model-B",
-        label: "Model B",
-        context_window: undefined,
-        deprecated: false,
-        thinking: false,
-      },
-    ]);
-
-    fetchSpy.mockRestore();
+      { id: "model-B", label: "Model B", deprecated: false, thinking: false },
+    ];
+    (appStoreMock as any).appStore.refreshProviderModels.mockReturnValue(
+      Effect.succeed(mockModels),
+    );
+    renderCard();
+    const refreshBtn = screen.getByRole("button", { name: /refresh models/i });
+    await user.click(refreshBtn);
+    await waitFor(() => {
+      expect(screen.getByText(/Loaded 2 model/i)).toBeInTheDocument();
+    });
+    expect((appStoreMock as any).appStore.refreshProviderModels).toHaveBeenCalledWith("minimax");
   });
 
-  // ── Test 4: model dropdown calls appStore.set on change ──
+  it("Refresh models failure shows error message", async () => {
+    const user = userEvent.setup();
+    (appStoreMock as any).appStore.refreshProviderModels.mockReturnValue(
+      Effect.fail({ kind: "IPC" as const, message: "fetchModels failed: HTTP 401" }),
+    );
+    renderCard();
+    const refreshBtn = screen.getByRole("button", { name: /refresh models/i });
+    await user.click(refreshBtn);
+    await waitFor(() => {
+      expect(screen.getByText(/Refresh failed.*IPC.*fetchModels failed/i)).toBeInTheDocument();
+    });
+  });
+
+  // 鈹€鈹€ Test 4: model dropdown calls appStore.set on change 鈹€鈹€
   it("model dropdown calls appStore.set with new model", async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
@@ -225,7 +211,7 @@ describe("ProviderCard", () => {
     );
   });
 
-  // ── Test 5: LLM-only provider hides billing subform ──
+  // 鈹€鈹€ Test 5: LLM-only provider hides billing subform 鈹€鈹€
   it("LLM-only provider (no billing) hides billing subform", () => {
     render(() => (
       <ProviderCard provider={mockProviderNoBilling} onUpdate={vi.fn()} onDelete={vi.fn()} />
@@ -237,7 +223,7 @@ describe("ProviderCard", () => {
     expect(screen.queryByText("Billing")).not.toBeInTheDocument();
   });
 
-  // ── Test 6: provider with billing renders billing subform with kind dropdown ──
+  // 鈹€鈹€ Test 6: provider with billing renders billing subform with kind dropdown 鈹€鈹€
   it("provider with billing renders billing subform with kind dropdown", () => {
     renderCard();
 
@@ -250,26 +236,22 @@ describe("ProviderCard", () => {
     expect(selects.length).toBeGreaterThanOrEqual(2);
   });
 
-  // ── Test 7: delete button removes provider from appStore ──
-  it("delete button removes provider from appStore and calls onDelete", async () => {
+  // ── Test 7 (V1.8+ ADR-0016 D4): delete button calls appStore.deleteProvider + onDelete ──
+  it("delete button calls appStore.deleteProvider and onDelete", async () => {
     const user = userEvent.setup();
     const onDelete = vi.fn();
-    // Mock confirm to return true
     vi.spyOn(window, "confirm").mockReturnValue(true);
-
+    (appStoreMock as any).appStore.deleteProvider.mockReturnValue(Effect.void);
     render(() => <ProviderCard provider={mockProvider} onUpdate={vi.fn()} onDelete={onDelete} />);
-
     const deleteBtn = screen.getByRole("button", { name: /delete provider/i });
     await user.click(deleteBtn);
-
-    const lastSet = getLastSetCall();
-    expect(lastSet).toBeTruthy();
-    const updatedProviders = lastSet.providers;
-    expect(updatedProviders.find((p: any) => p.id === "minimax")).toBeUndefined();
+    await waitFor(() => {
+      expect((appStoreMock as any).appStore.deleteProvider).toHaveBeenCalledWith("minimax");
+    });
     expect(onDelete).toHaveBeenCalledWith("minimax");
   });
 
-  // ── Test 8: API Key input onInput calls appStore.set ──
+  // 鈹€鈹€ Test 8: API Key input onInput calls appStore.set 鈹€鈹€
   it("API Key input onInput calls appStore.set with updated api_key", async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
@@ -292,7 +274,7 @@ describe("ProviderCard", () => {
     );
   });
 
-  // ── Test 9: No Save buttons in LLM or Billing subform sections ──
+  // 鈹€鈹€ Test 9: No Save buttons in LLM or Billing subform sections 鈹€鈹€
   it("no Save button appears in LLM or Billing subform sections", () => {
     renderCard();
 

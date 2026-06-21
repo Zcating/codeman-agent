@@ -1,26 +1,41 @@
-//! 全局 app-store (ADR-0015).
+﻿//! 全局 app-store (ADR-0015 + ADR-0016).
 //!
 //! Settings 的全局 reactive 桥接层。UI 通过 `appStore.state.value` 读，
-//! 通过 `appStore.set(patch)` / `appStore.forceFlush()` / `appStore.refresh()` 写。
+//! 通过 `appStore.set(patch)` / `appStore.forceFlush()` / `appStore.refresh()`
+//! 及 service-only-in-store 新方法 (D4) 写。
 //!
 //! 架构约束：
-//! - **store 函数返回类型二选一**：`void` 或 `Effect<A, E, R>`。绝不返回 Promise。
-//! - **本模块不持 debounce 逻辑**。`set()` 是同步 state mutation;debounce 由 Settings
+//! - **store 函数返回类型二选一**：`void` 或 `Effect<A, E, never>`。绝不返回 Promise。
+//! - **本模块不接 debounce 逻辑**。`set()` 是同步 state mutation；debounce 由 Settings
 //!   feature 层（`src/features/settings/lib/settings-saver.ts`）用 es-toolkit 实现。
+//! - **D4 硬规则**（ADR-0016）：所有 service 操作（IPC / ProviderService / SettingsService /
+//!   WorkspaceService）必须包成 store method，组件层只调 `Effect.runPromiseExit(store.method())`。
 //!
 //! 设计要点：
-//! - `value: Settings` 永不为 null —— `defaultSettings` 占位
+//! - `value: Settings` 永不为 null — `defaultSettings` 站位
 //! - `set(patch)` 同步 in-memory update（不触发 IPC）
-//! - `forceFlush()` 跳过任何 debounce，立即 IPC（footer Save 调用）
+//! - `forceFlush()` 跳过 debounce 立即 IPC（footer Save 调用）
 //! - `refresh()` 从后端重新加载
-//! - 启动时由 `src/index.tsx` 在 mount RouterProvider 之前 `await Effect.runPromise(appStore.refresh())`
+//! - `refreshProviderModels(id)` 拉 models + 写 state + D2 不变量
+//! - `pickWorkspacePath()` 弹 OS folder picker
+//! - `deleteProvider(id)` 从 providers[] 移除
+//! - `clearAllHistory()` 清 SQLite conversation 表
+//! - 启动时由 `src/index.tsx` 在 mount RouterProvider 之前 `await Effect.runPromiseExit(appStore.refresh())`
 
 import { createStore } from "solid-js/store";
 import { Effect } from "effect";
 import type { Settings, Provider, ProviderBilling, ModelMeta, AppError } from "../lib/types";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import {
+  ProviderService,
+  ProviderServiceLive,
+  WorkspaceService,
+  WorkspaceServiceLive,
+  SettingsService,
+  SettingsServiceLive,
+} from "../lib/tauri";
 
-// ─── Default Settings (ADR-0015) ─────────────────────────────────────
+// ─── Default Settings (ADR-0015) ──────────────────────────────────────
 const DEFAULT_MINIMAX_PROVIDER: Provider = {
   id: "minimax",
   label: "MiniMax",
@@ -107,6 +122,66 @@ const refreshEffect: Effect.Effect<Settings, AppError> = Effect.tryPromise({
   catch: toAppError,
 });
 
+/**
+ * V1.8+ ADR-0016 D1 + D2: 拉 models 列表 + 写 state + 强制执行 Default Model Invariant。
+ *
+ * Invariant: `Provider.llm.default_model` 始终是 `Provider.llm.models` 中某元素 id 或 `""`。
+ *  若 default_model 不在新数组中且数组非空 → 改 models[0].id
+ *  若数组为空 → 改 `""`
+ *  已经在数组里 → 不动
+ */
+const refreshProviderModelsEffect = (id: string): Effect.Effect<ModelMeta[], AppError> =>
+  Effect.gen(function* () {
+    const svc = yield* ProviderService;
+    const models = yield* svc.fetchModels(id);
+    setSettings("value", (prev) => {
+      const providers = (prev.providers ?? []).map((p) => {
+        if (p.id !== id) return p;
+        const newLlm = { ...p.llm, models };
+        if (models.length > 0 && !models.some((m) => m.id === p.llm.default_model)) {
+          newLlm.default_model = models[0].id;
+        } else if (models.length === 0) {
+          newLlm.default_model = "";
+        }
+        return { ...p, llm: newLlm };
+      });
+      return { ...prev, providers };
+    });
+    return models;
+  })
+    .pipe(Effect.provide(ProviderServiceLive))
+    .pipe(Effect.mapError((e: unknown) => toAppError(e)));
+
+/** V1.8+ ADR-0016 D4: 弹 OS folder picker，返回选中路径或 null。 */
+const pickWorkspacePathEffect = Effect.gen(function* () {
+  const svc = yield* WorkspaceService;
+  return yield* svc.pickPath();
+})
+  .pipe(Effect.provide(WorkspaceServiceLive))
+  .pipe(Effect.provide(SettingsServiceLive))
+  .pipe(Effect.mapError((e: unknown) => toAppError(e)));
+
+/** V1.8+ ADR-0016 D4: 从 providers[] 移除指定记录 + 触发后端 delete IPC (V0 占位)。 */
+const deleteProviderEffect = (id: string): Effect.Effect<void, AppError> =>
+  Effect.gen(function* () {
+    // 1. client-side state mutation (实际删除)
+    const providers = (settings.value.providers ?? []).filter((p) => p.id !== id);
+    setSettings("value", (prev) => ({ ...prev, providers }));
+    // 2. 后端 IPC (V0 占位, 失败不阻塞 — Rust 端无此命令但前端调用不 throw)
+    const svc = yield* ProviderService;
+    yield* svc.delete(id);
+  })
+    .pipe(Effect.provide(ProviderServiceLive))
+    .pipe(Effect.mapError((e: unknown) => toAppError(e)));
+
+/** V1.8+ ADR-0016 D4 + D5: 清 SQLite conversation 表。 */
+const clearAllHistoryEffect: Effect.Effect<void, AppError> = Effect.gen(function* () {
+  const svc = yield* SettingsService;
+  yield* svc.clearAllHistory();
+})
+  .pipe(Effect.provide(SettingsServiceLive))
+  .pipe(Effect.mapError((e: unknown) => toAppError(e)));
+
 export const appStore = {
   /** Reactive read of current Settings (always defined, never null). */
   state: settings,
@@ -123,7 +198,7 @@ export const appStore = {
 
   /**
    * Force immediate flush (skip debounce). Called by footer Save button.
-   * Returns Effect —— 调用方用 `Effect.runPromise(appStore.forceFlush())` 桥接。
+   * Returns Effect — caller bridges via `Effect.runPromiseExit(appStore.forceFlush())`.
    */
   forceFlush(): Effect.Effect<void, AppError> {
     return flushEffect;
@@ -131,10 +206,44 @@ export const appStore = {
 
   /**
    * Reload Settings from backend. Called on app startup and on demand.
-   * Returns Effect —— 调用方用 `Effect.runPromise(appStore.refresh())` 桥接。
+   * Returns Effect — caller bridges via `Effect.runPromiseExit(appStore.refresh())`.
    */
   refresh(): Effect.Effect<Settings, AppError> {
     return refreshEffect;
+  },
+
+  /**
+   * V1.8+ ADR-0016 D1: 拉指定 provider 的 models 列表，写入 store。
+   * 包含 D2 Default Model Invariant 强制执行。
+   * 组件用 `Effect.runPromiseExit(appStore.refreshProviderModels(id))` + Exit.match 处理。
+   * 注意: settingsSaver.scheduleSave() 仍由组件调用 (shared → feature 单向依赖)。
+   */
+  refreshProviderModels(id: string): Effect.Effect<ModelMeta[], AppError> {
+    return refreshProviderModelsEffect(id);
+  },
+
+  /**
+   * V1.8+ ADR-0016 D4: 弹 OS folder picker，返回选中路径或 null。
+   * 组件用 `Effect.runPromiseExit(appStore.pickWorkspacePath())` + Exit.match。
+   */
+  pickWorkspacePath(): Effect.Effect<string | null, AppError> {
+    return pickWorkspacePathEffect;
+  },
+
+  /**
+   * V1.8+ ADR-0016 D4: 从 providers[] 移除 + 后端 delete IPC。
+   * 组件用 `Effect.runPromiseExit(appStore.deleteProvider(id))` + Exit.match。
+   */
+  deleteProvider(id: string): Effect.Effect<void, AppError> {
+    return deleteProviderEffect(id);
+  },
+
+  /**
+   * V1.8+ ADR-0016 D4 + D5: 清 SQLite conversation 表。
+   * 组件用 `Effect.runPromiseExit(appStore.clearAllHistory())` + Exit.match。
+   */
+  clearAllHistory(): Effect.Effect<void, AppError> {
+    return clearAllHistoryEffect;
   },
 };
 

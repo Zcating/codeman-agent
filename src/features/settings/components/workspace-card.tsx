@@ -1,7 +1,7 @@
-//! WorkspaceCard — Card-based UI for a single workspace entry (ADR-0015 V1.7+).
+﻿//! WorkspaceCard 鈥?Card-based UI for a single workspace entry (ADR-0015 V1.7+).
 //! All writes go through appStore (debounced 500ms auto-flush); no direct invoke for settings.
 //! Uses Tailwind v4 utility classes only (ADR-0006). No BEM, no <style> blocks.
-//! No `import { Effect }` — this is a pure Solid UI component.
+//! No `import { Effect }` 鈥?this is a pure Solid UI component.
 
 import { createSignal } from "solid-js";
 import { Effect } from "effect";
@@ -71,7 +71,7 @@ export function WorkspaceCard(props: WorkspaceCardProps) {
 
   return (
     <Card class="mb-3 overflow-hidden">
-      {/* ── Header: label + enabled toggle ── */}
+      {/* 鈹€鈹€ Header: label + enabled toggle 鈹€鈹€ */}
       <CardHeader class="flex flex-row items-center justify-between p-4 pb-3">
         <div class="flex flex-col gap-0.5 min-w-0 flex-1">
           <div class="flex items-center gap-2">
@@ -92,7 +92,7 @@ export function WorkspaceCard(props: WorkspaceCardProps) {
         </span>
       </CardHeader>
 
-      {/* ── Content: root_path input + browse ── */}
+      {/* 鈹€鈹€ Content: root_path input + browse 鈹€鈹€ */}
       <CardContent class="space-y-2 p-4 pt-0">
         <div class="flex flex-col gap-1">
           <label class="text-xs text-muted-foreground font-medium">Root path</label>
@@ -118,7 +118,7 @@ export function WorkspaceCard(props: WorkspaceCardProps) {
         </div>
       </CardContent>
 
-      {/* ── Footer: delete ── */}
+      {/* 鈹€鈹€ Footer: delete 鈹€鈹€ */}
       <CardFooter class="flex justify-end p-4 pt-0">
         <button
           type="button"

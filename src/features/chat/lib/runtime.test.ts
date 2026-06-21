@@ -146,6 +146,7 @@ const MockWorkspaceServiceLive = Layer.succeed(WorkspaceService, {
   add: () => Effect.succeed(undefined),
   update: () => Effect.succeed(undefined),
   remove: () => Effect.succeed(undefined),
+  pickPath: () => Effect.succeed(null),
 });
 
 // AgentRuntimeLive 现在 yield* SettingsService + MessageService 在

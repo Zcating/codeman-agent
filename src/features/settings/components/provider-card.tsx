@@ -1,14 +1,16 @@
-//! ProviderCard — V1.7+ ADR-0015 unified provider card.
+﻿//! ProviderCard — V1.8+ ADR-0015/0016 unified provider card.
 //! 1 card per provider with LLM subform (always) + Billing subform (if provider.billing).
-//! All writes go through appStore (debounced 500ms auto-flush); no direct invoke for settings.
+//! V1.8+ ADR-0016: all writes go through appStore (debounced 500ms auto-flush);
+//! handleRefreshModels + handleDelete 走 appStore.refreshProviderModels / appStore.deleteProvider,
+//! 不用 Effect.gen + ProviderService 也不再裸 invoke "delete_provider"。
 //! LLM API Key + Billing API Key collapsed to single Provider.api_key field.
 //! Uses Tailwind v4 utility classes only (ADR-0006). No BEM, no <style> blocks.
 
 import { createSignal, Show, For } from "solid-js";
-import { Effect } from "effect";
-import { ProviderService, ProviderServiceLive } from "../../../shared/lib/tauri";
+import { Effect, Exit } from "effect";
 import { appStore } from "../../../shared/stores/app.store";
 import { settingsSaver } from "../lib/settings-saver";
+import { formatAppError } from "../../../shared/lib/format-app-error";
 import type { Provider } from "../../../shared/lib/types";
 import { Button } from "../../../shared/components/ui/button";
 import { Input } from "../../../shared/components/ui/input";
@@ -37,7 +39,7 @@ export function ProviderCard(props: ProviderCardProps) {
   const [refreshMsg, setRefreshMsg] = createSignal<string | null>(null);
   const [isDeleting, setIsDeleting] = createSignal(false);
 
-  // ─── Handlers ───────────────────────────────────────────────
+  // ─── Handlers ──────────────────────────────────────────────────
 
   const handleEnabledToggle = (enabled: boolean) => {
     const updated: Provider = { ...props.provider, enabled };
@@ -79,29 +81,15 @@ export function ProviderCard(props: ProviderCardProps) {
   const handleRefreshModels = async () => {
     setIsRefreshing(true);
     setRefreshMsg(null);
-    try {
-      const models = await Effect.runPromise(
-        Effect.gen(function* () {
-          const svc = yield* ProviderService;
-          return yield* svc.fetchModels(props.provider.id);
-        }).pipe(Effect.provide(ProviderServiceLive)),
-      );
-      const updated: Provider = {
-        ...props.provider,
-        llm: { ...props.provider.llm, models },
-      };
-      const providers = appStore.state.value.providers!.map((p) =>
-        p.id === updated.id ? updated : p,
-      );
-      appStore.set({ providers });
+    // V1.8+ ADR-0016 D1: store refreshProviderModels 已经写 state + 强制 D2 不变量。
+    const exit = await Effect.runPromiseExit(appStore.refreshProviderModels(props.provider.id));
+    if (Exit.isSuccess(exit)) {
       settingsSaver.scheduleSave();
-      props.onUpdate(updated);
-      setRefreshMsg(`Loaded ${models.length} model(s)`);
-    } catch (e) {
-      setRefreshMsg(`Refresh failed: ${e}`);
-    } finally {
-      setIsRefreshing(false);
+      setRefreshMsg(`Loaded ${exit.value.length} model(s)`);
+    } else {
+      setRefreshMsg(`Refresh failed: ${formatAppError(exit.cause)}`);
     }
+    setIsRefreshing(false);
   };
 
   const handleBillingKindChange = (kind: "balance" | "plan_quota") => {
@@ -121,21 +109,22 @@ export function ProviderCard(props: ProviderCardProps) {
   const handleDelete = async () => {
     if (!confirm(`Delete provider "${props.provider.label}"?`)) return;
     setIsDeleting(true);
-    try {
-      const providers = appStore.state.value.providers!.filter((p) => p.id !== props.provider.id);
-      appStore.set({ providers });
+    // V1.8+ ADR-0016 D4: delete 走 appStore (含 state mutation + 后端 delete IPC)。
+    const exit = await Effect.runPromiseExit(appStore.deleteProvider(props.provider.id));
+    if (Exit.isSuccess(exit)) {
       settingsSaver.scheduleSave();
       props.onDelete(props.provider.id);
-    } finally {
-      setIsDeleting(false);
+    } else {
+      setRefreshMsg(`Delete failed: ${formatAppError(exit.cause)}`);
     }
+    setIsDeleting(false);
   };
 
-  // ─── Render ─────────────────────────────────────────────────
+  // ─── Render ─────────────────────────────────────────────────────
 
   return (
     <Card class="p-0 overflow-hidden">
-      {/* ── Header: label + enabled toggle ── */}
+      {/* ─── Header: label + enabled toggle ─── */}
       <CardHeader class="flex flex-row items-center justify-between p-4 pb-3">
         <div class="flex flex-col gap-0.5">
           <CardTitle class="text-base font-semibold">{props.provider.label}</CardTitle>
@@ -153,9 +142,8 @@ export function ProviderCard(props: ProviderCardProps) {
           />
         </div>
       </CardHeader>
-
       <CardContent class="space-y-4 p-4 pt-0">
-        {/* ── LLM Subform (always rendered) ── */}
+        {/* ─── LLM Subform (always rendered) ─── */}
         <div class="space-y-3 rounded-md border border-border p-3">
           <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">LLM</p>
 
@@ -225,7 +213,7 @@ export function ProviderCard(props: ProviderCardProps) {
           </div>
         </div>
 
-        {/* ── Billing Subform (only if provider.billing exists) ── */}
+        {/* ─── Billing Subform (only if provider.billing exists) ─── */}
         <Show when={props.provider.billing}>
           <div class="space-y-3 rounded-md border border-border p-3">
             <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -273,7 +261,7 @@ export function ProviderCard(props: ProviderCardProps) {
         </Show>
       </CardContent>
 
-      {/* ── Footer: delete ── */}
+      {/* ─── Footer: delete ─── */}
       <CardFooter class="flex justify-end p-4 pt-0">
         <Button variant="destructive" size="sm" onClick={handleDelete} disabled={isDeleting()}>
           {isDeleting() ? "Deleting…" : "Delete provider"}

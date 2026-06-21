@@ -1,4 +1,4 @@
-//! Tests for V1.5 ProviderService + BillingService + V2 WorkspaceService + FileService
+﻿//! Tests for V1.5 ProviderService + BillingService + V2 WorkspaceService + FileService
 //! Uses Layer.succeed for mock implementations with it.effect pattern
 
 import { it, expect } from "@effect/vitest";
@@ -18,7 +18,7 @@ import {
 } from "./tauri";
 import type { Provider, Snapshot } from "./types";
 
-// ─── Mock Data ────────────────────────────────────────────────
+// 鈹€鈹€鈹€ Mock Data 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 const mockProvider: Provider = {
   id: "minimax",
@@ -47,7 +47,7 @@ const mockProvider: Provider = {
 
 const mockProviderList: Provider[] = [mockProvider];
 
-// ─── Mock Layers ──────────────────────────────────────────────
+// 鈹€鈹€鈹€ Mock Layers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 const MockProviderServiceLive = Layer.succeed(ProviderService, {
   list: () => Effect.succeed(mockProviderList.filter((p) => p.enabled)),
@@ -79,6 +79,14 @@ const MockProviderServiceLive = Layer.succeed(ProviderService, {
     }
     return Effect.succeed(provider.llm.models ?? []);
   },
+
+  delete: (id) => {
+    const provider = mockProviderList.find((p) => p.id === id);
+    if (!provider) {
+      return Effect.fail(TauriError.IPC(`Provider not found: ${id}`));
+    }
+    return Effect.void;
+  },
 });
 
 const MockBillingServiceLive = Layer.succeed(BillingService, {
@@ -109,7 +117,7 @@ const MockBillingServiceLive = Layer.succeed(BillingService, {
   },
 });
 
-// ─── ProviderService Tests ────────────────────────────────────
+// 鈹€鈹€鈹€ ProviderService Tests 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 describe("ProviderService.list", () => {
   it.effect("returns enabled providers", () =>
@@ -188,7 +196,7 @@ describe("ProviderService.getModels", () => {
   );
 });
 
-// ─── BillingService Tests ─────────────────────────────────────
+// 鈹€鈹€鈹€ BillingService Tests 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 describe("BillingService.list", () => {
   it.effect("returns providers with billing configured", () =>
@@ -218,7 +226,7 @@ describe("BillingService.fetchSnapshot", () => {
   );
 });
 
-// ─── WorkspaceService Smoke Tests ─────────────────────────────────────────
+// 鈹€鈹€鈹€ WorkspaceService Smoke Tests 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 describe("WorkspaceService.list", () => {
   it.effect("returns empty array when no workspaces in settings", () =>
@@ -234,7 +242,7 @@ describe("WorkspaceService.list", () => {
   );
 });
 
-// ─── FileService Smoke Tests ───────────────────────────────────────────────
+// 鈹€鈹€鈹€ FileService Smoke Tests 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 describe("FileService.readFile", () => {
   it.effect("invokes read_file with correct camelCase args", () =>
