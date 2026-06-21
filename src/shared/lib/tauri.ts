@@ -458,10 +458,10 @@ export const WorkspaceServiceLive = Layer.effect(
 // was removed in v3 (renamed to Layer.effect, which takes an Effect<Service, E, R>).
 export const FileServiceLive = Layer.succeed(FileService, {
   readFile: (workspaceId: string, path: string) =>
-    invoke<string>("read_file", { workspace_id: workspaceId, path }),
+    invoke<string>("read_file", { workspaceId, path }),
 
   writeFile: (workspaceId: string, path: string, content: string) =>
-    invoke<void>("write_file", { workspace_id: workspaceId, path, content }),
+    invoke<void>("write_file", { workspaceId, path, content }),
 
   editFile: (
     workspaceId: string,
@@ -471,22 +471,22 @@ export const FileServiceLive = Layer.succeed(FileService, {
     replaceAll: boolean,
   ) =>
     invoke<void>("edit_file", {
-      workspace_id: workspaceId,
+      workspaceId,
       path,
-      old_text: oldText,
-      new_text: newText,
-      replace_all: replaceAll,
+      oldText,
+      newText,
+      replaceAll,
     }),
 
   searchFiles: (workspaceId: string, glob: string, contentPattern: string | null) =>
     invoke<FileMatch[]>("search_files", {
-      workspace_id: workspaceId,
+      workspaceId,
       glob,
-      content_pattern: contentPattern,
+      contentPattern,
     }),
 
   deleteFile: (workspaceId: string, path: string) =>
-    invoke<void>("delete_file", { workspace_id: workspaceId, path }),
+    invoke<void>("delete_file", { workspaceId, path }),
 });
 
 // ─── 桥接函数（基于 Promise，用于 Solid UI） ──────────────────────────

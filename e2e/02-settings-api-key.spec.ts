@@ -84,17 +84,25 @@ test.describe("02 — 设置 LLM API key", () => {
 
     // When idle, password input is present (V1.5+ always shown) and should reflect saved value --
     await assert.visible(page.locator('input[type="password"]').first(), { timeout: 5_000 });
-    const values = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('input[type="password"]')).map(
-        (el) => (el as HTMLInputElement).value,
-      ),
-    );
-    expect(values.length, "settings 页有 password input").toBeGreaterThan(0);
-    for (let i = 0; i < values.length; i++) {
-      expect(
-        values[i],
-        `password input ${i} should reflect saved value, actual="${values[i]}"`,
-      ).toBe(FAKE_KEY);
+    // Wait for SettingsPage onMount refresh() to complete - poll until input has FAKE_KEY
+    const refreshDeadline = Date.now() + 5_000;
+    let values: string[] = [];
+    while (Date.now() < refreshDeadline) {
+      values = (await page.evaluate(() =>
+        Array.from(document.querySelectorAll('input[type="password"]')).map(
+          (el) => (el as HTMLInputElement).value,
+        ),
+      )) as string[];
+      if (values.length > 0 && values[0] === FAKE_KEY) break;
+      await new Promise((r) => setTimeout(r, 100));
     }
+    expect(values.length, "settings 页有 password input").toBeGreaterThan(0);
+    // V1.5+ ProviderCard always shows each enabled provider. Test only set the first
+    // provider's key; others should still be empty. Only assert the first input is
+    // FAKE_KEY; others are allowed to be empty.
+    expect(
+      values[0],
+      `first password input should reflect saved value, actual="${values[0]}"`,
+    ).toBe(FAKE_KEY);
   });
 });

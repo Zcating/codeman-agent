@@ -140,6 +140,9 @@ function buildRequestBody(
   };
 }
 
+// // ─── Agent loop hard limit (prevent LLM infinite loop)
+const MAX_TURNS = 16;
+
 // ─── Transport 实现 ─────────────────────────────────────────────────
 
 export interface AnthropicTransportOptions {
@@ -173,27 +176,16 @@ interface AssistantMsgLike {
  */
 export class AnthropicTransport {
   constructor(private readonly options: AnthropicTransportOptions) {}
-
-  async *run(
+  private async *streamTurn(
+    apiKey: string,
+    baseUrl: string,
+    model: { id: string; maxTokens?: number },
+    systemPrompt: string,
     messages: Message[],
-    _userMessage: Message,
-    config: AgentRunConfig,
-    signal?: AbortSignal,
-  ): AsyncGenerator<unknown, void, unknown> {
-    // pi-ai version drift: Message/AgentEvent from pi-ai@0.73.1 (local) is
-    // incompatible with pi-ai@0.9.4 (peer of pi-agent). Cast to any for the
-    // version-bridging shim — runtime behavior matches because runtime.ts
-    // only reads .role / .content[].type / .content[].text.
-    const msgs = messages as unknown as any[];
-    const cfg = config as unknown as any;
-    const apiKey = await this.options.getApiKey();
-    if (!apiKey) {
-      throw new Error("AnthropicTransport: 缺少 apiKey");
-    }
-
-    const body = buildRequestBody(cfg.model, cfg.systemPrompt, msgs, cfg.tools);
-
-    const baseUrl = cfg.model.baseUrl ?? "https://api.minimaxi.com/anthropic";
+    tools: AgentRunConfig[`tools`],
+    signal: AbortSignal | undefined,
+  ): AsyncGenerator<unknown, AssistantMsgLike, unknown> {
+    const body = buildRequestBody(model, systemPrompt, messages, tools);
     const url = `${baseUrl.replace(/\/$/, "")}/v1/messages`;
 
     const response = await fetch(url, {
@@ -218,7 +210,7 @@ export class AnthropicTransport {
     const assistantMsg: AssistantMsgLike = {
       content: [],
       stopReason: null,
-      model: cfg.model.id,
+      model: model.id,
     };
 
     const reader = response.body.getReader();
@@ -228,7 +220,6 @@ export class AnthropicTransport {
     let currentBlockType: "text" | "thinking" | "tool_use" | null = null;
     let pendingToolCallJson = "";
 
-    yield { type: "agent_start" };
     yield { type: "message_start", message: assistantMsg };
 
     try {
@@ -341,6 +332,302 @@ export class AnthropicTransport {
       reader.releaseLock();
     }
 
-    yield { type: "agent_end", messages: [assistantMsg] };
+    return assistantMsg;
+  } /**
+   * Mock stream turn — for e2e tests only.
+   *
+   * Reads canned responses from globalThis.__MOCK_LLM_QUEUE__ (a queue).
+   * Each turn is either text, toolCalls, or both. The mock simulates
+   * SSE streaming by yielding content_block_start / delta / stop events
+   * with optional delays between chunks.
+   *
+   * Activated when baseUrl starts with `mock://`. The transport
+   * dispatches to this method instead of making a real HTTP call.
+   *
+   * Queue shape:
+   *   globalThis.__MOCK_LLM_QUEUE__ = [
+   *     { text: `Hello!` },
+   *     { toolCalls: [{ name: `read_file`, input: {...} }] },
+   *     { text: `Done.` },
+   *   ]
+   *
+   * If the queue is empty, returns a default `no mock configured`
+   * text response and warns the developer.
+   */
+  private async *mockStreamTurn(
+    model: { id: string; maxTokens?: number },
+    _systemPrompt: string,
+    _messages: Message[],
+    _tools: AgentRunConfig[`tools`],
+    signal: AbortSignal | undefined,
+  ): AsyncGenerator<unknown, AssistantMsgLike, unknown> {
+    const assistantMsg: AssistantMsgLike = {
+      content: [],
+      stopReason: null,
+      model: model.id,
+    };
+
+    const w = globalThis as unknown as {
+      __MOCK_LLM_QUEUE__?: Array<{
+        text?: string;
+        toolCalls?: Array<{ name: string; input: Record<string, unknown> }>;
+        delayMs?: number;
+      }>;
+    };
+    const queue = w.__MOCK_LLM_QUEUE__ ?? [];
+    const turn = queue.shift();
+
+    yield { type: `message_start`, message: assistantMsg };
+
+    if (!turn) {
+      console.warn(
+        `[AnthropicTransport mock] queue empty; use __MOCK_LLM_ENQUEUE__ before sending.`,
+      );
+      assistantMsg.content.push({ type: `text`, text: `[mock] no canned response queued` });
+      yield { type: `message_update`, message: assistantMsg };
+      assistantMsg.stopReason = `end_turn`;
+      yield { type: `message_end`, message: assistantMsg };
+      return assistantMsg;
+    }
+
+    if (turn.text) {
+      const textBlock = { type: `text` as const, text: `` };
+      assistantMsg.content.push(textBlock);
+      yield { type: `message_update`, message: assistantMsg };
+      const chunkSize = 4;
+      for (let i = 0; i < turn.text.length; i += chunkSize) {
+        if (signal?.aborted) {
+          throw new DOMException(`Aborted`, `AbortError`);
+        }
+        textBlock.text += turn.text.slice(i, i + chunkSize);
+        yield { type: `message_update`, message: assistantMsg };
+        await this.simulateChunkDelay(signal, turn.delayMs ?? 5);
+      }
+    }
+
+    if (turn.toolCalls && turn.toolCalls.length > 0) {
+      for (const tc of turn.toolCalls) {
+        if (signal?.aborted) {
+          throw new DOMException(`Aborted`, `AbortError`);
+        }
+        const id = `mock_tool_` + Math.random().toString(36).slice(2, 10);
+        const toolBlock = {
+          type: `toolCall` as const,
+          id,
+          name: tc.name,
+          arguments: tc.input as Record<string, unknown>,
+        };
+        assistantMsg.content.push(toolBlock);
+        yield { type: `message_update`, message: assistantMsg };
+        await this.simulateChunkDelay(signal, turn.delayMs ?? 5);
+      }
+    }
+
+    assistantMsg.stopReason = `end_turn`;
+    yield { type: `message_end`, message: assistantMsg };
+    return assistantMsg;
+  }
+
+  /** Small async delay to simulate network/streaming latency. */
+  private async simulateChunkDelay(signal: AbortSignal | undefined, ms: number): Promise<void> {
+    if (ms <= 0) return;
+    return new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        signal?.removeEventListener(`abort`, onAbort);
+        resolve();
+      }, ms);
+      const onAbort = () => {
+        clearTimeout(timer);
+        reject(new DOMException(`Aborted`, `AbortError`));
+      };
+      signal?.addEventListener(`abort`, onAbort, { once: true });
+    });
+  }
+  /**
+   * Public entry — implements pi-agent 的 AgentTransport contract。
+   * 负责 complete agent loop:yield agent_start → loop turn (LLM call + tool exec)
+   * → yield agent_end。
+   *
+   * Agent loop (V1.5+ tool calling fix):
+   *   旧 implementation only sent one LLM call then emit agent_end. tool_use was
+   *   never executed, LLM kept requesting the same tool, UI saw a 131-iteration
+   *   loop. New implementation: after each turn, if assistant content has
+   *   tool_use blocks, execute them (emit tool_execution_start/end events),
+   *   append the tool_result messages to currentMessages, then call LLM again.
+   *   Termination: no more tool calls / MAX_TURNS / abort signal.
+   *
+   * Mock mode: when baseUrl starts with `mock://`, the transport
+   * uses mockStreamTurn instead of real HTTP. The mock reads from a
+   * global queue (globalThis.__MOCK_LLM_QUEUE__) that the test sets up.
+   */
+  async *run(
+    messages: Message[],
+    _userMessage: Message,
+    config: AgentRunConfig,
+    signal?: AbortSignal,
+  ): AsyncGenerator<unknown, void, unknown> {
+    const msgs = messages as unknown as any[];
+    const cfg = config as unknown as any;
+    const apiKey = await this.options.getApiKey();
+    if (!apiKey) {
+      throw new Error(`AnthropicTransport: 缺 apiKey`);
+    }
+
+    const baseUrl = cfg.model.baseUrl ?? `https://api.minimaxi.com/anthropic`;
+    const systemPrompt = cfg.systemPrompt ?? ``;
+    const tools = cfg.tools;
+    const isMockMode = baseUrl.startsWith(`mock://`);
+
+    // Maintain growing messages list. Start with input; after each turn, append
+    // assistant + tool results. Next LLM call sees the full history.
+    const currentMessages: any[] = msgs.map((m) => ({ ...m }));
+
+    // Collect all messages generated during this prompt cycle (assistant + toolResult).
+    const generatedMessages: any[] = [];
+
+    yield { type: `agent_start` };
+
+    let turnIndex = 0;
+    try {
+      while (turnIndex < MAX_TURNS) {
+        if (signal?.aborted) {
+          throw new DOMException(`Aborted`, `AbortError`);
+        }
+
+        yield { type: `turn_start` };
+
+        // Single turn — either real HTTP or mock, based on baseUrl.
+        const turnGen = isMockMode
+          ? this.mockStreamTurn(cfg.model, systemPrompt, currentMessages, tools, signal)
+          : this.streamTurn(
+              apiKey,
+              baseUrl,
+              cfg.model,
+              systemPrompt,
+              currentMessages,
+              tools,
+              signal,
+            );
+        let assistantMsg: AssistantMsgLike | undefined;
+        while (true) {
+          const { value, done } = (await turnGen.next()) as IteratorResult<
+            unknown,
+            AssistantMsgLike
+          >;
+          if (done) {
+            assistantMsg = value;
+            break;
+          }
+          if (value !== undefined) {
+            yield value;
+          }
+        }
+        if (!assistantMsg) {
+          throw new Error(`AnthropicTransport: streamTurn ended without value`);
+        }
+
+        const toolCalls = assistantMsg.content.filter(
+          (
+            b,
+          ): b is {
+            type: `toolCall`;
+            id: string;
+            name: string;
+            arguments: Record<string, unknown>;
+          } => b.type === `toolCall` && (b as any).id !== undefined,
+        );
+
+        currentMessages.push({ role: `assistant`, content: assistantMsg.content });
+        generatedMessages.push({
+          role: `assistant`,
+          content: assistantMsg.content,
+          stopReason: assistantMsg.stopReason,
+          model: assistantMsg.model,
+        });
+
+        if (toolCalls.length === 0) {
+          yield {
+            type: `turn_end`,
+            message: generatedMessages[generatedMessages.length - 1],
+            toolResults: [],
+          };
+          break;
+        }
+
+        const toolResultMessages: any[] = [];
+        for (const tc of toolCalls) {
+          const tool = tools?.find((t: any) => t.name === tc.name) as
+            | {
+                name: string;
+                execute: (id: string, args: unknown, signal?: AbortSignal) => Promise<any>;
+              }
+            | undefined;
+
+          yield {
+            type: `tool_execution_start`,
+            toolCallId: tc.id,
+            toolName: tc.name,
+            args: tc.arguments,
+          };
+
+          let resultOrError: any;
+          let isError = false;
+          try {
+            if (!tool) {
+              throw new Error(`Tool ${tc.name} not found`);
+            }
+            resultOrError = await tool.execute(tc.id, tc.arguments, signal);
+          } catch (e) {
+            resultOrError = e instanceof Error ? e.message : String(e);
+            isError = true;
+          }
+
+          yield {
+            type: `tool_execution_end`,
+            toolCallId: tc.id,
+            toolName: tc.name,
+            result: resultOrError,
+            isError,
+          };
+
+          const resultContent: Array<{ type: `text`; text: string }> =
+            typeof resultOrError === `string`
+              ? [{ type: `text`, text: resultOrError }]
+              : Array.isArray(resultOrError?.content)
+                ? resultOrError.content
+                : [{ type: `text`, text: String(resultOrError) }];
+
+          const toolResultMessage = {
+            role: `toolResult`,
+            toolCallId: tc.id,
+            toolName: tc.name,
+            content: resultContent,
+            details: typeof resultOrError === `string` ? {} : (resultOrError?.details ?? {}),
+            isError,
+            timestamp: Date.now(),
+          };
+
+          yield { type: `message_start`, message: toolResultMessage };
+          yield { type: `message_end`, message: toolResultMessage };
+
+          currentMessages.push(toolResultMessage);
+          toolResultMessages.push(toolResultMessage);
+        }
+
+        yield {
+          type: `turn_end`,
+          message: generatedMessages[generatedMessages.length - 1],
+          toolResults: toolResultMessages,
+        };
+
+        turnIndex++;
+      }
+
+      if (turnIndex >= MAX_TURNS) {
+        console.warn(`[AnthropicTransport] reached MAX_TURNS=${MAX_TURNS}, terminating agent loop`);
+      }
+    } finally {
+      yield { type: `agent_end`, messages: generatedMessages };
+    }
   }
 }
