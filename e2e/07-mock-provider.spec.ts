@@ -66,8 +66,15 @@ test.describe("07 — Mock LLM provider", () => {
     // 等 assistant bubble 出现并包含预置文本
     const bubble = page.locator("div.justify-start > div[class*='bg-card']");
     await assert.visible(bubble.first(), { timeout: 10_000 });
-    const text = await bubble.first().textContent();
-    expect(text, "assistant bubble 应包含 mock 预置文本").toContain(cannedText);
+    // 绛?text 杈惧埌瀹屽叡 text(mock 浠?4-char chunks 娴?+ 5ms delay,20 瀛楃闇€ 25ms+)
+    const textDeadline = Date.now() + 5_000;
+    let polledText = "";
+    while (Date.now() < textDeadline) {
+      polledText = (await bubble.first().textContent()) ?? "";
+      if (polledText.includes(cannedText)) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    expect(polledText, "assistant bubble 应包含 mock 预置文本").toContain(cannedText);
   });
 
   test("工具调用响应:LLM 调用工具后,tool_result 在 DOM 中可见", async () => {

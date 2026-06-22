@@ -406,7 +406,23 @@ export const SettingsServiceLive = Layer.succeed(SettingsService, {
         return yield* Effect.succeed(null);
       }
       return yield* Effect.succeed(
-        settings.llm_providers.find((p) => p.id === id && p.enabled) ?? null,
+        // V1.5+ (ADR-0012): 读 settings.providers[] (V1.5 unified schema)。
+        // 返回 V1 LLMProvider 形状给 chat runtime 消费:把 llm.* 字段拼到顶层。
+        // 实际 api_key 走 v15Provider.api_key (ADR-0015),不在 V1 形状上,见 runtime.ts。
+        (() => {
+          const p = (settings.providers ?? []).find((p) => p.id === id && p.enabled);
+          if (!p || !p.llm) return null;
+          const v1: LLMProvider = {
+            id: p.id,
+            label: p.label,
+            enabled: p.enabled,
+            default_model: p.llm.default_model,
+            base_url: p.llm.base_url,
+            api_type: p.llm.api_type,
+            api_key_ref: "",
+          };
+          return v1;
+        })(),
       );
     }),
 });
@@ -425,7 +441,23 @@ export const SettingsServiceImpl = {
         return yield* Effect.succeed(null);
       }
       return yield* Effect.succeed(
-        settings.llm_providers.find((p) => p.id === id && p.enabled) ?? null,
+        // V1.5+ (ADR-0012): 读 settings.providers[] (V1.5 unified schema)。
+        // 返回 V1 LLMProvider 形状给 chat runtime 消费:把 llm.* 字段拼到顶层。
+        // 实际 api_key 走 v15Provider.api_key (ADR-0015),不在 V1 形状上,见 runtime.ts。
+        (() => {
+          const p = (settings.providers ?? []).find((p) => p.id === id && p.enabled);
+          if (!p || !p.llm) return null;
+          const v1: LLMProvider = {
+            id: p.id,
+            label: p.label,
+            enabled: p.enabled,
+            default_model: p.llm.default_model,
+            base_url: p.llm.base_url,
+            api_type: p.llm.api_type,
+            api_key_ref: "",
+          };
+          return v1;
+        })(),
       );
     }),
 } as const;

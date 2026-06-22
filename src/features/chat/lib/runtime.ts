@@ -114,7 +114,7 @@ export const AgentRuntimeLive = Layer.effect(
       conversation: Conversation,
       userMessage: Message,
     ): Stream.Stream<RuntimeEvent, AppError | RuntimeError, never> => {
-      return Stream.unwrap(
+      return Stream.unwrapScoped(
         Effect.gen(function* () {
           const queue = yield* Queue.unbounded<RuntimeEvent>();
 
@@ -416,4 +416,11 @@ export const RuntimeDeps = Layer.mergeAll(
 // 喂给 AgentRuntimeLive,然后 Layer.merge 把 deps 也对外暴露,这样
 // call site `Effect.provide(RuntimeLayer)` 才能满足 chat-view 内部
 // Effect 对 SettingsService 等的 requirement。
-export const RuntimeLayer = Layer.merge(Layer.provide(AgentRuntimeLive, RuntimeDeps), RuntimeDeps);
+// ADR-0018: use Layer.provideMerge to preserve RuntimeDeps in the output type.
+// RuntimeDeps includes SettingsServiceLive, BillingServiceLive, MessageServiceLive, etc.
+// Layer.merge would lose the deps in the output type (TypeScript inference limitation);
+// provideMerge correctly preserves them.
+export const RuntimeLayer = Layer.provideMerge(
+  Layer.provide(AgentRuntimeLive, RuntimeDeps),
+  RuntimeDeps,
+);
