@@ -83,6 +83,66 @@ vi.mock("../stores/messages.store", () => ({
   appendStreamingAssistantMessage: vi.fn(),
 }));
 
+// V1.x provider selector: mock appStore (state + set) 和 settingsSaver (scheduleSave)。
+// appStore 内部 state 用 module-scoped variable, test 之间通过 __setAppStoreState 重置。
+vi.mock("../../../shared/stores/app.store", () => {
+  let settings = {
+    providers: [
+      {
+        id: "minimax",
+        label: "MiniMax",
+        enabled: true,
+        api_key: "",
+        llm: {
+          default_model: "MiniMax-M2.5-highspeed",
+          base_url: "https://api.minimaxi.com/anthropic",
+          api_type: "anthropic-messages",
+          models: [
+            { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", deprecated: false, thinking: false },
+          ],
+          models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+        },
+        billing: { kind: "plan_quota" },
+      },
+    ],
+    default_llm_provider_id: "minimax",
+  };
+  return {
+    appStore: {
+      state: {
+        get value() {
+          return settings;
+        },
+        set value(v) {
+          settings = v;
+        },
+      },
+      set: vi.fn((patch) => {
+        settings = { ...settings, ...patch };
+      }),
+      forceFlush: vi.fn(),
+      refresh: vi.fn(),
+      refreshProviderModels: vi.fn(),
+      deleteProvider: vi.fn(),
+      pickWorkspacePath: vi.fn(),
+      clearAllHistory: vi.fn(),
+    },
+    _resetAppStoreForTest: vi.fn(),
+    __setAppStoreState: (s: { providers: any[]; default_llm_provider_id: string }) => {
+      settings = s;
+    },
+    __getAppStoreState: () => settings,
+  };
+});
+
+vi.mock("../../settings/lib/settings-saver", () => ({
+  settingsSaver: {
+    scheduleSave: vi.fn(),
+    cancelPending: vi.fn(),
+    flushNow: vi.fn(),
+  },
+}));
+
 vi.mock(import("../lib/runtime"), async (importOriginal) => {
   // V1.7+ 的 mock 只覆盖 AgentRuntime / RuntimeLayer(组件测试不需要真 runtime),
   // 但 commit 1fc33e7 之后 agent.ts 在模块加载时引用了 AgentRuntimeLive / RuntimeDeps
@@ -144,5 +204,106 @@ describe("ChatView", () => {
     const codeElements = container.querySelectorAll("code");
     const hasToolCallId = Array.from(codeElements).some((code) => code.textContent === "tc-read-1");
     expect(hasToolCallId).toBe(true);
+  });
+
+  // ─── V1.x provider 选择器测试 ─────────────────────────────────────
+  // 通过 vi.mock 工厂内导出的 __setAppStoreState / __getAppStoreState helpers
+  // 在每个 test 之间重置 appStore state,避免 test 顺序耦合。
+  it("渲染 provider 选择器并列出 enabled 的 provider", () => {
+    const { container } = render(() => <ChatView />);
+    const select = container.querySelector('select[id="provider-select"]') as HTMLSelectElement;
+    expect(select).toBeTruthy();
+    // 默认 mock providers 只 1 个 enabled (minimax)
+    const options = Array.from(select.querySelectorAll("option")).map((o) => o.value);
+    expect(options).toEqual(["minimax"]);
+  });
+
+  it("默认值匹配 appStore.state.value.default_llm_provider_id", () => {
+    const { container } = render(() => <ChatView />);
+    const select = container.querySelector('select[id="provider-select"]') as HTMLSelectElement;
+    expect(select.value).toBe("minimax");
+  });
+
+  it("切换 provider 触发 appStore.set + settingsSaver.scheduleSave", async () => {
+    const user = (await import("@testing-library/user-event")).default;
+    const appStoreMock = await import("../../../shared/stores/app.store");
+    const settingsSaverMock = await import("../../settings/lib/settings-saver");
+    (appStoreMock as any).__setAppStoreState({
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          enabled: true,
+          api_key: "",
+          llm: {
+            default_model: "MiniMax-M2.5-highspeed",
+            base_url: "https://api.minimaxi.com/anthropic",
+            api_type: "anthropic-messages",
+            models: [
+              { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", deprecated: false, thinking: false },
+            ],
+            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          },
+          billing: { kind: "plan_quota" },
+        },
+        {
+          id: "deepseek",
+          label: "DeepSeek",
+          enabled: true,
+          api_key: "",
+          llm: {
+            default_model: "deepseek-chat",
+            base_url: "https://api.deepseek.com/anthropic",
+            api_type: "anthropic-messages",
+            models: [
+              { id: "deepseek-chat", label: "deepseek-chat", deprecated: false, thinking: false },
+            ],
+            models_endpoint: "https://api.deepseek.com/models",
+          },
+        },
+      ],
+      default_llm_provider_id: "minimax",
+    });
+    const { container } = render(() => <ChatView />);
+    const select = container.querySelector('select[id="provider-select"]') as HTMLSelectElement;
+    expect(select).toBeTruthy();
+    const options = Array.from(select.querySelectorAll("option")).map((o) => o.value);
+    expect(options).toEqual(["minimax", "deepseek"]);
+    await user.selectOptions(select, "deepseek");
+    const setMock = (appStoreMock as any).appStore.set as ReturnType<typeof vi.fn>;
+    expect(setMock).toHaveBeenCalled();
+    const lastSetCall = setMock.mock.calls[setMock.mock.calls.length - 1][0];
+    expect(lastSetCall.default_llm_provider_id).toBe("deepseek");
+    const scheduleSaveMock = (settingsSaverMock as any).settingsSaver
+      .scheduleSave as ReturnType<typeof vi.fn>;
+    expect(scheduleSaveMock).toHaveBeenCalled();
+  });
+
+  it("无 enabled provider 时显示空状态链接到 /settings", async () => {
+    const appStoreMock = await import("../../../shared/stores/app.store");
+    (appStoreMock as any).__setAppStoreState({
+      providers: [
+        {
+          id: "deepseek",
+          label: "DeepSeek",
+          enabled: false,
+          api_key: "",
+          llm: {
+            default_model: "deepseek-chat",
+            base_url: "https://api.deepseek.com/anthropic",
+            api_type: "anthropic-messages",
+            models: [{ id: "deepseek-chat", label: "deepseek-chat", deprecated: false, thinking: false }],
+            models_endpoint: "https://api.deepseek.com/models",
+          },
+        },
+      ],
+      default_llm_provider_id: "deepseek",
+    });
+    const { container } = render(() => <ChatView />);
+    const select = container.querySelector('select[id="provider-select"]');
+    expect(select).toBeNull();
+    const link = container.querySelector('a[href="/settings"]');
+    expect(link).toBeTruthy();
+    expect(link?.textContent).toContain("settings");
   });
 });

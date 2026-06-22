@@ -58,6 +58,28 @@ src/features/chat/
 - **组件不调 IPC。** 所有 Tauri IPC 走 `src/shared/lib/tauri.ts` Service Tags。
 - **`Sidebar` 用 `createSignal` 做局部状态。** `query` / `debouncedQuery` / `setQuery/setDebouncedQuery` signals 是组件局部的，不与 store 导出冲突。streaming 状态点（per-conv 反馈）走 `streaming$` store accessor（来自 `conversations` 或独立 streaming store）。
 
+## 输入框下方的 provider 选择器
+
+V1.x 起 ChatView 在 textarea 下方（form 第二行）渲染一个 `<select id="provider-select">`，让用户在不进 Settings 的情况下切换活跃 LLM provider。
+
+**数据源**：`appStore.state.value.providers[]`（V1.5 unified schema, ADR-0012 + ADR-0015）。
+`ProviderSelect` 内部 filter: `providers.filter(p => p.enabled && p.llm)` — enabled 且有 LLM 配置的 provider 才列出。
+billing-only / disabled / 无 llm 的 provider 不显示。
+
+**写路径**：
+- 用户切换 → `appStore.set({ default_llm_provider_id: nextId })` 同步更新本地 state
+- 然后 `settingsSaver.scheduleSave()` debounced 500ms 刷到后端（跟 settings 域同 pattern, ADR-0015）
+- runtime 下次 `run()` 通过 `SettingsService.getActiveLlmProvider()` 读到这个新值
+
+**不变量**（per ADR-0014 D1）：
+- `AgentRuntime` 内部 `Ref<Map<ConvId, Agent>>` 锁定每个 conversation 首次 run 时的 provider
+- 已 in-flight 的 conversation 在切换 selector 后**不会**改 provider（已创建的 Agent 不会重新构造）
+- 新 conversation 首次 send 时取新的 `default_llm_provider_id` 构造 Agent
+
+**空状态**：所有 provider 都 disabled / 没 LLM 时，`<select>` 不渲染，改渲染 "无 provider — 前往 settings" 链接（指向 `/settings`），引导用户去配置。
+
+**实现位置**：`ProviderSelect` 是 `chat-view.tsx` 内的本地子组件（非 feature 共享）。它直接读 `appStore` 状态而不是通过 `SettingsService` IPC,避免在每次组件渲染时都触发 IPC。debounced flush 走 `settingsSaver.scheduleSave()`（settings feature 的 lib, 跨 feature import 允许）。
+
 ## Runtime 事件（5 变体）
 
 | 变体          | Payload                        | UI 副作用                     |

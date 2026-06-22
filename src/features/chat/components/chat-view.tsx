@@ -32,6 +32,68 @@ import { SettingsServiceLive } from "../../../shared/lib/tauri";
 import { Button } from "../../../shared/components/ui/button";
 import { Textarea } from "../../../shared/components/ui/textarea";
 import { startThemeSync } from "../../../shared/stores/theme";
+import { appStore } from "../../../shared/stores/app.store";
+import { settingsSaver } from "../../settings/lib/settings-saver";
+import type { Provider } from "../../../shared/lib/types";
+
+/**
+ * V1.x chat 输入框下方的 provider 选择器。
+ *
+ * 数据源:appStore.state.value.providers[] (V1.5 unified schema, ADR-0012 + ADR-0015)。
+ * 列出所有 enabled 且有 llm 配置的 provider。
+ * 选中后写 appStore.state.value.default_llm_provider_id (全局生效 —
+ * 影响 runtime 后续 run() 选取的 active provider;
+ * 不影响 in-flight conversation 的 per-conv Agent 实例锁定, 那是 ADR-0014 行为)。
+ * debounced 500ms auto-flush 走 settingsSaver.scheduleSave(), 跟 settings 域同模式。
+ *
+ * 空状态:无 enabled provider 时显示提示并跳到 settings。
+ */
+function ProviderSelect() {
+  const enabledProviders = (): Provider[] =>
+    (appStore.state.value.providers ?? []).filter((p) => p.enabled && p.llm);
+  const currentId = (): string => {
+    const id = appStore.state.value.default_llm_provider_id;
+    if (id && enabledProviders().some((p) => p.id === id)) {
+      return id;
+    }
+    return enabledProviders()[0]?.id ?? "";
+  };
+  const handleChange = (e: Event & { currentTarget: HTMLSelectElement }) => {
+    const next = e.currentTarget.value;
+    if (!next) {
+      return;
+    }
+    appStore.set({ default_llm_provider_id: next });
+    settingsSaver.scheduleSave();
+  };
+  return (
+    <Show
+      when={enabledProviders().length > 0}
+      fallback={
+        <a
+          href="/settings"
+          class="text-xs text-muted-foreground hover:text-foreground"
+          aria-label="无 provider, 请到 settings 配置"
+        >
+          无 provider — 前往 settings
+        </a>
+      }
+    >
+      <select
+        id="provider-select"
+        class="h-9 max-w-[14rem] truncate rounded-md border border-input bg-background px-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        value={currentId()}
+        onChange={handleChange}
+        aria-label="选择 LLM provider"
+        data-testid="provider-select"
+      >
+        <For each={enabledProviders()}>
+          {(p) => <option value={p.id}>{p.label}</option>}
+        </For>
+      </select>
+    </Show>
+  );
+}
 
 export function ChatView() {
   const [input, setInput] = createSignal("");
@@ -194,7 +256,7 @@ export function ChatView() {
         <div ref={messagesEndRef} />
       </div>
       <form
-        class="flex gap-2 p-3 border-t border-border bg-card"
+        class="flex flex-col gap-2 p-3 border-t border-border bg-card"
         onSubmit={(e) => {
           e.preventDefault();
           void send();
@@ -205,35 +267,42 @@ export function ChatView() {
         </label>
         <Textarea
           id="chat-input"
-          class="flex-1"
+          class="w-full"
           rows={3}
           value={input()}
           onInput={(e) => setInput(e.currentTarget.value)}
           placeholder="发条消息…"
           disabled={running()}
         />
-        <Show
-          when={!running()}
-          fallback={
-            <Button type="button" variant="destructive" onClick={cancel} aria-label="取消运行">
-              取消
-              <X class="h-4 w-4" />
-            </Button>
-          }
-        >
-          <Button
-            type="submit"
-            onClick={(e) => {
-              e.preventDefault();
-              void send();
-            }}
-            disabled={!input().trim()}
-            aria-label="发送消息"
+        <div class="flex items-center gap-2">
+          <label for="provider-select" class="text-xs text-muted-foreground whitespace-nowrap">
+            Provider
+          </label>
+          <ProviderSelect />
+          <div class="flex-1" />
+          <Show
+            when={!running()}
+            fallback={
+              <Button type="button" variant="destructive" onClick={cancel} aria-label="取消运行">
+                取消
+                <X class="h-4 w-4" />
+              </Button>
+            }
           >
-            发送
-            <Send class="h-4 w-4" />
-          </Button>
-        </Show>
+            <Button
+              type="submit"
+              onClick={(e) => {
+                e.preventDefault();
+                void send();
+              }}
+              disabled={!input().trim()}
+              aria-label="发送消息"
+            >
+              发送
+              <Send class="h-4 w-4" />
+            </Button>
+          </Show>
+        </div>
       </form>
     </>
   );
