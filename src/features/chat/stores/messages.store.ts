@@ -104,9 +104,19 @@ export async function persistAssistantMessage(message: Message): Promise<void> {
 }
 
 /** 追加流式增量到进行中的 assistant 消息（仅本地，无 IPC）。 */
+/**
+ * Update the in-progress assistant message with the current text.
+ *
+ * ADR-0018 V2 streaming fix: the transport (mock + real) yields the FULL
+ * assistantMsg on every message_update, with textBlock.text being the CUMULATIVE
+ * text (matching real Anthropic API where the SDK accumulates deltas before
+ * yielding). So this function REPLACES the content with the latest cumulative
+ * text, not appends — otherwise we get duplicated text like
+ * "Hell" + "Hello fr" + "Hello from m" = "HellHello frHello from m".
+ */
 export function appendAssistantMessageDelta(messageId: string, chunk: string): void {
   setMessages(
-    messages().map((m) => (m.id === messageId ? { ...m, content: m.content + chunk } : m)),
+    messages().map((m) => (m.id === messageId ? { ...m, content: chunk } : m)),
   );
 }
 

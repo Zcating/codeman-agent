@@ -28,6 +28,7 @@ import {
 import { activeId$, conversations$ } from "../stores/conversations.store";
 import { chatAgentStore } from "../stores/agent.store";
 import type { RuntimeEvent } from "../lib/runtime";
+import { SettingsServiceLive } from "../../../shared/lib/tauri";
 import { Button } from "../../../shared/components/ui/button";
 import { Textarea } from "../../../shared/components/ui/textarea";
 import { startThemeSync } from "../../../shared/stores/theme";
@@ -165,7 +166,7 @@ export function ChatView() {
       });
 
     const exit = await Effect.runPromiseExit(
-      Stream.runForEach(chatAgentStore.startRun(conversation, userMsg), handleEvent),
+      Stream.runForEach(chatAgentStore.startRun(conversation, userMsg), handleEvent).pipe(Effect.provide(SettingsServiceLive)),
     );
     if (Exit.isFailure(exit)) {
       console.error("[ChatView] 运行错误:", String(exit.cause));

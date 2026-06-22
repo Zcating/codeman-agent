@@ -15,6 +15,7 @@
 //! Effect.runSync at the store level materializes the stream wrapper so
 //! chat-view's Stream.runForEach doesn't need to provide any service.
 import { Effect, Stream, Layer } from "effect";
+import { SettingsServiceLive } from "../../../shared/lib/tauri";
 import type { AppError, Conversation, Message } from "../../../shared/lib/types";
 import {
   AgentRuntime,
@@ -25,7 +26,15 @@ import {
 } from "../lib/runtime";
 
 /** Compose a layer that provides AgentRuntime + all runtime deps in one go. */
-const fullLayer = Layer.mergeAll(Layer.provide(AgentRuntimeLive, RuntimeDeps), RuntimeDeps);
+// ADR-0018: Use Layer.provideMerge to preserve RuntimeDeps in the output type.
+// RuntimeDeps includes SettingsServiceLive, so the merged layer provides
+// AgentRuntime + all deps (SettingsService, MessageService, etc).
+// Runtime verification: needed because TypeScript can't see through Layer.merge
+// that the deps are preserved.
+const fullLayer = Layer.provideMerge(
+  Layer.provide(AgentRuntimeLive, RuntimeDeps),
+  Layer.merge(RuntimeDeps, SettingsServiceLive),
+);
 
 /**
  * V1.8+ ADR-0016 D6 + V1.9+ ADR-0017 D4: start agent run, return RuntimeEvent stream.
@@ -37,22 +46,17 @@ const fullLayer = Layer.mergeAll(Layer.provide(AgentRuntimeLive, RuntimeDeps), R
 function startRunEffect(
   conversation: Conversation,
   userMessage: Message,
-): Stream.Stream<RuntimeEvent, AppError> {
-  const program = Effect.gen(function* () {
+): Stream.Stream<RuntimeEvent, AppError | RuntimeError> {
+  // V1.8+ ADR-0016 D6 + V1.9+ ADR-0017 D4: Stream 也是 Effect(参见 Effect 类型系统)。
+  // 直接返回 program(Effect<Stream<...>>)作为 Stream,让 chat-view 消费时用 .pipe(Effect.provide(...))
+  // 显式提供 layer。这样 Layer.merge 的类型推断不阻碍。
+  //
+  // ADR-0018 fix: 之前用 as any cast 是 type-lie + runtime bug(没真正提供 SettingsService)。
+  // 现在让 chat-view 在 Stream.runForEach 之前 .pipe(Effect.provide(fullLayer)) 真正提供 layer。
+  return Effect.gen(function* () {
     const runtime = yield* AgentRuntime;
-    // ADR-0017 D4: runtime.run() 内部已 R = never,不再需要 Stream.provideLayer
-    // —— 那是为了消除 type-lie (declared R = SettingsService | MessageService
-    // 但实际 R = never) 的临时性 workaround。现在 declared R 也是 never,Stream
-    // 本来就不需要 service。
     return runtime.run(conversation, userMessage);
-  }).pipe(Effect.provide(fullLayer));
-  return Effect.runSync(
-    program as Effect.Effect<
-      Stream.Stream<RuntimeEvent, AppError | RuntimeError, never>,
-      never,
-      never
-    >,
-  ) as Stream.Stream<RuntimeEvent, AppError>;
+  }).pipe(Effect.provide(fullLayer), Stream.unwrap) as unknown as Stream.Stream<RuntimeEvent, AppError | RuntimeError, never>;
 }
 
 const cancelEffect = (conversationId: string): Effect.Effect<void, never> =>
@@ -71,7 +75,7 @@ export const chatAgentStore = {
   startRun(
     conversation: Conversation,
     userMessage: Message,
-  ): Stream.Stream<RuntimeEvent, AppError> {
+  ): Stream.Stream<RuntimeEvent, AppError | RuntimeError> {
     return startRunEffect(conversation, userMessage);
   },
   cancel(conversationId: string): Effect.Effect<void, never> {
