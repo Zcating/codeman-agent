@@ -9,11 +9,11 @@ export { MessageBubble } from "./components/message-bubble";
 export { ToolCallCard } from "./components/tool-call-card";
 
 export {
-  AgentRuntime,
-  AgentRuntimeLive,
-  RuntimeLayer,
+  createAgentRuntime,
+  type AgentRuntime,
   type RuntimeEvent,
-  type RuntimeError,
+  type ProviderConfig,
+  type RunOptions,
 } from "./lib/runtime";
 
 export * as chatStore from "./stores/conversations.store";

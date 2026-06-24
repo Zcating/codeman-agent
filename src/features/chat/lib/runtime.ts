@@ -55,8 +55,9 @@ export function createAgentRuntime(): AgentRuntime {
       context: _context,
       provider: _provider,
     }: RunOptions): Stream.Stream<RuntimeEvent, never, never> {
-      // TODO(Task 3): 实现 Agent + Queue + Fiber 完整 wiring
-      // 当前只返回 empty stream 让 factory contract test 通过
+      // TODO(Task 3): assign currentAbortController = new AbortController() first,
+      // then create Queue + Agent + Fiber + subscribe to events + Stream.fromQueue.
+      // Until then, this is a placeholder returning Stream.empty.
       return Stream.empty;
     },
 

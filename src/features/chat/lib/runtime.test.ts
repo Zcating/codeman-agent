@@ -1,6 +1,5 @@
 ﻿import { describe, it, expect } from "vitest";
-import { Stream } from "effect";
-import { createAgentRuntime, type ProviderConfig, type RuntimeEvent } from "./runtime";
+import { createAgentRuntime, type ProviderConfig } from "./runtime";
 import type { Message } from "../../../shared/lib/types";
 
 const mockProvider: ProviderConfig = {
