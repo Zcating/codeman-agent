@@ -3,6 +3,7 @@
 //! T6: read_file — 已实现
 //! T7-T10: 骨架（待实现）
 
+use log;
 use crate::filesystem::sandbox::validate_path_in_workspace;
 use crate::settings::Settings;
 use crate::state::AppState;
@@ -79,8 +80,27 @@ pub async fn read_file(
     workspace_id: String,
     path: String,
 ) -> Result<String, AppError> {
+    log::debug!("read_file: 进入 workspace_id={} path={}", workspace_id, path);
     let settings = state.get_settings();
-    read_file_impl(&settings, &workspace_id, &path)
+    let result = read_file_impl(&settings, &workspace_id, &path);
+    match &result {
+        Ok(_) => {
+            log::info!("read_file: 成功 workspace_id={} path={}", workspace_id, path);
+        }
+        Err(AppError::SandboxViolation { .. }) => {
+            log::warn!("read_file: 越界 workspace_id={} path={}", workspace_id, path);
+        }
+        Err(AppError::NotFound { .. }) => {
+            log::warn!("read_file: 失败 workspace_id={} path={}", workspace_id, path);
+        }
+        Err(AppError::InvalidConfig { .. }) => {
+            log::warn!("read_file: 失败 workspace_id={} path={}", workspace_id, path);
+        }
+        Err(_) => {
+            log::error!("read_file: 失败 workspace_id={} path={}", workspace_id, path);
+        }
+    }
+    result
 }
 
 /// Pure logic for write_file. Testable without AppState.
@@ -222,8 +242,27 @@ pub async fn write_file(
     path: String,
     content: String,
 ) -> Result<(), AppError> {
+    log::debug!("write_file: 进入 workspace_id={} path={}", workspace_id, path);
     let settings = state.get_settings();
-    write_file_impl(&settings, &workspace_id, &path, &content)
+    let result = write_file_impl(&settings, &workspace_id, &path, &content);
+    match &result {
+        Ok(_) => {
+            log::info!("write_file: 成功 workspace_id={} path={}", workspace_id, path);
+        }
+        Err(AppError::SandboxViolation { .. }) => {
+            log::warn!("write_file: 越界 workspace_id={} path={}", workspace_id, path);
+        }
+        Err(AppError::NotFound { .. }) => {
+            log::warn!("write_file: 失败 workspace_id={} path={}", workspace_id, path);
+        }
+        Err(AppError::InvalidConfig { .. }) => {
+            log::warn!("write_file: 失败 workspace_id={} path={}", workspace_id, path);
+        }
+        Err(_) => {
+            log::error!("write_file: 失败 workspace_id={} path={}", workspace_id, path);
+        }
+    }
+    result
 }
 
 /// Pure logic for edit_file. Testable without AppState.
@@ -382,8 +421,27 @@ pub async fn edit_file(
     new_text: String,
     replace_all: bool,
 ) -> Result<(), AppError> {
+    log::debug!("edit_file: 进入 workspace_id={} path={}", workspace_id, path);
     let settings = state.get_settings();
-    edit_file_impl(&settings, &workspace_id, &path, &old_text, &new_text, replace_all)
+    let result = edit_file_impl(&settings, &workspace_id, &path, &old_text, &new_text, replace_all);
+    match &result {
+        Ok(_) => {
+            log::info!("edit_file: 成功 workspace_id={} path={}", workspace_id, path);
+        }
+        Err(AppError::SandboxViolation { .. }) => {
+            log::warn!("edit_file: 越界 workspace_id={} path={}", workspace_id, path);
+        }
+        Err(AppError::NotFound { .. }) => {
+            log::warn!("edit_file: 失败 workspace_id={} path={}", workspace_id, path);
+        }
+        Err(AppError::InvalidConfig { .. }) => {
+            log::warn!("edit_file: 失败 workspace_id={} path={}", workspace_id, path);
+        }
+        Err(_) => {
+            log::error!("edit_file: 失败 workspace_id={} path={}", workspace_id, path);
+        }
+    }
+    result
 }
 
 /// Pure logic for search_files. Testable without AppState.
@@ -538,8 +596,27 @@ pub async fn search_files(
     glob: String,
     content_pattern: Option<String>,
 ) -> Result<Vec<crate::filesystem::types::FileMatch>, AppError> {
+    log::debug!("search_files: 进入 workspace_id={} glob={}", workspace_id, glob);
     let settings = state.get_settings();
-    search_files_impl(&settings, &workspace_id, &glob, content_pattern.as_deref())
+    let result = search_files_impl(&settings, &workspace_id, &glob, content_pattern.as_deref());
+    match &result {
+        Ok(matches) => {
+            log::info!("search_files: 成功 workspace_id={} glob={} count={}", workspace_id, glob, matches.len());
+        }
+        Err(AppError::SandboxViolation { .. }) => {
+            log::warn!("search_files: 越界 workspace_id={} glob={}", workspace_id, glob);
+        }
+        Err(AppError::NotFound { .. }) => {
+            log::warn!("search_files: 失败 workspace_id={} glob={}", workspace_id, glob);
+        }
+        Err(AppError::InvalidConfig { .. }) => {
+            log::warn!("search_files: 失败 workspace_id={} glob={}", workspace_id, glob);
+        }
+        Err(_) => {
+            log::error!("search_files: 失败 workspace_id={} glob={}", workspace_id, glob);
+        }
+    }
+    result
 }
 
 /// Pure logic for delete_file. Testable without AppState.
@@ -614,8 +691,27 @@ pub async fn delete_file(
     workspace_id: String,
     path: String,
 ) -> Result<(), AppError> {
+    log::debug!("delete_file: 进入 workspace_id={} path={}", workspace_id, path);
     let settings = state.get_settings();
-    delete_file_impl(&settings, &workspace_id, &path)
+    let result = delete_file_impl(&settings, &workspace_id, &path);
+    match &result {
+        Ok(_) => {
+            log::info!("delete_file: 成功 workspace_id={} path={}", workspace_id, path);
+        }
+        Err(AppError::SandboxViolation { .. }) => {
+            log::warn!("delete_file: 越界 workspace_id={} path={}", workspace_id, path);
+        }
+        Err(AppError::NotFound { .. }) => {
+            log::warn!("delete_file: 失败 workspace_id={} path={}", workspace_id, path);
+        }
+        Err(AppError::InvalidConfig { .. }) => {
+            log::warn!("delete_file: 失败 workspace_id={} path={}", workspace_id, path);
+        }
+        Err(_) => {
+            log::error!("delete_file: 失败 workspace_id={} path={}", workspace_id, path);
+        }
+    }
+    result
 }
 
 #[cfg(test)]

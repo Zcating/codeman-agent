@@ -34,6 +34,7 @@ import { Textarea } from "../../../shared/components/ui/textarea";
 import { startThemeSync } from "../../../shared/stores/theme";
 import { appStore } from "../../../shared/stores/app.store";
 import { settingsSaver } from "../../settings/lib/settings-saver";
+import { logger } from "../../../shared/lib/logger";
 import type { Provider } from "../../../shared/lib/types";
 
 /**
@@ -87,9 +88,7 @@ function ProviderSelect() {
         aria-label="选择 LLM provider"
         data-testid="provider-select"
       >
-        <For each={enabledProviders()}>
-          {(p) => <option value={p.id}>{p.label}</option>}
-        </For>
+        <For each={enabledProviders()}>{(p) => <option value={p.id}>{p.label}</option>}</For>
       </select>
     </Show>
   );
@@ -168,7 +167,7 @@ export function ChatView() {
     }
     const userMsg = messages$()[messages$().length - 1];
     if (!userMsg) {
-      console.error(
+      logger.error(
         "[ChatView] 运行错误:userMsg 是 undefined — appendUserMessage 可能没成功,convId=",
         convId,
         "messagesLen=",
@@ -219,7 +218,7 @@ export function ChatView() {
             break;
           }
           case "error": {
-            console.error("[ChatView] 代理错误:", event.error);
+            logger.error("[ChatView] 代理错误:", event.error);
             break;
           }
         }
@@ -233,7 +232,7 @@ export function ChatView() {
       ),
     );
     if (Exit.isFailure(exit)) {
-      console.error("[ChatView] 运行错误:", String(exit.cause));
+      logger.error("[ChatView] 运行错误:", String(exit.cause));
     }
     setRunning(false);
     setStreamingMessageId(null);

@@ -111,6 +111,7 @@ V1 是 Tauri 2 + Solid chat agent，**不是 V0 280x100 浮窗**。视觉层走 
 - `src/shared/mocks/` 目录——已删除，唯一源在`src/__mocks__/`（ADR-0010 Q6）。
 - `src/assets/`、`src/styles/` 顶层杂目录——已删除，不要新增（ADR-0010）。
 - 创建空 feature 子目录只为"预留位"——5 个子目录是白名单可选，billing 只有 `lib/` 是合理的。
+- 前端新增 `console.log` / `console.warn` / `console.error` / `console.debug` —— 全部走 `@/shared/lib/logger` 的 `logger.{debug, info, warn, error}`（ADR-0018 D5）。logger 不算 service 操作（不调 invoke / Effect.gen yield* / fetch），UI 层允许所有档；但**不得**包含完整 `Provider.api_key` 值（developer 自觉，详见 ADR-0018 D6）。
 
 ## 测试
 

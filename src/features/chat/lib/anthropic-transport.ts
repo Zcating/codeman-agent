@@ -15,6 +15,7 @@
 
 import type { Message } from "@mariozechner/pi-ai";
 import type { AgentRunConfig } from "@mariozechner/pi-agent";
+import { logger } from "../../../shared/lib/logger";
 
 // ─── SSE 行解析 ─────────────────────────────────────────────────────
 
@@ -394,7 +395,7 @@ export class AnthropicTransport {
     yield { type: `message_start`, message: assistantMsg };
 
     if (!turn) {
-      console.warn(
+      logger.warn(
         `[AnthropicTransport mock] queue empty; use __MOCK_LLM_ENQUEUE__ before sending.`,
       );
       assistantMsg.content.push({ type: `text`, text: `[mock] no canned response queued` });
@@ -640,7 +641,7 @@ export class AnthropicTransport {
       }
 
       if (turnIndex >= MAX_TURNS) {
-        console.warn(`[AnthropicTransport] reached MAX_TURNS=${MAX_TURNS}, terminating agent loop`);
+        logger.warn(`[AnthropicTransport] reached MAX_TURNS=${MAX_TURNS}, terminating agent loop`);
       }
     } finally {
       yield { type: `agent_end`, messages: generatedMessages };

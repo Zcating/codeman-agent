@@ -6,7 +6,7 @@
 
 | 子目录                 | 语义                                                              | 现状                                                                              |
 | ---------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `lib/`                 | 纯函数 + 跨域类型：`cn.ts` / `tauri.ts` / `units.ts` / `types.ts` | 4 个文件（ADR-0010 前：3 文件，types 是独立目录）                                 |
+| `lib/`                 | 纯函数 + 跨域类型：`cn.ts` / `logger.ts` / `tauri.ts` / `units.ts` / `types.ts` / `format-app-error.ts` | 6 个文件（ADR-0010 前：3 文件，types 是独立目录；ADR-0018 加 `logger.ts`；ADR-0016 加 `format-app-error.ts`） |
 | `stores/`              | 跨域 Solid signal                                                 | `theme.ts`（从 `state/` 迁，ADR-0010）                                            |
 | `hooks/`               | 跨域 composable（`use-` 前缀）                                    | 空，V1 预留                                                                       |
 | `components/ui/`       | 跨域**设计系统原子**                                              | 5 原子（Button / Card / Checkbox / Input / Textarea）+ `AGENTS.md`（从 `ui/` 迁） |
@@ -88,6 +88,7 @@ import { mockState } from "@/shared/shared-mock-state";
 | 文件                        | 测试方式                                                                     |
 | --------------------------- | ---------------------------------------------------------------------------- |
 | `lib/cn.ts`                 | 独立测试（`cn.test.ts`），覆盖冲突合并 + 条件拼接                            |
+| `lib/logger.ts`             | 独立测试（`logger.test.ts`），覆盖 level 路由 + args 透传 + prefix 大写       |
 | `lib/tauri.ts`              | 跟随消费方 feature 的集成测试，不单独写                                      |
 | `lib/types.ts`              | 纯类型，无运行时，不单独测                                                   |
 | `lib/units.ts`              | 独立测试（`units.test.ts`），覆盖格式化边界                                  |

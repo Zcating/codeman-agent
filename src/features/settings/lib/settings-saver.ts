@@ -19,13 +19,14 @@ import { debounce } from "es-toolkit";
 import { Effect, Exit } from "effect";
 import { appStore } from "../../../shared/stores/app.store";
 import { formatAppError } from "../../../shared/lib/format-app-error";
+import { logger } from "../../../shared/lib/logger";
 
 const DEBOUNCE_MS = 500;
 
 const debouncedFlushFn = debounce(() => {
   Effect.runPromiseExit(appStore.forceFlush()).then((exit) => {
     if (Exit.isFailure(exit)) {
-      console.error("[settingsSaver] debounced flush failed:", formatAppError(exit.cause));
+      logger.error("[settingsSaver] debounced flush failed:", formatAppError(exit.cause));
     }
   });
 }, DEBOUNCE_MS);

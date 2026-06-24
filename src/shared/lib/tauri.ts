@@ -11,6 +11,7 @@
 
 import { Effect, Context, Layer } from "effect";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { logger } from "./logger";
 import type {
   AppError,
   Conversation,
@@ -55,6 +56,7 @@ export const invoke = <T>(
     catch: (e) => {
       // 保留上游 AppError 形状(若有 kind 字段),否则退化为 Unknown。
       // 否则 sandbox 错误会被 `String(e)` 打成 "[object Object]",错误种类丢失。
+      logger.error("IPC 调用失败", name, e);
       if (e && typeof e === "object" && "kind" in e) {
         return e as AppError;
       }

@@ -54,6 +54,7 @@ import { AnthropicTransport } from "./anthropic-transport";
 import type { AppError, Conversation, Message } from "../../../shared/lib/types";
 import { getBalanceTool, getPlanQuotaTool } from "../../billing/lib/billing";
 import { fileTools } from "../../file-tools/lib/file-tools";
+import { logger } from "../../../shared/lib/logger";
 
 /** Conversation ID — 字符串,镜像 src-tauri/src/types.rs Conversation.id。 */
 type ConversationId = string;
@@ -264,8 +265,14 @@ export const AgentRuntimeLive = Layer.effect(
                               arguments?: Record<string, unknown>;
                             };
                             if (b.type === "text" && b.text !== undefined) {
+                              logger.debug("runtime token", { convId, deltaLen: b.text.length });
                               Queue.unsafeOffer(queue, { type: "token", content: b.text });
                             } else if (b.type === "toolCall" && b.id !== undefined) {
+                              logger.info("runtime tool_call", {
+                                convId,
+                                toolCallId: b.id,
+                                name: b.name ?? "",
+                              });
                               Queue.unsafeOffer(queue, {
                                 type: "tool_call",
                                 toolCall: {
@@ -283,6 +290,12 @@ export const AgentRuntimeLive = Layer.effect(
                         break;
                       }
                       case "tool_execution_end": {
+                        logger.info("runtime tool_result", {
+                          convId,
+                          toolCallId: evt.toolCallId,
+                          name: evt.toolName,
+                          isError: evt.isError,
+                        });
                         Queue.unsafeOffer(queue, {
                           type: "tool_result",
                           toolCallId: evt.toolCallId,
@@ -330,12 +343,19 @@ export const AgentRuntimeLive = Layer.effect(
                             output_tokens: null,
                             created_at: Date.now(),
                           };
+                          logger.info("runtime done", {
+                            convId,
+                            messageId: doneMessage.id,
+                            inputTokens: doneMessage.input_tokens,
+                            outputTokens: doneMessage.output_tokens,
+                          });
                           Queue.unsafeOffer(queue, { type: "done", message: doneMessage });
                         }
                         break;
                       }
                     }
                   } catch (e) {
+                    logger.error("runtime error", { convId, message: String(e) });
                     Queue.unsafeOffer(queue, {
                       type: "error",
                       error: { message: String(e) },
@@ -352,6 +372,7 @@ export const AgentRuntimeLive = Layer.effect(
                 yield* Effect.tryPromise({
                   try: () => agent!.prompt(userMessage.content),
                   catch: (e) => {
+                    logger.error("runtime error", { convId, message: String(e) });
                     Queue.unsafeOffer(queue, {
                       type: "error",
                       error: { message: String(e) },

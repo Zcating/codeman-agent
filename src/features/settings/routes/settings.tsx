@@ -15,6 +15,7 @@ import { WorkspaceCard } from "../components/workspace-card";
 import { appStore } from "../../../shared/stores/app.store";
 import { settingsSaver } from "../lib/settings-saver";
 import { invoke } from "../../../shared/lib/tauri";
+import { logger } from "../../../shared/lib/logger";
 import type { Provider, Workspace } from "../../../shared/lib/types";
 
 type Tab = "llm" | "app" | "window" | "billing" | "advanced";
@@ -77,7 +78,7 @@ export function SettingsPage() {
       await Effect.runPromise(invoke<void>("clear_all_history"));
       setConfirmClear(false);
     } catch (e) {
-      console.error("[SettingsPage] 清除失败：", e);
+      logger.error("[SettingsPage] 清除失败：", e);
     }
   };
 

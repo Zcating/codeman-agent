@@ -104,11 +104,9 @@ main 窗口用 `default` capability。关键授权：
 
 ## 日志
 
-`%LocalAppData%\codeman-agent\logs\codeman-agent.log`（`tauri-plugin-log`，3 个 target：stdout + LogDir + Webview）。
+**基础设施（ADR-0011）**：`tauri-plugin-log` 2.x + `log = "0.4"`，3 个 target（stdout + `%LocalAppData%\codeman-agent\logs\codeman-agent.log` + Webview），默认 `Info` 级（`lib.rs::run` 的 builder 显式调 `.level(log::LevelFilter::Info)`）。外部 crate（keyring / reqwest / sqlx）的 DEBUG 噪音默认被过滤。
 
-**默认 level = `Info`**（决策 ADR-0011，`lib.rs::run` 的 builder 显式调 `.level(log::LevelFilter::Info)`）。项目内 `log::*!` 宏只用到 `info` / `warn` / `error` 三档；外部 crate（keyring / reqwest / sqlx 等）的 DEBUG 噪音默认被过滤。
-
-**全量 DEBUG 走环境变量**：
+**DEBUG 走环境变量**：
 
 ```powershell
 $env:RUST_LOG = "keyring=debug,codeman_agent_lib=debug"
@@ -116,6 +114,30 @@ pnpm tauri:dev
 ```
 
 不带 `=` 的 `=debug` 等价于全局。常见 pattern：`keyring=debug`（只开 keyring 内部 DEBUG）、`codeman_agent_lib=debug`（只开本 crate DEBUG）。
+
+**IPC handler 日志强制约定（ADR-0018 D2）**：每个 `#[tauri::command]` 函数必须包含 3 类日志：
+
+| 时机 | level | 位置 |
+|------|-------|------|
+| handler 进入 | `debug!` | 函数首行（param extraction 之后） |
+| handler 成功 | `info!` | return Ok 之前 |
+| handler 错误 | `warn!` 或 `error!` | `Err(AppError::...)` 构造前一行 |
+
+- `AppError::NotFound` / `InvalidConfig` / `Unauthorized` / `SandboxViolation` → `warn!`
+- `AppError::Upstream`（IPC 错误、DB 错误）→ `error!`
+
+filesystem 5 命令（`read_file` / `write_file` / `edit_file` / `search_files` / `delete_file`）失败时**必须**带 `workspace_id` + `path` 字段；`SandboxViolation` 单独标注越界便于诊断 agent 路径错误。
+
+**禁止（ADR-0018 D2 强化）**：
+
+- ❌ 用 `eprintln!` / `println!` 打诊断（始终走 `log::{info, warn, error}`）
+- ❌ 打印完整 `Provider` struct（避开 `api_key` 明文）；使用 `&provider` 会自动 Debug，但不写 Provider 到日志
+- ❌ `.expose()` 取 `Secret<String>` 原文再 log（`Secret` 自动 Debug = `Secret(***)`，无需手动处理）
+- ❌ `ProviderError::Upstream` 携带 URL（已 ADR-0003 规则）
+
+**log message 语言**：按 ADR-0009 §4，`log::*!` 字符串一律中文。
+
+**log rotation**：本期不实现。`tauri-plugin-log` 2.x 默认 LogDir 单文件 append，无轮转。V1 单机单用户使用频率下增长慢（每日 ~1MB）。开 ADR-0019 follow-up（按大小 / 按日 / tracing 升级 三选一）。
 
 ## 测试
 

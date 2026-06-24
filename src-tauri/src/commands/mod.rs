@@ -3,6 +3,7 @@
 
 pub mod filesystem;
 
+use log;
 use tauri_plugin_dialog::DialogExt;
 
 use crate::db::conversations;
@@ -15,6 +16,8 @@ use uuid::Uuid;
 
 #[tauri::command]
 pub async fn get_settings(state: State<'_, AppState>) -> Result<Settings, String> {
+    log::debug!("get_settings: 进入");
+    log::info!("get_settings: 成功");
     Ok(state.get_settings())
 }
 
@@ -23,9 +26,11 @@ pub async fn update_settings(
     new_settings: Settings,
     state: State<'_, AppState>,
 ) -> Result<Settings, String> {
+    log::debug!("update_settings: 进入");
     let sanitized = new_settings.sanitized();
     state.apply_settings(sanitized.clone())?;
     state.persist_settings();
+    log::info!("update_settings: 成功 providers={}", sanitized.providers.len());
     Ok(sanitized)
 }
 
@@ -38,7 +43,14 @@ pub async fn list_conversations(
     pool: tauri::State<'_, sqlx::SqlitePool>,
     include_archived: bool,
 ) -> Result<Vec<conversations::Conversation>, AppError> {
-    Ok(conversations::list_conversations(pool.inner(), include_archived).await?)
+    log::debug!("list_conversations: 进入 include_archived={}", include_archived);
+    let result = conversations::list_conversations(pool.inner(), include_archived).await
+        .map_err(|e| {
+            log::error!("list_conversations: 失败");
+            AppError::from(e)
+        })?;
+    log::info!("list_conversations: 成功 count={}", result.len());
+    Ok(result)
 }
 
 #[tauri::command]
@@ -46,14 +58,23 @@ pub async fn get_conversation(
     pool: tauri::State<'_, sqlx::SqlitePool>,
     id: String,
 ) -> Result<conversations::Conversation, AppError> {
-    let uuid = Uuid::parse_str(&id).map_err(|e| AppError::InvalidConfig {
-        message: format!("UUID 格式错误：{e}"),
+    log::debug!("get_conversation: 进入 id={}", id);
+    let uuid = Uuid::parse_str(&id).map_err(|e| {
+        log::warn!("get_conversation: 失败");
+        AppError::InvalidConfig {
+            message: format!("UUID 格式错误：{e}"),
+        }
     })?;
-    conversations::get_conversation(pool.inner(), &uuid)
+    let result = conversations::get_conversation(pool.inner(), &uuid)
         .await?
-        .ok_or_else(|| AppError::NotFound {
-            message: format!("会话 {id} 未找到"),
-        })
+        .ok_or_else(|| {
+            log::warn!("get_conversation: 失败");
+            AppError::NotFound {
+                message: format!("会话 {id} 未找到"),
+            }
+        })?;
+    log::info!("get_conversation: 成功");
+    Ok(result)
 }
 
 #[tauri::command(rename_all = "camelCase")]
@@ -62,7 +83,14 @@ pub async fn create_conversation(
     title: String,
     system_prompt: Option<String>,
 ) -> Result<conversations::Conversation, AppError> {
-    Ok(conversations::create_conversation(pool.inner(), &title, system_prompt.as_deref()).await?)
+    log::debug!("create_conversation: 进入 title={}", title);
+    let result = conversations::create_conversation(pool.inner(), &title, system_prompt.as_deref()).await
+        .map_err(|e| {
+            log::error!("create_conversation: 失败");
+            AppError::from(e)
+        })?;
+    log::info!("create_conversation: 成功 id={}", result.id);
+    Ok(result)
 }
 
 #[tauri::command]
@@ -70,10 +98,20 @@ pub async fn archive_conversation(
     pool: tauri::State<'_, sqlx::SqlitePool>,
     id: String,
 ) -> Result<(), AppError> {
-    let uuid = Uuid::parse_str(&id).map_err(|e| AppError::InvalidConfig {
-        message: format!("UUID 格式错误：{e}"),
+    log::debug!("archive_conversation: 进入 id={}", id);
+    let uuid = Uuid::parse_str(&id).map_err(|e| {
+        log::warn!("archive_conversation: 失败");
+        AppError::InvalidConfig {
+            message: format!("UUID 格式错误：{e}"),
+        }
     })?;
-    Ok(conversations::archive_conversation(pool.inner(), &uuid).await?)
+    conversations::archive_conversation(pool.inner(), &uuid).await
+        .map_err(|e| {
+            log::error!("archive_conversation: 失败");
+            AppError::from(e)
+        })?;
+    log::info!("archive_conversation: 成功");
+    Ok(())
 }
 
 #[tauri::command]
@@ -81,10 +119,20 @@ pub async fn delete_conversation(
     pool: tauri::State<'_, sqlx::SqlitePool>,
     id: String,
 ) -> Result<(), AppError> {
-    let uuid = Uuid::parse_str(&id).map_err(|e| AppError::InvalidConfig {
-        message: format!("UUID 格式错误：{e}"),
+    log::debug!("delete_conversation: 进入 id={}", id);
+    let uuid = Uuid::parse_str(&id).map_err(|e| {
+        log::warn!("delete_conversation: 失败");
+        AppError::InvalidConfig {
+            message: format!("UUID 格式错误：{e}"),
+        }
     })?;
-    Ok(conversations::hard_delete_conversation(pool.inner(), &uuid).await?)
+    conversations::hard_delete_conversation(pool.inner(), &uuid).await
+        .map_err(|e| {
+            log::error!("delete_conversation: 失败");
+            AppError::from(e)
+        })?;
+    log::info!("delete_conversation: 成功");
+    Ok(())
 }
 
 #[tauri::command(rename_all = "camelCase")]
@@ -92,10 +140,20 @@ pub async fn list_messages(
     pool: tauri::State<'_, sqlx::SqlitePool>,
     conversation_id: String,
 ) -> Result<Vec<messages::Message>, AppError> {
-    let uuid = Uuid::parse_str(&conversation_id).map_err(|e| AppError::InvalidConfig {
-        message: format!("UUID 格式错误：{e}"),
+    log::debug!("list_messages: 进入 conversation_id={}", conversation_id);
+    let uuid = Uuid::parse_str(&conversation_id).map_err(|e| {
+        log::warn!("list_messages: 失败");
+        AppError::InvalidConfig {
+            message: format!("UUID 格式错误：{e}"),
+        }
     })?;
-    Ok(messages::list_messages(pool.inner(), &uuid).await?)
+    let result = messages::list_messages(pool.inner(), &uuid).await
+        .map_err(|e| {
+            log::error!("list_messages: 失败");
+            AppError::from(e)
+        })?;
+    log::info!("list_messages: 成功 count={}", result.len());
+    Ok(result)
 }
 
 #[tauri::command(rename_all = "camelCase")]
@@ -110,10 +168,14 @@ pub async fn append_message(
     input_tokens: Option<i64>,
     output_tokens: Option<i64>,
 ) -> Result<messages::Message, AppError> {
-    let uuid = Uuid::parse_str(&conversation_id).map_err(|e| AppError::InvalidConfig {
-        message: format!("UUID 格式错误：{e}"),
+    log::debug!("append_message: 进入 conversation_id={}", conversation_id);
+    let uuid = Uuid::parse_str(&conversation_id).map_err(|e| {
+        log::warn!("append_message: 失败");
+        AppError::InvalidConfig {
+            message: format!("UUID 格式错误：{e}"),
+        }
     })?;
-    Ok(messages::append_message(
+    let result = messages::append_message(
         pool.inner(),
         uuid,
         &role,
@@ -124,7 +186,13 @@ pub async fn append_message(
         input_tokens,
         output_tokens,
     )
-    .await?)
+    .await
+    .map_err(|e| {
+        log::error!("append_message: 失败");
+        AppError::from(e)
+    })?;
+    log::info!("append_message: 成功 id={}", result.id);
+    Ok(result)
 }
 
 #[tauri::command]
@@ -133,7 +201,14 @@ pub async fn search_messages(
     query: String,
     limit: u32,
 ) -> Result<Vec<messages::Message>, AppError> {
-    Ok(messages::search_messages(pool.inner(), &query, limit).await?)
+    log::debug!("search_messages: 进入 query={} limit={}", query, limit);
+    let result = messages::search_messages(pool.inner(), &query, limit).await
+        .map_err(|e| {
+            log::error!("search_messages: 失败");
+            AppError::from(e)
+        })?;
+    log::info!("search_messages: 成功 count={}", result.len());
+    Ok(result)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -145,10 +220,16 @@ pub async fn get_provider_snapshot(
     state: State<'_, AppState>,
     provider: ProviderId,
 ) -> Result<SnapshotEnvelope, AppError> {
-    state
+    log::debug!("get_provider_snapshot: 进入 provider={}", provider);
+    let result = state
         .fetch_provider(provider)
         .await
-        .map_err(|e| AppError::Upstream { message: e.to_string() })
+        .map_err(|e| {
+            log::error!("get_provider_snapshot: 失败");
+            AppError::Upstream { message: e.to_string() }
+        })?;
+    log::info!("get_provider_snapshot: 成功");
+    Ok(result)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -159,20 +240,37 @@ pub async fn get_provider_snapshot(
 pub async fn clear_all_history(
     pool: tauri::State<'_, sqlx::SqlitePool>,
 ) -> Result<(), AppError> {
-    let mut tx = pool.begin().await.map_err(AppError::from)?;
+    log::debug!("clear_all_history: 进入");
+    let mut tx = pool.begin().await.map_err(|e| {
+        log::error!("clear_all_history: 失败");
+        AppError::from(e)
+    })?;
     sqlx::query("DELETE FROM messages_fts")
         .execute(&mut *tx)
         .await
-        .map_err(AppError::from)?;
+        .map_err(|e| {
+            log::error!("clear_all_history: 失败");
+            AppError::from(e)
+        })?;
     sqlx::query("DELETE FROM messages")
         .execute(&mut *tx)
         .await
-        .map_err(AppError::from)?;
+        .map_err(|e| {
+            log::error!("clear_all_history: 失败");
+            AppError::from(e)
+        })?;
     sqlx::query("DELETE FROM conversations")
         .execute(&mut *tx)
         .await
-        .map_err(AppError::from)?;
-    tx.commit().await.map_err(AppError::from)?;
+        .map_err(|e| {
+            log::error!("clear_all_history: 失败");
+            AppError::from(e)
+        })?;
+    tx.commit().await.map_err(|e| {
+        log::error!("clear_all_history: 失败");
+        AppError::from(e)
+    })?;
+    log::info!("clear_all_history: 成功");
     Ok(())
 }
 
@@ -182,6 +280,7 @@ pub async fn clear_all_history(
 
 #[tauri::command]
 pub async fn pick_workspace_path(app: tauri::AppHandle) -> Result<Option<String>, AppError> {
+    log::debug!("pick_workspace_path: 进入");
     let (tx, rx) = tokio::sync::oneshot::channel();
     app.dialog()
         .file()
@@ -189,7 +288,12 @@ pub async fn pick_workspace_path(app: tauri::AppHandle) -> Result<Option<String>
         .pick_folder(move |path: Option<tauri_plugin_dialog::FilePath>| {
             let _ = tx.send(path.map(|p| p.to_string()));
         });
-    rx.await.map_err(|e| AppError::Upstream {
-        message: format!("Dialog error: {}", e),
-    })
+    let result = rx.await.map_err(|e| {
+        log::error!("pick_workspace_path: 失败");
+        AppError::Upstream {
+            message: format!("Dialog error: {}", e),
+        }
+    })?;
+    log::info!("pick_workspace_path: 成功");
+    Ok(result)
 }

@@ -5,6 +5,7 @@ import { RouterProvider } from "@tanstack/solid-router";
 import { router } from "./router";
 import { appStore } from "./shared/stores/app.store";
 import { Effect, Exit } from "effect";
+import { logger } from "./shared/lib/logger";
 
 // Render the RouterProvider FIRST with the in-memory defaultSettings, so the SPA
 // is visible immediately even if the Rust backend is slow or `get_settings` IPC
@@ -23,7 +24,7 @@ import { formatAppError } from "./shared/lib/format-app-error";
 function bootstrap() {
   const root = document.getElementById("root");
   if (!root) {
-    console.error("[index.tsx] #root not found — cannot mount Solid");
+    logger.error("[index.tsx] #root not found — cannot mount Solid");
     return;
   }
   render(() => <RouterProvider router={router} />, root);
@@ -32,7 +33,7 @@ function bootstrap() {
   // unhandled rejections — the user keeps the defaults and the UI works.
   Effect.runPromiseExit(appStore.refresh()).then((exit) => {
     if (Exit.isFailure(exit)) {
-      console.warn(
+      logger.warn(
         "[index.tsx] background get_settings refresh failed — using defaults:",
         formatAppError(exit.cause),
       );

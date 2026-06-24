@@ -45,7 +45,7 @@
 ### 密钥
 
 - **API Key (API 密钥)** — Provider 的对外调用凭据，shape 为 `Provider.api_key: string`。**明文存于 Settings JSON**（`%LocalAppData%\codeman-agent\settings.json`），与 Settings 其它字段同档；不再分 LLM / Billing 二分（ADR-0015）。LLM 调用和计费工具调端点都复用同一 key。V1 单机单用户威胁模型下接受明文；如未来需 OS 级密钥管理（keyring / Windows Credential Manager）需重做 ADR-0015。_避免_：把 key 单独存 Tauri store 再走 IPC（V1.7+ 前的设计，已废止）。
-- **Secret** — Rust 端 `Secret<String>` newtype，`Debug` / `Display` 打印 `Secret(***)` / `***`。V1.7+ 后 Settings JSON 明文存 key，`Secret` 主要用于 pi-agent 运行时构造 header 时临时包裹。_避免_：对任何凭据使用裸 `String`。
+- **Secret** — Rust 端 `Secret<String>` newtype，`Debug` / `Display` 打印 `Secret(***)` / `***`。V1.7+ 后 Settings JSON 明文存 key，`Secret` 主要用于 pi-agent 运行时构造 header 时临时包裹。**调用方**：`logger.*` / `log::*!` 不得打印完整 secret 值（任一语言）；`Secret` 类型自动重载 `Debug` / `Display`，裸字符串变量需手动 redact 为 `***`。V1.10+ 起本规则从"强制 redact"降级为 developer 自觉——理由是 simple logger API 与自动 redaction 实现冲突，详见 ADR-0018 D6。_避免_：对任何凭据使用裸 `String`。
 
 ### Settings 与状态
 
@@ -192,13 +192,6 @@ interface ModelMeta {
 ## MiniMax 端点
 
 MiniMax `plan_quota` 端点（`https://api.minimaxi.com/anthropic/v1/quota/plan`）当前有效。`balance` 端点尚未公开验证，调用时 adapter 返回 `Upstream` 错误。DeepSeek balance 端点 `https://api.deepseek.com/user/balance` 当前有效；DeepSeek 不支持 `plan_quota`，调用时 adapter 返回 `Upstream` 错误。
-
-## Logging
-
-- 日志位于 `%LocalAppData%\codeman-agent\logs\`，按日轮转，容量上限。
-- `log` + `tauri-plugin-log`；默认 `info` 级，通过环境变量启用 `debug`。
-- API 密钥材料在 Rust 端包成 `Secret<String>`，在 TS 端由 adapter 层使用前才 `expose()`；log 语句避免格式化完整 secret（任一语言）。
-- V1.7+ 后 `Provider.api_key` 落在 Settings JSON 明文：**log 语句一律 redact `api_key` 字段**，用 `***` 替换；不能因"反正明文存盘"就放松 log 端 sanitization。Rust 端 logging 中遇到 `Provider` struct 时跳过 `api_key` 字段。
 
 ## Non-goals
 

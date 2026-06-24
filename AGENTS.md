@@ -1,6 +1,6 @@
 # codeman-agent — 项目知识库
 
-> **AI Agent 协作入口**。读 `CONTEXT.md` 拿词汇表，读 ADR 拿决策，读子目录 `AGENTS.md` 拿硬性规则。
+> **AI Agent 协作入口**。读 `CLAUDE.md` 拿工作方式，读 `CONTEXT.md` 拿词汇表，读 ADR 拿决策，读子目录 `AGENTS.md` 拿硬性规则。
 
 **生成时间:** 2026-06-14
 **Commit:** (TBD)
@@ -106,8 +106,11 @@ codeman-agent/
 | **0013** | **V2 file IO tools + workspace sandbox**                                    | V2 新增 5 个文件工具（read/write/edit/search/delete），workspace 沙箱隔离，Rust 端强制 path validation，10MB 上限，UTF-8 编码，系统文件（.exe/.dll 等）阻塞；Settings UI 新增 WorkspaceCard；工具在 `src/features/file-tools/lib/file-tools.ts` |
 | **0014** | **Per-Conversation Agent 实例（多流并行 + 切换保留状态）**                | `AgentRuntime` 从 `Ref<Agent | null>` 单例改为 `Context.Tag` service 单例（每进程 1 个 service）+ 内部 `Ref<Map<ConversationId, Agent>>` 托管 per-conversation 实例；每个 Conversation 1 个 Agent；service 公开 `run(conv, msg)` / `cancel(convId)` / `destroy(convId)`；多 conv 可并行 streaming，切换 conv 保留 in-flight 流；supersedes `chat/AGENTS.md` 的 "AgentRuntime 单例" 硬规则 |
 | **0015** | **Settings 全局 app-store + API Key 模型简化（明文进 Settings JSON）**    | **本期新加**（via grill-with-docs 2026-06-20 触发）：引入 `src/shared/stores/app.store.ts` 全局 reactive 桥接层（`createStore` + debounced 500ms auto-flush + `forceFlush()` skip debounce + `refresh()`）；LLM API Key / Billing API Key 合并为单一 `Provider.api_key` 字段，**明文进 Settings JSON**（安全回归：V1 单机单用户威胁模型下接受；如未来需 OS 级密钥管理需重做本 ADR）；删除 Tauri store key 路径 `llm_providers/<id>/api_key` + `billing/<id>/api_key`、IPC `set_llm_key` / `set_billing_key` / `has_llm_key` / `get_llm_key` / `delete_provider_keys`、`src/features/settings/lib/llm-providers.ts`（`LLMProviderService` + 3 bridge 函数）、`LLMProvider` 类型别名；ProviderCard / WorkspaceCard onChange 走 `appStore.set(...)`（修 ADR-0003 的 UI 直接 invoke 违规）；footer Save 唯一入口调 `appStore.forceFlush()`；per-row API Key Save 按钮删除；Settings UI 单一 Save 心智模型；dot-separated 文件名 `app.store.ts` 是 ADR-0010 后第二例命名例外 |
+| **0018** | **统一日志系统（前端 logger.ts + Rust log 强制 + CONTEXT.md Logging 段移除）** | **本期新加**（via grill-with-docs 2026-06-24 触发）：新建 `src/shared/lib/logger.ts`，API 形状 `logger.{debug,info,warn,error}(msg, ...args)` 与 `console.*` 1:1 转发 + `[LEVEL]` 前缀；不引入 consola/pino/logtape；后端保持 `log` + `tauri-plugin-log` 不变；Rust 18 个 IPC handler 全量加 `debug!`/`info!`/`warn!`（含 filesystem 5 命令的 5-10 个错误分支）；前端 RuntimeEvent 5 变体（token 降 debug，其余 info/error）+ `invoke<T>()` 失败 catch 加 `logger.error`；替换 9 处 `console.*` 散点为 `logger.*`；UI 层 `logger.*` 允许所有档（不是 service 操作，不违反 ADR-0016 D4）；**CONTEXT.md § Logging 段完整移除**（log path 是实现细节），redaction 规则从"强制"降级为 developer 自觉（simple API 与自动 redaction 冲突，理由详见 ADR-0018 D6）；log rotation 本期不实现，开 ADR-0019 follow-up |
 
 > **新决策**先写 ADR 再动代码。`docs/adr/` 用 `NNNN-kebab-title.md` 命名；格式见 `.agents/skills/grill-with-docs/ADR-FORMAT.md`。
+
+> ⚠️ AGENTS.md ADR 索引落后：ADR-0016 / 0017 已 accepted 但未列入本索引。补齐是其他 PR 范围，本任务只追加 0018。
 
 ## 关键概念
 
@@ -184,6 +187,8 @@ LLM Provider             Billing Provider
 - 直接 return `reqwest::Error`（Rust 端） — 用 `ProviderError::Upstream(format!("{status}: {body}"))`
 - 在 main 窗口之外的 webview 调 `invoke(...)` — 单 webview 约束（ADR-0007）
 - 引入 Radix UI / Kobalte — V1 排除（ADR-0008），等真出现 Dialog 需求再开新 ADR
+- 前端新增 `console.log` / `console.warn` / `console.error` / `console.debug` — 全部走 `@/shared/lib/logger`（ADR-0018 D5）
+- 后端新增 `eprintln!` / `println!` 打诊断 — 全部走 `log::{info, warn, error}`（ADR-0011 + ADR-0018 D2）
 
 ## 命令
 
@@ -239,16 +244,6 @@ vp run e2e:report        # 看上一次 HTML 报告
 | 03  | 聊天调 billing 工具    | user bubble 写入 + assistant 开始 streaming OR Cancel 出现 (LLM 可失败) |
 | 04  | 主题 light/dark/system | `update_settings.theme` → `<html class>` 在 5s poll 内切换              |
 
-### 反模式 (E2E 特有)
-
-- **不要在 E2E spec 里 mock IPC** — 这一层的价值是真后端，真数据库，真 keyring。Vitest + `__mocks__` 是单元测试的领域。
-- **不要并行跑** — Tauri 是单实例，多 worker 会撞同一个 window/Rust state。`workers: 1` 是硬约束。
-- **不要用真实 LLM key 跑 E2E** — 慢、不确定、贵。spec 03 只验 chat loop 活着，不验响应内容。
-- **不要断言 console.warn** — `console.error` 才算 canary 失败；warning 太嘈杂。
-- **不要在 E2E 写 BEM class** — ADR-0006；断言走 utility class（跟 vitest 一致）。
-- **不要在 E2E 测 Tailwind 样式细节** — 验 `classList.contains("dark")` 这种语义状态，不验 computed style。
-- **不要在 E2E 用 vitest 的 `vi.mock`** — Playwright 走自己的 fixture 体系（`getTauriPage` / `invoke`）。
-- **不要直接 `taskkill /IM tauri.exe` 在 spec 里** — 那是 `global-teardown` 的职责，失败时一票否决。
 
 ### 何时新增 E2E spec
 
@@ -257,9 +252,6 @@ vp run e2e:report        # 看上一次 HTML 报告
 - 改主题/外观语义 → 加到 04 或新开 "ui-state" describe
 - 加新 Tauri 插件 → 单独 spec，不要塞进现有 4 个
 
-### CI 留待后续
-
-用户已确认 V1 E2E **不进 CI**。后续接入时要装：WebView2 Runtime + `tauri-driver` + `@playwright/test` + Edge WebDriver；跑在 Windows runner；`tauri build` 产物比 `tauri dev` 稳定但慢 2x，看情况选。
 
 ## 子目录知识库表
 
