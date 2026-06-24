@@ -1,10 +1,10 @@
 # src/features/chat/ — Chat Feature (聊天域)
 
-> **chat feature** = lib (AgentRuntime) + stores (Effect→Solid bridge) + components (4 UI 原子) + routes。
+> **chat feature** = lib (`createAgentRuntime` 工厂) + stores (`conversations.store` Solid createStore) + components (4 UI 原子) + routes。
 > 本目录结构遵循 [ADR-0010](../../docs/adr/0010-frontend-5-1-folder-whitelist.md) 的 5 子目录白名单（`stores` / `components` / `routes` / `hooks` / `lib`）。
 > Billing tools（`src/features/billing/lib/billing.ts`）由本 feature 的 `lib/runtime.ts` 引用注册。
 
-## 目录布局（ADR-0010 V1.5）
+## 目录布局（ADR-0010 V1.5 + ADR-0019 V2）
 
 ```
 src/features/chat/
@@ -12,51 +12,52 @@ src/features/chat/
 ├── AGENTS.md             # 本文件
 │
 ├── lib/                  # 纯逻辑 / Effect-TS 运行时
-│   ├── runtime.ts        # AgentRuntime + RuntimeLayer + RuntimeDeps（从根级迁入）
-│   └── runtime.test.ts   # Runtime 单元测试
+│   ├── runtime.ts        # createAgentRuntime() 工厂 + ProviderConfig / RunOptions / AgentRuntime 类型
+│   └── runtime.test.ts   # 工厂模式 + mock Agent + per-run lifecycle
 │
-├── stores/               # 反应式状态（Solid signal / store / Accessor）
-│   ├── conversations.store.ts  # Effect → Solid bridge: conversations$ + CRUD
-│   ├── conversations.test.ts
-│   ├── messages.store.ts       # Effect → Solid bridge: messages$ + stream callbacks
-│   └── messages.test.ts
+├── stores/               # 反应式状态（Solid createStore）
+│   ├── conversations.store.ts  # ConversationState 类型 + createStore + sendMessage + handleEvent + CRUD
+│   └── conversations.store.test.ts
 │
 ├── components/           # UI 组件
-│   ├── sidebar.tsx       # Conversation list + search (reads chatStore)
+│   ├── sidebar.tsx       # Conversation list + search + streaming 状态点
 │   ├── sidebar.test.tsx
-│   ├── message-bubble.tsx # Role-aware message renderer (user/assistant/tool/system)
+│   ├── message-bubble.tsx # Role-aware message renderer
 │   ├── message-bubble.test.tsx
-│   ├── tool-call-card.tsx # Tool invocation card (running/success/error states)
+│   ├── tool-call-card.tsx # Tool invocation card
 │   ├── tool-call-card.test.tsx
-│   ├── chat-view.tsx     # Main chat UI (subscribes runtime events → store)
+│   ├── chat-view.tsx     # Main chat UI（用 conversations.store，不再 import messages.store / agent.store）
 │   └── chat-view.test.tsx
 │
 └── routes/
     └── index.tsx         # ChatLayout — Sidebar + ChatView + Settings link
 ```
 
-> **ADR-0010 前后路径对照**：
+> **路径演变**：
 >
-> - `runtime.ts`（feature 根级） → `lib/runtime.ts`（feature 根级只允许 `index.ts` + `AGENTS.md`）
-> - `store/conversations.ts` → `stores/conversations.ts`（单数 → 复数）
-> - `store/messages.ts` → `stores/messages.ts`
+> - `runtime.ts`（feature 根级） → `lib/runtime.ts`（ADR-0010）
+> - `store/conversations.ts` → `stores/conversations.store.ts`（单数 → 复数，加 `.store` 后缀，ADR-0010）
+> - `messages.store.ts` + `agent.store.ts` → **删除**，合并到 `conversations.store.ts`（ADR-0019 D3）
 > - 旧 `types/` 目录（空）已删除
 >
 > `hooks/` 目录 V1 暂无，未来首个 `use-` 钩子（候选：`useConversations` / `useDebouncedQuery`）落地时创建。
 
 ## 硬性规则
 
-- **UI 组件（`components/*.tsx`）禁止导入 `effect`。** 它们是纯 Solid signal 消费者。逻辑层在 `stores/*.ts` 和 `lib/*.ts` 中。
-- **`AgentRuntime` service 是单例，但托管 per-conversation Agent 映射表。**（V1.6 起，按 [ADR-0014](../../docs/adr/0014-per-conversation-agent.md) 修订。）
-  - `AgentRuntimeLive` 持有 `Ref<Map<ConversationId, Agent>>`。
-  - 每个 Conversation 至多 1 个 active 流；多 Conversation 可并行 streaming（见 ADR-0014 D5）。
-  - `run(conv, msg)`：按 `conv.id` 在 Map 中查找/创建 Agent；首次创建时从 `MessageService.list(convId)` 拉历史消息一次性回填（见 D4）。
-  - `cancel(convId)`：从 Map 拿对应 Agent 调 `agent.abort()`；in-flight partial 保留在 Agent state，不落库。
-  - `destroy(convId)`：从 Map 移除该 Agent 实例（用于 `archiveConversation` / `deleteConversation` 入口）。
-  - `archiveConversation` / `deleteConversation` store 入口在调 DB 删之前**必须**先 `AgentRuntime.cancel(convId)`，再 `AgentRuntime.destroy(convId)`，确保 SSE 连接被显式清理（避免 JS GC 不可预测）。
-- **Store 是唯一的桥接层。** `stores/*.ts` 通过 `Effect.runPromiseExit` 将 Effect 结果转换为 Solid signals。组件永远不直接调用 `Effect.runPromise`。
-- **组件不调 IPC。** 所有 Tauri IPC 走 `src/shared/lib/tauri.ts` Service Tags。
-- **`Sidebar` 用 `createSignal` 做局部状态。** `query` / `debouncedQuery` / `setQuery/setDebouncedQuery` signals 是组件局部的，不与 store 导出冲突。streaming 状态点（per-conv 反馈）走 `streaming$` store accessor（来自 `conversations` 或独立 streaming store）。
+- **UI 组件（`components/*.tsx`）禁止导入 `effect`。** 它们是纯 Solid signal / createStore 消费者。逻辑层在 `stores/*.ts` 和 `lib/*.ts` 中。
+- **`createAgentRuntime` 工厂函数，无 `Context.Tag` / Layer DI / Map**（V2 起，按 [ADR-0019](../../docs/adr/0019-per-run-transient-agent.md) supersede [ADR-0014](../../docs/adr/0014-per-conversation-agent.md) D1 + D4）。
+  - 每个 Conversation 对应一个 `createAgentRuntime()` 产物，存放在 `ConversationState.runtime`（在 `conversations.store.ts` inline 定义）。
+  - `run({ context, provider })`：`context: Message[]` 是 store messages 浅拷贝（含最新 user msg）；`provider: ProviderConfig` 包含 `apiKey` / `baseUrl` / `defaultModel` / `systemPrompt` / `tools`。每次 run 新建 pi-mono `Agent` + `Queue.unbounded<RuntimeEvent>` + `Effect.fork` fiber。
+  - `cancel()`：调 closure 内 `AbortController.abort()` 触发 fetch abort。in-flight partial 保留在 store（stream 订阅实时写）。
+  - `archiveConversation` / `deleteConversation` store 入口在调 DB 删之前**必须**先调 `runtime.cancel()`，再从 `store.byId` 移除 ConvState（runtime 随 ConvState GC）。
+- **`conversations.store.ts` 是 chat 域唯一 store**（V2 起合并 `messages.store` + `agent.store`，per ADR-0019 D3）。
+  - 内嵌 `ConversationState` 类型（DB fields + `messages: Message[]` + `streamingMessageId: string | null` + `runtime: AgentRuntime`）。
+  - 唯一响应式源：Solid `createStore<{ activeId: string | null; byId: Record<ConvId, ConversationState> }>`。
+  - `sendMessage(convId, content, provider)`：`append user msg`（local + DB persist）→ `context = [...byId[convId].messages]` → `runtime.run({ context, provider })` → `Stream.runForEach` 订阅，更新 `byId[convId].messages` / `streamingMessageId`。
+  - UI 读 `store.byId[activeId()]?.messages`，Solid proxy 自动按路径细粒度反应式，跨 conv streaming 不互相重算。
+  - ADR-0016 D4-D5-D6 的"组件不直接 import runtime"约束保留：组件调 `conversations.store.sendMessage(...)` / `conversations.store.cancel(convId)` / `conversations.store.archiveConversation(convId)`，不直接 import `lib/runtime.ts`。
+- **组件不调 IPC。** 所有 Tauri IPC 走 `src/shared/lib/tauri.ts` Service Tags，在 `conversations.store.ts` 内 `yield*` 使用。
+- **`Sidebar` 用 `createSignal` 做局部状态。** `query` / `debouncedQuery` / `setQuery/setDebouncedQuery` signals 是组件局部的。streaming 状态点（per-conv 反馈）走 `conversations.store`：读 `Object.values(store.byId).filter(c => c.streamingMessageId !== null)` 列出所有正在 streaming 的 conv，在 sidebar 列表项旁显示 ⏳ 徽标。
 
 ## 输入框下方的 provider 选择器
 
@@ -69,12 +70,13 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 **写路径**：
 - 用户切换 → `appStore.set({ default_llm_provider_id: nextId })` 同步更新本地 state
 - 然后 `settingsSaver.scheduleSave()` debounced 500ms 刷到后端（跟 settings 域同 pattern, ADR-0015）
-- runtime 下次 `run()` 通过 `SettingsService.getActiveLlmProvider()` 读到这个新值
+- `conversations.store.sendMessage()` 入口从 `appStore` 读当前 `default_llm_provider_id` + 对应 provider 配置,构造 `ProviderConfig` 传给 `runtime.run({ ..., provider })`(per ADR-0019 D2 "provider 是 run-time 参数")
 
-**不变量**（per ADR-0014 D1）：
-- `AgentRuntime` 内部 `Ref<Map<ConvId, Agent>>` 锁定每个 conversation 首次 run 时的 provider
-- 已 in-flight 的 conversation 在切换 selector 后**不会**改 provider（已创建的 Agent 不会重新构造）
-- 新 conversation 首次 send 时取新的 `default_llm_provider_id` 构造 Agent
+**不变量**（per ADR-0019 D1 + D2）：
+- Provider 是 `run({ context, provider })` 的**参数**(per-run)，不是 closure 变量 — 每次 send 都从 `appStore` 读 `default_llm_provider_id` 当前值构造 `ProviderConfig`
+- 已 in-flight 的 conversation 在切换 selector 后**不会**改 provider(已在跑的那次 run 闭包锁定的 `ProviderConfig` 保留到 run 结束)
+- 新 conversation 下次 send 时取新的 `default_llm_provider_id` 构造新 `ProviderConfig`
+- 与 V1.6 ADR-0014 D1 "首次 run 锁定 provider" 的差异:provider 现在跟 `run()` 调用绑定,不再跟 `AgentRuntime` 实例生命周期绑定 — 等价行为(in-flight 不变),但实现更直接
 
 **空状态**：所有 provider 都 disabled / 没 LLM 时，`<select>` 不渲染，改渲染 "无 provider — 前往 settings" 链接（指向 `/settings`），引导用户去配置。
 
@@ -82,29 +84,28 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 
 ## Runtime 事件（5 变体）
 
-| 变体          | Payload                        | UI 副作用                     |
-| ------------- | ------------------------------ | ----------------------------- |
-| `token`       | `string`                       | `appendAssistantMessageDelta` |
-| `tool_call`   | `ToolCall`                     | `appendToolCall`              |
-| `tool_result` | `toolCallId + result + error?` | `finalizeToolResult`          |
-| `done`        | `Message`                      | `finalizeAssistantMessage`    |
-| `error`       | `{ message: string }`          | 仅记录日志                    |
+| 变体          | Payload                        | UI 副作用（`conversations.store` 内 `handleEvent`）|
+| ------------- | ------------------------------ | -------------------------------------------------- |
+| `token`       | `string`                       | `setStore("byId", convId, "messages", msgs => appendAssistantDelta(msgs, evt.content))` |
+| `tool_call`   | `ToolCall`                     | `setStore("byId", convId, "messages", msgs => appendToolCall(msgs, evt.toolCall))` |
+| `tool_result` | `toolCallId + result + error?` | `setStore("byId", convId, "messages", msgs => finalizeToolResult(msgs, evt.toolCallId, evt.result, evt.error))` |
+| `done`        | `Message`                      | `setStore("byId", convId, "messages", msgs => finalizeAssistantMessage(msgs, evt.message))` + `setStore("byId", convId, "streamingMessageId", null)` + `void persistAssistantMessage(evt.message)` |
+| `error`       | `{ message: string }`          | `logger.error("[ChatAgent] runtime error:", evt.error)` |
 
-## pi-mono 版本漂移（已知问题）
-
-`lib/runtime.ts` 在 ~119 行有 `// pi-ai@0.73.1 vs pi-agent@0.9.0 type drift — `as any` bridge`。
-`pi-ai@0.73.1` 导出 `Tool`（无 `AgentTool`）。`pi-agent@0.9.0` 期望 `AgentTool`（有 `label + execute`）。
-当前 workaround：`billingTools` 上的 `as any` 转换。**升级 pi-ai 前**，移除 `as any` 转换并通过 `getModel()` 接入真实 Model。
 
 ## 测试模式
 
-| 层         | 测试文件                | 框架                                               |
-| ---------- | ----------------------- | -------------------------------------------------- |
-| Runtime    | `lib/runtime.test.ts`   | `@effect/vitest` + `it.effect()` + `Layer.succeed` |
-| Store      | `stores/*.test.ts`      | `@effect/vitest` + `it.effect()` + `Layer.succeed` |
-| Components | `components/*.test.tsx` | `vitest` + `@solidjs/testing-library` + `render`   |
+| 层         | 测试文件                                  | 框架                                                          |
+| ---------- | ----------------------------------------- | ------------------------------------------------------------- |
+| Runtime    | `lib/runtime.test.ts`                     | `@effect/vitest` + `it.effect()`，factory 直接调 + mock `Agent` / `Queue` |
+| Store      | `stores/conversations.store.test.ts`      | `vitest` + Solid Testing Library（`render` + `createRoot`）   |
+| Components | `components/*.test.tsx`                   | `vitest` + `@solidjs/testing-library` + `render`              |
 
-Component tests 通过 `vi.mock("../stores/X")` mock store 模块（**路径从 `store/` 改为 `stores/`**——ADR-0010）。Runtime tests 通过 `Layer.mergeAll` 提供 mock `SettingsService` + `BillingService`。
+**Runtime tests**: `createAgentRuntime()` 无 `Layer` 依赖,直接调用工厂函数 + mock `Agent` / `Queue` / `AbortController`。`run()` 内部 Effect 通过 `Effect.runPromise` 或 `Effect.runSync` 触发,断言 stream 输出。
+
+**Store tests**: Solid Testing Library `createRoot` 包裹 reactive scope,直接读 `store.byId[convId].messages` / `streamingMessageId` 断言反应式更新。Mock `MessageService` / `ConversationService` 在 store 测试 entry 通过 `vi.mock("../../../shared/lib/tauri", ...)` 注入。
+
+**Component tests**: 通过 `vi.mock("../stores/conversations.store")` mock store 模块。`chat-view.test.tsx` 不再 mock `messages.store` / `agent.store`(已删除)。
 
 ## 图标策略
 
@@ -122,3 +123,4 @@ Component tests 通过 `vi.mock("../stores/X")` mock store 模块（**路径从 
 
 - **Wave 4**（2026-06-14）：从 `src/agent/` → `src/features/chat/` 迁移
 - **Wave V1.5**（2026-06-15，ADR-0010）：`runtime.ts` 从根级入 `lib/`；`store/` → `stores/`；删空 `types/`
+- **Wave V2**（2026-06-25，ADR-0019）：`AgentRuntime` service 单例 + Map → `createAgentRuntime()` 工厂 + per-conv `ConversationState.runtime`；`messages.store` + `agent.store` 合并到 `conversations.store`；`createStore<{ activeId, byId }>` 取代全局 signal + Map；supersede ADR-0014 D1 + D4

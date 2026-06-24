@@ -35,11 +35,11 @@
 
 ### 架构
 
-- **Runtime (运行时)** — 包装 pi-mono agent loop 的 Effect-TS 层。掌控 per-conversation Agent 生命周期、工具注册表、Stream 订阅。V1.9+ 改用 Queue-based Mailbox 架构（ADR-0017）：`Queue.unbounded` 作为 event bus，`Effect.fork` 在子 fiber 里跑 `agent.subscribe + agent.prompt`，事件通过 `Queue.unsafeOffer` 推入；consumer 端 `Stream.fromQueue(queue)` 是 leaf operator。`AgentRuntime.run` 的 declared R = `never`（truthful，无 type-lie），结构上不可能触发 `Service not found: SettingsService`。_避免_：agent core、agent loop。
-- **Per-Conversation Agent (会话级 Agent 实例)** — 每个 Conversation 对应一个 pi-mono `Agent` 实例。生命周期跟随 Conversation：lazy 创建于该 conv 首次 `run()`，销毁于 Conversation 被 delete / archive。Agent 实例在 `run()` 之间复用、累积 `messages: PiMessage[]`；首次创建时从 `MessageService.list(convId)` 一次性拉历史消息回填。同一 Conversation 至多 1 个 active 流；多 Conversation 可并行 streaming。切换 Conversation 时 in-flight 流保留状态、不被 cancel。_避免_：singleton Agent、per-request Agent。
-- **Agent Map (Agent 映射表)** — `AgentRuntimeLive` 持有的 `Ref<Map<ConversationId, Agent>>`。Service 本身仍是 `Context.Tag` 单例（每进程 1 个 service），但 service 内部状态按 ConversationId 索引。Service 公开 `run(conv, msg)`、`cancel(convId)`、`destroy(convId)` 三个方法；不暴露内部 Map（封装边界）。
-- **Bridge (桥接层)** — 将 Effect Service 的 `Effect` / `Stream` 输出翻译为 Solid signal 的层。UI 组件不 `import 'effect'`。_避免_：adapter（过载）。
-- **Effect Service (Effect 服务)** — 类型化异步模块，暴露 `Effect<A, E, R>` 或 `Stream<A, E, R>`。通过 Effect layer 组合；通过 mock layer 测试（`@effect/vitest`）。
+- **Runtime (运行时)** — 包装 pi-mono agent loop 的**纯工厂函数** `createAgentRuntime()`。无 `Context.Tag` service、无 Layer DI、无内部 Map（V2 起 per ADR-0019 supersede ADR-0014 D1）。每次调用 `createAgentRuntime()` 返回独立的 `AgentRuntime` 实体，存放在 `ConversationState.runtime`（per-conv 实例化）。`AgentRuntime.run({ context, provider })` 内部仍用 Queue-based Mailbox 架构（per ADR-0017）：`Queue.unbounded` 作为 event bus，`Effect.fork` 在子 fiber 里跑 `agent.subscribe + agent.prompt`，事件通过 `Queue.unsafeOffer` 推入；consumer 端 `Stream.fromQueue(queue)` 是 leaf operator。每次 `run()` 调用新建 pi-mono `Agent`，`initialState.messages = context`（store 来的浅拷贝，per ADR-0019 D2 "Agent 是 per-run transient"）；`AbortController` 注入 transport，`cancel()` 通过 `abortController.abort()` 触发 fetch abort。_避免_：agent core、agent loop、AgentRuntime service（旧 Context.Tag + Layer 设计）。
+- **Per-Conversation Runtime (会话级运行时)** — 每个 Conversation 对应一个 `createAgentRuntime()` 产物（即一个 `AgentRuntime` 实体），存放在 `ConversationState.runtime`（`src/features/chat/stores/conversations.store.ts` inline 定义）。生命周期跟随 Conversation：创建于 Conversation 首次 send 时（lazy），销毁于 Conversation 被 delete / archive。in-flight 流不被 cancel — 切换 Conversation 时 partial 进度保留在 `ConversationState.messages`（stream 订阅实时写）。同一 Conversation 至多 1 个 active 流；多 Conversation 可并行 streaming。_避免_：singleton Agent（旧 ADR-0014 D1 已被 supersede）、per-request Agent、Per-Conversation Agent（旧 term,已并入本词条）。
+- **Conversation State (会话视图)** — `Conversation`（DB-backed 持久字段）+ per-conv reactive state（`messages: Message[]` + `streamingMessageId: string | null`）+ per-conv runtime（`runtime: AgentRuntime`）的组合类型。定义在 `src/features/chat/stores/conversations.store.ts`（V2 起合并原 `messages.store` + `agent.store`，per ADR-0019 D3）。Solid `createStore<{ activeId: string | null; byId: Record<ConvId, ConversationState> }>` 管理反应式。UI 读 `store.byId[activeId()]` 拿到 reactive 视图；store 是 single source of truth，runtime 是 stateless LLM caller。_避免_：Per-Conv message signal（旧 `messages$` 全局 signal，已废止）、Agent Map（旧 `Ref<Map<ConvId, Agent>>`，已废止）。
+- **Bridge (桥接层)** — 将 Effect `Stream` / `Effect` 输出翻译为 Solid `createStore` 的层。V2 起归口到 `conversations.store.ts`：stream `runForEach` 订阅 → `setStore("byId", convId, ...)` 写 reactive state。UI 组件不 `import 'effect'`。_避免_：adapter（过载）。
+- **Effect Service (Effect 服务)** — 类型化异步模块，暴露 `Effect<A, E, R>` 或 `Stream<A, E, R>`。通过 Effect layer 组合；通过 mock layer 测试（`@effect/vitest`）。V2 起 chat 域不再用 Effect Service 模式承载 runtime（`createAgentRuntime` 是纯工厂函数而非 Context.Tag），但 DB 桥接仍用 Service 模式（`ConversationService` / `MessageService` in `shared/lib/tauri.ts`）。
 - **IPC** — Tauri 命令桥接。Rust 端命令注册在 `src-tauri/src/lib.rs::invoke_handler!`；TS 端包装在 `src/shared/lib/tauri.ts`（Service Tag + Live Layer）。`invoke` 在该文件之外不出现。
 
 ### 密钥
@@ -83,8 +83,8 @@
 
 ```
 Agent
-  ├── runtime          (Effect-TS layer wrapping pi-mono)
-  ├── bridge           (Effect → Solid signal 翻译器)
+  ├── runtime          (createAgentRuntime() 工厂, per-conv 实例化 per ADR-0019)
+  ├── bridge           (Effect → Solid createStore 翻译器, conversations.store.ts)
   └── tools[]          (类型化函数；计费 + 文件工具)
         ├── get_balance(provider_id)             → Snapshot
         ├── get_plan_quota(provider_id)          → Snapshot
@@ -94,14 +94,20 @@ Agent
         ├── search_files(workspace_id, glob, pattern?) → FileMatch[]
         └── delete_file(workspace_id, path)      → void
 
-Conversation          (src/shared/lib/types.ts)
+Conversation          (src/shared/lib/types.ts, DB-backed)
   ├── id, title, system_prompt?, created_at, updated_at, archived_at?
-  └── messages[]       (线性)
+  └── messages[]       (DB-persisted, 线性)
         ├── id, role, content
         ├── tool_calls[]    (assistant 调用工具时)
         ├── tool_results[]  (返回给 LLM 的结果)
         ├── model, input_tokens, output_tokens
         └── created_at
+
+Conversation State    (src/features/chat/stores/conversations.store.ts, V2 in-memory view)
+  ├── (DB fields 镜像 Conversation)
+  ├── messages[]               (Solid createStore reactive, per-conv 实时更新)
+  ├── streamingMessageId       (当前 streaming 的 assistant msg id, 或 null)
+  └── runtime                  (per-conv AgentRuntime 实例, createAgentRuntime() 产物)
 
 Provider              (Settings.providers[].api_key + llm 必选 + .billing 可选, ADR-0015)
   ├── id, label, enabled
