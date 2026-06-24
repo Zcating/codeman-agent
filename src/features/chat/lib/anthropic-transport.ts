@@ -156,6 +156,8 @@ const MAX_TURNS = 16;
 
 export interface AnthropicTransportOptions {
   getApiKey: () => Promise<string | undefined>;
+  /** 注入的 abort signal,优先级高于 pi-agent 内部 signal。ADR-0019 D2 cancel 用 AbortController。 */
+  signal?: AbortSignal;
 }
 
 interface AssistantMsgLike {
@@ -481,8 +483,10 @@ export class AnthropicTransport {
     messages: Message[],
     _userMessage: Message,
     config: AgentRunConfig,
-    signal?: AbortSignal,
+    piAgentSignal?: AbortSignal,
   ): AsyncGenerator<unknown, void, unknown> {
+    // 优先使用注入的 signal(createAgentRuntime 的 abortController),fallback 到 pi-agent 内部 signal。
+    const signal = this.options.signal ?? piAgentSignal;
     const msgs = messages as unknown as any[];
     const cfg = config as unknown as any;
     const apiKey = await this.options.getApiKey();
