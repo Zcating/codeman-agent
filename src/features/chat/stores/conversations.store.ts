@@ -17,7 +17,12 @@ import {
   type RuntimeEvent,
   type ProviderConfig,
 } from "../lib/runtime";
-import { MessageService, MessageServiceLive } from "../../../shared/lib/tauri";
+import {
+  ConversationService,
+  ConversationServiceLive,
+  MessageService,
+  MessageServiceLive,
+} from "../../../shared/lib/tauri";
 
 // ─── ConversationState 类型 (inline 在 conversations.store) ──────
 
@@ -221,4 +226,74 @@ async function persistAssistantMessage(msg: Message): Promise<void> {
     });
   }).pipe(Effect.provide(MessageServiceLive));
   await Effect.runPromiseExit(program);
+}
+
+// ─── cancel: 调 runtime.cancel() 中断 in-flight stream ───────
+
+export function cancel(convId: string): void {
+  store.byId[convId]?.runtime.cancel();
+}
+
+// ─── archiveConversation: cancel + 从 store 移除 + DB archive ──
+
+export async function archiveConversation(convId: string): Promise<void> {
+  cancel(convId);
+  const program = Effect.gen(function* () {
+    const svc = yield* ConversationService;
+    return yield* svc.archive(convId);
+  }).pipe(Effect.provide(ConversationServiceLive));
+  await Effect.runPromiseExit(program);
+  setStore("byId", convId, undefined as unknown as ConversationState);
+  if (activeId() === convId) setActiveIdSignal(null);
+  setConversationsSignal(Object.values(store.byId));
+}
+
+// ─── deleteConversation: cancel + 从 store 移除 + DB delete ───
+
+export async function deleteConversation(convId: string): Promise<void> {
+  cancel(convId);
+  const program = Effect.gen(function* () {
+    const svc = yield* ConversationService;
+    return yield* svc.delete(convId);
+  }).pipe(Effect.provide(ConversationServiceLive));
+  await Effect.runPromiseExit(program);
+  setStore("byId", convId, undefined as unknown as ConversationState);
+  if (activeId() === convId) setActiveIdSignal(null);
+  setConversationsSignal(Object.values(store.byId));
+}
+
+// ─── loadConversations: DB → byId ─────────────────────────────
+
+export async function loadConversations(includeArchived = false): Promise<void> {
+  const listProgram = Effect.gen(function* () {
+    const svc = yield* ConversationService;
+    return yield* svc.list(includeArchived);
+  }).pipe(Effect.provide(ConversationServiceLive));
+  const listResult = await Effect.runPromiseExit(listProgram);
+  if (Exit.isFailure(listResult)) return;
+  const convs = listResult.value;
+
+  for (const conv of convs) {
+    const historyProgram = Effect.gen(function* () {
+      const svc = yield* MessageService;
+      return yield* svc.list(conv.id);
+    }).pipe(Effect.provide(MessageServiceLive));
+    const historyResult = await Effect.runPromiseExit(historyProgram);
+    const history = Exit.isSuccess(historyResult) ? historyResult.value : [];
+    setupConvState(conv, history);
+  }
+}
+
+// ─── createConversation: DB 新建 + setupConvState ─────────────
+
+export async function createConversation(title: string, systemPrompt?: string): Promise<void> {
+  const program = Effect.gen(function* () {
+    const svc = yield* ConversationService;
+    return yield* svc.create(title, systemPrompt);
+  }).pipe(Effect.provide(ConversationServiceLive));
+  const result = await Effect.runPromiseExit(program);
+  if (Exit.isSuccess(result)) {
+    setupConvState(result.value, []);
+    selectConversation(result.value.id);
+  }
 }

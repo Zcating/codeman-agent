@@ -1,5 +1,5 @@
 //! conversations.store Solid createStore 测试 (Task 4)
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createRoot } from "solid-js";
 import {
   store,
@@ -8,6 +8,8 @@ import {
   conversations$,
   selectConversation,
   setupConvState,
+  cancel,
+  archiveConversation,
   type ConversationState,
 } from "./conversations.store";
 import type { Conversation, Message } from "../../../shared/lib/types";
@@ -103,4 +105,28 @@ describe("sendMessage — cross-conv isolation", () => {
 
       dispose();
     }));
+});
+
+describe("cancel / archive / delete", () => {
+  it("cancel() calls runtime.cancel()", () =>
+    createRoot((dispose) => {
+      setupConvState(mockConv, []);
+      const cs = store.byId["c1"];
+      const spy = vi.spyOn(cs!.runtime, "cancel");
+      cancel("c1");
+      expect(spy).toHaveBeenCalled();
+      dispose();
+    }));
+
+  it("archiveConversation() removes from store + calls runtime.cancel()", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, []);
+      const cs = store.byId["c1"];
+      const spy = vi.spyOn(cs!.runtime, "cancel");
+      await archiveConversation("c1");
+      expect(spy).toHaveBeenCalled();
+      expect(store.byId["c1"]).toBeUndefined();
+      dispose();
+    });
+  });
 });
