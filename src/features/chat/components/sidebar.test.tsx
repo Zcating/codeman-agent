@@ -12,6 +12,7 @@ import { render, cleanup } from "@solidjs/testing-library";
 
 // 先 mock 桥接层（在任何 Sidebar 导入之前）。
 vi.mock("../store/conversations", () => ({
+  store: { byId: {} },
   conversations$: () => [],
   activeId$: () => null,
   loadConversations: vi.fn(() => Promise.resolve()),

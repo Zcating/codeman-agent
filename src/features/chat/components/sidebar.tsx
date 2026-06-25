@@ -4,17 +4,18 @@
 //! 本文件任何位置都**不**导入 'effect'。
 //! Polish F3/F7: inline confirm 替代 confirm() + 完整键盘导航 (ArrowUp/Down/Enter/Delete) + aria-label。
 //!
-//! "新对话" 的"空画布"守卫放在 store (`startNewConversation`) ——
+//! "新对话" 的"空画布"守卫放在 store (`createConversation`) ——
 /*! UI 不再判断 active 是否空,只调 store 入口。 */
 //! 这样业务规则单点,未来加 "n 消息内自动跳过" 之类的规则只动 store 不动组件。
 
 import { createSignal, createEffect, For, onMount, Show } from "solid-js";
 import { Plus, Trash2 } from "lucide-solid";
 import {
+  store,
   conversations$,
   activeId$,
   loadConversations,
-  startNewConversation,
+  createConversation,
   selectConversation,
   deleteConversation,
 } from "../stores/conversations.store";
@@ -81,10 +82,10 @@ export function Sidebar() {
   };
 
   // 新对话: 直接调 store 入口。
-  // "空画布跳过" 守卫在 `startNewConversation` 内部（看 conversations.ts）,
+  // "空画布跳过" 守卫在 `createConversation` 内部（看 conversations.store.ts）,
   // UI 不再做这个判断 —— 业务规则单点,不在每个调用方重复实现。
   const handleNewConversation = () => {
-    void startNewConversation("新会话");
+    void createConversation("新会话");
   };
 
   return (
@@ -140,7 +141,14 @@ export function Sidebar() {
                 when={confirmingId() === c.id}
                 fallback={
                   <>
-                    <span class="text-sm font-medium truncate">{c.title}</span>
+                    <div class="flex items-center gap-1">
+                      <span class="text-sm font-medium truncate">{c.title}</span>
+                      <Show when={store.byId[c.id]?.streamingMessageId != null}>
+                        <span class="text-xs" aria-label="streaming">
+                          ⏳
+                        </span>
+                      </Show>
+                    </div>
                     <span class="text-xs text-muted-foreground mt-0.5">
                       {new Date(c.updated_at * 1000).toLocaleDateString("zh-CN")}
                     </span>
