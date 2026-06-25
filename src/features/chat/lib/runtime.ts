@@ -13,7 +13,7 @@ import type { Message } from "../../../shared/lib/types";
 import { AnthropicTransport } from "./anthropic-transport";
 import type { AgentTransport } from "@mariozechner/pi-agent";
 import { Agent } from "@mariozechner/pi-agent";
-import type { Model } from "@mariozechner/pi-ai";
+import type { Model, Message as PiMessage } from "@mariozechner/pi-ai";
 import { getBalanceTool, getPlanQuotaTool } from "../../billing/lib/billing";
 import { fileTools } from "../../file-tools/lib/file-tools";
 
@@ -88,7 +88,10 @@ export function createAgentRuntime(): AgentRuntime {
             systemPrompt: provider.systemPrompt,
             model,
             tools,
-            messages: context,
+            // ADR-0019 D2 + pi-ai version drift (per chat/AGENTS.md): our DB Message
+            // shape (snake_case) differs from pi-ai's Message shape (camelCase + Content).
+            // Bridge via 2-hop cast; proper mapper is a follow-up.
+            messages: context as unknown as PiMessage[],
           },
         });
 

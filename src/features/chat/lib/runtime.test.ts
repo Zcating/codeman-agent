@@ -1,6 +1,6 @@
 ﻿import { describe, it, expect } from "vitest";
 import { createAgentRuntime, type ProviderConfig, type RuntimeEvent } from "./runtime";
-import { Stream, Effect, Fiber } from "effect";
+import { Stream, Effect } from "effect";
 import type { Message } from "../../../shared/lib/types";
 import { vi } from "vitest";
 
@@ -144,8 +144,8 @@ describe("error handling", () => {
         "network failure",
       );
     } finally {
-      // Restore original mock
-      mockedAgent.mockImplementation(originalImpl);
+      // Restore original mock (cast to constructor signature; may be undefined)
+      mockedAgent.mockImplementation(originalImpl as never);
     }
   });
 });
