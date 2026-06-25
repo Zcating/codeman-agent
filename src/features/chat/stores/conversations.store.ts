@@ -97,7 +97,9 @@ export async function sendMessage(
   provider: ProviderConfig,
 ): Promise<void> {
   const cs = store.byId[convId];
-  if (!cs) return;
+  if (!cs) {
+    return;
+  }
 
   // 1. Append user message to local + DB
   const userMsg: Message = {
@@ -134,7 +136,9 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
     case "token": {
       // 找或创建 streaming stub
       const cs = store.byId[convId];
-      if (!cs) return;
+      if (!cs) {
+        return;
+      }
       let stubId = cs.streamingMessageId;
       if (!stubId) {
         stubId = crypto.randomUUID();
@@ -161,7 +165,9 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
     case "tool_call":
       setStore("byId", convId, "messages", (msgs) =>
         msgs.map((m) => {
-          if (m.id !== store.byId[convId]?.streamingMessageId) return m;
+          if (m.id !== store.byId[convId]?.streamingMessageId) {
+            return m;
+          }
           return { ...m, tool_calls: [...(m.tool_calls ?? []), evt.toolCall] };
         }),
       );
@@ -169,7 +175,9 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
     case "tool_result":
       setStore("byId", convId, "messages", (msgs) =>
         msgs.map((m) => {
-          if (m.id !== store.byId[convId]?.streamingMessageId) return m;
+          if (m.id !== store.byId[convId]?.streamingMessageId) {
+            return m;
+          }
           return {
             ...m,
             tool_results: [
@@ -244,7 +252,9 @@ export async function archiveConversation(convId: string): Promise<void> {
   }).pipe(Effect.provide(ConversationServiceLive));
   await Effect.runPromiseExit(program);
   setStore("byId", convId, undefined as unknown as ConversationState);
-  if (activeId() === convId) setActiveIdSignal(null);
+  if (activeId() === convId) {
+    setActiveIdSignal(null);
+  }
   setConversationsSignal(Object.values(store.byId));
 }
 
@@ -258,7 +268,9 @@ export async function deleteConversation(convId: string): Promise<void> {
   }).pipe(Effect.provide(ConversationServiceLive));
   await Effect.runPromiseExit(program);
   setStore("byId", convId, undefined as unknown as ConversationState);
-  if (activeId() === convId) setActiveIdSignal(null);
+  if (activeId() === convId) {
+    setActiveIdSignal(null);
+  }
   setConversationsSignal(Object.values(store.byId));
 }
 
@@ -270,7 +282,9 @@ export async function loadConversations(includeArchived = false): Promise<void> 
     return yield* svc.list(includeArchived);
   }).pipe(Effect.provide(ConversationServiceLive));
   const listResult = await Effect.runPromiseExit(listProgram);
-  if (Exit.isFailure(listResult)) return;
+  if (Exit.isFailure(listResult)) {
+    return;
+  }
   const convs = listResult.value;
 
   for (const conv of convs) {

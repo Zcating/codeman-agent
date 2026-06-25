@@ -229,8 +229,12 @@ export class TauriPage {
   on(event: "console", handler: (e: { type: string; text: string }) => void): void;
   on(event: "pageerror", handler: (e: Error) => void): void;
   on(event: string, handler: unknown): void {
-    if (event === "console") (this as any).consoleHandler = handler;
-    if (event === "pageerror") (this as any).pageErrorHandler = handler;
+    if (event === "console") {
+      (this as any).consoleHandler = handler;
+    }
+    if (event === "pageerror") {
+      (this as any).pageErrorHandler = handler;
+    }
   }
 
   close(): void {
@@ -256,7 +260,9 @@ async function waitFor(
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (await predicate()) return;
+    if (await predicate()) {
+      return;
+    }
     await sleep(50);
   }
   throw new Error(`waitFor timed out after ${timeoutMs}ms: ${label}`);
@@ -318,8 +324,12 @@ export const assert = {
 // ---- 内部 ----
 
 function roleSelFor(role: "link" | "button" | "textbox"): string {
-  if (role === "link") return `a,[role="link"]`;
-  if (role === "button") return `button,[role="button"],input[type="button"],input[type="submit"]`;
+  if (role === "link") {
+    return `a,[role="link"]`;
+  }
+  if (role === "button") {
+    return `button,[role="button"],input[type="button"],input[type="submit"]`;
+  }
   return `input,textarea,[role="textbox"]`;
 }
 
@@ -346,11 +356,16 @@ class CDPConnection {
       if (msg.id != null && this.pending.has(msg.id)) {
         const { resolve, reject } = this.pending.get(msg.id)!;
         this.pending.delete(msg.id);
-        if (msg.error) reject(new Error(`${msg.error.code ?? ""} ${msg.error.message}`));
-        else resolve(msg.result);
+        if (msg.error) {
+          reject(new Error(`${msg.error.code ?? ""} ${msg.error.message}`));
+        } else {
+          resolve(msg.result);
+        }
       } else if (msg.method) {
         const handler = this.eventHandlers.get(msg.method);
-        if (handler) handler(msg.params);
+        if (handler) {
+          handler(msg.params);
+        }
       }
     } catch {
       // ignore parse errors
@@ -362,7 +377,9 @@ class CDPConnection {
       const id = this.nextId++;
       this.pending.set(id, { resolve, reject });
       const msg: Record<string, unknown> = { id, method, params };
-      if (sessionId) msg.sessionId = sessionId;
+      if (sessionId) {
+        msg.sessionId = sessionId;
+      }
       this.ws.send(JSON.stringify(msg));
     });
   }
@@ -383,9 +400,13 @@ class CDPConnection {
 /** 顶层入口 — 连 WebView2,attach 页面,返回 TauriPage。 */
 export async function connectTauri(): Promise<TauriPage> {
   const res = await fetch(`http://${CDP_HOST}:${CDP_PORT}/json/version`);
-  if (!res.ok) throw new Error(`CDP /json/version returned ${res.status}`);
+  if (!res.ok) {
+    throw new Error(`CDP /json/version returned ${res.status}`);
+  }
   const info = (await res.json()) as { webSocketDebuggerUrl: string };
-  if (!info.webSocketDebuggerUrl) throw new Error("CDP /json/version missing webSocketDebuggerUrl");
+  if (!info.webSocketDebuggerUrl) {
+    throw new Error("CDP /json/version missing webSocketDebuggerUrl");
+  }
 
   const ws = new WebSocket(info.webSocketDebuggerUrl);
   await new Promise<void>((resolve, reject) => {

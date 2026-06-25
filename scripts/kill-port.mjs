@@ -23,10 +23,14 @@ const isWindows = process.platform === "win32";
 
 /** WSL detection — covers both WSL1 and WSL2. */
 function isWSL() {
-  if (isWindows) return false;
+  if (isWindows) {
+    return false;
+  }
   // WSL sets WSL_DISTRO_NAME in env (WSL2) and stamps /proc/version with
   // "Microsoft" (WSL1/2). Either is sufficient on its own.
-  if (process.env.WSL_DISTRO_NAME) return true;
+  if (process.env.WSL_DISTRO_NAME) {
+    return true;
+  }
   try {
     return /microsoft/i.test(readFileSync("/proc/version", "utf8"));
   } catch {
@@ -61,7 +65,9 @@ function pidsOnPort(port) {
     const re = new RegExp(`[:.]${port}\\s.*LISTENING\\s+(\\d+)\\s*$`, "i");
     for (const line of out.split(/\r?\n/)) {
       const m = line.match(re);
-      if (m) pids.add(m[1]);
+      if (m) {
+        pids.add(m[1]);
+      }
     }
     return [...pids];
   }
@@ -92,7 +98,9 @@ function killPid(pid) {
  * @returns {boolean} true if any host-side process was killed.
  */
 function killWindowsSideOnPorts(targetPorts) {
-  if (!inWSL || targetPorts.length === 0) return false;
+  if (!inWSL || targetPorts.length === 0) {
+    return false;
+  }
   // Port values are validated to be safe integers above; safe to interpolate.
   const portList = targetPorts.join(",");
   const ps = [
@@ -111,7 +119,9 @@ function killWindowsSideOnPorts(targetPorts) {
     encoding: "utf8",
   });
   const out = r.stdout || "";
-  if (out) process.stdout.write(out);
+  if (out) {
+    process.stdout.write(out);
+  }
   return /killing Windows PID/.test(out);
 }
 

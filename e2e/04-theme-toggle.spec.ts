@@ -58,7 +58,9 @@ async function setTheme(
   let isDark = false;
   while (Date.now() < deadline) {
     isDark = await page.evaluate(() => document.documentElement.classList.contains("dark"));
-    if (isDark === wantDark) return;
+    if (isDark === wantDark) {
+      return;
+    }
     await new Promise((r) => setTimeout(r, 500));
   }
   throw new Error(`7s 内主题未切到 ${theme}; isDark=${isDark}`);

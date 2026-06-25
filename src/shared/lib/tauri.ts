@@ -413,7 +413,9 @@ export const SettingsServiceLive = Layer.succeed(SettingsService, {
         // 实际 api_key 走 v15Provider.api_key (ADR-0015),不在 V1 形状上,见 runtime.ts。
         (() => {
           const p = (settings.providers ?? []).find((p) => p.id === id && p.enabled);
-          if (!p || !p.llm) return null;
+          if (!p || !p.llm) {
+            return null;
+          }
           const v1: LLMProvider = {
             id: p.id,
             label: p.label,
@@ -448,7 +450,9 @@ export const SettingsServiceImpl = {
         // 实际 api_key 走 v15Provider.api_key (ADR-0015),不在 V1 形状上,见 runtime.ts。
         (() => {
           const p = (settings.providers ?? []).find((p) => p.id === id && p.enabled);
-          if (!p || !p.llm) return null;
+          if (!p || !p.llm) {
+            return null;
+          }
           const v1: LLMProvider = {
             id: p.id,
             label: p.label,

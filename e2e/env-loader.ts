@@ -14,17 +14,23 @@ import { resolve } from "node:path";
 
 export function loadEnvFile(envPath = ".env"): Record<string, string> {
   const absPath = resolve(process.cwd(), envPath);
-  if (!existsSync(absPath)) return {};
+  if (!existsSync(absPath)) {
+    return {};
+  }
 
   const content = readFileSync(absPath, "utf-8");
   const env: Record<string, string> = {};
 
   for (const rawLine of content.split(/\r?\n/)) {
     const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
+    if (!line || line.startsWith("#")) {
+      continue;
+    }
 
     const eq = line.indexOf("=");
-    if (eq < 0) continue;
+    if (eq < 0) {
+      continue;
+    }
 
     const key = line.slice(0, eq).trim();
     let value = line.slice(eq + 1).trim();

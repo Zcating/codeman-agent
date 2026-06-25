@@ -55,7 +55,9 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
     consoleErrors = [];
     const page = await getTauriPage();
     page.on("console", (msg: { type: string; text: string }) => {
-      if (msg.type === "error") consoleErrors.push(msg.text);
+      if (msg.type === "error") {
+        consoleErrors.push(msg.text);
+      }
     });
     page.on("pageerror", (err: Error) => {
       consoleErrors.push("pageerror: " + err.message);

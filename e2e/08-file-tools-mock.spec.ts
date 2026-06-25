@@ -72,7 +72,9 @@ test.describe("08 — 文件工具 (mock LLM)", () => {
     consoleErrors = [];
     const page = await getTauriPage();
     page.on("console", (msg: { type: string; text: string }) => {
-      if (msg.type === "error") consoleErrors.push(msg.text);
+      if (msg.type === "error") {
+        consoleErrors.push(msg.text);
+      }
     });
     page.on("pageerror", (err: Error) => {
       consoleErrors.push("pageerror: " + err.message);
@@ -125,7 +127,9 @@ test.describe("08 — 文件工具 (mock LLM)", () => {
     let bodyText = "";
     while (Date.now() < deadline) {
       bodyText = (await page.evaluate(() => document.body.textContent)) ?? "";
-      if (bodyText.includes("written the file and read it back")) break;
+      if (bodyText.includes("written the file and read it back")) {
+        break;
+      }
       await new Promise((r) => setTimeout(r, 200));
     }
     expect(bodyText, "应出现 mock 预置的最终响应").toContain("written the file and read it back");
@@ -173,8 +177,9 @@ test.describe("08 — 文件工具 (mock LLM)", () => {
         bodyText.toLowerCase().includes("sandbox") ||
         bodyText.toLowerCase().includes("outside") ||
         bodyText.includes("Error")
-      )
+      ) {
         break;
+      }
       await new Promise((r) => setTimeout(r, 200));
     }
     // LLM mock 的最终响应是 "i cannot read that file because it is outside the workspace"

@@ -40,7 +40,9 @@ test.describe("07 — Mock LLM provider", () => {
   test.beforeEach(async () => {
     const page = await getTauriPage();
     page.on("console", (msg: { type: string; text: string }) => {
-      if (msg.type === "error") console.log("[" + __filename + " page error]", msg.text);
+      if (msg.type === "error") {
+        console.log("[" + __filename + " page error]", msg.text);
+      }
     });
     page.on("pageerror", (err: Error) => {
       console.log("[" + __filename + " page pageerror]", err.message);
@@ -71,7 +73,9 @@ test.describe("07 — Mock LLM provider", () => {
     let polledText = "";
     while (Date.now() < textDeadline) {
       polledText = (await bubble.first().textContent()) ?? "";
-      if (polledText.includes(cannedText)) break;
+      if (polledText.includes(cannedText)) {
+        break;
+      }
       await new Promise((r) => setTimeout(r, 100));
     }
     expect(polledText, "assistant bubble 应包含 mock 预置文本").toContain(cannedText);
@@ -106,7 +110,9 @@ test.describe("07 — Mock LLM provider", () => {
     let bodyText = "";
     while (Date.now() < deadline) {
       bodyText = (await page.evaluate(() => document.body.textContent)) ?? "";
-      if (bodyText.includes("balance is 100 USD")) break;
+      if (bodyText.includes("balance is 100 USD")) {
+        break;
+      }
       await new Promise((r) => setTimeout(r, 200));
     }
     expect(bodyText, "应出现包含 'balance is 100 USD' 的 assistant bubble").toContain(

@@ -20,12 +20,16 @@ function ProviderSelect() {
     (appStore.state.value.providers ?? []).filter((p) => p.enabled && p.llm);
   const currentId = (): string => {
     const id = appStore.state.value.default_llm_provider_id;
-    if (id && enabledProviders().some((p) => p.id === id)) return id;
+    if (id && enabledProviders().some((p) => p.id === id)) {
+      return id;
+    }
     return enabledProviders()[0]?.id ?? "";
   };
   const handleChange = (e: Event & { currentTarget: HTMLSelectElement }) => {
     const next = e.currentTarget.value;
-    if (!next) return;
+    if (!next) {
+      return;
+    }
     appStore.set({ default_llm_provider_id: next });
     settingsSaver.scheduleSave();
   };
@@ -73,7 +77,9 @@ export function ChatView() {
   // 派生 running 状态(per-conv streaming)
   const isRunning = (): boolean => {
     const id = convId();
-    if (!id) return false;
+    if (!id) {
+      return false;
+    }
     return (
       store.byId[id]?.streamingMessageId !== null &&
       store.byId[id]?.streamingMessageId !== undefined
@@ -83,7 +89,9 @@ export function ChatView() {
   // 当前 conv 的 messages(反应式,只在该 conv 的 messages 路径变化时重算)
   const currentMessages = () => {
     const id = convId();
-    if (!id) return [];
+    if (!id) {
+      return [];
+    }
     return store.byId[id]?.messages ?? [];
   };
 
@@ -97,14 +105,18 @@ export function ChatView() {
 
   const handleCancel = async () => {
     const id = convId();
-    if (!id) return;
+    if (!id) {
+      return;
+    }
     cancel(id);
   };
 
   const handleSend = async () => {
     const text = input().trim();
     const id = convId();
-    if (!text || !id || isRunning()) return;
+    if (!text || !id || isRunning()) {
+      return;
+    }
     setInput("");
 
     const providerId = appStore.state.value.default_llm_provider_id;

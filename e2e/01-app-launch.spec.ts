@@ -13,7 +13,9 @@ test.describe("01 — 应用启动", () => {
     consoleErrors = [];
     const page = await getTauriPage();
     page.on("console", (msg) => {
-      if (msg.type === "error") consoleErrors.push(msg.text);
+      if (msg.type === "error") {
+        consoleErrors.push(msg.text);
+      }
     });
     page.on("pageerror", (err) => {
       consoleErrors.push(`pageerror: ${err.message}`);

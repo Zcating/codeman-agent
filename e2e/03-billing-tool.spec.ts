@@ -77,7 +77,9 @@ test.describe("03 — 聊天 → billing 工具", () => {
     // 诊断: 听 console + pageerror 看 LLM call 实际失败原因
     page.on("console", (msg) => {
       const t = msg.text;
-      if (t.includes("[vite]") || t.includes("[HMR]")) return;
+      if (t.includes("[vite]") || t.includes("[HMR]")) {
+        return;
+      }
       console.log(`[page ${msg.type}] ${t}`);
     });
     page.on("pageerror", (err) => {

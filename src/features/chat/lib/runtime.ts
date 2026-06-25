@@ -116,7 +116,9 @@ export function createAgentRuntime(): AgentRuntime {
             switch (e.type) {
               case "message_update": {
                 const msg = e.message;
-                if (!msg?.content || !Array.isArray(msg.content)) return;
+                if (!msg?.content || !Array.isArray(msg.content)) {
+                  return;
+                }
                 for (const block of msg.content) {
                   const b = block as {
                     type: string;

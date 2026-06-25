@@ -93,7 +93,9 @@ test.describe("02 — 设置 LLM API key", () => {
           (el) => (el as HTMLInputElement).value,
         ),
       )) as string[];
-      if (values.length > 0 && values[0] === FAKE_KEY) break;
+      if (values.length > 0 && values[0] === FAKE_KEY) {
+        break;
+      }
       await new Promise((r) => setTimeout(r, 100));
     }
     expect(values.length, "settings 页有 password input").toBeGreaterThan(0);

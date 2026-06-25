@@ -64,7 +64,9 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
     page.on("console", (msg) => {
       // 过滤掉 vite hmr 噪声
       const t = msg.text;
-      if (t.includes("[vite]") || t.includes("[HMR]") || t.includes("hmr update")) return;
+      if (t.includes("[vite]") || t.includes("[HMR]") || t.includes("hmr update")) {
+        return;
+      }
       console.log(`[page ${msg.type}] ${t}`);
     });
     page.on("pageerror", (err) => {
@@ -169,7 +171,9 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
     });
     const matching = convos.find((c) => c.title === (activeTitle ?? "").trim());
     expect(matching, `找不到标题为 "${activeTitle}" 的会话`).toBeTruthy();
-    if (!matching) return; // 为 TS 缩小类型
+    if (!matching) {
+      return;
+    } // 为 TS 缩小类型
 
     const messages = await invoke<MessageRow[]>("list_messages", {
       conversationId: matching.id,
@@ -185,7 +189,9 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
     const page = await getTauriPage();
     page.on("console", (msg) => {
       const t = msg.text;
-      if (t.includes("[vite]") || t.includes("[HMR]")) return;
+      if (t.includes("[vite]") || t.includes("[HMR]")) {
+        return;
+      }
       console.log(`[page ${msg.type}] ${t}`);
     });
     page.on("pageerror", (err) => {

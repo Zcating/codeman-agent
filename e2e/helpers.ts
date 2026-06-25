@@ -14,7 +14,9 @@ export { TauriLocator, TauriPage, assert };
 
 /** 连 WebView2 拿到 Tauri 页面（首次调用建连,后续直接返回缓存）。 */
 export async function getTauriPage(): Promise<TauriPage> {
-  if (page) return page;
+  if (page) {
+    return page;
+  }
   page = await connectTauri();
   return page;
 }
