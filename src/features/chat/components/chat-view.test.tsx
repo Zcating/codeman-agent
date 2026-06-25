@@ -1,58 +1,75 @@
 //! ChatView 组件测试。
 //!
-//! Mocked: conversations store, messages store, runtime services.
+//! Mocked: conversations store (V2 ADR-0019，不再 mock messages.store / agent.store）。
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import { ChatView } from "./chat-view";
 import type { Message } from "../../../shared/lib/types";
 
-const mockMessages: Message[] = [
-  {
-    id: "msg-1",
-    conversation_id: "conv-1",
-    role: "user",
-    content: "Hello",
-    tool_calls: null,
-    tool_results: null,
-    model: null,
-    input_tokens: null,
-    output_tokens: null,
-    created_at: 1710000000,
-  },
-  {
-    id: "msg-2",
-    conversation_id: "conv-1",
-    role: "assistant",
-    content: "Hi there!",
-    tool_calls: null,
-    tool_results: null,
-    model: "gpt-4o",
-    input_tokens: null,
-    output_tokens: null,
-    created_at: 1710000001,
-  },
-  {
-    id: "msg-3",
-    conversation_id: "conv-1",
-    role: "tool",
-    content: "file content here",
-    tool_calls: null,
-    tool_results: [
-      {
-        tool_call_id: "tc-read-1",
-        result: "const x = 1;\nconst y = 2;\nconsole.log(x + y);",
-        error: null,
-      },
-    ],
-    model: null,
-    input_tokens: null,
-    output_tokens: null,
-    created_at: 1710000002,
-  },
-];
-
+// V2 ADR-0019: 不再 mock messages.store / agent.store，全部走 conversations.store
+// 注意: vi.mock 会被 hoisting，所以 mock 数据必须内联在工厂函数内部
 vi.mock("../stores/conversations.store", () => ({
+  store: {
+    activeId: null,
+    byId: {
+      "conv-1": {
+        id: "conv-1",
+        title: "Test",
+        system_prompt: null,
+        created_at: 1710000000,
+        updated_at: 1710000000,
+        archived_at: null,
+        messages: [
+          {
+            id: "msg-1",
+            conversation_id: "conv-1",
+            role: "user",
+            content: "Hello",
+            tool_calls: null,
+            tool_results: null,
+            model: null,
+            input_tokens: null,
+            output_tokens: null,
+            created_at: 1710000000,
+          },
+          {
+            id: "msg-2",
+            conversation_id: "conv-1",
+            role: "assistant",
+            content: "Hi there!",
+            tool_calls: null,
+            tool_results: null,
+            model: "gpt-4o",
+            input_tokens: null,
+            output_tokens: null,
+            created_at: 1710000001,
+          },
+          {
+            id: "msg-3",
+            conversation_id: "conv-1",
+            role: "tool",
+            content: "file content here",
+            tool_calls: null,
+            tool_results: [
+              {
+                tool_call_id: "tc-read-1",
+                result: "const x = 1;\nconst y = 2;\nconsole.log(x + y);",
+                error: null,
+              },
+            ],
+            model: null,
+            input_tokens: null,
+            output_tokens: null,
+            created_at: 1710000002,
+          },
+        ] as Message[],
+        streamingMessageId: null,
+        runtime: { run: vi.fn(), cancel: vi.fn() },
+      },
+    },
+  },
+  activeId$: vi.fn(() => "conv-1"),
   conversations$: vi.fn(() => [
     {
       id: "conv-1",
@@ -63,24 +80,10 @@ vi.mock("../stores/conversations.store", () => ({
       archived_at: null,
     },
   ]),
-  activeId$: vi.fn(() => "conv-1"),
-  loadConversations: vi.fn(),
-  createConversation: vi.fn(),
+  sendMessage: vi.fn().mockResolvedValue(undefined),
+  cancel: vi.fn(),
   selectConversation: vi.fn(),
-  deleteConversation: vi.fn(),
-}));
-
-vi.mock("../stores/messages.store", () => ({
-  messages$: vi.fn(() => mockMessages),
-  loadMessages: vi.fn(),
-  appendUserMessage: vi.fn(),
-  appendAssistantMessageDelta: vi.fn(),
-  finalizeAssistantMessage: vi.fn(),
-  persistAssistantMessage: vi.fn(),
-  appendToolCall: vi.fn(),
-  finalizeToolResult: vi.fn(),
-  clearMessages: vi.fn(),
-  appendStreamingAssistantMessage: vi.fn(),
+  setupConvState: vi.fn(),
 }));
 
 // V1.x provider selector: mock appStore (state + set) 和 settingsSaver (scheduleSave)。
@@ -98,7 +101,12 @@ vi.mock("../../../shared/stores/app.store", () => {
           base_url: "https://api.minimaxi.com/anthropic",
           api_type: "anthropic-messages",
           models: [
-            { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", deprecated: false, thinking: false },
+            {
+              id: "MiniMax-M2.5-highspeed",
+              label: "MiniMax-M2.5-highspeed",
+              deprecated: false,
+              thinking: false,
+            },
           ],
           models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
         },
@@ -144,11 +152,6 @@ vi.mock("../../settings/lib/settings-saver", () => ({
 }));
 
 vi.mock(import("../lib/runtime"), async (importOriginal) => {
-  // V1.7+ 的 mock 只覆盖 AgentRuntime / RuntimeLayer(组件测试不需要真 runtime),
-  // 但 commit 1fc33e7 之后 agent.ts 在模块加载时引用了 AgentRuntimeLive / RuntimeDeps
-  // / RuntimeError 来构建 fullLayer(ADR-0016 D6)。用 importOriginal spread 真模块
-  // 保留这些符号,避免 Layer.provide(AgentRuntimeLive, RuntimeDeps) 报
-  // "No AgentRuntimeLive export is defined"。
   const actual = await importOriginal<typeof import("../lib/runtime")>();
   return {
     ...actual,
@@ -159,7 +162,7 @@ vi.mock(import("../lib/runtime"), async (importOriginal) => {
 describe("ChatView", () => {
   afterEach(() => cleanup());
 
-  it("从 messages$ 渲染消息列表", () => {
+  it("从 store.byId[convId].messages 渲染消息列表", () => {
     const { container } = render(() => <ChatView />);
     // MessageBubble 外层包装有 class `mb-3 flex w-full`（Tailwind utilities）
     // mock 数据含 3 条消息(user / assistant / tool),全 role 都走同一 wrapper,
@@ -178,13 +181,11 @@ describe("ChatView", () => {
 
   it("运行中状态显示 Cancel 按钮", async () => {
     const { container } = render(() => <ChatView />);
-    // 运行状态在组件内部 - 我们测试当 running() 为 true 时，
+    // 运行状态在组件内部 - 我们测试当 isRunning() 为 true 时，
     // Cancel 按钮替代 Send 按钮出现。我们可以验证初始状态显示 "发送"。
-    // Polish F2: 按钮文字走中文 "发送" (前是 "Send")
     const submitBtn = container.querySelector('button[type="submit"]');
     expect(submitBtn?.textContent).toBe("发送");
     // 当运行时，按钮会通过 <Show> fallback 变为 "取消"。
-    // 我们可以验证结构是正确的 - 有一个带 fallback 的 Show 组件。
     const cancelBtn = container.querySelector('button:not([type="submit"])');
     expect(cancelBtn).toBeNull(); // 初始时无 cancel 按钮
   });
@@ -207,8 +208,6 @@ describe("ChatView", () => {
   });
 
   // ─── V1.x provider 选择器测试 ─────────────────────────────────────
-  // 通过 vi.mock 工厂内导出的 __setAppStoreState / __getAppStoreState helpers
-  // 在每个 test 之间重置 appStore state,避免 test 顺序耦合。
   it("渲染 provider 选择器并列出 enabled 的 provider", () => {
     const { container } = render(() => <ChatView />);
     const select = container.querySelector('select[id="provider-select"]') as HTMLSelectElement;
@@ -240,7 +239,12 @@ describe("ChatView", () => {
             base_url: "https://api.minimaxi.com/anthropic",
             api_type: "anthropic-messages",
             models: [
-              { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", deprecated: false, thinking: false },
+              {
+                id: "MiniMax-M2.5-highspeed",
+                label: "MiniMax-M2.5-highspeed",
+                deprecated: false,
+                thinking: false,
+              },
             ],
             models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
           },
@@ -274,8 +278,9 @@ describe("ChatView", () => {
     expect(setMock).toHaveBeenCalled();
     const lastSetCall = setMock.mock.calls[setMock.mock.calls.length - 1][0];
     expect(lastSetCall.default_llm_provider_id).toBe("deepseek");
-    const scheduleSaveMock = (settingsSaverMock as any).settingsSaver
-      .scheduleSave as ReturnType<typeof vi.fn>;
+    const scheduleSaveMock = (settingsSaverMock as any).settingsSaver.scheduleSave as ReturnType<
+      typeof vi.fn
+    >;
     expect(scheduleSaveMock).toHaveBeenCalled();
   });
 
@@ -292,7 +297,9 @@ describe("ChatView", () => {
             default_model: "deepseek-chat",
             base_url: "https://api.deepseek.com/anthropic",
             api_type: "anthropic-messages",
-            models: [{ id: "deepseek-chat", label: "deepseek-chat", deprecated: false, thinking: false }],
+            models: [
+              { id: "deepseek-chat", label: "deepseek-chat", deprecated: false, thinking: false },
+            ],
             models_endpoint: "https://api.deepseek.com/models",
           },
         },
