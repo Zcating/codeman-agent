@@ -12,6 +12,7 @@
     "test": "vp run test:web",
     "test:web": "vitest --run",
     "test:ui": "vitest --ui",
+    "test:coverage": "vitest --run --coverage",
     "tauri:dev": " vp run kill-port && tauri dev",
     "tauri:build": "vp run kill-port && tauri build",
     "tauri:test": "cd src-tauri && cargo test",
