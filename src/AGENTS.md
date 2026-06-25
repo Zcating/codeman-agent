@@ -8,13 +8,13 @@ V1 是 Tauri 2 + Solid chat agent，**不是 V0 280x100 浮窗**。视觉层走 
 
 ## src/ 根级文件
 
-| 文件            | 角色                                                                               | 备注                                                                     |
-| --------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| `index.tsx`     | Solid 渲染入口（挂载 `<RouterProvider>`）                                          | 首行 `import "./index.css"`                                              |
-| `index.css`     | Tailwind v4 入口（`@import` + `@theme` + `@layer base`）                           | token 集中地                                                             |
-| `router.tsx`    | TanStack Router code-based 配置                                                    | 不用 `@tanstack/router-plugin`（ADR-0007）                               |
-| `test-setup.ts` | vitest setup（`vi.mock("@tauri-apps/api/core", ...)` + `scrollIntoView` polyfill） | mockState 唯一源在src/__mocks__/@tauri-apps/api/core.ts（ADR-0010） |
-| `vite-env.d.ts` | Vite 类型                                                                          | 不可删                                                                   |
+| 文件            | 角色                                                                               | 备注                                                                |
+| --------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `index.tsx`     | Solid 渲染入口（挂载 `<RouterProvider>`）                                          | 首行 `import "./index.css"`                                         |
+| `index.css`     | Tailwind v4 入口（`@import` + `@theme` + `@layer base`）                           | token 集中地                                                        |
+| `router.tsx`    | TanStack Router code-based 配置                                                    | 不用 `@tanstack/router-plugin`（ADR-0007）                          |
+| `test-setup.ts` | vitest setup（`vi.mock("@tauri-apps/api/core", ...)` + `scrollIntoView` polyfill） | mockState 唯一源在src/**mocks**/@tauri-apps/api/core.ts（ADR-0010） |
+| `vite-env.d.ts` | Vite 类型                                                                          | 不可删                                                              |
 
 ## src/ 子目录（5+1 白名单）
 
@@ -75,7 +75,7 @@ V1 是 Tauri 2 + Solid chat agent，**不是 V0 280x100 浮窗**。视觉层走 
 - **服务对象通过 `Context.Tag` 注入。** `ConversationService` / `MessageService` / `BillingService` / `SettingsService` 在 `shared/lib/tauri.ts` 定义 Tag + Live Layer；测试用 `Layer.succeed` 提供 mock。
 - **错误上抛是 `AppError` 判别联合。** UI 不 catch Effect-typed error；桥接层用 `Exit.isSuccess` 过滤，失败的 Effect 转成空数据 / 错误 toast。
 - **测试分两层。** Effect 服务测用 `it.effect()` + mock `Layer`；Solid store 测用 `@solidjs/testing-library` 跑 jsdom。两者分开不混。
-- **mockState 唯一源**在src/__mocks__/@tauri-apps/api/core.ts（vitest 约定路径）。`src/shared/shared-mock-state.ts` 已删除（ADR-0010 Q6 修复双源 bug）。
+- **mockState 唯一源**在src/**mocks**/@tauri-apps/api/core.ts（vitest 约定路径）。`src/shared/shared-mock-state.ts` 已删除（ADR-0010 Q6 修复双源 bug）。
 
 ## 查阅指南
 
@@ -111,7 +111,7 @@ V1 是 Tauri 2 + Solid chat agent，**不是 V0 280x100 浮窗**。视觉层走 
 - `src/shared/mocks/` 目录——已删除，唯一源在`src/__mocks__/`（ADR-0010 Q6）。
 - `src/assets/`、`src/styles/` 顶层杂目录——已删除，不要新增（ADR-0010）。
 - 创建空 feature 子目录只为"预留位"——5 个子目录是白名单可选，billing 只有 `lib/` 是合理的。
-- 前端新增 `console.log` / `console.warn` / `console.error` / `console.debug` —— 全部走 `@/shared/lib/logger` 的 `logger.{debug, info, warn, error}`（ADR-0018 D5）。logger 不算 service 操作（不调 invoke / Effect.gen yield* / fetch），UI 层允许所有档；但**不得**包含完整 `Provider.api_key` 值（developer 自觉，详见 ADR-0018 D6）。
+- 前端新增 `console.log` / `console.warn` / `console.error` / `console.debug` —— 全部走 `@/shared/lib/logger` 的 `logger.{debug, info, warn, error}`（ADR-0018 D5）。logger 不算 service 操作（不调 invoke / Effect.gen yield\* / fetch），UI 层允许所有档；但**不得**包含完整 `Provider.api_key` 值（developer 自觉，详见 ADR-0018 D6）。
 
 ## 测试
 
@@ -122,4 +122,4 @@ pnpm test:watch            # 监听模式
 
 - Effect 服务测试：`*_test.ts` 用 `it.effect()` + `Layer.succeed(Service, mock)`。
 - Solid 组件测试：`<Name>.test.tsx` 用 `@solidjs/testing-library` 的 `render` + `screen`。
-- IPC mock 走src/__mocks__/@tauri-apps/api/core.ts，`mockState` 在此唯一源（ADR-0010）。
+- IPC mock 走src/**mocks**/@tauri-apps/api/core.ts，`mockState` 在此唯一源（ADR-0010）。

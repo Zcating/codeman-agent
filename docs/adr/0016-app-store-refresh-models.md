@@ -15,6 +15,7 @@ ADR-0015 把 Settings 写入收敛到 `appStore.set(patch)` + `settingsSaver.sch
 ### 触发 2: 边界场景下 store 进入"select 显示 X, default_model 是 Y"的不一致态
 
 用户配 `default_model: "old-model"`,点 Refresh 后远端返回新 models 列表里不含 "old-model" (模型下架了)。当前代码把 `models` 数组**整个替换**,`default_model` 字段**不动**:
+
 - `<select>` 下拉里看不到 "old-model" (浏览器 fallback 到第一项或空)
 - store 里 `default_model` = "old-model" (无效值)
 - 下次发 LLM 消息时传一个不存在的 model 给上游 → 错误
@@ -32,6 +33,7 @@ pre-existing bug,这次搬逻辑正好触到 `llm: { ...llm, models }` 这一行
 ADR-0003: "UI 组件 `import { Effect, ... }` — 只能在 `store/` / `runtime.ts` / `subsystems/`"。ADR-0015: "所有对 Settings 的读写都走 app-store,禁止组件直接 `invoke("update_settings")` 或 `invoke("get_settings")`"。
 
 组件层当前有 7 处 service 知识:
+
 - `provider-card.tsx`: `ProviderService.fetchModels` (Effect.gen) + `delete_provider` IPC (V0 leftover,Rust 端无此命令)
 - `workspace-card.tsx`: `pick_workspace_path` IPC (裸 invoke)
 - `settings.tsx`: `clear_all_history` IPC (裸 invoke)
@@ -79,13 +81,12 @@ refreshProviderModels(id: string): Effect.Effect<ModelMeta[], AppError> {
 **`props.onUpdate(updated)` 在新 handler 中不调** — 父组件 `onProviderChange` 是 idempotent re-sync,新设计下已是 no-op。
 
 组件 handler 简化:
+
 ```ts
 const handleRefreshModels = async () => {
   setIsRefreshing(true);
   setRefreshMsg(null);
-  const exit = await Effect.runPromiseExit(
-    appStore.refreshProviderModels(props.provider.id),
-  );
+  const exit = await Effect.runPromiseExit(appStore.refreshProviderModels(props.provider.id));
   if (Exit.isSuccess(exit)) {
     settingsSaver.scheduleSave();
     setRefreshMsg(`Loaded ${exit.value.length} model(s)`);
@@ -101,6 +102,7 @@ const handleRefreshModels = async () => {
 **不变量**: `Provider.llm.default_model` 始终是 `Provider.llm.models` 数组中某个元素的 `id`,或 `""` (空 models 时)。
 
 `refreshProviderModels` 写 state 时强制执行:
+
 - 若 `models.length > 0` 且 `default_model` 不在新数组中 → 改成 `models[0].id`
 - 若 `models.length === 0` → 改成 `""`
 - 已经在数组里 → 不动
@@ -109,15 +111,15 @@ const handleRefreshModels = async () => {
 
 ### D3. 组件层 `runPromiseExit` 标准化,范围 = ① try-catch + ② .catch
 
-| # | 位置 | 改前 | 改后 |
-| --- | --- | --- | --- |
-| 1 | `provider-card.tsx:90-119` (handleRefreshModels) | `try { await Effect.runPromise(Effect.gen(...ProviderService...)) } catch (e) { setRefreshMsg(\`failed: ${e}\`) } finally { setIsRefreshing(false) }` | `await Effect.runPromiseExit(appStore.refreshProviderModels(...))` + `Exit.match` + 错误用 `formatAppError(cause)` 输出 |
-| 2 | `provider-card.tsx:128-139` (handleDelete) | `try { ... } finally { setIsDeleting(false) }` (无 catch) | `await Effect.runPromiseExit(appStore.deleteProvider(id))` + 成功/失败各自 `setIsDeleting(false)` |
-| 3 | `workspace-card.tsx:54-69` (handleBrowse) | `try { ... } finally { setIsPicking(false) }` (无 catch,IPC 错误未处理) | `await Effect.runPromiseExit(appStore.pickWorkspacePath())` + 成功 setPathInput,失败 log + 同样 setIsPicking(false) |
-| 4 | `settings.tsx:72-79` (clearHistory) | `try { ... } catch (e) { console.error(...) }` | `await Effect.runPromiseExit(appStore.clearAllHistory())` + `Exit.isSuccess` 检查 + 错误 log |
-| 5 | `chat-view.tsx:121-195` (startRun) | redundant `try { await Effect.runPromiseExit(... Exit.isSuccess ...) } catch (e) { console.error(...) } finally { ... }` — `runPromiseExit` 已经返回 `Exit`,外层 try-catch 是 dead code | 删外层 try-catch-finally,只保留 `Stream.runForEach(chatAgentStore.startRun(...), handler)` + `Effect.runPromiseExit` + `Exit.isSuccess` 检查 |
-| 6 | `settings-saver.ts:23-30` (debounce flush) | `Effect.runPromise(appStore.forceFlush()).catch(e => console.error(...))` | `Effect.runPromiseExit(appStore.forceFlush())` + 失败时 log cause |
-| 7 | `index.tsx:38-42` (启动 refresh) | `Effect.runPromise(appStore.refresh()).catch(e => console.warn(...))` | `Effect.runPromiseExit(appStore.refresh())` + 失败时 log warn,保持"启动用默认"语义 |
+| #   | 位置                                             | 改前                                                                                                                                                                                    | 改后                                                                                                                                         |
+| --- | ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `provider-card.tsx:90-119` (handleRefreshModels) | `try { await Effect.runPromise(Effect.gen(...ProviderService...)) } catch (e) { setRefreshMsg(\`failed: ${e}\`) } finally { setIsRefreshing(false) }`                                   | `await Effect.runPromiseExit(appStore.refreshProviderModels(...))` + `Exit.match` + 错误用 `formatAppError(cause)` 输出                      |
+| 2   | `provider-card.tsx:128-139` (handleDelete)       | `try { ... } finally { setIsDeleting(false) }` (无 catch)                                                                                                                               | `await Effect.runPromiseExit(appStore.deleteProvider(id))` + 成功/失败各自 `setIsDeleting(false)`                                            |
+| 3   | `workspace-card.tsx:54-69` (handleBrowse)        | `try { ... } finally { setIsPicking(false) }` (无 catch,IPC 错误未处理)                                                                                                                 | `await Effect.runPromiseExit(appStore.pickWorkspacePath())` + 成功 setPathInput,失败 log + 同样 setIsPicking(false)                          |
+| 4   | `settings.tsx:72-79` (clearHistory)              | `try { ... } catch (e) { console.error(...) }`                                                                                                                                          | `await Effect.runPromiseExit(appStore.clearAllHistory())` + `Exit.isSuccess` 检查 + 错误 log                                                 |
+| 5   | `chat-view.tsx:121-195` (startRun)               | redundant `try { await Effect.runPromiseExit(... Exit.isSuccess ...) } catch (e) { console.error(...) } finally { ... }` — `runPromiseExit` 已经返回 `Exit`,外层 try-catch 是 dead code | 删外层 try-catch-finally,只保留 `Stream.runForEach(chatAgentStore.startRun(...), handler)` + `Effect.runPromiseExit` + `Exit.isSuccess` 检查 |
+| 6   | `settings-saver.ts:23-30` (debounce flush)       | `Effect.runPromise(appStore.forceFlush()).catch(e => console.error(...))`                                                                                                               | `Effect.runPromiseExit(appStore.forceFlush())` + 失败时 log cause                                                                            |
+| 7   | `index.tsx:38-42` (启动 refresh)                 | `Effect.runPromise(appStore.refresh()).catch(e => console.warn(...))`                                                                                                                   | `Effect.runPromiseExit(appStore.refresh())` + 失败时 log warn,保持"启动用默认"语义                                                           |
 
 **新 helper** `src/shared/lib/format-app-error.ts`:
 
@@ -146,6 +148,7 @@ function formatOne(e: AppError): string {
 ```
 
 **范围排除**:
+
 - `src/shared/lib/tauri.ts` 7 个 bridge 函数 (`getSettingsBridge` 等) — ADR-0015 已弃用,留作单独清理
 - 测试里的 `await Effect.runPromise(...)` — 测试自己的 try/catch 断言不同,不动
 - 裸 `Effect.runPromise(program)` 在 `chat-view.tsx:85` 之类 cancel 调用 — cancel 是不透明副作用,套 Exit 没价值
@@ -165,15 +168,15 @@ function formatOne(e: AppError): string {
 
 7 处违反 → 7 处 store 化:
 
-| # | 组件 | 旧形态 | 新 store method |
-| --- | --- | --- | --- |
-| 1 | `provider-card.tsx` (handleRefreshModels) | `Effect.gen(...yield* ProviderService.fetchModels...)` | `appStore.refreshProviderModels(id)` (D1) |
-| 2 | `provider-card.tsx` (handleDelete) | `await Effect.runPromise(invoke("delete_provider"))` (V0 leftover, Rust 无此命令) | `appStore.deleteProvider(id)` — 纯 state mutation,不调 IPC (实际删除走 `appStore.set({providers: filtered})`) |
-| 3 | `workspace-card.tsx` (handleBrowse) | `await Effect.runPromise(invoke("pick_workspace_path"))` | `appStore.pickWorkspacePath()` — 内部 `WorkspaceService.pickPath()` (新增) |
-| 4 | `settings.tsx` (clearHistory) | `await Effect.runPromise(invoke("clear_all_history"))` | `appStore.clearAllHistory()` — 内部 `SettingsService.clearAllHistory()` |
-| 5 | `chat-view.tsx` (cancel) | `Effect.gen(...yield* AgentRuntime.cancel...)` | `chatAgentStore.cancel(convId)` (D5) |
-| 6 | `chat-view.tsx` (startRun) | `Effect.gen(...yield* AgentRuntime.run...)` + 70 行事件处理 | `chatAgentStore.startRun(conv, msg)` 返回 `Stream<RuntimeEvent, AppError>`,组件用 `Stream.runForEach` 接 (D6) |
-| 7 | `theme.ts` | `await getSettingsBridge()` (Promise 桥接,ADR-0015 弃用) | `await Effect.runPromiseExit(appStore.refresh())` 一次性,5s 轮询也用 |
+| #   | 组件                                      | 旧形态                                                                            | 新 store method                                                                                               |
+| --- | ----------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 1   | `provider-card.tsx` (handleRefreshModels) | `Effect.gen(...yield* ProviderService.fetchModels...)`                            | `appStore.refreshProviderModels(id)` (D1)                                                                     |
+| 2   | `provider-card.tsx` (handleDelete)        | `await Effect.runPromise(invoke("delete_provider"))` (V0 leftover, Rust 无此命令) | `appStore.deleteProvider(id)` — 纯 state mutation,不调 IPC (实际删除走 `appStore.set({providers: filtered})`) |
+| 3   | `workspace-card.tsx` (handleBrowse)       | `await Effect.runPromise(invoke("pick_workspace_path"))`                          | `appStore.pickWorkspacePath()` — 内部 `WorkspaceService.pickPath()` (新增)                                    |
+| 4   | `settings.tsx` (clearHistory)             | `await Effect.runPromise(invoke("clear_all_history"))`                            | `appStore.clearAllHistory()` — 内部 `SettingsService.clearAllHistory()`                                       |
+| 5   | `chat-view.tsx` (cancel)                  | `Effect.gen(...yield* AgentRuntime.cancel...)`                                    | `chatAgentStore.cancel(convId)` (D5)                                                                          |
+| 6   | `chat-view.tsx` (startRun)                | `Effect.gen(...yield* AgentRuntime.run...)` + 70 行事件处理                       | `chatAgentStore.startRun(conv, msg)` 返回 `Stream<RuntimeEvent, AppError>`,组件用 `Stream.runForEach` 接 (D6) |
+| 7   | `theme.ts`                                | `await getSettingsBridge()` (Promise 桥接,ADR-0015 弃用)                          | `await Effect.runPromiseExit(appStore.refresh())` 一次性,5s 轮询也用                                          |
 
 ### D5. 新 store 落位 + clearAllHistory 归属
 
@@ -226,6 +229,7 @@ const exit = await Effect.runPromiseExit(effect);
 ```
 
 `cancel` 同样 wrap:
+
 ```ts
 cancel(convId: string): Effect.Effect<void, never, never> {
   return Effect.gen(function* () {
@@ -236,6 +240,7 @@ cancel(convId: string): Effect.Effect<void, never, never> {
 ```
 
 `destroy` 同样 wrap (用于 archive/delete conversation):
+
 ```ts
 destroy(convId: string): Effect.Effect<void, never, never> {
   return Effect.gen(function* () {
@@ -249,51 +254,51 @@ destroy(convId: string): Effect.Effect<void, never, never> {
 
 ### D1 (新方法放哪) 3 选
 
-| 选 | 描述 | 选 / 不选 |
-| --- | --- | --- |
-| A | `appStore.refreshProviderModels(id)` (本次) | 选 — 单一聚合点,组件只关心 Effect + 反馈 |
-| B | 走 `features/settings/lib/provider-models.ts` 新 helper | 不选 — `settingsSaver` 已经是 lib helper,再加一个会让 lib 域膨胀;store 是更聚合的归宿 |
-| C | 直接 `Effect.runPromiseExit(Effect.gen(...).pipe(Effect.provide(ProviderServiceLive)))` 留在组件 | 不选 — 搬动的目的就是消除这种"业务逻辑在组件里"的形态 |
+| 选  | 描述                                                                                             | 选 / 不选                                                                             |
+| --- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| A   | `appStore.refreshProviderModels(id)` (本次)                                                      | 选 — 单一聚合点,组件只关心 Effect + 反馈                                              |
+| B   | 走 `features/settings/lib/provider-models.ts` 新 helper                                          | 不选 — `settingsSaver` 已经是 lib helper,再加一个会让 lib 域膨胀;store 是更聚合的归宿 |
+| C   | 直接 `Effect.runPromiseExit(Effect.gen(...).pipe(Effect.provide(ProviderServiceLive)))` 留在组件 | 不选 — 搬动的目的就是消除这种"业务逻辑在组件里"的形态                                 |
 
 ### D2 (default_model fallback) 3 选
 
-| 选 | 描述 | 选 / 不选 |
-| --- | --- | --- |
-| A | 搬逻辑时保持现状 (default_model 不动) | 不选 — 维持 pre-existing bug,改天还得回头修 |
-| B | 自动 fallback 到 `models[0]?.id` (本次) | 选 — 重构触到这一行,顺手修 4 行,store 永远一致 |
-| C | Effect 返回 `{ models, warning: "default_model no longer available" }`,UI 在 `refreshMsg` 里展示 | 不选 — 走 warning 通道让 API surface 复杂化,与 D1 的 `Effect<ModelMeta[]>` 冲突;用户其实只看到 dropdown 自动跳,不需要文字警告 |
+| 选  | 描述                                                                                             | 选 / 不选                                                                                                                     |
+| --- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| A   | 搬逻辑时保持现状 (default_model 不动)                                                            | 不选 — 维持 pre-existing bug,改天还得回头修                                                                                   |
+| B   | 自动 fallback 到 `models[0]?.id` (本次)                                                          | 选 — 重构触到这一行,顺手修 4 行,store 永远一致                                                                                |
+| C   | Effect 返回 `{ models, warning: "default_model no longer available" }`,UI 在 `refreshMsg` 里展示 | 不选 — 走 warning 通道让 API surface 复杂化,与 D1 的 `Effect<ModelMeta[]>` 冲突;用户其实只看到 dropdown 自动跳,不需要文字警告 |
 
 ### D3 (runPromiseExit 范围) 3 选
 
-| 选 | 描述 | 选 / 不选 |
-| --- | --- | --- |
-| A | 只动有 try-catch 的 4 处 (provider-card x2, workspace-card, settings) | 不选 — `chat-view.tsx` 的 redundant try-catch 看起来无害但确实是 dead code,留着给将来挖坑 |
-| B | ① + ② (本次) | 选 — 命中"接 Effect 错误然后 `String(e)` 丢类型"的所有反模式 |
-| C | B + bridge 函数也改 | 不选 — 7 个 bridge 函数 6 个已弃用,改它们没 UX 价值;剩 1 个 `getSettingsBridge` 单独看(D4 第 7 条覆盖) |
+| 选  | 描述                                                                  | 选 / 不选                                                                                              |
+| --- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| A   | 只动有 try-catch 的 4 处 (provider-card x2, workspace-card, settings) | 不选 — `chat-view.tsx` 的 redundant try-catch 看起来无害但确实是 dead code,留着给将来挖坑              |
+| B   | ① + ② (本次)                                                          | 选 — 命中"接 Effect 错误然后 `String(e)` 丢类型"的所有反模式                                           |
+| C   | B + bridge 函数也改                                                   | 不选 — 7 个 bridge 函数 6 个已弃用,改它们没 UX 价值;剩 1 个 `getSettingsBridge` 单独看(D4 第 7 条覆盖) |
 
 ### D4 (service-in-store 范围) 3 选
 
-| 选 | 描述 | 选 / 不选 |
-| --- | --- | --- |
-| A | 全部 7 处一起做 (本 PR) | 选 — 一次性达到"组件零 service 知识" |
-| B | 只做 settings 域 (4 处) + provider-card (2 处) | 不选 — chat-view 留坑,新规则不完整 |
-| C | 只做 provider-card (2 处) + ADR 落规则 | 不选 — 留 70 行 `Effect.gen` 违反新规则,读 ADR 困惑 |
+| 选  | 描述                                           | 选 / 不选                                           |
+| --- | ---------------------------------------------- | --------------------------------------------------- |
+| A   | 全部 7 处一起做 (本 PR)                        | 选 — 一次性达到"组件零 service 知识"                |
+| B   | 只做 settings 域 (4 处) + provider-card (2 处) | 不选 — chat-view 留坑,新规则不完整                  |
+| C   | 只做 provider-card (2 处) + ADR 落规则         | 不选 — 留 70 行 `Effect.gen` 违反新规则,读 ADR 困惑 |
 
 ### D5 (chat store 落位) 3 选
 
-| 选 | 描述 | 选 / 不选 |
-| --- | --- | --- |
-| i | `src/features/chat/stores/agent.ts` 装 `cancel` + `startRun`,`clearAllHistory` 留 `appStore` (本次) | 选 — 跟 chat 域 `conversations.ts` / `messages.ts` 同模式 |
-| ii | 拆 3 个 store | 不选 — 过度拆分 |
-| iii | 全部塞 appStore | 不选 — 违反"feature 自治" |
+| 选  | 描述                                                                                                | 选 / 不选                                                 |
+| --- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| i   | `src/features/chat/stores/agent.ts` 装 `cancel` + `startRun`,`clearAllHistory` 留 `appStore` (本次) | 选 — 跟 chat 域 `conversations.ts` / `messages.ts` 同模式 |
+| ii  | 拆 3 个 store                                                                                       | 不选 — 过度拆分                                           |
+| iii | 全部塞 appStore                                                                                     | 不选 — 违反"feature 自治"                                 |
 
 ### D6 (streaming API 形状) 3 选
 
-| 选 | 描述 | 选 / 不选 |
-| --- | --- | --- |
-| i | 回调参数 (store 接受 `onEvent` 转手) | 不选 — runtime 层已是 Stream,改造反而是逆向 |
-| ii | 沿用现有 Stream,store 只 wrap + bake layer (本次) | 选 — 不改 runtime.ts,store 是薄 wrapper |
-| iii | 拆 2 步 start + subscribe | 不选 — 复杂化,本 PR 不必 |
+| 选  | 描述                                              | 选 / 不选                                   |
+| --- | ------------------------------------------------- | ------------------------------------------- |
+| i   | 回调参数 (store 接受 `onEvent` 转手)              | 不选 — runtime 层已是 Stream,改造反而是逆向 |
+| ii  | 沿用现有 Stream,store 只 wrap + bake layer (本次) | 选 — 不改 runtime.ts,store 是薄 wrapper     |
+| iii | 拆 2 步 start + subscribe                         | 不选 — 复杂化,本 PR 不必                    |
 
 ## Consequences
 

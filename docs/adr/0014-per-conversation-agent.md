@@ -13,11 +13,11 @@
 `src/features/chat/lib/runtime.ts:70,163,286,297` V1.5 现状：
 
 ```ts
-const agentRef = yield* Ref.make<Agent | null>(null);
+const agentRef = yield * Ref.make<Agent | null>(null);
 // ...
-yield* Ref.set(agentRef, agent);   // 单例 ref 只持"当前" Agent
+yield * Ref.set(agentRef, agent); // 单例 ref 只持"当前" Agent
 // run() 完成时:
-yield* Ref.set(agentRef, null);    // 立刻清空
+yield * Ref.set(agentRef, null); // 立刻清空
 ```
 
 **痛点 A：多轮对话 LLM 看不到历史**
@@ -30,6 +30,7 @@ LLM 视角：每轮对话都是"白板"开始，**没有跨轮 context**。
 **痛点 B：切换 conversation 期间 partial 状态丢失**
 
 用户 A conversation 发消息 → AI 正在 streaming → 用户切到 B → 用户切回 A：
+
 - V1.5 `run()` 不被 cancel（stream 在主线程 fetch 异步跑）
 - streaming 持续到 `done` 事件
 - 但 `loadMessages(A)` 重载 signal 时，DB 没有 A 的 AI 消息（done 之前的 partial 永远不落库）
@@ -46,7 +47,7 @@ LLM 视角：每轮对话都是"白板"开始，**没有跨轮 context**。
 let abortController: AbortController | null = null;
 // ...
 const cancel = async () => {
-  abortController?.abort();  // ← AbortController 没传给 pi-mono
+  abortController?.abort(); // ← AbortController 没传给 pi-mono
   setRunning(false);
 };
 ```
@@ -157,23 +158,24 @@ per-conversation Agent 的"后台" = Agent 实例在 webview 内存中常驻、�
 
 ### 跨文件影响清单
 
-| 文件 | 变更 |
-|------|------|
-| `docs/adr/0014-per-conversation-agent.md` | 本 ADR（新增） |
-| `src/features/chat/AGENTS.md:50` | 硬规则修订（"singleton Agent" → "singleton service + Map<ConvId, Agent>"） |
-| `src/features/chat/lib/runtime.ts` | `Ref<Map<ConvId, Agent>>` + 3 方法（`run` / `cancel` / `destroy`） + lazy create + history feed |
-| `src/features/chat/lib/runtime.test.ts` | 新增 per-conversation API surface 测试（cancel/destroy 签名 + 幂等性） |
-| `src/features/chat/stores/conversations.ts` | `archiveConversation` / `deleteConversation` 加 `AgentRuntime.cancel(convId)` + `destroy(convId)` 前置调用 |
-| `src/features/chat/stores/conversations.test.ts` | 验证 cancel-before-delete（mock AgentRuntime） |
-| `src/features/chat/components/chat-view.tsx` | Cancel 按钮调 `AgentRuntime.cancel(activeId)`（修 V1.5 bug）；`running` 信号 per-conv |
-| `src/features/chat/components/chat-view.test.tsx` | mock 加 `AgentRuntime` 服务；新增 cancel 按钮触发 + per-conv running 行为 |
-| `src/features/chat/components/sidebar.tsx` | streaming 状态点（per-conv 反馈） |
-| `src/features/chat/components/sidebar.test.tsx` | 新增 streaming 状态点测试 |
-| `CONTEXT.md` 词汇表 | 新增 "Per-Conversation Agent" + "Agent Map"，更新 "Runtime" / "Conversation" |
+| 文件                                              | 变更                                                                                                       |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `docs/adr/0014-per-conversation-agent.md`         | 本 ADR（新增）                                                                                             |
+| `src/features/chat/AGENTS.md:50`                  | 硬规则修订（"singleton Agent" → "singleton service + Map<ConvId, Agent>"）                                 |
+| `src/features/chat/lib/runtime.ts`                | `Ref<Map<ConvId, Agent>>` + 3 方法（`run` / `cancel` / `destroy`） + lazy create + history feed            |
+| `src/features/chat/lib/runtime.test.ts`           | 新增 per-conversation API surface 测试（cancel/destroy 签名 + 幂等性）                                     |
+| `src/features/chat/stores/conversations.ts`       | `archiveConversation` / `deleteConversation` 加 `AgentRuntime.cancel(convId)` + `destroy(convId)` 前置调用 |
+| `src/features/chat/stores/conversations.test.ts`  | 验证 cancel-before-delete（mock AgentRuntime）                                                             |
+| `src/features/chat/components/chat-view.tsx`      | Cancel 按钮调 `AgentRuntime.cancel(activeId)`（修 V1.5 bug）；`running` 信号 per-conv                      |
+| `src/features/chat/components/chat-view.test.tsx` | mock 加 `AgentRuntime` 服务；新增 cancel 按钮触发 + per-conv running 行为                                  |
+| `src/features/chat/components/sidebar.tsx`        | streaming 状态点（per-conv 反馈）                                                                          |
+| `src/features/chat/components/sidebar.test.tsx`   | 新增 streaming 状态点测试                                                                                  |
+| `CONTEXT.md` 词汇表                               | 新增 "Per-Conversation Agent" + "Agent Map"，更新 "Runtime" / "Conversation"                               |
 
 ### 不可逆性
 
 推翻本 ADR 需：
+
 - 改 `runtime.ts` `Ref` 形态（撤销 D1）
 - 改 `chat-view.tsx` Cancel 按钮 + running 信号（撤销 D6）
 - 改 `conversations.ts` 2 个 store 入口（撤销 D7）

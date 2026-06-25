@@ -11,6 +11,7 @@
 ### 触发 1:ADR-0014 D1/D4 在 V1.x 暴露的 2 个架构代价
 
 ADR-0014 决策:
+
 - **D1**:`AgentRuntime` = `Context.Tag` service 单例,内部 `Ref<Map<ConversationId, Agent>>`
 - **D4**:`Agent` 是 in-memory owner,DB 是 mirror,首次 `run()` 拉历史回填一次
 
@@ -27,6 +28,7 @@ ADR-0014 决策:
 ### 触发 2:bug — streaming state leak between convs
 
 V1.x 报告的 bug:
+
 - 用户在 conv A 发送消息,LLM 开始 streaming
 - 用户切到 conv B
 - conv A 的 stream 仍在运行(in-flight 不 cancel,per ADR-0014 D5)
@@ -70,10 +72,12 @@ export function createAgentRuntime(): AgentRuntime;
 ```
 
 **拒绝**:
+
 - A(`Context.Tag` service + `Ref<Map>`)— ADR-0014 D1 原设计
 - C(`class` 形式)— 同样引入 indirection,但语法差异不带来语义收益
 
 理由:
+
 - `AgentRuntime` 语义上是"工厂"(每个调用产生独立 entity),不是"service"(全局共享能力)
 - 工厂函数 + closure 自带封装,无需 `this` / `class` 语法
 - 不依赖 Effect Layer DI,call site 直接 `createAgentRuntime()`,无需 `Effect.provide(Layer)`
@@ -84,6 +88,7 @@ export function createAgentRuntime(): AgentRuntime;
 **采用**:B(每次 `run()` 调用新建 pi-mono `Agent`,store 是 single source of truth)
 
 流程:
+
 1. `run({ context, provider })` 调用
 2. 创建新 `AbortController`,赋给 closure 变量 `currentAbortController`
 3. 创建新 pi-mono `Agent`,`initialState.messages = context`(store 来的浅拷贝)
@@ -93,10 +98,12 @@ export function createAgentRuntime(): AgentRuntime;
 7. `cancel()` 调 `currentAbortController.abort()` 触发 fetch abort
 
 **拒绝**:
+
 - A(per-conv `Agent` 累积)— ADR-0014 D4 原设计
 - C(per-request `Agent` via factory)— 等价于 per-run,术语差异
 
 理由:
+
 - Store 通过 subscribe 拿到每个 event,`store.byId[convId].messages` 实时更新
 - Done 事件触发后,store 有完整的最新状态
 - 下次 `run()` 调用时,store 提供 `context` 包含全部历史,新 `Agent` 看到一致视图
@@ -138,6 +145,7 @@ const [store, setStore] = createStore<{
 ```
 
 `sendMessage(convId, content, provider)` 流程:
+
 1. 取 `conv = store.byId[convId]`,append user message(`setStore("byId", convId, "messages", msgs => [...msgs, userMsg])` + DB persist)
 2. `context = [...store.byId[convId].messages]`(浅拷贝)
 3. `conv.runtime.run({ context, provider })` → `Stream<RuntimeEvent>`
@@ -145,10 +153,12 @@ const [store, setStore] = createStore<{
 5. `handleEvent` 按 `evt.type` 调 `setStore("byId", convId, ...)` 更新 messages / streamingMessageId;`done` 事件额外触发 `persistAssistantMessage(evt.message)` 异步落库
 
 **拒绝**:
+
 - A(messages.store + agent.store 各自保留)— 维持多 store 边界,但增加跨 store import,signal 跨 store 路由复杂
 - C(每个 conv 独立 Solid root)— Solid 不支持跨 root reactivity,不可行
 
 理由:
+
 - `ConversationState` 是"对话的完整视图",包含 DB 数据 + 内存状态 + 运行时——单一类型统一表达
 - `createStore` 提供 fine-grained 反应式:只读 `store.byId[convId].messages` 的组件在该路径变更时重算,跨 conv streaming 不互相影响
 - store 订阅 stream 事件 → `setStore("byId", convId, ...)` 更新——唯一写路径,反应式自动传播
@@ -176,31 +186,32 @@ const [store, setStore] = createStore<{
 
 ### 跨文件影响清单
 
-| 文件 | 改动 |
-|------|------|
-| `docs/adr/0019-per-run-transient-agent.md` | 本 ADR(新增,supersede 0014 D1 + D4) |
-| `src/features/chat/lib/runtime.ts` | 完全重写:删除 `Context.Tag` + `AgentRuntimeLive` Layer + `Ref<Map<ConvId, Agent>>` + per-conv history 回填逻辑;导出 `createAgentRuntime` factory + `ProviderConfig` / `RunOptions` / `AgentRuntime` 类型 |
-| `src/features/chat/lib/runtime.test.ts` | 改测试:factory 模式 + mock `Agent` + per-run lifecycle |
-| `src/features/chat/lib/anthropic-transport.ts` | 适配:`AbortSignal` 改为由 `createAgentRuntime` 注入,而不是走 pi-mono `Agent.abort()` |
-| `src/features/chat/stores/conversations.store.ts` | 扩大:内嵌 `ConversationState` 类型 + `createStore` + `sendMessage` + `handleEvent` + `archiveConversation` + `deleteConversation`(合并 `agent.store` + `messages.store`) |
-| `src/features/chat/stores/conversations.store.test.ts` | 加 ConvState 初始化 / `sendMessage` stream 订阅 / cross-conv isolation 测试 |
-| `src/features/chat/stores/agent.store.ts` | **删除** |
-| `src/features/chat/stores/agent.store.test.ts` | **删除** |
-| `src/features/chat/stores/messages.store.ts` | **删除** |
-| `src/features/chat/stores/messages.store.test.ts` | **删除** |
-| `src/features/chat/components/chat-view.tsx` | 改用 `conversations.store` API;删除对 `messages$` / `chatAgentStore` 的 import;`running` 改从 `store.byId[activeId()]?.streamingMessageId !== null` 派生 |
-| `src/features/chat/components/chat-view.test.tsx` | 改 mock + 加 streaming state per-conv 断言 |
-| `src/features/chat/components/sidebar.tsx` | 加 streaming 状态点(per ADR-0014 D5 "N 个 conversation 在后台流" UI 要求):读 `Object.values(store.byId).filter(c => c.streamingMessageId !== null)` |
-| `src/features/chat/components/sidebar.test.tsx` | 加 streaming 状态点测试 |
-| `src/features/chat/AGENTS.md` | 硬规则改:删除"`AgentRuntime` service 单例 + Map";加"`createAgentRuntime` factory + ConvState per-conv";删除"Store 是唯一桥接层"旧表述,加"conversations.store 是唯一 store" |
-| `src/AGENTS.md` | 查阅指南更新:`messages.store` / `agent.store` 引用替换为 `conversations.store` |
-| `CONTEXT.md` | 词汇表改:`Per-Conversation Agent` → `Per-Conversation Runtime`;`Agent Map` 删除;新增 `Conversation State` 词汇 |
-| `src-tauri/src/...` | 不变(DB schema / Tauri command 不动) |
-| `src/shared/lib/types.ts` | 不变(`Conversation` / `Message` 类型不变) |
+| 文件                                                   | 改动                                                                                                                                                                                                     |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/adr/0019-per-run-transient-agent.md`             | 本 ADR(新增,supersede 0014 D1 + D4)                                                                                                                                                                      |
+| `src/features/chat/lib/runtime.ts`                     | 完全重写:删除 `Context.Tag` + `AgentRuntimeLive` Layer + `Ref<Map<ConvId, Agent>>` + per-conv history 回填逻辑;导出 `createAgentRuntime` factory + `ProviderConfig` / `RunOptions` / `AgentRuntime` 类型 |
+| `src/features/chat/lib/runtime.test.ts`                | 改测试:factory 模式 + mock `Agent` + per-run lifecycle                                                                                                                                                   |
+| `src/features/chat/lib/anthropic-transport.ts`         | 适配:`AbortSignal` 改为由 `createAgentRuntime` 注入,而不是走 pi-mono `Agent.abort()`                                                                                                                     |
+| `src/features/chat/stores/conversations.store.ts`      | 扩大:内嵌 `ConversationState` 类型 + `createStore` + `sendMessage` + `handleEvent` + `archiveConversation` + `deleteConversation`(合并 `agent.store` + `messages.store`)                                 |
+| `src/features/chat/stores/conversations.store.test.ts` | 加 ConvState 初始化 / `sendMessage` stream 订阅 / cross-conv isolation 测试                                                                                                                              |
+| `src/features/chat/stores/agent.store.ts`              | **删除**                                                                                                                                                                                                 |
+| `src/features/chat/stores/agent.store.test.ts`         | **删除**                                                                                                                                                                                                 |
+| `src/features/chat/stores/messages.store.ts`           | **删除**                                                                                                                                                                                                 |
+| `src/features/chat/stores/messages.store.test.ts`      | **删除**                                                                                                                                                                                                 |
+| `src/features/chat/components/chat-view.tsx`           | 改用 `conversations.store` API;删除对 `messages$` / `chatAgentStore` 的 import;`running` 改从 `store.byId[activeId()]?.streamingMessageId !== null` 派生                                                 |
+| `src/features/chat/components/chat-view.test.tsx`      | 改 mock + 加 streaming state per-conv 断言                                                                                                                                                               |
+| `src/features/chat/components/sidebar.tsx`             | 加 streaming 状态点(per ADR-0014 D5 "N 个 conversation 在后台流" UI 要求):读 `Object.values(store.byId).filter(c => c.streamingMessageId !== null)`                                                      |
+| `src/features/chat/components/sidebar.test.tsx`        | 加 streaming 状态点测试                                                                                                                                                                                  |
+| `src/features/chat/AGENTS.md`                          | 硬规则改:删除"`AgentRuntime` service 单例 + Map";加"`createAgentRuntime` factory + ConvState per-conv";删除"Store 是唯一桥接层"旧表述,加"conversations.store 是唯一 store"                               |
+| `src/AGENTS.md`                                        | 查阅指南更新:`messages.store` / `agent.store` 引用替换为 `conversations.store`                                                                                                                           |
+| `CONTEXT.md`                                           | 词汇表改:`Per-Conversation Agent` → `Per-Conversation Runtime`;`Agent Map` 删除;新增 `Conversation State` 词汇                                                                                           |
+| `src-tauri/src/...`                                    | 不变(DB schema / Tauri command 不动)                                                                                                                                                                     |
+| `src/shared/lib/types.ts`                              | 不变(`Conversation` / `Message` 类型不变)                                                                                                                                                                |
 
 ### 不可逆性
 
 推翻本 ADR 需:
+
 - 改 `runtime.ts` factory 函数 → `Context.Tag` service + `Ref<Map>`
 - 改 `conversations.store.ts` ConvState 结构 → 拆分为 `messages.store` + `agent.store`
 - 改 `chat-view.tsx` 的 reactive 路径(回到全局 `messages$`)

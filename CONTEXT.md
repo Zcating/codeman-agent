@@ -61,6 +61,7 @@
   - `appStore.clearAllHistory()` — 清 SQLite conversation 表（settings 路由 advanced tab 调用）
 
   **D4 硬规则（ADR-0016）**：**所有** service 操作（`Effect.gen(...yield* Service...)` / 裸 `invoke("...")` / 裸 `fetch`）只能在 Store 中出现。组件层 `.tsx` 文件**禁止**直接 import service 或调 IPC，全部走 `Effect.runPromiseExit(store.method(...))` + `Exit.match`。测试代码（`*.test.ts*`）不受 D4 约束。
+
 - **Stale (过期)** — `Snapshot` 时间戳超过 Billing Provider 的 `stale_after_seconds`；传统的"过期徽标"语义在 tool result 缓存场景保留。
 
 ### 样式
@@ -124,18 +125,20 @@ Provider              (Settings.providers[].api_key + llm 必选 + .billing 可�
 interface Settings {
   // A. Providers (统一记录：llm 必选，billing 可选)
   providers: Array<{
-    id: string;             // 预置 "minimax"
-    label: string;          // 人类可读名
+    id: string; // 预置 "minimax"
+    label: string; // 人类可读名
     enabled: boolean;
-    api_key: string;        // 明文；LLM + billing 共用 (ADR-0015)
-    llm: {                  // 必选
+    api_key: string; // 明文；LLM + billing 共用 (ADR-0015)
+    llm: {
+      // 必选
       default_model: string;
       base_url: string;
       api_type: "anthropic-messages";
-      models: ModelMeta[];             // 用户可编辑的模型列表
-      models_endpoint: string;         // 拉取模型列表的 URL（per-provider 可配置）
+      models: ModelMeta[]; // 用户可编辑的模型列表
+      models_endpoint: string; // 拉取模型列表的 URL（per-provider 可配置）
     };
-    billing?: {             // 可选
+    billing?: {
+      // 可选
       kind: "balance" | "plan_quota";
     };
   }>;
@@ -178,11 +181,11 @@ interface Settings {
 }
 
 interface ModelMeta {
-  id: string;               // "MiniMax-M2.5-highspeed" | ...
-  label: string;            // "M2.5 Highspeed" | ...
-  context_window?: number;  // token 上限
-  deprecated?: boolean;     // UI 标灰
-  thinking?: boolean;       // 是否支持 extended thinking
+  id: string; // "MiniMax-M2.5-highspeed" | ...
+  label: string; // "M2.5 Highspeed" | ...
+  context_window?: number; // token 上限
+  deprecated?: boolean; // UI 标灰
+  thinking?: boolean; // 是否支持 extended thinking
 }
 ```
 
@@ -210,4 +213,3 @@ MiniMax `plan_quota` 端点（`https://api.minimaxi.com/anthropic/v1/quota/plan`
 - 跨平台打包（Tauri 保持可移植；仅 Windows）
 - 自动更新、代码签名
 - 点击穿透透明区域
-

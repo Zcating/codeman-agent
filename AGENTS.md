@@ -23,12 +23,11 @@ Windows 桌面 AI Agent，原生单窗口应用；主窗口是 LLM 对话 (`/`)�
 | 持久化       | SQLite + sqlx 0.8 + **FTS5** 全文搜索            | `sqlx 0.8`                                     |
 | 密钥         | Windows Credential Manager via `keyring` crate   | `keyring 3`                                    |
 | 路由         | **TanStack Router (code-based)**                 | `^1.170.15`                                    |
-| 包管理       | vite-plus                                             | `0.1.24`                                       |
-
+| 包管理       | vite-plus                                        | `0.1.24`                                       |
 
 ## 目录布局
 
-``` txt
+```txt
 codeman-agent/
 ├── src/
 │   ├── index.tsx                  # Solid 入口（挂 <RouterProvider>，~6 行）
@@ -86,7 +85,7 @@ codeman-agent/
 
 ## Domain shape
 
-``` txt
+```txt
 Agent
   ├── runtime          (Effect-TS layer wrapping pi-mono, src/features/chat/runtime.ts)
   ├── bridge           (Effect → Solid signal translator, src/features/chat/store/)

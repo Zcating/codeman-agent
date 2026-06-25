@@ -4,20 +4,20 @@
 
 ## 5+1 子目录职责
 
-| 子目录                 | 语义                                                              | 现状                                                                              |
-| ---------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| 子目录                 | 语义                                                                                                    | 现状                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | `lib/`                 | 纯函数 + 跨域类型：`cn.ts` / `logger.ts` / `tauri.ts` / `units.ts` / `types.ts` / `format-app-error.ts` | 6 个文件（ADR-0010 前：3 文件，types 是独立目录；ADR-0018 加 `logger.ts`；ADR-0016 加 `format-app-error.ts`） |
-| `stores/`              | 跨域 Solid signal                                                 | `theme.ts`（从 `state/` 迁，ADR-0010）                                            |
-| `hooks/`               | 跨域 composable（`use-` 前缀）                                    | 空，V1 预留                                                                       |
-| `components/ui/`       | 跨域**设计系统原子**                                              | 5 原子（Button / Card / Checkbox / Input / Textarea）+ `AGENTS.md`（从 `ui/` 迁） |
-| `components/internal/` | 跨域**业务组件**                                                  | 空，V1 预留（ErrorBoundary / LoadingSpinner / Provider wrappers / Layout atoms）  |
+| `stores/`              | 跨域 Solid signal                                                                                       | `theme.ts`（从 `state/` 迁，ADR-0010）                                                                        |
+| `hooks/`               | 跨域 composable（`use-` 前缀）                                                                          | 空，V1 预留                                                                                                   |
+| `components/ui/`       | 跨域**设计系统原子**                                                                                    | 5 原子（Button / Card / Checkbox / Input / Textarea）+ `AGENTS.md`（从 `ui/` 迁）                             |
+| `components/internal/` | 跨域**业务组件**                                                                                        | 空，V1 预留（ErrorBoundary / LoadingSpinner / Provider wrappers / Layout atoms）                              |
 
 **`shared/` 不允许**的子目录（旧命名已废弃，违反 ADR-0010 一律删除）：
 
 - `types/` — 旧跨域类型目录，合并到 `lib/types.ts`
 - `state/` — 旧 Solid 状态目录，重命名为 `stores/`
 - `ui/` — 旧设计系统目录，重命名为 `components/ui/`
-- `mocks/` — 已删除，唯一源在src/__mocks__/@tauri-apps/api/core.ts（ADR-0010 Q6 修复双源 bug）
+- `mocks/` — 已删除，唯一源在src/**mocks**/@tauri-apps/api/core.ts（ADR-0010 Q6 修复双源 bug）
 - `assets/` — 当前无跨域静态资源需求；如未来有新增，走新 ADR 加进白名单
 
 ## components/ui vs components/internal 边界（Q4 决策）
@@ -71,7 +71,7 @@ import { cn } from "@/shared/lib/cn";
 
 ## mockState 唯一源（ADR-0010 Q6）
 
-`mockState` 唯一源在src/__mocks__/@tauri-apps/api/core.ts（vitest 约定路径，自动应用）。`src/shared/shared-mock-state.ts` 已删除，**所有**测试 import 从 src/__mocks__/ 路径走。
+`mockState` 唯一源在src/**mocks**/@tauri-apps/api/core.ts（vitest 约定路径，自动应用）。`src/shared/shared-mock-state.ts` 已删除，**所有**测试 import 从 src/**mocks**/ 路径走。
 
 ```ts
 // 正确
@@ -81,14 +81,14 @@ import { mockState } from "src/__mocks__/@tauri-apps/api/core";
 import { mockState } from "@/shared/shared-mock-state";
 ```
 
-`src/test-setup.ts` 用 `vi.mock("@tauri-apps/api/core", () => ({ invoke: ... }))` 配置 invoke 默认行为，`mockState` 从 src/__mocks__/ 唯一源 import，运行时配置与测试 import 是同一引用。
+`src/test-setup.ts` 用 `vi.mock("@tauri-apps/api/core", () => ({ invoke: ... }))` 配置 invoke 默认行为，`mockState` 从 src/**mocks**/ 唯一源 import，运行时配置与测试 import 是同一引用。
 
 ## 测试策略
 
 | 文件                        | 测试方式                                                                     |
 | --------------------------- | ---------------------------------------------------------------------------- |
 | `lib/cn.ts`                 | 独立测试（`cn.test.ts`），覆盖冲突合并 + 条件拼接                            |
-| `lib/logger.ts`             | 独立测试（`logger.test.ts`），覆盖 level 路由 + args 透传 + prefix 大写       |
+| `lib/logger.ts`             | 独立测试（`logger.test.ts`），覆盖 level 路由 + args 透传 + prefix 大写      |
 | `lib/tauri.ts`              | 跟随消费方 feature 的集成测试，不单独写                                      |
 | `lib/types.ts`              | 纯类型，无运行时，不单独测                                                   |
 | `lib/units.ts`              | 独立测试（`units.test.ts`），覆盖格式化边界                                  |

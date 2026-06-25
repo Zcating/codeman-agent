@@ -123,7 +123,7 @@ components:
 
 **Key Characteristics:**
 
-- **Functional accent, not brand accent.** `Lab Sky` 是 *计量色*,不是 *品牌色*;只用于状态变化、关键操作、选中态、信息焦点。中性面做主。
+- **Functional accent, not brand accent.** `Lab Sky` 是 _计量色_,不是 _品牌色_;只用于状态变化、关键操作、选中态、信息焦点。中性面做主。
 - **Flat by default, border-driven depth.** 阴影几乎不存在,边界 1px 即可。`border + shadow` 不同现(戒律)。
 - **CJK-first typography.** Noto Sans SC 跟 Inter 同等优先级,行高按 CJK 优化 (1.55 body / 1.3 label)。
 - **Three-state theme integrity.** light / dark / system 三态中,Lab Sky 的相对地位保持不变;只换 cool-paper ↔ cool-charcoal。

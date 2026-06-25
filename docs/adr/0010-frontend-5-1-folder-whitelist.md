@@ -87,7 +87,7 @@ src/
 | --------------------------------- | ----------------------------------------------------------------- |
 | `src/assets/logo.svg`             | 死代码（无 import，tauri.conf.json icon 指向 `src-tauri/icons/`） |
 | `src/styles/`                     | 空目录                                                            |
-| `src/shared/shared-mock-state.ts` | 与 `src/__mocks__/@tauri-apps/api/core.ts` 重复，迁移唯一源后删除     |
+| `src/shared/shared-mock-state.ts` | 与 `src/__mocks__/@tauri-apps/api/core.ts` 重复，迁移唯一源后删除 |
 | `src/shared/mocks/`               | 删除 shared-mock-state.ts 后为空                                  |
 | `src/shared/types/`               | 已合并到 `lib/types.ts`                                           |
 | `src/shared/state/`               | 已重命名为 `stores/`                                              |

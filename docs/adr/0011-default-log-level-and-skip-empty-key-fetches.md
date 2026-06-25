@@ -29,6 +29,7 @@
 `state.rs::fetch_provider` 在调 `secrets::get_api_key` **之前**先调 `secrets::has_api_key(id)`。`false` 时**不调** `adapter.fetch`，构造一个 `SnapshotEnvelope { snapshot: None, error: Some("API key not configured") }` 写入 snapshots 缓存，**不**打 `warn!`、**不** emit `refresh-failed` 事件。
 
 静默原因：
+
 - `refresh-failed` 事件本意是 "上游 fetch 异常"，不包含 "用户未配置" 这种稳定状态
 - warn 日志刷屏即本次问题的主因
 - 调度器每 60s 一次（见 #3），如需提示用户配置 key，**前端**是更合适的位置
@@ -64,21 +65,25 @@
 ## Consequences
 
 **正面**：
+
 - 终端无 key 状态下从"刷屏"降到"静默"
 - keyring 等外部 crate 的 DEBUG 不再污染 stdout
 - 调度器下限 60s 后，即便 #2 漏 case，失败日志密度降 12 倍
 
 **负面 / 风险**：
+
 - 配 key 之前 UI 看不到任何 "fetch 失败" 提示 — 需前端 `latest_snapshot` 渲染路径支持 "error == NoApiKey" 分支（**留待后续前端 PR**）
 - 用户自定义 `refresh_interval_secs: 5` 会被静默 clamp 到 60，**无可见警告**（沿用现有钳制行为，不变）
 - 改动后日志默认比之前安静 — 如果开发期间想看 keyring DEBUG，需手动 `$env:RUST_LOG = "keyring=debug"`
 
 **回归验证**：
+
 - `pnpm typecheck` 通过
 - `cd src-tauri && cargo test` 全部通过（settings 11 + scheduler 4 + state 3 + providers 集成测试 + db 迁移测试）
 - `pnpm tauri:dev` 启动后终端静默（不配 key 的情况下）
 
 **文档同步**：
+
 - `src-tauri/AGENTS.md` "日志" 章节：把"默认 info 级，要 debug 走环境变量"重写为"默认 Info 级（业务宏），外部 crate DEBUG 默认关（keyring / reqwest / sqlx），要全量 DEBUG 走 `$env:RUST_LOG` 环境变量"
 
 ## References

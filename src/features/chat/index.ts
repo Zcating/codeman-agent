@@ -17,6 +17,5 @@ export {
 } from "./lib/runtime";
 
 export * as chatStore from "./stores/conversations.store";
-export * as messageStore from "./stores/messages.store";
 
 export type { Message, Conversation, Role, ToolCall, ToolResult } from "../../shared/lib/types";

@@ -37,13 +37,13 @@ pi-agent (webview TS)
 
 ### B. File Tool 族 (V2 内置 5 个)
 
-| Tool           | 签名                                                                       | 语义                              |
-| -------------- | -------------------------------------------------------------------------- | --------------------------------- |
-| `read_file`    | `(workspace_id, path) -> string`                                           | 读全文                            |
-| `write_file`   | `(workspace_id, path, content) -> ()`                                      | 覆盖写 (原子 rename 兜底)         |
-| `edit_file`    | `(workspace_id, path, old_text, new_text, replace_all?) -> ()`             | search/replace (V2 启动时定细节)  |
-| `search_files` | `(workspace_id, glob, content_pattern?) -> Match[]`                        | glob + content 双过滤             |
-| `delete_file`  | `(workspace_id, path) -> ()`                                               | 移至回收站 (Windows SHFileOperation) |
+| Tool           | 签名                                                           | 语义                                 |
+| -------------- | -------------------------------------------------------------- | ------------------------------------ |
+| `read_file`    | `(workspace_id, path) -> string`                               | 读全文                               |
+| `write_file`   | `(workspace_id, path, content) -> ()`                          | 覆盖写 (原子 rename 兜底)            |
+| `edit_file`    | `(workspace_id, path, old_text, new_text, replace_all?) -> ()` | search/replace (V2 启动时定细节)     |
+| `search_files` | `(workspace_id, glob, content_pattern?) -> Match[]`            | glob + content 双过滤                |
+| `delete_file`  | `(workspace_id, path) -> ()`                                   | 移至回收站 (Windows SHFileOperation) |
 
 ### C. 沙箱: Workspace-based, Rust 端校验
 
@@ -112,6 +112,7 @@ async fn delete_file(workspace_id: String, path: String) -> Result<(), AppError>
 pi-agent 留 webview, fs 走 Tauri command。
 
 **理由**:
+
 - 与 ADR-0002 ("所有 file 形态的东西走 Tauri 命令") 字面一致, 是延伸不是逆转
 - 与 ADR-0012 (billing 移 TS 同进程 tool dispatch) 同构, AgentTool.execute 模式直接复用
 - Rust 端 `canonicalize + starts_with` 是现成 path validation, 不可绕过
@@ -123,6 +124,7 @@ pi-agent 留 webview, fs 走 Tauri command。
 spawn node 子进程跑 pi-mono, Tauri webview JSON-RPC 转发。
 
 **否决理由**:
+
 - 与 ADR-0002 第 38-40 行字面冲突 ("agent loop 绑定到 Tauri webview")
 - 与 ADR-0012 第 174 行延期冲突 ("E. billing 进 Node sidecar (V1.6+) 评估", 当时未做)
 - +50-200ms 工具调用延迟 (跨进程 IPC)
@@ -136,6 +138,7 @@ spawn node 子进程跑 pi-mono, Tauri webview JSON-RPC 转发。
 弃 pi-mono, 自己用 Rust 写 agent loop。
 
 **否决理由**:
+
 - ~6 个月起的工作量
 - 失去 pi-mono 自动获得的 LLM provider 维护 (他们加 provider 我自动获得, 我加要自己实现)
 - 与 ADR-0002 + ADR-0012 实质逆转
@@ -146,6 +149,7 @@ spawn node 子进程跑 pi-mono, Tauri webview JSON-RPC 转发。
 Rust 成为 agent runtime, webview 只渲染。
 
 **否决理由**:
+
 - 产品从 "webview 跑 agent" 变成 "native agent + 嵌入式 webview UI", 定位大变
 - Solid UI → Rust 的桥接需要重写 chat runtime / store 拓扑 / IPC surface
 - 失去 Effect-TS 逻辑层优势

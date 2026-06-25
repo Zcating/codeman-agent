@@ -35,7 +35,7 @@ import type { Settings } from "../lib/types";
 const [settings, setSettings] = createStore<{ value: Settings | null }>({ value: null });
 
 export const appStore = {
-  state: settings,  // reactive read
+  state: settings, // reactive read
   set: async (patch: Partial<Settings>): Promise<void> => {
     // merge into state.value
     // debounced 500ms auto-flush via updateSettingsBridge
@@ -76,7 +76,7 @@ interface Provider {
   id: string;
   label: string;
   enabled: boolean;
-  api_key: string;  // 明文，单字段，Settings JSON 一部分
+  api_key: string; // 明文，单字段，Settings JSON 一部分
   llm: {
     default_model: string;
     base_url: string;
@@ -111,6 +111,7 @@ interface Provider {
 `app.store.ts` 沿用 Pinia / Vuex 风格的 dot-separated 命名，**不**改为项目 kebab-case `app-store.ts`。在 ADR-0010 的"5+1 子目录白名单"段追加"dot-separated 例外清单"：
 
 > 已知例外：
+>
 > 1. `src/features/settings/lib/llm-providers.ts`（snake_case → kebab-case，V1.5 修复）
 > 2. `src/shared/stores/app.store.ts`（dot-separated，V1.7+ 用户指定）
 

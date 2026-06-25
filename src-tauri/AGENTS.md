@@ -117,11 +117,11 @@ pnpm tauri:dev
 
 **IPC handler 日志强制约定（ADR-0018 D2）**：每个 `#[tauri::command]` 函数必须包含 3 类日志：
 
-| 时机 | level | 位置 |
-|------|-------|------|
-| handler 进入 | `debug!` | 函数首行（param extraction 之后） |
-| handler 成功 | `info!` | return Ok 之前 |
-| handler 错误 | `warn!` 或 `error!` | `Err(AppError::...)` 构造前一行 |
+| 时机         | level               | 位置                              |
+| ------------ | ------------------- | --------------------------------- |
+| handler 进入 | `debug!`            | 函数首行（param extraction 之后） |
+| handler 成功 | `info!`             | return Ok 之前                    |
+| handler 错误 | `warn!` 或 `error!` | `Err(AppError::...)` 构造前一行   |
 
 - `AppError::NotFound` / `InvalidConfig` / `Unauthorized` / `SandboxViolation` → `warn!`
 - `AppError::Upstream`（IPC 错误、DB 错误）→ `error!`

@@ -11,11 +11,11 @@ V1.6+ per-conversation Agent runtime（ADR-0014）使用 `Stream.unwrap + Effect
 ```ts
 return Stream.unwrap(
   Effect.gen(function* () {
-    const settings = yield* settingsSvc.getSettings();   // ← service closed-over, R = never
+    const settings = yield* settingsSvc.getSettings(); // ← service closed-over, R = never
     // ...
     const stream = Stream.async<RuntimeEvent, RuntimeError>((emit) => {
       // ...
-      agent.subscribe(evt => emit.single(convertEvent(evt)))
+      agent.subscribe((evt) => emit.single(convertEvent(evt)));
       // ...
     });
     return stream;
@@ -30,7 +30,7 @@ return Stream.unwrap(
 但现实证据（e2e run 2026-06-21 全量 16 spec，9 fail / 7 pass）显示 issue 仍然存在：
 
 ```
-[page pageerror] (FiberFailure) Error: Service not found: SettingsService 
+[page pageerror] (FiberFailure) Error: Service not found: SettingsService
   (defined at http://localhost:1420/src/shared/lib/tauri.ts:41:68)
     at http://localhost:1420/node_modules/.vite/deps/effect.js?v=4bfb6399:45159:24
     at http://localhost:1420/node_modules/.vite/deps/effect.js?v=4bfb6399:45194:39
@@ -38,10 +38,10 @@ return Stream.unwrap(
 
 **关键观察**：
 
-| Spec | 结果 | 模式 |
-|---|---|---|
-| 04-llm-stream | ✓ pass (8s) | 单 message + 单次 SSE 流，无 tool call |
-| 04-theme, 05-bubble, 03-billing | ✓ pass | 不需要 LLM 完成 streaming |
+| Spec                                                         | 结果                 | 模式                                                |
+| ------------------------------------------------------------ | -------------------- | --------------------------------------------------- |
+| 04-llm-stream                                                | ✓ pass (8s)          | 单 message + 单次 SSE 流，无 tool call              |
+| 04-theme, 05-bubble, 03-billing                              | ✓ pass               | 不需要 LLM 完成 streaming                           |
 | 05-file-tools ×4, 06-round-trip, 07-mock ×2, 08-mock-file ×2 | ✗ fail (60s timeout) | 多轮交互：tool call → tool result → 下一轮 LLM call |
 
 `pageerror Service not found: SettingsService` 在 spec 02/03/05-bubble 都被抓到，但这些 spec 仍 pass — 说明这个错误**对单 message 流是 non-fatal**。失败的 spec 都是需要**多轮** tool call / round-trip 的，OP_MICRO 在多步路径才 fatal。
@@ -75,7 +75,11 @@ const run = (
       if (!agent) {
         // ... existing lazy-create block, unchanged ...
       }
-      agent.appendMessage({ role: "user", content: userMessage.content, timestamp: userMessage.created_at });
+      agent.appendMessage({
+        role: "user",
+        content: userMessage.content,
+        timestamp: userMessage.created_at,
+      });
 
       // Fork agent 执行到子 fiber。子 fiber subscribe pi-agent → enqueue event；
       // consumer 从 Stream.fromQueue 拉。两者解耦，stream 不再依赖 agent 的完成。
@@ -84,8 +88,12 @@ const run = (
           const handleAgentEvent = (evt: AgentEvent) => {
             try {
               switch (evt.type) {
-                case "message_update": { /* token / tool_call enqueue */ break; }
-                case "tool_execution_end": { /* tool_result enqueue */ break; }
+                case "message_update": {
+                  /* token / tool_call enqueue */ break;
+                }
+                case "tool_execution_end": {
+                  /* tool_result enqueue */ break;
+                }
                 case "agent_end": {
                   // construct done message (existing logic, unchanged)
                   Queue.unsafeOffer(queue, { type: "done", message: doneMessage });
@@ -111,7 +119,7 @@ const run = (
           }).pipe(Effect.ignore);
 
           yield* Effect.sync(() => sub());
-          yield* Effect.sync(() => Queue.shutdown(queue));  // close queue → Stream.fromQueue ends
+          yield* Effect.sync(() => Queue.shutdown(queue)); // close queue → Stream.fromQueue ends
         }),
       );
 
@@ -164,14 +172,26 @@ const program = Effect.gen(function* () {
   const runtime = yield* AgentRuntime;
   return Stream.provideLayer(runtime.run(conversation, userMessage), RuntimeDeps);
 }).pipe(Effect.provide(fullLayer));
-return Effect.runSync(program as Effect.Effect<Stream.Stream<RuntimeEvent, AppError | RuntimeError, never>, never, never>) as Stream.Stream<RuntimeEvent, AppError>;
+return Effect.runSync(
+  program as Effect.Effect<
+    Stream.Stream<RuntimeEvent, AppError | RuntimeError, never>,
+    never,
+    never
+  >,
+) as Stream.Stream<RuntimeEvent, AppError>;
 
 // After
 const program = Effect.gen(function* () {
   const runtime = yield* AgentRuntime;
-  return runtime.run(conversation, userMessage);  // R = never
+  return runtime.run(conversation, userMessage); // R = never
 }).pipe(Effect.provide(fullLayer));
-return Effect.runSync(program as Effect.Effect<Stream.Stream<RuntimeEvent, AppError | RuntimeError, never>, never, never>) as Stream.Stream<RuntimeEvent, AppError>;
+return Effect.runSync(
+  program as Effect.Effect<
+    Stream.Stream<RuntimeEvent, AppError | RuntimeError, never>,
+    never,
+    never
+  >,
+) as Stream.Stream<RuntimeEvent, AppError>;
 ```
 
 `Effect.runSync + fullLayer` 仍保留 —— 它把 stream 在 store 层 materialize（chat-view 不需要 provide AgentRuntime）。`Stream.provideLayer` 调用删除。
@@ -180,26 +200,26 @@ return Effect.runSync(program as Effect.Effect<Stream.Stream<RuntimeEvent, AppEr
 
 ### D1 (queue 类型) 3 选
 
-| 选 | 描述 | 选 / 不选 |
-|---|---|---|
-| A | Queue.unbounded | 选 — chat 场景 event rate << 内存压力阈值 |
-| B | Queue.bounded(1) + sliding | 不选 — 丢中间 token，破坏增量渲染 UX |
-| C | Queue.bounded(N) + await-based backpressure | 不选 — agent.subscribe 是 callback 不是 Effect，wrap 复杂 |
+| 选  | 描述                                        | 选 / 不选                                                 |
+| --- | ------------------------------------------- | --------------------------------------------------------- |
+| A   | Queue.unbounded                             | 选 — chat 场景 event rate << 内存压力阈值                 |
+| B   | Queue.bounded(1) + sliding                  | 不选 — 丢中间 token，破坏增量渲染 UX                      |
+| C   | Queue.bounded(N) + await-based backpressure | 不选 — agent.subscribe 是 callback 不是 Effect，wrap 复杂 |
 
 ### D3 (fork lifecycle) 3 选
 
-| 选 | 描述 | 选 / 不选 |
-|---|---|---|
-| A | Fiber.interrupt on stream cancel | 选 — 资源确定释放，跟 Cancel 按钮语义契合 |
-| B | Detached fiber (own lifecycle) | 不选 — 资源泄漏风险；当前无强需求 |
-| C | Hybrid: detached + explicit Cancel hook | 不选 — 两路径维护，复杂度溢出收益 |
+| 选  | 描述                                    | 选 / 不选                                 |
+| --- | --------------------------------------- | ----------------------------------------- |
+| A   | Fiber.interrupt on stream cancel        | 选 — 资源确定释放，跟 Cancel 按钮语义契合 |
+| B   | Detached fiber (own lifecycle)          | 不选 — 资源泄漏风险；当前无强需求         |
+| C   | Hybrid: detached + explicit Cancel hook | 不选 — 两路径维护，复杂度溢出收益         |
 
 ### D5 (declared R) 2 选
 
-| 选 | 描述 | 选 / 不选 |
-|---|---|---|
-| A | `never`（truthful） | 选 — 消除 type-lie，去掉 Stream.provideLayer |
-| B | 保留 `SettingsService \| MessageService` lie | 不选 — ADR-0014 doc lied；继续标 "known issue" 是技术债 |
+| 选  | 描述                                         | 选 / 不选                                               |
+| --- | -------------------------------------------- | ------------------------------------------------------- |
+| A   | `never`（truthful）                          | 选 — 消除 type-lie，去掉 Stream.provideLayer            |
+| B   | 保留 `SettingsService \| MessageService` lie | 不选 — ADR-0014 doc lied；继续标 "known issue" 是技术债 |
 
 ## Consequences
 
@@ -237,19 +257,19 @@ return Effect.runSync(program as Effect.Effect<Stream.Stream<RuntimeEvent, AppEr
 
 **实际结果**：`vp run e2e:single` 跑完 16 spec，**7 passed / 9 failed** — **跟 1fc33e7 baseline 完全一样**。
 
-| Spec | baseline (1fc33e7) | Queue refactor (本次) |
-|---|---|---|
-| 01-app-launch | ✓ | ✓ |
-| 02-settings-api-key | ✓ (有 pageerror) | ✓ (有 pageerror) |
-| 03-billing-tool | ✓ (有 pageerror) | ✓ (有 pageerror) |
-| 04-llm-stream | ✓ | ✓ |
-| 04-theme-toggle | ✓ | ✓ |
-| 05-chat-message-bubble | ✓ (有 pageerror) | ✓ (有 pageerror) |
-| 05-chat-message-bubble-2 | ✓ (有 pageerror) | ✓ (有 pageerror) |
-| **05-file-tools ×4** | ✗ timeout 60s | ✗ timeout 60s |
-| **06-llm-round-trip** | ✗ waitFor 60s | ✗ waitFor 60s |
-| **07-mock-provider ×2** | ✗ waitFor 10-15s | ✗ waitFor 10-15s |
-| **08-file-tools-mock ×2** | ✗ 没 mock 响应 | ✗ 没 mock 响应 |
+| Spec                      | baseline (1fc33e7) | Queue refactor (本次) |
+| ------------------------- | ------------------ | --------------------- |
+| 01-app-launch             | ✓                  | ✓                     |
+| 02-settings-api-key       | ✓ (有 pageerror)   | ✓ (有 pageerror)      |
+| 03-billing-tool           | ✓ (有 pageerror)   | ✓ (有 pageerror)      |
+| 04-llm-stream             | ✓                  | ✓                     |
+| 04-theme-toggle           | ✓                  | ✓                     |
+| 05-chat-message-bubble    | ✓ (有 pageerror)   | ✓ (有 pageerror)      |
+| 05-chat-message-bubble-2  | ✓ (有 pageerror)   | ✓ (有 pageerror)      |
+| **05-file-tools ×4**      | ✗ timeout 60s      | ✗ timeout 60s         |
+| **06-llm-round-trip**     | ✗ waitFor 60s      | ✗ waitFor 60s         |
+| **07-mock-provider ×2**   | ✗ waitFor 10-15s   | ✗ waitFor 10-15s      |
+| **08-file-tools-mock ×2** | ✗ 没 mock 响应     | ✗ 没 mock 响应        |
 
 **pageerror `(FiberFailure) Error: Service not found: SettingsService` 仍在 spec 02/03/05-bubble 出现**（出现在 effect.js:45159 — 不是 runtime.ts 的 yield）。
 

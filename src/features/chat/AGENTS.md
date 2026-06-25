@@ -68,11 +68,13 @@ V1.x 起 ChatView 在 textarea 下方（form 第二行）渲染一个 `<select i
 billing-only / disabled / 无 llm 的 provider 不显示。
 
 **写路径**：
+
 - 用户切换 → `appStore.set({ default_llm_provider_id: nextId })` 同步更新本地 state
 - 然后 `settingsSaver.scheduleSave()` debounced 500ms 刷到后端（跟 settings 域同 pattern, ADR-0015）
 - `conversations.store.sendMessage()` 入口从 `appStore` 读当前 `default_llm_provider_id` + 对应 provider 配置,构造 `ProviderConfig` 传给 `runtime.run({ ..., provider })`(per ADR-0019 D2 "provider 是 run-time 参数")
 
 **不变量**（per ADR-0019 D1 + D2）：
+
 - Provider 是 `run({ context, provider })` 的**参数**(per-run)，不是 closure 变量 — 每次 send 都从 `appStore` 读 `default_llm_provider_id` 当前值构造 `ProviderConfig`
 - 已 in-flight 的 conversation 在切换 selector 后**不会**改 provider(已在跑的那次 run 闭包锁定的 `ProviderConfig` 保留到 run 结束)
 - 新 conversation 下次 send 时取新的 `default_llm_provider_id` 构造新 `ProviderConfig`
@@ -84,22 +86,21 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 
 ## Runtime 事件（5 变体）
 
-| 变体          | Payload                        | UI 副作用（`conversations.store` 内 `handleEvent`）|
-| ------------- | ------------------------------ | -------------------------------------------------- |
-| `token`       | `string`                       | `setStore("byId", convId, "messages", msgs => appendAssistantDelta(msgs, evt.content))` |
-| `tool_call`   | `ToolCall`                     | `setStore("byId", convId, "messages", msgs => appendToolCall(msgs, evt.toolCall))` |
-| `tool_result` | `toolCallId + result + error?` | `setStore("byId", convId, "messages", msgs => finalizeToolResult(msgs, evt.toolCallId, evt.result, evt.error))` |
+| 变体          | Payload                        | UI 副作用（`conversations.store` 内 `handleEvent`）                                                                                                                                                |
+| ------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `token`       | `string`                       | `setStore("byId", convId, "messages", msgs => appendAssistantDelta(msgs, evt.content))`                                                                                                            |
+| `tool_call`   | `ToolCall`                     | `setStore("byId", convId, "messages", msgs => appendToolCall(msgs, evt.toolCall))`                                                                                                                 |
+| `tool_result` | `toolCallId + result + error?` | `setStore("byId", convId, "messages", msgs => finalizeToolResult(msgs, evt.toolCallId, evt.result, evt.error))`                                                                                    |
 | `done`        | `Message`                      | `setStore("byId", convId, "messages", msgs => finalizeAssistantMessage(msgs, evt.message))` + `setStore("byId", convId, "streamingMessageId", null)` + `void persistAssistantMessage(evt.message)` |
-| `error`       | `{ message: string }`          | `logger.error("[ChatAgent] runtime error:", evt.error)` |
-
+| `error`       | `{ message: string }`          | `logger.error("[ChatAgent] runtime error:", evt.error)`                                                                                                                                            |
 
 ## 测试模式
 
-| 层         | 测试文件                                  | 框架                                                          |
-| ---------- | ----------------------------------------- | ------------------------------------------------------------- |
-| Runtime    | `lib/runtime.test.ts`                     | `@effect/vitest` + `it.effect()`，factory 直接调 + mock `Agent` / `Queue` |
-| Store      | `stores/conversations.store.test.ts`      | `vitest` + Solid Testing Library（`render` + `createRoot`）   |
-| Components | `components/*.test.tsx`                   | `vitest` + `@solidjs/testing-library` + `render`              |
+| 层         | 测试文件                             | 框架                                                                      |
+| ---------- | ------------------------------------ | ------------------------------------------------------------------------- |
+| Runtime    | `lib/runtime.test.ts`                | `@effect/vitest` + `it.effect()`，factory 直接调 + mock `Agent` / `Queue` |
+| Store      | `stores/conversations.store.test.ts` | `vitest` + Solid Testing Library（`render` + `createRoot`）               |
+| Components | `components/*.test.tsx`              | `vitest` + `@solidjs/testing-library` + `render`                          |
 
 **Runtime tests**: `createAgentRuntime()` 无 `Layer` 依赖,直接调用工厂函数 + mock `Agent` / `Queue` / `AbortController`。`run()` 内部 Effect 通过 `Effect.runPromise` 或 `Effect.runSync` 触发,断言 stream 输出。
 

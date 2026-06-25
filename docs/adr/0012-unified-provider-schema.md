@@ -45,13 +45,13 @@ V1 的实际后果：
 
 V0 是"widget"形态（280×100 浮窗），**轮询** DeepSeek balance 实时显示。V0 设计直接驱动 V1 的 layout：
 
-| 设计 | 目的 | V1 状态 |
-|---|---|---|
-| `scheduler.rs` 轮询当前激活 provider | widget 实时刷新 | **V1 死代码** |
-| `providers/*.rs` HTTP + 解析 | widget 抓数据 | 还能用，但 chat 路径不调 |
-| key 存 `keyring` | widget 不该持明文 | V1 仍合理（keyring 比 Tauri store 安全） |
-| `Snapshot` 缓存 + `SnapshotEnvelope` | widget 显示过期态 | V1 on-demand 没意义 |
-| `refresh_interval_secs` 字段 | 控制轮询频率 | 随 scheduler 一起死 |
+| 设计                                 | 目的              | V1 状态                                  |
+| ------------------------------------ | ----------------- | ---------------------------------------- |
+| `scheduler.rs` 轮询当前激活 provider | widget 实时刷新   | **V1 死代码**                            |
+| `providers/*.rs` HTTP + 解析         | widget 抓数据     | 还能用，但 chat 路径不调                 |
+| key 存 `keyring`                     | widget 不该持明文 | V1 仍合理（keyring 比 Tauri store 安全） |
+| `Snapshot` 缓存 + `SnapshotEnvelope` | widget 显示过期态 | V1 on-demand 没意义                      |
+| `refresh_interval_secs` 字段         | 控制轮询频率      | 随 scheduler 一起死                      |
 
 V1 改成 chat agent 后，**这套设计大部分失效**。真正"还在工作"的只剩 key 隔离。
 
@@ -94,17 +94,19 @@ interface Provider {
   id: string;
   label: string;
   enabled: boolean;
-  llm: {                              // 必选
+  llm: {
+    // 必选
     default_model: string;
     base_url: string;
     api_type: "anthropic-messages";
     llm_api_key_ref: string;
-    models: ModelMeta[];              // 用户可编辑
-    models_endpoint: string;          // per-provider 可配置
+    models: ModelMeta[]; // 用户可编辑
+    models_endpoint: string; // per-provider 可配置
   };
-  billing?: {                         // 可选
+  billing?: {
+    // 可选
     kind: "balance" | "plan_quota";
-    billing_api_key_ref: string;      // V1.5+ 指向 Tauri store（V0 是 keyring）
+    billing_api_key_ref: string; // V1.5+ 指向 Tauri store（V0 是 keyring）
   };
 }
 

@@ -1,12 +1,15 @@
 # Product
 
 ## Register
+
 product
 
 ## Users
+
 中文独立开发者与效率玩家。在 Windows 桌面长时间工作,把"快提词"和"看计费"当成肌肉记忆;预期延迟以毫秒计,反感任何"AI 工具"的居中紫色欢迎卡、emoji 弹雨、营销腔。常驻显示器右下角或第二屏,作为终端 / IDE / 浏览器之外的"第四个面板"出现。
 
 ## Product Purpose
+
 codeman-agent 是 Windows 原生 AI Agent 桌面应用。V1 唯一交付:
 
 - 单 Tauri 主窗口内提供 LLM 流式对话(Markdown 渲染,工具调用可视化)
@@ -17,6 +20,7 @@ codeman-agent 是 Windows 原生 AI Agent 桌面应用。V1 唯一交付:
 成功 = 用户的"打开 → 发消息 → 看 tool result → 关"路径在 ≤ 1.5s 内完成首次反馈,流式更新 ≤ 200ms。
 
 ## Brand Personality
+
 高效、冷静、专业。声音像终端提示符:不寒暄,不解释自己,不堆 emoji,不为 AI 道歉。
 
 - **高效**:每个像素 / 动效 / 文案都该挣到自己的位置
@@ -24,6 +28,7 @@ codeman-agent 是 Windows 原生 AI Agent 桌面应用。V1 唯一交付:
 - **专业**:跟系统主题走,信任用户,克制装饰(无渐变文 / 无 hero-metric / 无 eyebrow 标号)
 
 ## Anti-references
+
 - **不要做成 ChatGPT 居中紫色欢迎卡 + hero 输入区**——2026 AI 工具的第一反射
 - **不要做成 Notion / Webflow 那种"全黑侧栏 + emoji 弹 + 营销腔"**——本产品是工具,不是协作平台
 - **不要做成 VSCode / Cursor 套壳的三面板 IDE 形态**——codeman-agent 是聊天 + 工具调用,不是 IDE
@@ -32,6 +37,7 @@ codeman-agent 是 Windows 原生 AI Agent 桌面应用。V1 唯一交付:
 - **不要 side-stripe border / numbered eyebrows / kicker 小字 ALL-CAPS**——AI scaffold 三大 tell
 
 ## Design Principles
+
 1. **Performance as design**: 延迟本身就是美学。首次 token ≤ 1.5s,流式更新 ≤ 200ms。
 2. **Density without clutter**: Sidebar / 消息区 / 输入区 / footer 四区明确分区;窄而深,Raycast 节奏。
 3. **Theme-integrity over theme-decor**: violet 主色以 token 形式贯穿,light/dark 一致,不大块铺面;状态色靠 border + bg 而不是饱和度。
@@ -39,6 +45,7 @@ codeman-agent 是 Windows 原生 AI Agent 桌面应用。V1 唯一交付:
 5. **CJK-first**: Noto Sans SC 与 Inter 同权,中英文混排节奏跟 JetBrains Mono 工具调用卡片配对协调;行高 / 字距按 CJK 优化。
 
 ## Accessibility & Inclusion
+
 - **WCAG 2.1 AA 起步**:body text 4.5:1,大文本 3:1,focus 状态 3:1
 - **三态主题尊重 `prefers-color-scheme`**:夜间不烧眼(violet 不铺满大块面,中度使用)
 - **完整键盘导航**:Tab/Shift+Tab focus 可见;Enter 发消息;Esc 取消流;Up/Down 选会话;Delete 删会话
