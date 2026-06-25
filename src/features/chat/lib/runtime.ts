@@ -67,7 +67,7 @@ export function createAgentRuntime(): AgentRuntime {
           signal: abortController.signal,
         });
 
-        const model: Model<any> = {
+        const model: Model<"anthropic-messages"> = {
           id: provider.defaultModel || "auto",
           name: provider.systemPrompt.slice(0, 20) || "agent",
           api: "anthropic-messages",
@@ -88,7 +88,7 @@ export function createAgentRuntime(): AgentRuntime {
             systemPrompt: provider.systemPrompt,
             model,
             tools,
-            messages: context as any,
+            messages: context,
           },
         });
 
@@ -136,7 +136,7 @@ export function createAgentRuntime(): AgentRuntime {
               case "tool_execution_end": {
                 emit.single({
                   type: "tool_result",
-                  toolCallId: e.toolCallId!,
+                  toolCallId: e.toolCallId ?? "unknown",
                   result: e.result,
                   error: e.isError ? String(e.result) : undefined,
                 });
