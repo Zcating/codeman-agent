@@ -42,6 +42,7 @@ desktop.ini
 
 # Test coverage
 coverage/
+coverage-test/
 .nyc_output/
 .dev-debs/
 cov.txt
