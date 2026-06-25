@@ -98,7 +98,7 @@ Run:
 
 ```bash
 cd C:\Users\zcati\Documents\project\codeman-agent
-pnpm typecheck
+vp run typecheck
 ```
 
 Expected: no errors. (Existing usage of `AnthropicTransport` passes only `getApiKey`; new `signal` is optional so no breakage.)
@@ -108,7 +108,7 @@ Expected: no errors. (Existing usage of `AnthropicTransport` passes only `getApi
 Run:
 
 ```bash
-pnpm test -- src/features/chat/lib
+vp run test -- src/features/chat/lib
 ```
 
 Expected: all pass.
@@ -190,7 +190,7 @@ describe("createAgentRuntime()", () => {
 Run:
 
 ```bash
-pnpm test -- src/features/chat/lib/runtime.test.ts
+vp run test -- src/features/chat/lib/runtime.test.ts
 ```
 
 Expected: FAIL — `createAgentRuntime` and `ProviderConfig` / `RuntimeEvent` not exported from `./runtime`.
@@ -277,7 +277,7 @@ export function createAgentRuntime(): AgentRuntime {
 Run:
 
 ```bash
-pnpm test -- src/features/chat/lib/runtime.test.ts
+vp run test -- src/features/chat/lib/runtime.test.ts
 ```
 
 Expected: PASS (3/3 tests).
@@ -346,7 +346,7 @@ describe("run() — event translation", () => {
 Run:
 
 ```bash
-pnpm test -- src/features/chat/lib/runtime.test.ts
+vp run test -- src/features/chat/lib/runtime.test.ts
 ```
 
 Expected: FAIL — events array is empty (because `Stream.empty` returns no events).
@@ -508,7 +508,7 @@ run({ context, provider }: RunOptions): Stream.Stream<RuntimeEvent, never, never
 Run:
 
 ```bash
-pnpm test -- src/features/chat/lib/runtime.test.ts
+vp run test -- src/features/chat/lib/runtime.test.ts
 ```
 
 Expected: PASS — events array contains translated token events.
@@ -609,7 +609,7 @@ describe("conversations.store — ConversationState", () => {
 Run:
 
 ```bash
-pnpm test -- src/features/chat/stores/conversations.store.test.ts
+vp run test -- src/features/chat/stores/conversations.store.test.ts
 ```
 
 Expected: FAIL — `store`, `setupConvState`, `ConversationState` not exported.
@@ -707,7 +707,7 @@ export function selectConversation(id: string): void {
 Run:
 
 ```bash
-pnpm test -- src/features/chat/stores/conversations.store.test.ts
+vp run test -- src/features/chat/stores/conversations.store.test.ts
 ```
 
 Expected: PASS.
@@ -790,7 +790,7 @@ describe("sendMessage — cross-conv isolation", () => {
 Run:
 
 ```bash
-pnpm test -- src/features/chat/stores/conversations.store.test.ts
+vp run test -- src/features/chat/stores/conversations.store.test.ts
 ```
 
 Expected: PASS — the test verifies createStore path isolation, which already works.
@@ -959,7 +959,7 @@ import type { ProviderConfig } from "../lib/runtime";
 Run:
 
 ```bash
-pnpm typecheck
+vp run typecheck
 ```
 
 Expected: no errors.
@@ -969,7 +969,7 @@ Expected: no errors.
 Run:
 
 ```bash
-pnpm test -- src/features/chat/stores/conversations.store.test.ts
+vp run test -- src/features/chat/stores/conversations.store.test.ts
 ```
 
 Expected: PASS.
@@ -1026,7 +1026,7 @@ describe("cancel/archive/delete", () => {
 Run:
 
 ```bash
-pnpm test -- src/features/chat/stores/conversations.store.test.ts
+vp run test -- src/features/chat/stores/conversations.store.test.ts
 ```
 
 Expected: FAIL — `cancel` / `archiveConversation` not exported.
@@ -1078,7 +1078,7 @@ export async function deleteConversation(convId: string): Promise<void> {
 Run:
 
 ```bash
-pnpm test -- src/features/chat/stores/conversations.store.test.ts
+vp run test -- src/features/chat/stores/conversations.store.test.ts
 ```
 
 Expected: PASS.
@@ -1122,7 +1122,7 @@ describe("loadConversations", () => {
 Run:
 
 ```bash
-pnpm test -- src/features/chat/stores/conversations.store.test.ts
+vp run test -- src/features/chat/stores/conversations.store.test.ts
 ```
 
 Expected: FAIL — `loadConversations` not defined or doesn't populate store.
@@ -1176,7 +1176,7 @@ export async function createConversation(title: string, systemPrompt?: string): 
 Run:
 
 ```bash
-pnpm test -- src/features/chat/stores/conversations.store.test.ts
+vp run test -- src/features/chat/stores/conversations.store.test.ts
 ```
 
 Expected: PASS.
@@ -1217,7 +1217,7 @@ Expected: shows `chat-view.tsx` and any test files importing it. Note: `chat-vie
 Run:
 
 ```bash
-pnpm typecheck
+vp run typecheck
 ```
 
 Expected: typecheck may show errors about `messages.store` imports — this is fine, will be resolved when `chat-view.tsx` is refactored.
@@ -1527,7 +1527,7 @@ export function ChatView() {
 Run:
 
 ```bash
-pnpm typecheck
+vp run typecheck
 ```
 
 Expected: no errors (assuming messages.store / agent.store still exist during this task).
@@ -1537,7 +1537,7 @@ Expected: no errors (assuming messages.store / agent.store still exist during th
 Run:
 
 ```bash
-pnpm test -- src/features/chat/components/chat-view.test.tsx
+vp run test -- src/features/chat/components/chat-view.test.tsx
 ```
 
 Expected: PASS.
@@ -1588,7 +1588,7 @@ git rm src/features/chat/stores/agent.store.ts src/features/chat/stores/agent.st
 Run:
 
 ```bash
-pnpm typecheck
+vp run typecheck
 ```
 
 Expected: no errors.
@@ -1598,7 +1598,7 @@ Expected: no errors.
 Run:
 
 ```bash
-pnpm test -- src/features/chat
+vp run test -- src/features/chat
 ```
 
 Expected: all PASS.
@@ -1642,7 +1642,7 @@ describe("Sidebar — streaming indicator", () => {
 Run:
 
 ```bash
-pnpm test -- src/features/chat/components/sidebar.test.tsx
+vp run test -- src/features/chat/components/sidebar.test.tsx
 ```
 
 Expected: FAIL — no badge in current sidebar.
@@ -1701,8 +1701,8 @@ import {
 Run:
 
 ```bash
-pnpm typecheck
-pnpm test -- src/features/chat/components/sidebar.test.tsx
+vp run typecheck
+vp run test -- src/features/chat/components/sidebar.test.tsx
 ```
 
 Expected: PASS.
@@ -1771,7 +1771,7 @@ git commit -m "docs(AGENTS): replace messages.store/agent.store refs with conver
 - [ ] **Step 1: Run typecheck**
 
 ```bash
-pnpm typecheck
+vp run typecheck
 ```
 
 Expected: no errors.
@@ -1779,7 +1779,7 @@ Expected: no errors.
 - [ ] **Step 2: Run full test suite**
 
 ```bash
-pnpm test
+vp run test
 ```
 
 Expected: all tests pass.
@@ -1787,7 +1787,7 @@ Expected: all tests pass.
 - [ ] **Step 3: Run build**
 
 ```bash
-pnpm build
+vp run build
 ```
 
 Expected: successful build to `dist/`.
@@ -1795,7 +1795,7 @@ Expected: successful build to `dist/`.
 - [ ] **Step 4: Manual smoke test (optional, requires Tauri runtime)**
 
 ```bash
-pnpm tauri:dev
+vp run tauri:dev
 ```
 
 In the running app:

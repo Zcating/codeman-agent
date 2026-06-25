@@ -6,7 +6,7 @@
 
 ## Context
 
-`pnpm tauri:dev` 启动后终端持续刷日志，根因 3 层叠加：
+`vp run tauri:dev` 启动后终端持续刷日志，根因 3 层叠加：
 
 1. **tauri-plugin-log 2.x 默认行为**：官方文档原话 "By default all logs are processed"，不调 `.level(...)` 时 `LevelFilter::Trace` 生效。`keyring 3.x` 等外部 crate 的 DEBUG 日志（"creating entry" / "get password from entry" / 等）被无差别输出到 stdout。
 2. **默认 active provider = Deepseek**（`state.rs:42` 写死 `let active_id = ProviderId::Deepseek;`），用户未配 key 时 `secrets::get_api_key` 返回 `None`，`fetch_provider` 用 `Secret::empty()` 继续走 fetch → 必然失败 → 打 warn。
@@ -22,7 +22,7 @@
 
 理由：项目内 `log::*!` 宏只用到 `info` / `warn` / `error` 三档，DEBUG 仅来自外部依赖（keyring / reqwest / sqlx 未开 query log），业务调试走前端 devtools / 日志文件（`LogDir` target）即可。
 
-如需 DEBUG 走环境变量：`$env:RUST_LOG = "codeman_agent_lib=debug" pnpm tauri:dev`。项目范围内已被 `keyring` 等子模块 DEBUG 噪音淹没，不应自动开启。
+如需 DEBUG 走环境变量：`$env:RUST_LOG = "codeman_agent_lib=debug" vp run tauri:dev`。项目范围内已被 `keyring` 等子模块 DEBUG 噪音淹没，不应自动开启。
 
 ### 2. fetch_provider 在 has_api_key=false 时跳过 fetch
 
@@ -78,9 +78,9 @@
 
 **回归验证**：
 
-- `pnpm typecheck` 通过
+- `vp run typecheck` 通过
 - `cd src-tauri && cargo test` 全部通过（settings 11 + scheduler 4 + state 3 + providers 集成测试 + db 迁移测试）
-- `pnpm tauri:dev` 启动后终端静默（不配 key 的情况下）
+- `vp run tauri:dev` 启动后终端静默（不配 key 的情况下）
 
 **文档同步**：
 

@@ -63,7 +63,7 @@ new Agent({
 `lib/file-tools.test.ts` 使用 vitest + `mockState`（`src/__mocks__/@tauri-apps/api/core.ts`）来 mock Tauri invoke。
 
 ```bash
-pnpm test src/features/file-tools
+vp run test src/features/file-tools
 ```
 
 集成测试（E2E）位于 `e2e/05-file-tools.spec.ts`（未来实现）。

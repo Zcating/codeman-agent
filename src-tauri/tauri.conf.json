@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "com.zcati.codeman-agent",
   "build": {
-    "beforeDevCommand": "pnpm run dev",
+    "beforeDevCommand": "vp run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm run build",
+    "beforeBuildCommand": "vp run build",
     "frontendDist": "../dist"
   },
   "app": {

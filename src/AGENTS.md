@@ -116,8 +116,8 @@ V1 是 Tauri 2 + Solid chat agent，**不是 V0 280x100 浮窗**。视觉层走 
 ## 测试
 
 ```bash
-pnpm test                  # vitest --run（jsdom）
-pnpm test:watch            # 监听模式
+vp run test                  # vitest --run（jsdom）
+vp run test:watch            # 监听模式
 ```
 
 - Effect 服务测试：`*_test.ts` 用 `it.effect()` + `Layer.succeed(Service, mock)`。

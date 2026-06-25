@@ -110,7 +110,7 @@ main 窗口用 `default` capability。关键授权：
 
 ```powershell
 $env:RUST_LOG = "keyring=debug,codeman_agent_lib=debug"
-pnpm tauri:dev
+vp run tauri:dev
 ```
 
 不带 `=` 的 `=debug` 等价于全局。常见 pattern：`keyring=debug`（只开 keyring 内部 DEBUG）、`codeman_agent_lib=debug`（只开本 crate DEBUG）。

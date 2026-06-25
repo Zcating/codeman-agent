@@ -20,7 +20,7 @@
 | 测试         | Vitest, Playwright, @solidjs/testing-library, jsdom, @testing-library                      |
 | 持久化       | SQLite, FTS5, sqlx                                                                         |
 | 密钥         | keyring (crate), Windows Credential Manager                                                |
-| 构建         | Vite, vite-plugin-solid, pnpm, cargo, rustc                                                |
+| 构建         | Vite, vite-plugin-solid, vp, cargo, rustc                                                |
 | 类型         | Rust `Secret<String>` newtype, `Result<T, E>`, `Option<T>`, `Result::Err`                  |
 | 协议         | IPC, Tauri store, Tauri plugin                                                             |
 | Web 标准     | HTML, CSS, JSX, TSX, TypeScript, ESM, CommonJS                                             |

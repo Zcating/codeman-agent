@@ -129,6 +129,8 @@ LLM Provider             Billing Provider
 
 ## 命令
 
+禁止使用 pnpm
+
 ```bash
 vp run install
 vp run test              # 前端 vitest (jsdom)

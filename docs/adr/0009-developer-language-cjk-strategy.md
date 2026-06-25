@@ -172,10 +172,10 @@ PR #1（本 PR）只动 policy + 工具链，不动源码 / 文档翻译。翻�
 - [ ] **新增 identifier 已加 `CONTEXT.md` 术语条目**（详见 "Glossary
       增补"）
 - [ ] **新注释遵守 `docs/translation-rules.md` 规则**
-- [ ] `pnpm typecheck` 通过
-- [ ] `pnpm test` 通过
+- [ ] `vp run typecheck` 通过
+- [ ] `vp run test` 通过
 - [ ] `cargo test` 通过
-- [ ] `pnpm e2e` 通过（新增 IPC 命令时同步加 e2e spec）
+- [ ] `vp run e2e` 通过（新增 IPC 命令时同步加 e2e spec）
 - [ ] commit message 格式：`type(scope): 中文 subject`
 - [ ] branch name 英文 ASCII：`feature/xxx` / `fix/xxx` / `docs/xxx`
 
@@ -188,9 +188,9 @@ PR #1（本 PR）只动 policy + 工具链，不动源码 / 文档翻译。翻�
 
 - **不引入 custom lint 脚本**（如 `scripts/check-chinese-comments.mjs`）
   —— 漏译靠 review 阶段发现，列入 follow-up
-- 依赖现有 pipeline：`pnpm typecheck` + `pnpm test` + `cargo test` +
-  `pnpm e2e` 抓语法 / 类型 / 行为错误
-- identifier 改动靠 `pnpm typecheck` 强制（type 错误 → CI 红）
+- 依赖现有 pipeline：`vp run typecheck` + `vp run test` + `cargo test` +
+  `vp run e2e` 抓语法 / 类型 / 行为错误
+- identifier 改动靠 `vp run typecheck` 强制（type 错误 → CI 红）
 
 ## Glossary 增补机制
 

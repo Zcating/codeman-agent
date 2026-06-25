@@ -4,10 +4,10 @@
  *
  * Why a wrapper, not a one-liner in vite.config.ts:
  *   - `vp staged` appends staged file paths as positional args to the staged
- *     command. `pnpm typecheck` (`tsc --noEmit`) treats extra args as files
+ *     command. `vp run typecheck` (`tsc --noEmit`) treats extra args as files
  *     to typecheck, which drops the project tsconfig context and produces a
  *     storm of false-positive resolution errors. The wrapper consumes the
- *     arg list itself, so the inner `pnpm typecheck` is invoked with NO
+ *     arg list itself, so the inner `vp run typecheck` is invoked with NO
  *     trailing paths and always runs a full-project check.
  *   - The test step also needs arg control. `vitest --run <file>` only runs
  *     the given test file; `vitest --related <file>` (vitest 3+) walks the
@@ -17,8 +17,8 @@
  *     ~4s) and full-coverage is the right default for a pre-commit gate.
  *
  * Behaviour:
- *   1. Always: full-project `pnpm typecheck` (ignores arg list).
- *   2. Always: full `pnpm test` (~4s; covers every test, including ones that
+ *   1. Always: full-project `vp run typecheck` (ignores arg list).
+ *   2. Always: full `vp run test` (~4s; covers every test, including ones that
  *      mock or import the staged source, which a per-file filter would miss).
  *
  * Args (consumed, not forwarded): paths to staged files, as passed by
@@ -33,13 +33,13 @@ import process from "node:process";
 
 // 1. Full-project typecheck. Never pass file args — tsc would treat them as
 //    the per-file input set and lose tsconfig.json context.
-console.log("[precommit] pnpm typecheck (full project)");
-execFileSync("pnpm", ["typecheck"], { stdio: "inherit", shell: true });
+console.log("[precommit] vp run typecheck (full project)");
+execFileSync("vp", ["run", "typecheck"], { stdio: "inherit", shell: true });
 
 // 2. Full test suite. Stays under 5s on this codebase; runs every test
 //    regardless of which files were staged.
-console.log("[precommit] pnpm test (full suite)");
-execFileSync("pnpm", ["test"], { stdio: "inherit", shell: true });
+console.log("[precommit] vp run test (full suite)");
+execFileSync("vp", ["run", "test"], { stdio: "inherit", shell: true });
 
 // Quiet the linter about unused argv — we accept it to document the
 // vp-staged arg contract even though the script does not forward it.

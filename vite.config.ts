@@ -10,7 +10,7 @@ import { resolve } from "path";
 // module-runner hands that id to `createRequire` as `file:///@solid-refresh`
 // — Node rejects the bare shape. We disable HMR only when vitest is the
 // command, so unit tests run without the injected virtual import while
-// `pnpm tauri:dev` keeps full HMR.
+// `vp run tauri:dev` keeps full HMR.
 const isVitest = !!process.env.VITEST;
 const solidOptions = isVitest ? { hot: false } : undefined;
 
@@ -23,7 +23,7 @@ export default defineConfig(async () => ({
 
   // `vp staged` runs on `git commit` (see `.vite-hooks/pre-commit`, installed
   // by `vp config`). The wrapper script consumes vp-staged's positional file
-  // args so the typecheck stays full-project and runs `pnpm test` (the
+  // args so the typecheck stays full-project and runs `vp run test` (the
   // project is on vitest 2.1.x which has no `--related` flag, and the full
   // suite is <5s). We intentionally do not use `vp check --fix` here: it
   // would invoke oxfmt/oxlint and reformat the entire codebase, conflicting
@@ -33,7 +33,7 @@ export default defineConfig(async () => ({
   // staged checks (e.g. a Rust check on `*.rs` would go in
   // scripts/precommit.mjs).
   staged: {
-    "*.{ts,tsx,mjs}": "vp check --fix",
+    "*.{ts,tsx,mjs}": "node scripts/precommit.mjs",
   },
   resolve: {
     conditions: ["browser", "development"],
@@ -81,10 +81,10 @@ export default defineConfig(async () => ({
     host: host || "127.0.0.1",
     hmr: host
       ? {
-          protocol: "ws",
-          host,
-          port: 1421,
-        }
+        protocol: "ws",
+        host,
+        port: 1421,
+      }
       : undefined,
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`

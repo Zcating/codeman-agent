@@ -6,7 +6,7 @@
 //!     so the test reporter's stdout stays clean — the user is here for
 //!     test results, not 5MB of compile noise.
 //!  1. Free ports (1420, 1421, 9222) — same script the dev path uses.
-//!  2. Spawn `pnpm tauri:dev` with WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS set,
+//!  2. Spawn `vp run tauri:dev` with WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS set,
 //!     so WebView2 exposes a CDP endpoint on 9222. Output discarded for the
 //!     same reason; check exit code on failure.
 //!  3. Wait for the Vite dev server (1420) and the CDP /json/version endpoint.
@@ -27,7 +27,7 @@ import { resolve } from "node:path";
 import { PORTS } from "../playwright.config";
 
 // Path to the port-killer so we don't depend on a separate `predev` step.
-// Mirrors what `pnpm tauri:dev` does on its own (see package.json#tauri:dev).
+// Mirrors what `vp run tauri:dev` does on its own (see package.json#tauri:dev).
 const KILL_PORT = "node scripts/kill-port.mjs";
 
 // 90s is plenty: with the prewarm done, tauri:dev's only remaining work is
@@ -77,10 +77,10 @@ export default async function globalSetup(): Promise<void> {
     const stderr = err.stderr ? err.stderr.toString() : "(no stderr captured — stdio: ignore)";
     throw new Error(
       `[e2e setup] cargo build failed (status=${err.status ?? "?"}, signal=${err.signal ?? "none"})\n` +
-        `cwd: ${process.cwd()}\n` +
-        `--- stderr ---\n${stderr}\n--- end ---\n` +
-        `${err.message ?? String(e)}\n` +
-        `Run \`cd src-tauri && cargo build\` manually for interactive output.`,
+      `cwd: ${process.cwd()}\n` +
+      `--- stderr ---\n${stderr}\n--- end ---\n` +
+      `${err.message ?? String(e)}\n` +
+      `Run \`cd src-tauri && cargo build\` manually for interactive output.`,
     );
   }
   const prewarmMs = Date.now() - prewarmStart;
@@ -93,8 +93,8 @@ export default async function globalSetup(): Promise<void> {
   if (!envFileExists) {
     console.warn(
       "[e2e setup] ⚠ .env not found in cwd — " +
-        "spec 04 will fail unless MiniMax key is manually configured in Settings UI. " +
-        "Create .env with MINIMAX_CN_API_KEY=... + MINIMAX_CN_API_BASE_URL=..., then re-run.",
+      "spec 04 will fail unless MiniMax key is manually configured in Settings UI. " +
+      "Create .env with MINIMAX_CN_API_KEY=... + MINIMAX_CN_API_BASE_URL=..., then re-run.",
     );
   }
 
@@ -160,14 +160,14 @@ export default async function globalSetup(): Promise<void> {
     if (tauriExitCode !== null && tauriExitCode !== 0) {
       throw new Error(
         `[e2e setup] tauri:dev exited with code ${tauriExitCode} before tests could start. ` +
-          `Run \`pnpm tauri:dev\` manually for full diagnostic output.`,
+        `Run \`vp run tauri:dev\` manually for full diagnostic output.`,
       );
     }
     // Otherwise tauri:dev is hung (most likely a compile or window-open
     // issue). Same advice — run manually.
     throw new Error(
       `[e2e setup] port-wait failed: ${String(e)}. ` +
-        `Run \`pnpm tauri:dev\` manually for full diagnostic output.`,
+      `Run \`vp run tauri:dev\` manually for full diagnostic output.`,
     );
   }
 
@@ -177,7 +177,7 @@ export default async function globalSetup(): Promise<void> {
   if (tauriExitCode !== null && tauriExitCode !== 0) {
     throw new Error(
       `[e2e setup] tauri:dev exited with code ${tauriExitCode} right after becoming ready. ` +
-        `Run \`pnpm tauri:dev\` manually for full diagnostic output.`,
+      `Run \`vp run tauri:dev\` manually for full diagnostic output.`,
     );
   }
 

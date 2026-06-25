@@ -59,7 +59,7 @@ new Agent({
 `lib/billing.test.ts` 使用 `it.effect` + `Layer.succeed(BillingService, ...)` 来 mock 服务。无真实 IPC；测试验证 `getSnapshot` 分发到正确的 provider，以及 `hasKey` 对每个 provider 返回正确的布尔值。
 
 ```bash
-pnpm test src/features/billing/lib/billing.test.ts
+vp run test src/features/billing/lib/billing.test.ts
 ```
 
 ## 从本 Feature 导入

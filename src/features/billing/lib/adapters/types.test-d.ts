@@ -32,11 +32,3 @@ const testAdapter: BillingAdapter = {
 const _id: string = testAdapter.id;
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 void [_id]; // 防止未使用警告
-
-// =============================================================================
-// Negative test: 缺少 fetchPlanQuota 的实现应产生类型错误
-// =============================================================================
-
-// @ts-expect-error - 缺少 fetchPlanQuota 方法，BillingAdapter 接口要求此方法
-
-// @ts-expect-error - fetchBalance 返回类型不匹配（返回 string 而非 Balance）

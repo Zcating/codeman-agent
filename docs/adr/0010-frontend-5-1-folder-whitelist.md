@@ -185,8 +185,8 @@ AGENTS.md 是该 feature 域的"leading source of truth"——开发者进入 fe
 
 **回归验证**：
 
-- `pnpm typecheck` 必须通过
-- `pnpm test` 全部通过（chat 4 测试 + settings 3 测试 + billing 1 测试 + shared 7 测试 = 15 测试）
+- `vp run typecheck` 必须通过
+- `vp run test` 全部通过（chat 4 测试 + settings 3 测试 + billing 1 测试 + shared 7 测试 = 15 测试）
 - 所有迁路径的 import 必须全部更新（grep 自查）
 
 **已知坑保留**：
