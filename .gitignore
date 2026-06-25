@@ -44,6 +44,8 @@ desktop.ini
 coverage/
 .nyc_output/
 .dev-debs/
+cov.txt
+lcov.info
 
 
 # AI

@@ -211,6 +211,11 @@ export const mockState = {
   store: {} as Record<string, Record<string, string>>,
   // V0 migration flag
   v0FixtureActive: false,
+  // Command-specific resolved override: when set, only applies to specific commands
+  // while the general resolved still applies to all commands.
+  // This allows tests to override return values for specific commands without
+  // affecting get_settings (which needs to return full settings for provider validation).
+  resolvedByCommand: {} as Record<string, unknown>,
 };
 
 // ─── V0 → V1.5 Migration ───────────────────────────────────────
@@ -392,12 +397,57 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
     return mockState.resolved;
   },
 
+  // ─── Billing IPC ───────────────────────────────────────────────
+  get_provider_snapshot(): unknown {
+    return mockState.resolved;
+  },
+
   search_files(): unknown {
     return mockState.resolved;
   },
 
   delete_file(): unknown {
     return mockState.resolved;
+  },
+
+  // ─── Conversation IPC (ADR-0013) ─────────────────────────────────
+  list_conversations(_args?: IPCArgs): unknown {
+    // Return empty array by default; tests can override via mockState.resolved
+    return mockState.resolved ?? [];
+  },
+
+  get_conversation(args?: IPCArgs): unknown {
+    return mockState.resolved ?? { id: (args?.id as string) ?? "", title: "", system_prompt: null, created_at: 0, updated_at: 0, archived_at: null };
+  },
+
+  create_conversation(args?: IPCArgs): unknown {
+    return mockState.resolved ?? { id: "new-conv-id", title: (args?.title as string) ?? "", system_prompt: (args?.systemPrompt as string | null) ?? null, created_at: Date.now(), updated_at: Date.now(), archived_at: null };
+  },
+
+  archive_conversation(): unknown {
+    return mockState.resolved ?? undefined;
+  },
+
+  delete_conversation(): unknown {
+    return mockState.resolved ?? undefined;
+  },
+
+  // ─── Message IPC (ADR-0013) ─────────────────────────────────────
+  list_messages(_args?: IPCArgs): unknown {
+    return mockState.resolved ?? [];
+  },
+
+  append_message(args?: IPCArgs): unknown {
+    return mockState.resolved ?? { id: "new-msg-id", conversation_id: (args?.conversationId as string) ?? "", role: (args?.role as string) ?? "user", content: (args?.content as string) ?? "", tool_calls: null, tool_results: null, model: null, input_tokens: null, output_tokens: null, created_at: Date.now() };
+  },
+
+  search_messages(_args?: IPCArgs): unknown {
+    return mockState.resolved ?? [];
+  },
+
+  // ─── Workspace IPC ──────────────────────────────────────────────
+  pick_workspace_path(): unknown {
+    return mockState.resolved ?? null;
   },
 };
 
@@ -410,6 +460,12 @@ export const invoke = vi.fn().mockImplementation((name: string, args?: IPCArgs) 
 
   if (mockState.rejected) {
     return Promise.reject(mockState.rejected);
+  }
+
+  // Command-specific resolved override: takes precedence over general resolved.
+  // Allows tests to override specific commands without affecting get_settings.
+  if (mockState.resolvedByCommand[name] !== undefined && !mockState.v0FixtureActive) {
+    return Promise.resolve(mockState.resolvedByCommand[name]);
   }
 
   // Backward compatibility: if mockState.resolved is set AND v0FixtureActive is false,

@@ -19,7 +19,7 @@ import { logger } from "../../../shared/lib/logger";
 
 // ─── SSE 行解析 ─────────────────────────────────────────────────────
 
-function parseSseLine(line: string): { event?: string; data?: string } {
+export function parseSseLine(line: string): { event?: string; data?: string } {
   const trimmed = line.trim();
   if (trimmed.length === 0) {
     return {};
@@ -70,7 +70,7 @@ interface AnthropicRequestBody {
   }>;
 }
 
-function buildRequestBody(
+export function buildRequestBody(
   model: { id: string; maxTokens?: number },
   systemPrompt: string,
   messages: Message[],

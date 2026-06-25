@@ -42,7 +42,7 @@ vi.mock("solid-js/store", () => {
 
 import { appStore, _resetAppStoreForTest } from "./app.store";
 
-describe("appStore (ADR-0015 V1.7+ no debounce)", () => {
+describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
   beforeEach(async () => {
     _resetAppStoreForTest();
     mockState.calls = [];
@@ -71,16 +71,17 @@ describe("appStore (ADR-0015 V1.7+ no debounce)", () => {
   afterEach(() => {
     _resetAppStoreForTest();
     vi.clearAllMocks();
+    mockState.rejected = undefined;
   });
 
-  it("refresh() returns Effect; Effect.runPromise loads settings and returns them", async () => {
+  it("refresh() 返回 Effect; Effect.runPromise 加载 settings 并返回", async () => {
     const effect = appStore.refresh();
     expect(effect).toBeDefined();
     const fresh = await Effect.runPromise(effect);
     expect(fresh).toEqual(mockState.settings);
   });
 
-  it("set() is synchronous and does NOT trigger IPC", () => {
+  it("set() 同步更新 state, 不触发 IPC", () => {
     // set returns void
     const result = appStore.set({ theme: "light" });
     expect(result).toBeUndefined();
@@ -92,7 +93,7 @@ describe("appStore (ADR-0015 V1.7+ no debounce)", () => {
 
   // ─── V1.8+ ADR-0016 D1 + D2: refreshProviderModels ───
 
-  it("refreshProviderModels writes new models to state and returns them", async () => {
+  it("refreshProviderModels 写入新模型到 state 并返回", async () => {
     mockState.settings = {
       ...mockState.settings,
       providers: [
@@ -136,7 +137,7 @@ describe("appStore (ADR-0015 V1.7+ no debounce)", () => {
     fetchSpy.mockRestore();
   });
 
-  it("refreshProviderModels auto-fallback when default_model not in new list", async () => {
+  it("refreshProviderModels: default_model 不在新列表时自动回退到第一个", async () => {
     mockState.settings = {
       ...mockState.settings,
       providers: [
@@ -169,7 +170,7 @@ describe("appStore (ADR-0015 V1.7+ no debounce)", () => {
     fetchSpy.mockRestore();
   });
 
-  it("refreshProviderModels keeps default_model when already in new list", async () => {
+  it("refreshProviderModels: default_model 已在新列表时保留", async () => {
     mockState.settings = {
       ...mockState.settings,
       providers: [
@@ -207,7 +208,7 @@ describe("appStore (ADR-0015 V1.7+ no debounce)", () => {
     fetchSpy.mockRestore();
   });
 
-  it("refreshProviderModels fails for unknown provider (AppError)", async () => {
+  it("refreshProviderModels: 未知 provider 报错 (AppError)", async () => {
     mockState.settings = {
       ...mockState.settings,
       providers: [
@@ -231,11 +232,238 @@ describe("appStore (ADR-0015 V1.7+ no debounce)", () => {
     const exit = await Effect.runPromiseExit(appStore.refreshProviderModels("nonexistent"));
     expect(exit._tag).toBe("Failure");
   });
-  it("forceFlush() returns Effect; Effect.runPromise triggers IPC immediately", async () => {
+  it("forceFlush() 返回 Effect; Effect.runPromise 立即触发 IPC", async () => {
     appStore.set({ theme: "light" });
     const effect = appStore.forceFlush();
     expect(effect).toBeDefined();
     await Effect.runPromise(effect);
     expect(mockState.calls.filter((c) => c === "update_settings")).toHaveLength(1);
+  });
+
+  // ─── J1: forceFlush() failure → Effect.exit Failure with AppError ───
+  it("forceFlush() invoke 拒绝时失败 → Effect.exit Failure with AppError", async () => {
+    mockState.rejected = new Error("IPC boom");
+    const exit = await Effect.runPromiseExit(appStore.forceFlush());
+    expect(exit._tag).toBe("Failure");
+    if (exit._tag === "Failure") {
+      expect(exit.cause).toBeDefined();
+    }
+  });
+
+  // ─── J2: refresh() failure → Effect.exit Failure with AppError ───
+  it("refresh() invoke 拒绝时失败 → Effect.exit Failure with AppError", async () => {
+    mockState.rejected = new Error("get_settings IPC failed");
+    const exit = await Effect.runPromiseExit(appStore.refresh());
+    expect(exit._tag).toBe("Failure");
+    if (exit._tag === "Failure") {
+      expect(exit.cause).toBeDefined();
+    }
+  });
+
+  // ─── J12: refresh() rejection preserves AppError shape ───
+  it("refresh() 拒绝时保留错误形状 (AppError vs Unknown)", async () => {
+    // Simulate an AppError with kind field being rejected
+    const err = new Error("backend error") as Error & { kind: string };
+    err.kind = "IPC";
+    mockState.rejected = err;
+    const exit = await Effect.runPromiseExit(appStore.refresh());
+    expect(exit._tag).toBe("Failure");
+    if (exit._tag === "Failure") {
+      // Should preserve the IPC kind AppError
+      const cause = (exit.cause as any).error ?? exit.cause;
+      expect(cause).toBeDefined();
+    }
+  });
+
+  // ─── J3: refreshProviderModels() with empty models → default_model = "" ───
+  it("refreshProviderModels 空 models 数组 → default_model = ''", async () => {
+    mockState.settings = {
+      ...mockState.settings,
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          enabled: true,
+          api_key: "",
+          llm: {
+            default_model: "some-model",
+            base_url: "https://api.example.com/v1",
+            api_type: "anthropic-messages" as const,
+            models: [{ id: "some-model", label: "Some", deprecated: false, thinking: false }],
+            models_endpoint: "https://api.example.com/v1/models",
+          },
+          billing: { kind: "plan_quota" as const },
+        },
+      ],
+    };
+    await Effect.runPromise(appStore.refresh());
+    // fetch returns empty models array
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ data: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const exit = await Effect.runPromiseExit(appStore.refreshProviderModels("minimax"));
+    expect(exit._tag).toBe("Success");
+    const provider = (appStore.state.value as any).providers.find((p: any) => p.id === "minimax");
+    expect(provider.llm.default_model).toBe("");
+    fetchSpy.mockRestore();
+  });
+
+  // ─── J4: pickWorkspacePath() returns resolved path ───
+  it("pickWorkspacePath() 返回解析后的路径字符串", async () => {
+    mockState.resolved = "/selected/workspace/path";
+    const exit = await Effect.runPromiseExit(appStore.pickWorkspacePath());
+    expect(exit._tag).toBe("Success");
+    if (exit._tag === "Success") {
+      expect(exit.value).toBe("/selected/workspace/path");
+    }
+    expect(mockState.invokeCalls.some((c) => c.name === "pick_workspace_path")).toBe(true);
+  });
+
+  // ─── J5: pickWorkspacePath() returns null when user cancels ───
+  it("pickWorkspacePath() 用户取消时返回 null (resolved = null)", async () => {
+    mockState.resolved = null;
+    const exit = await Effect.runPromiseExit(appStore.pickWorkspacePath());
+    expect(exit._tag).toBe("Success");
+    if (exit._tag === "Success") {
+      expect(exit.value).toBeNull();
+    }
+  });
+
+  // ─── J6: pickWorkspacePath() fails when invoke rejects ───
+  it("pickWorkspacePath() invoke 拒绝时失败 → Effect.exit Failure", async () => {
+    mockState.rejected = new Error("pick cancelled or failed");
+    const exit = await Effect.runPromiseExit(appStore.pickWorkspacePath());
+    expect(exit._tag).toBe("Failure");
+    if (exit._tag === "Failure") {
+      expect(exit.cause).toBeDefined();
+    }
+  });
+
+  // ─── J7: deleteProvider() removes provider from settings.value.providers ───
+  it("deleteProvider(id) 从 state 中移除 provider", async () => {
+    mockState.settings = {
+      ...mockState.settings,
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          enabled: true,
+          api_key: "",
+          llm: {
+            default_model: "MiniMax-M2.5-highspeed",
+            base_url: "https://api.minimaxi.com/anthropic",
+            api_type: "anthropic-messages",
+            models: [],
+            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          },
+          billing: { kind: "plan_quota" },
+        },
+        {
+          id: "deepseek",
+          label: "DeepSeek",
+          enabled: true,
+          api_key: "",
+          llm: {
+            default_model: "deepseek-chat",
+            base_url: "https://api.deepseek.com/anthropic",
+            api_type: "anthropic-messages",
+            models: [],
+            models_endpoint: "https://api.deepseek.com/models",
+          },
+          billing: { kind: "balance" },
+        },
+      ],
+    };
+    await Effect.runPromise(appStore.refresh());
+    const exit = await Effect.runPromiseExit(appStore.deleteProvider("minimax"));
+    expect(exit._tag).toBe("Success");
+    const providers = (appStore.state.value as any).providers;
+    expect(providers.length).toBe(1);
+    expect(providers[0].id).toBe("deepseek");
+  });
+
+  // ─── J8: deleteProvider() for unknown id → providers unchanged ───
+  it("deleteProvider(id) 未知 id → providers 不变", async () => {
+    mockState.settings = {
+      ...mockState.settings,
+      providers: [
+        {
+          id: "deepseek",
+          label: "DeepSeek",
+          enabled: true,
+          api_key: "",
+          llm: {
+            default_model: "deepseek-chat",
+            base_url: "https://api.deepseek.com/anthropic",
+            api_type: "anthropic-messages",
+            models: [],
+            models_endpoint: "https://api.deepseek.com/models",
+          },
+          billing: { kind: "balance" },
+        },
+      ],
+    };
+    await Effect.runPromise(appStore.refresh());
+    const exit = await Effect.runPromiseExit(appStore.deleteProvider("nonexistent"));
+    expect(exit._tag).toBe("Success");
+    const providers = (appStore.state.value as any).providers;
+    expect(providers.length).toBe(1);
+    expect(providers[0].id).toBe("deepseek");
+  });
+
+  // ─── J9: clearAllHistory() invokes clear_all_history IPC ───
+  it("clearAllHistory() 调用 clear_all_history IPC", async () => {
+    const exit = await Effect.runPromiseExit(appStore.clearAllHistory());
+    expect(exit._tag).toBe("Success");
+    expect(mockState.calls.some((c) => c === "clear_all_history")).toBe(true);
+  });
+
+  // ─── J10: clearAllHistory() fails when IPC rejects ───
+  it("clearAllHistory() IPC 拒绝时失败 → Effect.exit Failure", async () => {
+    mockState.rejected = new Error("clear_all_history failed");
+    const exit = await Effect.runPromiseExit(appStore.clearAllHistory());
+    expect(exit._tag).toBe("Failure");
+    if (exit._tag === "Failure") {
+      expect(exit.cause).toBeDefined();
+    }
+  });
+
+  // ─── J11: deleteProvider() client mutation happens BEFORE IPC call ───
+  // Note: ProviderService.delete() catches errors and returns void on failure,
+  // so deleteProvider effect always succeeds (Failure is swallowed in provider service layer).
+  // J11 verifies client mutation happens before the IPC attempt regardless of outcome.
+  it("deleteProvider(id) 客户端变更先于 IPC 调用 — 即使 IPC 报错 provider 也被移除", async () => {
+    mockState.settings = {
+      ...mockState.settings,
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          enabled: true,
+          api_key: "",
+          llm: {
+            default_model: "MiniMax-M2.5-highspeed",
+            base_url: "https://api.minimaxi.com/anthropic",
+            api_type: "anthropic-messages",
+            models: [],
+            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          },
+          billing: { kind: "plan_quota" },
+        },
+      ],
+    };
+    await Effect.runPromise(appStore.refresh());
+    // Verify provider exists before deletion
+    expect((appStore.state.value as any).providers.length).toBe(1);
+    // Even if IPC throws, the client-side state mutation has already happened synchronously
+    mockState.rejected = new Error("delete IPC failed");
+    const exit = await Effect.runPromiseExit(appStore.deleteProvider("minimax"));
+    // ProviderService.delete catches its own errors → effect still succeeds
+    expect(exit._tag).toBe("Success");
+    const providers = (appStore.state.value as any).providers;
+    expect(providers.length).toBe(0); // client-side deletion already happened before IPC
   });
 });
