@@ -12,6 +12,9 @@ import {
   FileSearch,
   FileX,
   Wrench,
+  Loader2,
+  CheckCircle2,
+  XCircle,
 } from "lucide-solid";
 import type { ToolCall, ToolResult } from "../../../shared/lib/types";
 
@@ -47,15 +50,15 @@ export function ToolCallCard(props: { toolCall: ToolCall; result?: ToolResult })
     return `${base} border-destructive/40 bg-destructive/5`;
   };
 
-  const statusIcon = () => {
+  const StatusIcon = () => {
     const s = status();
     if (s === "running") {
-      return "⏳";
+      return <Loader2 class="h-4 w-4 animate-spin" aria-label="running" data-testid="icon-running" />;
     }
     if (s === "success") {
-      return "✓";
+      return <CheckCircle2 class="h-4 w-4 text-success" aria-label="success" data-testid="icon-success" />;
     }
-    return "✗";
+    return <XCircle class="h-4 w-4 text-destructive" aria-label="error" data-testid="icon-error" />;
   };
 
   const Icon = () => {
@@ -74,7 +77,7 @@ export function ToolCallCard(props: { toolCall: ToolCall; result?: ToolResult })
     <div class={outerClass()}>
       <div class="flex items-center gap-2 flex-wrap">
         <span class="text-muted-foreground" aria-hidden="true">
-          {statusIcon()}
+          <StatusIcon />
         </span>
         <span class="text-muted-foreground" aria-hidden="true">
           <Icon />

@@ -21,8 +21,8 @@ describe("ToolCallCard", () => {
     // Polish: border 改走 shadcn token `border-border` (前是 border-zinc-300)
     const card = container.querySelector("[class*='border-border']");
     expect(card).toBeTruthy();
-    const icon = card?.querySelector("span");
-    expect(icon?.textContent).toBe("⏳");
+    const icon = card?.querySelector("[data-testid='icon-running']");
+    expect(icon?.getAttribute("aria-label")).toBe("running");
     const name = card?.querySelector("code");
     expect(name?.textContent).toBe("read_file");
   });
@@ -42,8 +42,8 @@ describe("ToolCallCard", () => {
     // Polish: 成功态 border 走 `border-success/40` (前是 border-green-300)
     const card = container.querySelector("[class*='border-success']");
     expect(card).toBeTruthy();
-    const icon = card?.querySelector("span");
-    expect(icon?.textContent).toBe("✓");
+    const icon = card?.querySelector("[data-testid='icon-success']");
+    expect(icon?.getAttribute("aria-label")).toBe("success");
     const resultPre = card?.querySelector("details:last-of-type pre");
     expect(resultPre?.textContent).toContain("file content here");
   });
@@ -63,8 +63,8 @@ describe("ToolCallCard", () => {
     // Polish: 错误态 border 走 `border-destructive/40` (前是 border-red-300)
     const card = container.querySelector("[class*='border-destructive']");
     expect(card).toBeTruthy();
-    const icon = card?.querySelector("span");
-    expect(icon?.textContent).toBe("✗");
+    const icon = card?.querySelector("[data-testid='icon-error']");
+    expect(icon?.getAttribute("aria-label")).toBe("error");
     // Polish: 错误消息容器走 `bg-destructive/10` (前是 bg-red-100)
     const errorDiv = card?.querySelector("[class*='bg-destructive']");
     expect(errorDiv?.textContent).toBe("File not found");
