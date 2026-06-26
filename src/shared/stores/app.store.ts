@@ -243,6 +243,25 @@ export const appStore = {
   clearAllHistory(): Effect.Effect<void, AppError> {
     return clearAllHistoryEffect;
   },
+
+  /**
+   * 设置 Home 上次选中的 workspace id。
+   * 用户在 Home 选 workspace 时调用；写入 in-memory state 后由 settingsSaver.scheduleSave() 触发
+   * debounced IPC flush。详见 CONTEXT.md "Last-Used Workspace"。
+   */
+  setLastUsedWorkspaceId(id: string | null): void {
+    applyPatch({ last_used_workspace_id: id ?? undefined });
+  },
+
+  /**
+   * 读取 Home 上次选中的 workspace id。
+   * 返回 `null` 表示从未设置过（首次启动 / 用户未在 Home 选过）。
+   * 注意：调用方需配合 `Settings.workspaces[]` 做 fallback（删除/禁用检测），
+   * 不能假设返回值在 workspaces[] 中存在。
+   */
+  getLastUsedWorkspaceId(): string | null {
+    return appStore.state.value.last_used_workspace_id ?? null;
+  },
 };
 
 /** Test-only: reset store state to defaultSettings (called from app.store.test.ts). */

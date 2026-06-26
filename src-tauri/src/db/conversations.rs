@@ -16,6 +16,8 @@ pub struct Conversation {
     pub id: String,
     pub title: String,
     pub system_prompt: Option<String>,
+    /// V2.1: 1 conv 绑定 1 workspace. '' 表示 'Needs workspace' (V1.x 旧 conv)
+    pub workspace_id: String,
     pub created_at: i64,
     pub updated_at: i64,
     pub archived_at: Option<i64>,
@@ -27,6 +29,7 @@ impl Conversation {}
 pub async fn create_conversation(
     pool: &SqlitePool,
     title: &str,
+    workspace_id: &str,
     system_prompt: Option<&str>,
 ) -> Result<Conversation, sqlx::Error> {
     let id = Uuid::new_v4().to_string();
@@ -34,14 +37,15 @@ pub async fn create_conversation(
 
     sqlx::query_as::<_, Conversation>(
         r#"
-        INSERT INTO conversations (id, title, system_prompt, created_at, updated_at, archived_at)
-        VALUES ($1, $2, $3, $4, $5, NULL)
+        INSERT INTO conversations (id, title, system_prompt, workspace_id, created_at, updated_at, archived_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NULL)
         RETURNING *
         "#,
     )
     .bind(&id)
     .bind(title)
     .bind(system_prompt)
+    .bind(workspace_id)
     .bind(now)
     .bind(now)
     .fetch_one(pool)
@@ -54,7 +58,7 @@ pub async fn get_conversation(
     id: &Uuid,
 ) -> Result<Option<Conversation>, sqlx::Error> {
     sqlx::query_as::<_, Conversation>(
-        "SELECT id, title, system_prompt, created_at, updated_at, archived_at FROM conversations WHERE id = $1",
+        "SELECT id, title, system_prompt, workspace_id, created_at, updated_at, archived_at FROM conversations WHERE id = $1",
     )
     .bind(id.to_string())
     .fetch_optional(pool)
@@ -69,13 +73,13 @@ pub async fn list_conversations(
 ) -> Result<Vec<Conversation>, sqlx::Error> {
     if include_archived {
         sqlx::query_as::<_, Conversation>(
-            "SELECT id, title, system_prompt, created_at, updated_at, archived_at FROM conversations ORDER BY updated_at DESC",
+            "SELECT id, title, system_prompt, workspace_id, created_at, updated_at, archived_at FROM conversations ORDER BY updated_at DESC",
         )
         .fetch_all(pool)
         .await
     } else {
         sqlx::query_as::<_, Conversation>(
-            "SELECT id, title, system_prompt, created_at, updated_at, archived_at FROM conversations WHERE archived_at IS NULL ORDER BY updated_at DESC",
+            "SELECT id, title, system_prompt, workspace_id, created_at, updated_at, archived_at FROM conversations WHERE archived_at IS NULL ORDER BY updated_at DESC",
         )
         .fetch_all(pool)
         .await
@@ -107,24 +111,22 @@ pub async fn hard_delete_conversation(pool: &SqlitePool, id: &Uuid) -> Result<()
 mod tests {
     use super::*;
 
-    /// 构建内存池并运行初始迁移。
+    /// 构建内存池并运行迁移。
     async fn make_pool() -> SqlitePool {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-        // 为测试创建 schema
-        sqlx::query(include_str!("schema.sql"))
-            .execute(&pool)
-            .await
-            .expect("schema 迁移");
+        // 使用迁移系统（包括 0002_conversation_workspace）
+        crate::db::init(&pool).await.expect("迁移失败");
         pool
     }
 
     #[tokio::test]
     async fn create_and_get() {
         let pool = make_pool().await;
-        let created = create_conversation(&pool, "Test Title", Some("system prompt"))
+        let created = create_conversation(&pool, "Test Title", "ws-1", Some("system prompt"))
             .await
             .expect("创建成功");
         assert_eq!(created.title, "Test Title");
+        assert_eq!(created.workspace_id, "ws-1");
         assert_eq!(created.system_prompt.as_deref(), Some("system prompt"));
         assert!(created.archived_at.is_none());
 
@@ -135,6 +137,7 @@ mod tests {
             .expect("找到会话");
         assert_eq!(fetched.id, created.id);
         assert_eq!(fetched.title, "Test Title");
+        assert_eq!(fetched.workspace_id, "ws-1");
     }
 
     #[tokio::test]
@@ -144,18 +147,19 @@ mod tests {
         let list = list_conversations(&pool, false).await.expect("列出成功");
         assert!(list.is_empty());
 
-        let created = create_conversation(&pool, "First", None)
+        let created = create_conversation(&pool, "First", "ws-1", None)
             .await
             .expect("创建成功");
         let list = list_conversations(&pool, false).await.expect("列出成功");
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].id, created.id);
+        assert_eq!(list[0].workspace_id, "ws-1");
     }
 
     #[tokio::test]
     async fn archive_excluded_by_default() {
         let pool = make_pool().await;
-        let created = create_conversation(&pool, "To Archive", None)
+        let created = create_conversation(&pool, "To Archive", "ws-1", None)
             .await
             .expect("创建成功");
 
@@ -166,6 +170,7 @@ mod tests {
 
         let all = list_conversations(&pool, true).await.expect("列出全部成功");
         assert_eq!(all.len(), 1);
+        assert_eq!(all[0].workspace_id, "ws-1");
 
         let active = list_conversations(&pool, false).await.expect("列出活跃成功");
         assert!(active.is_empty());
@@ -176,7 +181,7 @@ mod tests {
         let pool = make_pool().await;
 
         // 创建会话和消息
-        let conv = create_conversation(&pool, "To Delete", None)
+        let conv = create_conversation(&pool, "To Delete", "ws-1", None)
             .await
             .expect("创建会话");
         let conv_uuid = Uuid::parse_str(&conv.id).unwrap();
@@ -222,5 +227,15 @@ mod tests {
             .await
             .expect("删除后检查消息");
         assert!(msg_after.is_none(), "消息应随会话被级联删除");
+    }
+
+    #[tokio::test]
+    async fn create_conversation_with_empty_workspace_id() {
+        let pool = make_pool().await;
+        let created = create_conversation(&pool, "Old V1 conv", "", None)
+            .await
+            .expect("创建成功");
+        assert_eq!(created.workspace_id, "");
+        assert_eq!(created.title, "Old V1 conv");
     }
 }

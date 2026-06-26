@@ -80,10 +80,11 @@ pub async fn get_conversation(
 pub async fn create_conversation(
     pool: tauri::State<'_, sqlx::SqlitePool>,
     title: String,
+    workspace_id: String,
     system_prompt: Option<String>,
 ) -> Result<conversations::Conversation, AppError> {
-    log::debug!("create_conversation: 进入 title={}", title);
-    let result = conversations::create_conversation(pool.inner(), &title, system_prompt.as_deref()).await
+    log::debug!("create_conversation: 进入 title={} workspace_id={}", title, workspace_id);
+    let result = conversations::create_conversation(pool.inner(), &title, &workspace_id, system_prompt.as_deref()).await
         .map_err(|e| {
             log::error!("create_conversation: 失败");
             AppError::from(e)

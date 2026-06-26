@@ -51,6 +51,8 @@ export interface Settings {
   llm_providers: LLMProvider[];
   /** V2: workspaces list. V1→V2 migration defaults to empty array. */
   workspaces?: Workspace[];
+  /** V2.1: last selected workspace id shown on Home. null means never set (first launch). */
+  last_used_workspace_id?: string;
 }
 
 // ============================================================================

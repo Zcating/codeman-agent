@@ -458,4 +458,30 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     const providers = (appStore.state.value as any).providers;
     expect(providers.length).toBe(0); // client-side deletion already happened before IPC
   });
+
+  // ─── T1.6: setLastUsedWorkspaceId / getLastUsedWorkspaceId ───
+
+  it("setLastUsedWorkspaceId: 设置后 state 立即可见", () => {
+    _resetAppStoreForTest();
+    appStore.setLastUsedWorkspaceId("ws-123");
+    expect(appStore.state.value.last_used_workspace_id).toBe("ws-123");
+  });
+
+  it("setLastUsedWorkspaceId(null): 清空字段", () => {
+    _resetAppStoreForTest();
+    appStore.setLastUsedWorkspaceId("ws-123");
+    appStore.setLastUsedWorkspaceId(null);
+    expect(appStore.state.value.last_used_workspace_id).toBeUndefined();
+  });
+
+  it("getLastUsedWorkspaceId: 默认返回 null", () => {
+    _resetAppStoreForTest();
+    expect(appStore.getLastUsedWorkspaceId()).toBeNull();
+  });
+
+  it("getLastUsedWorkspaceId: 设置后返回该值", () => {
+    _resetAppStoreForTest();
+    appStore.setLastUsedWorkspaceId("ws-456");
+    expect(appStore.getLastUsedWorkspaceId()).toBe("ws-456");
+  });
 });
