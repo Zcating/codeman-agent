@@ -25,8 +25,14 @@ export function SettingsPage() {
   const [confirmClear, setConfirmClear] = createSignal(false);
 
   // 挂载时确保从后端加载最新 Settings（main.tsx 已 eager refresh，此处保险再 refresh 一次）
+  // 用 `runPromiseExit` 而非 `runPromise`：失败时返回 Exit.Failure 而不是 reject，
+  // 避免 fire-and-forget 触发 unhandled rejection（per vitest 4.x "1 error" 计数）。
   onMount(() => {
-    void Effect.runPromise(appStore.refresh());
+    void Effect.runPromiseExit(appStore.refresh()).then((exit) => {
+      if (exit._tag === "Failure") {
+        logger.error("[SettingsPage] refresh 失败：", exit.cause);
+      }
+    });
   });
 
   // footer Save = force flush（跳过 debounce）

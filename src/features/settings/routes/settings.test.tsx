@@ -13,6 +13,9 @@ import type { Provider, Workspace } from "../../../shared/lib/types";
 
 // Mock solid-js/store — SettingsPage 导入 appStore, appStore 用 createStore。
 // jsdom 没有 Solid reactive context,需要这个 mock。
+// **不**在 vitest.setup.ts 全局注册(per ADR-0020):conversations.store.test.ts
+// 用 createRoot + 真 Solid 运行时,全局 mock 会与真 Solid signal 冲突。
+// 因此本文件内联 28 行 mock 块——6 个 settings/shared 测试文件保持同一模式。
 vi.mock("solid-js/store", () => {
   let store: { value: unknown } = { value: null };
   const setStore = vi.fn((...args: unknown[]) => {

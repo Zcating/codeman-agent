@@ -282,4 +282,119 @@ describe("ProviderCard", () => {
     const saveButtons = screen.queryAllByRole("button", { name: /save/i });
     expect(saveButtons.length).toBe(0);
   });
+
+  // ── Test 10: Base URL input triggers handleBaseUrlChange ──
+  it("Base URL input triggers handleBaseUrlChange and updates state", async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(() => <ProviderCard provider={mockProvider} onUpdate={onUpdate} onDelete={vi.fn()} />);
+
+    // Find the Base URL input (text input in LLM section)
+    const textInputs = document.querySelectorAll('input[type="text"]');
+    const baseUrlInput = textInputs[0] as HTMLInputElement;
+    expect(baseUrlInput).toBeTruthy();
+    expect(baseUrlInput.value).toBe("https://api.minimaxi.com/anthropic");
+
+    await user.clear(baseUrlInput);
+    await user.type(baseUrlInput, "https://api.example.com/v1");
+
+    const lastSet = getLastSetCall();
+    expect(lastSet).toBeTruthy();
+    const updatedProviders = lastSet.providers;
+    expect(updatedProviders.find((p: any) => p.id === "minimax")?.llm.base_url).toBe(
+      "https://api.example.com/v1",
+    );
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "minimax",
+        llm: expect.objectContaining({ base_url: "https://api.example.com/v1" }),
+      }),
+    );
+  });
+
+  // ── Test 11: Billing kind dropdown triggers handleBillingKindChange ──
+  it("Billing kind dropdown triggers handleBillingKindChange and updates state", async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(() => <ProviderCard provider={mockProvider} onUpdate={onUpdate} onDelete={vi.fn()} />);
+
+    // Find the Billing Kind select (second select)
+    const selects = document.querySelectorAll("select");
+    expect(selects.length).toBeGreaterThanOrEqual(2);
+    const billingKindSelect = selects[1] as HTMLSelectElement;
+    expect(billingKindSelect.value).toBe("plan_quota"); // default
+
+    await user.selectOptions(billingKindSelect, "balance");
+
+    const lastSet = getLastSetCall();
+    expect(lastSet).toBeTruthy();
+    const updatedProviders = lastSet.providers;
+    expect(updatedProviders.find((p: any) => p.id === "minimax")?.billing?.kind).toBe("balance");
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "minimax",
+        billing: expect.objectContaining({ kind: "balance" }),
+      }),
+    );
+  });
+
+  // ── Test 12: Billing API Key input triggers appStore.set (与 LLM 同步) ──
+  it("Billing API Key input updates provider.api_key in state", async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    // mockProvider has billing kind=plan_quota, so billing subform is visible
+    render(() => <ProviderCard provider={mockProvider} onUpdate={onUpdate} onDelete={vi.fn()} />);
+
+    // Find the Billing API Key input (second password input)
+    const passwordInputs = document.querySelectorAll('input[type="password"]');
+    expect(passwordInputs.length).toBeGreaterThanOrEqual(2);
+    const billingApiKeyInput = passwordInputs[1] as HTMLInputElement;
+    expect(billingApiKeyInput).toBeTruthy();
+
+    await user.clear(billingApiKeyInput);
+    await user.type(billingApiKeyInput, "billing-secret-key");
+
+    const lastSet = getLastSetCall();
+    expect(lastSet).toBeTruthy();
+    const updatedProviders = lastSet.providers;
+    // Both LLM and Billing share the same api_key field (ADR-0015)
+    expect(updatedProviders.find((p: any) => p.id === "minimax")?.api_key).toBe("billing-secret-key");
+  });
+
+  // ── Test 13: delete confirm=false 时不调 deleteProvider ──
+  it("delete confirm=false 时不调 deleteProvider", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    (appStoreMock as any).appStore.deleteProvider.mockReturnValue(Effect.void);
+    const onDelete = vi.fn();
+
+    render(() => <ProviderCard provider={mockProvider} onUpdate={vi.fn()} onDelete={onDelete} />);
+
+    const deleteBtn = screen.getByRole("button", { name: /delete provider/i });
+    await user.click(deleteBtn);
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect((appStoreMock as any).appStore.deleteProvider).not.toHaveBeenCalled();
+    expect(onDelete).not.toHaveBeenCalled();
+
+    confirmSpy.mockRestore();
+  });
+
+  // ── Test 14: delete 失败时显示 'Delete failed' ──
+  it("delete 失败时显示 Delete failed 错误信息", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    (appStoreMock as any).appStore.deleteProvider.mockReturnValue(
+      Effect.fail({ kind: "IPC" as const, message: "delete failed: provider not found" }),
+    );
+
+    render(() => <ProviderCard provider={mockProvider} onUpdate={vi.fn()} onDelete={vi.fn()} />);
+
+    const deleteBtn = screen.getByRole("button", { name: /delete provider/i });
+    await user.click(deleteBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Delete failed.*IPC.*delete failed: provider not found/i)).toBeInTheDocument();
+    });
+  });
 });

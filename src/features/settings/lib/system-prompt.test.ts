@@ -6,6 +6,7 @@ import { mockState } from "../../../__mocks__/@tauri-apps/api/core";
 // 必须支持 Solid setStore 的两种签名：
 //   - 1-arg: setStore(valueOrFn) — 整体替换
 //   - 2-arg: setStore("path", valueOrFn) — 路径更新（app.store.ts 用的就是这种）
+// 不在 vitest.setup.ts 全局注册:见 settings.test.tsx 同位置注释。
 vi.mock("solid-js/store", () => {
   let store: { value: unknown } = { value: null };
   const setStore = vi.fn((...args: unknown[]) => {

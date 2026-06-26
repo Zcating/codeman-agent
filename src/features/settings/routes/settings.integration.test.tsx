@@ -12,6 +12,7 @@ import { mockState, SettingsV15 } from "../../../__mocks__/@tauri-apps/api/core"
 import type { Provider } from "../../../shared/lib/types";
 
 // Mock solid-js/store — SettingsPage 导入 appStore, appStore 用 createStore。
+// 见 settings.test.tsx 同位置注释:不全局注册,本文件内联 28 行 mock 块。
 vi.mock("solid-js/store", () => {
   let store: { value: unknown } = { value: null };
   const setStore = vi.fn((...args: unknown[]) => {
@@ -243,5 +244,287 @@ describe("SettingsRoute integration — provider UX", () => {
     });
 
     fetchSpy.mockRestore();
+  });
+});
+
+// ── SettingsRoute integration — tab switching & handlers ──
+
+describe("SettingsRoute integration — tab switching & handlers", () => {
+  beforeEach(async () => {
+    _resetAppStoreForTest();
+    mockState.calls = [];
+    mockState.resolved = undefined;
+    mockState.rejected = undefined;
+    mockState.v0FixtureActive = false;
+    mockState.settings = {
+      ...baseSettings,
+      providers: [mockMiniMaxProvider],
+      workspaces: [],
+    };
+    const { Effect } = await import("effect");
+    await Effect.runPromise(appStore.refresh());
+    appStore.set({});
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  // ── Tab switching ──
+  it("点击 'App' tab 显示 start_at_login checkbox", async () => {
+    const user = userEvent.setup();
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Switch to App tab
+    await user.click(screen.getByRole("button", { name: "App" }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(screen.getByText("Start at login")).toBeInTheDocument();
+    const checkbox = screen.getByRole("checkbox") as HTMLInputElement;
+    expect(checkbox).toBeTruthy();
+    expect(checkbox.checked).toBe(false); // default start_at_login = false
+  });
+
+  it("App tab checkbox onChange 调 appStore.set({ start_at_login })", async () => {
+    const user = userEvent.setup();
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByRole("button", { name: "App" }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const checkbox = screen.getByRole("checkbox") as HTMLInputElement;
+    await user.click(checkbox);
+
+    await waitFor(() => {
+      expect(mockState.calls).toContain("update_settings");
+    });
+  });
+
+  it("点击 'Window' tab 显示 placeholder 文案", async () => {
+    const user = userEvent.setup();
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByRole("button", { name: "Window" }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(
+      screen.getByText(/Window settings \(default size 1280×1280, min 800×800; position is remembered\)/i),
+    ).toBeInTheDocument();
+  });
+
+  it("点击 'Billing' tab 显示 placeholder 文案", async () => {
+    const user = userEvent.setup();
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByRole("button", { name: "Billing" }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(
+      screen.getByText(/Billing providers — see ProviderCard for LLM; billing tools via tools\/billing\./i),
+    ).toBeInTheDocument();
+  });
+
+  it("Advanced tab 默认显示 'Clear all history' 按钮", async () => {
+    const user = userEvent.setup();
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByRole("button", { name: "Advanced" }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(screen.getByText(/Clear all history/i)).toBeInTheDocument();
+  });
+
+  it("点击 Clear 按钮进入 confirm 状态", async () => {
+    const user = userEvent.setup();
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByRole("button", { name: "Advanced" }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByText(/Clear all history/i));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(screen.getByText(/Delete all conversations\? This cannot be undone\./i)).toBeInTheDocument();
+    expect(screen.getByText(/Yes, delete all/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cancel/i)).toBeInTheDocument();
+  });
+
+  it("confirm 状态点 Cancel 回到默认", async () => {
+    const user = userEvent.setup();
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByRole("button", { name: "Advanced" }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByText(/Clear all history/i));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByText(/Cancel/i));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Back to initial state: Clear button visible again
+    expect(screen.getByText(/Clear all history/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Delete all conversations\?/i)).not.toBeInTheDocument();
+  });
+
+  it("confirm 状态点 'Yes, delete all' 触发 invoke('clear_all_history')", async () => {
+    const user = userEvent.setup();
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByRole("button", { name: "Advanced" }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByText(/Clear all history/i));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByText(/Yes, delete all/i));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(mockState.calls).toContain("clear_all_history");
+  });
+
+  it("clear_all_history 抛错时 logger.error 被调 (不 crash)", async () => {
+    const user = userEvent.setup();
+    mockState.rejected = new Error("boom");
+
+    const { logger } = await import("../../../shared/lib/logger");
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByRole("button", { name: "Advanced" }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByText(/Clear all history/i));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByText(/Yes, delete all/i));
+    // Wait for async error to propagate
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Should have logged the error
+    expect(errorSpy).toHaveBeenCalled();
+    // Component should not crash (dialog stays visible because setConfirmClear only called on success)
+    expect(screen.getByText(/Delete all conversations\?/i)).toBeInTheDocument();
+
+    errorSpy.mockRestore();
+    // Clean up rejected flag to prevent unhandled rejection
+    mockState.rejected = undefined;
+  });
+
+  it("footer Save 按钮触发 settingsSaver.flushNow", async () => {
+    const user = userEvent.setup();
+    const { settingsSaver } = await import("../lib/settings-saver");
+    const flushSpy = vi.spyOn(settingsSaver, "flushNow").mockResolvedValue(undefined);
+
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const saveBtn = screen.getByRole("button", { name: /save/i });
+    await user.click(saveBtn);
+
+    await waitFor(() => {
+      expect(flushSpy).toHaveBeenCalled();
+    });
+
+    flushSpy.mockRestore();
+  });
+
+  it("点击 'Add provider' 触发 alert 文案含 'future work'", async () => {
+    const user = userEvent.setup();
+    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
+
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByRole("button", { name: /add provider/i }));
+
+    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("future work"));
+
+    alertSpy.mockRestore();
+  });
+
+  it("onWorkspaceRemove confirm=true 删除 workspace", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    mockState.settings.workspaces = [
+      { id: "ws-001", label: "Project A", root_path: "C:\\Projects\\A", enabled: true },
+    ];
+    const { Effect } = await import("effect");
+    await Effect.runPromise(appStore.refresh());
+    appStore.set({});
+
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Click Delete on the workspace card
+    await user.click(screen.getByText("Delete"));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining("Delete this workspace?"));
+    // Workspace removed from appStore state
+    expect(appStore.state.value.workspaces!.length).toBe(0);
+
+    confirmSpy.mockRestore();
+  });
+
+  it("onWorkspaceRemove confirm=false 保留 workspace", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    mockState.settings.workspaces = [
+      { id: "ws-001", label: "Project A", root_path: "C:\\Projects\\A", enabled: true },
+    ];
+    const { Effect } = await import("effect");
+    await Effect.runPromise(appStore.refresh());
+    appStore.set({});
+
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Click Delete on the workspace card
+    await user.click(screen.getByText("Delete"));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(confirmSpy).toHaveBeenCalled();
+    // update_settings NOT called because confirm was false
+    const updateCalls = mockState.calls.filter((c) => c === "update_settings");
+    expect(updateCalls).toHaveLength(0);
+
+    confirmSpy.mockRestore();
+  });
+
+  it("点击 'Add workspace' 增加 1 个新 workspace", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    mockState.settings.workspaces = [
+      { id: "ws-001", label: "Project A", root_path: "C:\\Projects\\A", enabled: true },
+    ];
+    const { Effect } = await import("effect");
+    await Effect.runPromise(appStore.refresh());
+    appStore.set({});
+
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const beforeCount = appStore.state.value.workspaces!.length;
+    await user.click(screen.getByText(/add workspace/i));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(appStore.state.value.workspaces!.length).toBe(beforeCount + 1);
+    expect(appStore.state.value.workspaces![appStore.state.value.workspaces!.length - 1].label).toBe(
+      "New Workspace",
+    );
+
+    confirmSpy.mockRestore();
   });
 });

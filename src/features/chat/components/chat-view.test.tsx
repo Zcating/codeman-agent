@@ -313,4 +313,199 @@ describe("ChatView", () => {
     expect(link).toBeTruthy();
     expect(link?.textContent).toContain("settings");
   });
+
+  // ─── handleSend 测试 ─────────────────────────────────────────────────
+  it("handleSend with valid input 调 sendMessage", async () => {
+    const user = (await import("@testing-library/user-event")).default;
+    const conversationsStoreMock = await import("../stores/conversations.store");
+    const appStoreMock = await import("../../../shared/stores/app.store");
+    // Reset sendMessage mock and appStore state
+    (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
+    (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          enabled: true,
+          api_key: "",
+          llm: {
+            default_model: "MiniMax-M2.5-highspeed",
+            base_url: "https://api.minimaxi.com/anthropic",
+            api_type: "anthropic-messages",
+            models: [
+              {
+                id: "MiniMax-M2.5-highspeed",
+                label: "MiniMax-M2.5-highspeed",
+                deprecated: false,
+                thinking: false,
+              },
+            ],
+            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          },
+          billing: { kind: "plan_quota" },
+        },
+      ],
+      default_llm_provider_id: "minimax",
+    });
+    const { container } = render(() => <ChatView />);
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    await user.type(textarea, "hi");
+    expect(textarea.value).toBe("hi");
+    const submitBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
+    await user.click(submitBtn);
+    // sendMessage mockResolvedValue(undefined), so await
+    await vi.waitFor(() => {
+      expect((conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage).toHaveBeenCalledWith(
+        "conv-1",
+        "hi",
+        expect.objectContaining({
+          apiKey: "",
+          baseUrl: "https://api.minimaxi.com/anthropic",
+          defaultModel: "MiniMax-M2.5-highspeed",
+        })
+      );
+    });
+  });
+
+  it("handleSend empty input 不调 sendMessage", async () => {
+    const user = (await import("@testing-library/user-event")).default;
+    const conversationsStoreMock = await import("../stores/conversations.store");
+    // Reset sendMessage mock before test
+    (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
+    const { container } = render(() => <ChatView />);
+    const submitBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
+    await user.click(submitBtn);
+    expect((conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("handleSend 输入后清空 input", async () => {
+    const user = (await import("@testing-library/user-event")).default;
+    const appStoreMock = await import("../../../shared/stores/app.store");
+    const conversationsStoreMock = await import("../stores/conversations.store");
+    // Reset sendMessage mock and appStore state
+    (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
+    (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          enabled: true,
+          api_key: "",
+          llm: {
+            default_model: "MiniMax-M2.5-highspeed",
+            base_url: "https://api.minimaxi.com/anthropic",
+            api_type: "anthropic-messages",
+            models: [
+              {
+                id: "MiniMax-M2.5-highspeed",
+                label: "MiniMax-M2.5-highspeed",
+                deprecated: false,
+                thinking: false,
+              },
+            ],
+            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          },
+          billing: { kind: "plan_quota" },
+        },
+      ],
+      default_llm_provider_id: "minimax",
+    });
+    const { container } = render(() => <ChatView />);
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    await user.type(textarea, "hello world");
+    expect(textarea.value).toBe("hello world");
+    const submitBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
+    await user.click(submitBtn);
+    // After send, textarea should be cleared
+    await vi.waitFor(() => {
+      expect(textarea.value).toBe("");
+    });
+  });
+
+  // ─── handleCancel 测试 ───────────────────────────────────────────────
+  it("handleCancel 调 cancel(convId)", async () => {
+    const user = (await import("@testing-library/user-event")).default;
+    const conversationsStoreMock = await import("../stores/conversations.store");
+    // Reset cancel mock and set streaming state
+    (conversationsStoreMock as unknown as { cancel: ReturnType<typeof vi.fn> }).cancel.mockClear();
+    const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null }> } }).store;
+    mockStore.byId["conv-1"].streamingMessageId = "msg-streaming";
+    const { container } = render(() => <ChatView />);
+    // Cancel button appears when streaming
+    const cancelBtn = container.querySelector('button:not([type="submit"])') as HTMLButtonElement;
+    expect(cancelBtn).toBeTruthy();
+    await user.click(cancelBtn);
+    expect((conversationsStoreMock as unknown as { cancel: ReturnType<typeof vi.fn> }).cancel).toHaveBeenCalledWith("conv-1");
+  });
+
+  // ─── thinking indicator 测试 ────────────────────────────────────────
+  it("thinking indicator 显示当 streaming + 最后消息 content=''", async () => {
+    const conversationsStoreMock = await import("../stores/conversations.store");
+    const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null; messages: Message[] }> } }).store;
+    // Reset streaming state first, then set fresh
+    mockStore.byId["conv-1"].streamingMessageId = null;
+    mockStore.byId["conv-1"].streamingMessageId = "msg-streaming";
+    // Set last message content to empty string for thinking indicator condition
+    mockStore.byId["conv-1"].messages[mockStore.byId["conv-1"].messages.length - 1].content = "";
+    const { container } = render(() => <ChatView />);
+    const indicator = container.querySelector('[role="status"]');
+    expect(indicator).toBeTruthy();
+    expect(indicator?.textContent).toContain("正在思考…");
+  });
+
+  it("thinking indicator 不显示 non-streaming", async () => {
+    const conversationsStoreMock = await import("../stores/conversations.store");
+    // Ensure store state is clean
+    const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null }> } }).store;
+    mockStore.byId["conv-1"].streamingMessageId = null;
+    const { container } = render(() => <ChatView />);
+    const indicator = container.querySelector('[role="status"]');
+    expect(indicator).toBeNull();
+  });
+
+  // ─── form submit 测试 ────────────────────────────────────────────────
+  it("form submit preventDefault + handleSend", async () => {
+    const user = (await import("@testing-library/user-event")).default;
+    const conversationsStoreMock = await import("../stores/conversations.store");
+    const appStoreMock = await import("../../../shared/stores/app.store");
+    // Reset sendMessage mock and appStore state
+    (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
+    (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          enabled: true,
+          api_key: "",
+          llm: {
+            default_model: "MiniMax-M2.5-highspeed",
+            base_url: "https://api.minimaxi.com/anthropic",
+            api_type: "anthropic-messages",
+            models: [
+              {
+                id: "MiniMax-M2.5-highspeed",
+                label: "MiniMax-M2.5-highspeed",
+                deprecated: false,
+                thinking: false,
+              },
+            ],
+            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          },
+          billing: { kind: "plan_quota" },
+        },
+      ],
+      default_llm_provider_id: "minimax",
+    });
+    const { container } = render(() => <ChatView />);
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    await user.type(textarea, "submit test");
+    const form = container.querySelector("form") as HTMLFormElement;
+    // user.submit doesn't exist, use fireEvent.submit
+    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    await vi.waitFor(() => {
+      expect((conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage).toHaveBeenCalled();
+    });
+    // Also verify textarea cleared
+    expect(textarea.value).toBe("");
+  });
 });

@@ -2,13 +2,15 @@
 //! Tests rendering, toggle, path input, browse button, and delete.
 
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
-import { render, screen, cleanup } from "@solidjs/testing-library";
+import { render, screen, cleanup, waitFor, fireEvent } from "@solidjs/testing-library";
 import { WorkspaceCard } from "./workspace-card";
+import { mockState } from "../../../__mocks__/@tauri-apps/api/core";
 import type { Workspace } from "../../../shared/lib/types";
 
 // Mock solid-js/store — WorkspaceCard 导入 appStore, appStore 用 createStore。
 // jsdom 没有 Solid reactive context,需要这个 mock。
 // 必须支持 setStore 的 1-arg 和 2-arg 两种签名。
+// **不**在 vitest.setup.ts 全局注册:见 settings.test.tsx 同位置注释。
 vi.mock("solid-js/store", () => {
   let store: { value: unknown } = { value: null };
   const setStore = vi.fn((...args: unknown[]) => {
@@ -54,6 +56,11 @@ describe("WorkspaceCard", () => {
   beforeEach(() => {
     onUpdate = vi.fn();
     onRemove = vi.fn();
+    // Set up mockState.settings.workspaces so handlePathBlur can map over it
+    mockState.settings = {
+      ...mockState.settings,
+      workspaces: [{ ...mockWorkspace }],
+    };
     // 重置 appStore,确保 appStore.state.value 不为 null
     _resetAppStoreForTest();
     cleanup();
@@ -138,5 +145,75 @@ describe("WorkspaceCard", () => {
 
     // Placeholder text should be shown
     expect(screen.getByPlaceholderText("C:\\path\\to\\workspace")).toBeInTheDocument();
+  });
+
+  // ── Test 7: handlePathBlur no-op 当值未变 ──
+  it("handlePathBlur no-op 当值未变", async () => {
+    render(() => (
+      <WorkspaceCard workspace={mockWorkspace} onUpdate={onUpdate} onRemove={onRemove} />
+    ));
+
+    // Blur without changing the input value
+    const input = screen.getByDisplayValue("C:\\Projects\\my-project") as HTMLInputElement;
+    expect(input).toBeTruthy();
+
+    // Fire blur directly - no change to the input value means early return
+    fireEvent.blur(input);
+
+    // onUpdate should NOT have been called since value didn't change
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  // ── Test 8: handlePathBlur 写值 当值变 ──
+  it("handlePathBlur 写值 when value changes", async () => {
+    render(() => (
+      <WorkspaceCard workspace={mockWorkspace} onUpdate={onUpdate} onRemove={onRemove} />
+    ));
+
+    const input = screen.getByDisplayValue("C:\\Projects\\my-project") as HTMLInputElement;
+
+    // Simulate user typing by firing input event with new value, then blur
+    fireEvent.input(input, { target: { value: "D:\\New\\Path" } });
+    fireEvent.blur(input);
+
+    // onUpdate should have been called with the new path
+    await waitFor(() => {
+      expect(onUpdate).toHaveBeenCalledWith({ root_path: "D:\\New\\Path" });
+    });
+  });
+
+  // ── Test 9: handleBrowse no-op 当 invoke 返回 null ──
+  it("handleBrowse no-op 当 pick_workspace_path 返回 null", async () => {
+    mockState.resolvedByCommand["pick_workspace_path"] = null;
+
+    render(() => (
+      <WorkspaceCard workspace={mockWorkspace} onUpdate={onUpdate} onRemove={onRemove} />
+    ));
+
+    fireEvent.click(screen.getByText("Browse…"));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // onUpdate should NOT have been called
+    expect(onUpdate).not.toHaveBeenCalled();
+    // Input value should remain unchanged
+    expect(screen.getByDisplayValue("C:\\Projects\\my-project")).toBeInTheDocument();
+
+    delete mockState.resolvedByCommand["pick_workspace_path"];
+  });
+
+  // ── Test 10: handleBrowse 写值 当 invoke 返回路径 ──
+  it("handleBrowse 写值 when pick_workspace_path 返回路径", async () => {
+    mockState.resolvedByCommand["pick_workspace_path"] = "C:/picked";
+
+    render(() => (
+      <WorkspaceCard workspace={mockWorkspace} onUpdate={onUpdate} onRemove={onRemove} />
+    ));
+
+    fireEvent.click(screen.getByText("Browse…"));
+    await waitFor(() => {
+      expect(onUpdate).toHaveBeenCalledWith({ root_path: "C:/picked" });
+    });
+
+    delete mockState.resolvedByCommand["pick_workspace_path"];
   });
 });

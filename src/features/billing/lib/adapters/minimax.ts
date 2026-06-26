@@ -68,7 +68,7 @@ export const minimaxAdapter: BillingAdapter = {
           { remaining_credit: number; total_credit: number; expires_at?: string },
           BillingError
         > => {
-          if (typeof data !== "object" || data === null) {
+          if (typeof data !== "object" || data === null || Array.isArray(data)) {
             return Effect.fail({ kind: "Parse" as const, message: "Invalid JSON" });
           }
           const d = data as { remaining_credit: number; total_credit: number; expires_at?: string };

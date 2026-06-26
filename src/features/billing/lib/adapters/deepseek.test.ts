@@ -128,4 +128,59 @@ describe("deepseekAdapter", () => {
       });
     }
   });
+
+  // -------------------------------------------------------------------------
+  // Scenario 7: fetch 抛 non-TypeError Error → Upstream
+  // -------------------------------------------------------------------------
+  it("returns Upstream error when fetch throws non-TypeError", async () => {
+    vi.spyOn(global, "fetch").mockRejectedValue(new Error("boom"));
+
+    const exit = await Effect.runPromiseExit(deepseekAdapter.fetchBalance("any-key"));
+
+    const error = Exit.match(exit, {
+      onFailure: (cause) => (cause as { error: { kind: string; message: string } }).error,
+      onSuccess: () => null,
+    });
+    expect(error).toMatchObject({ kind: "Upstream" });
+    expect(error?.message).toContain("boom");
+  });
+
+  // -------------------------------------------------------------------------
+  // Scenario 8: 404 (non-401, non-5xx) → Upstream "HTTP 404"
+  // -------------------------------------------------------------------------
+  it("returns Upstream error on 404", async () => {
+    const mockResponse = {
+      ok: false,
+      status: 404,
+    } as unknown as Response;
+    vi.spyOn(global, "fetch").mockResolvedValue(mockResponse);
+
+    const exit = await Effect.runPromiseExit(deepseekAdapter.fetchBalance("any-key"));
+
+    const error = Exit.match(exit, {
+      onFailure: (cause) => (cause as { error: { kind: string; message: string } }).error,
+      onSuccess: () => null,
+    });
+    expect(error).toMatchObject({ kind: "Upstream", message: "HTTP 404" });
+  });
+
+  // -------------------------------------------------------------------------
+  // Scenario 9: balance_infos 为空数组 → Parse "No balance info"
+  // -------------------------------------------------------------------------
+  it("returns Parse error when balance_infos is empty array", async () => {
+    const mockResponse = {
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ balance_infos: [] }),
+    } as unknown as Response;
+    vi.spyOn(global, "fetch").mockResolvedValue(mockResponse);
+
+    const exit = await Effect.runPromiseExit(deepseekAdapter.fetchBalance("any-key"));
+
+    const error = Exit.match(exit, {
+      onFailure: (cause) => (cause as { error: { kind: string; message: string } }).error,
+      onSuccess: () => null,
+    });
+    expect(error).toMatchObject({ kind: "Parse", message: "No balance info" });
+  });
 });

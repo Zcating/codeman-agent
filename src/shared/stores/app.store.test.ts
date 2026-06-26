@@ -11,6 +11,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Effect } from "effect";
 import { mockState } from "../../__mocks__/@tauri-apps/api/core";
 
+// Mock solid-js/store（jsdom 没有 Solid reactive context）
+// 不在 vitest.setup.ts 全局注册:见 settings.test.tsx 同位置注释。
 vi.mock("solid-js/store", () => {
   let store: { value: unknown } = { value: null };
   const setStore = vi.fn((...args: unknown[]) => {

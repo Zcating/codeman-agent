@@ -23,15 +23,17 @@ export default defineConfig(async () => ({
 
   // `vp staged` runs on `git commit` (see `.vite-hooks/pre-commit`, installed
   // by `vp config`). The wrapper script consumes vp-staged's positional file
-  // args so the typecheck stays full-project and runs `vp run test` (the
-  // project is on vitest 2.1.x which has no `--related` flag, and the full
-  // suite is <5s). We intentionally do not use `vp check --fix` here: it
-  // would invoke oxfmt/oxlint and reformat the entire codebase, conflicting
-  // with the existing Tailwind v4 utility style (see ADR-0006). The `.mjs`
-  // extension is included so edits to `scripts/precommit.mjs` itself also
-  // re-trigger the hook. Add a new entry here when introducing additional
-  // staged checks (e.g. a Rust check on `*.rs` would go in
-  // scripts/precommit.mjs).
+  // args so the typecheck stays full-project, and runs the FILTERED test +
+  // coverage gate (vitest `related <staged>` + one `--coverage.include=`
+  // per staged source → perFile 90% threshold check on staged files only,
+  // ~5-30s). Full coverage is still available via `vp run test:coverage`
+  // for CI / local thorough checks. We intentionally do not use
+  // `vp check --fix` here: it would invoke oxfmt/oxlint and reformat the
+  // entire codebase, conflicting with the existing Tailwind v4 utility style
+  // (see ADR-0006). The `.mjs` extension is included so edits to
+  // `scripts/precommit.mjs` itself also re-trigger the hook. Add a new entry
+  // here when introducing additional staged checks (e.g. a Rust check on
+  // `*.rs` would go in scripts/precommit.mjs).
   staged: {
     "*.{ts,tsx,mjs}": "node scripts/precommit.mjs",
   },
@@ -51,7 +53,7 @@ export default defineConfig(async () => ({
   test: {
     environment: "jsdom",
     globals: true,
-    setupFiles: ["./src/test-setup.ts"],
+    setupFiles: ["./vitest.setup.ts"],
     passWithNoTests: true,
     // E2E specs in /e2e are run by Playwright, not vitest. The patterns
     // below keep vitest focused on the unit-test surface under /src.
@@ -60,6 +62,42 @@ export default defineConfig(async () => ({
     server: {
       deps: {
         inline: [/solid-js/, /solidjs/],
+      },
+    },
+    // Coverage (test:coverage). The exclude list keeps mocks, test files,
+    // and mount-point entry points out of the report. The statements
+    // threshold is per-file (per the 11-target goal that all core modules
+    // must hit ≥90% statements). Branches / functions / lines are tracked
+    // but not gated — branch coverage is noisy on typebox-driven code and
+    // cast-heavy wrappers (see ADR-0020 D1 + AGENTS.md "测试"段).
+    //
+    // Exclude rationale:
+    // - `src/**/*.test.{ts,tsx}` / `*.spec.{ts,tsx}` / `__tests__/**`
+    //   — test files themselves
+    // - `src/__mocks__/**` — IPC mock (per ADR-0010 single-source); not
+    //   production code
+    // - `*.test-d.ts` — typecheck-only fixtures (tsd-style); no runtime
+    // - `src/index.tsx` / `src/router.tsx` — mount / router config; e2e
+    //   coverage via Playwright (per `src/AGENTS.md` "测试"段)
+    // - `src/features/<feature>/routes/index.tsx` — route components
+    //   wired by `src/router.tsx`; e2e coverage
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/**/*.test.{ts,tsx}",
+        "src/**/*.spec.{ts,tsx}",
+        "src/**/*.test-d.ts",
+        "src/**/__tests__/**",
+        "src/__mocks__/**",
+        "src/index.tsx",
+        "src/router.tsx",
+        "src/features/**/routes/index.tsx",
+      ],
+      reporter: ["text", "html", "json-summary"],
+      thresholds: {
+        statements: 90,
+        perFile: true,
       },
     },
   },

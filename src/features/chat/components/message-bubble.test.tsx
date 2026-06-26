@@ -5,7 +5,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import { MessageBubble } from "./message-bubble";
-import type { Message, ToolCall, ToolResult } from "../../../shared/lib/types";
+import type { Message, ToolCall, ToolResult, FileMatch } from "../../../shared/lib/types";
 
 describe("MessageBubble", () => {
   afterEach(() => cleanup());
@@ -117,5 +117,169 @@ describe("MessageBubble", () => {
     const summary = details?.querySelector("summary");
     expect(summary?.textContent).toContain("工具调用 (1)");
     expect(details?.textContent).toContain("get_balance");
+  });
+
+  // ─── tool_results error/success 分支测试 ─────────────────────────────
+  it("tool_results[0].error 存在时用 text-destructive + ❌", () => {
+    const toolResults: ToolResult[] = [
+      { tool_call_id: "tc-1", result: "ok", error: "boom" },
+    ];
+    const msg: Message = {
+      id: "msg-6",
+      conversation_id: "conv-1",
+      role: "tool",
+      content: "",
+      tool_calls: null,
+      tool_results: toolResults,
+      model: null,
+      input_tokens: null,
+      output_tokens: null,
+      created_at: 1710000005,
+    };
+    const { container } = render(() => <MessageBubble message={msg} />);
+    const bubble = container.querySelector(".justify-start");
+    expect(bubble).toBeTruthy();
+    // text-destructive class for error
+    const errorDiv = bubble?.querySelector(".text-destructive");
+    expect(errorDiv).toBeTruthy();
+    expect(errorDiv?.textContent).toContain("❌");
+    expect(errorDiv?.textContent).toContain("tc-1");
+  });
+
+  it("tool_results[0].error = null 时用 text-success + ✓", () => {
+    const toolResults: ToolResult[] = [
+      { tool_call_id: "tc-1", result: "ok", error: null },
+    ];
+    const msg: Message = {
+      id: "msg-7",
+      conversation_id: "conv-1",
+      role: "tool",
+      content: "",
+      tool_calls: null,
+      tool_results: toolResults,
+      model: null,
+      input_tokens: null,
+      output_tokens: null,
+      created_at: 1710000006,
+    };
+    const { container } = render(() => <MessageBubble message={msg} />);
+    const bubble = container.querySelector(".justify-start");
+    expect(bubble).toBeTruthy();
+    // text-success class for success
+    const successDiv = bubble?.querySelector(".text-success");
+    expect(successDiv).toBeTruthy();
+    expect(successDiv?.textContent).toContain("✓");
+  });
+
+  // ─── 长字符串 tool result 渲染 details 测试 ─────────────────────────
+  it("tool result string.length > 200 渲染 details + 行数", () => {
+    // Create a string longer than 200 characters
+    const longResult = "a".repeat(250);
+    const toolResults: ToolResult[] = [
+      { tool_call_id: "tc-1", result: longResult, error: null },
+    ];
+    const msg: Message = {
+      id: "msg-8",
+      conversation_id: "conv-1",
+      role: "tool",
+      content: "",
+      tool_calls: null,
+      tool_results: toolResults,
+      model: null,
+      input_tokens: null,
+      output_tokens: null,
+      created_at: 1710000007,
+    };
+    const { container } = render(() => <MessageBubble message={msg} />);
+    const bubble = container.querySelector(".justify-start");
+    expect(bubble).toBeTruthy();
+    // Should have nested details for long content
+    const nestedDetails = bubble?.querySelectorAll("details");
+    expect(nestedDetails?.length).toBeGreaterThan(1);
+  });
+
+  // ─── FileMatch[] array 渲染测试 ─────────────────────────────────────
+  it("tool result array (FileMatch[]) 渲染 match list", () => {
+    const toolResults: ToolResult[] = [
+      {
+        tool_call_id: "tc-search",
+        result: [
+          { path: "src/x.ts", line_number: 42, line_content: "const x = 1" },
+          { path: "src/y.ts", line_number: 100, line_content: "const y = 2" },
+        ] as FileMatch[],
+        error: null,
+      },
+    ];
+    const msg: Message = {
+      id: "msg-9",
+      conversation_id: "conv-1",
+      role: "tool",
+      content: "",
+      tool_calls: null,
+      tool_results: toolResults,
+      model: null,
+      input_tokens: null,
+      output_tokens: null,
+      created_at: 1710000008,
+    };
+    const { container } = render(() => <MessageBubble message={msg} />);
+    const bubble = container.querySelector(".justify-start");
+    expect(bubble).toBeTruthy();
+    // Should show line numbers
+    expect(bubble?.textContent).toContain("42");
+    expect(bubble?.textContent).toContain("100");
+    // Should show paths in <code>
+    const codeElements = bubble?.querySelectorAll("code");
+    const paths = Array.from(codeElements ?? []).map((c) => c.textContent);
+    expect(paths).toContain("src/x.ts");
+    expect(paths).toContain("src/y.ts");
+  });
+
+  // ─── tool role 仅有 content 无 tool_results 测试 ─────────────────────
+  it("tool role 仅有 content (无 tool_results) 渲染 JSON", () => {
+    const msg: Message = {
+      id: "msg-10",
+      conversation_id: "conv-1",
+      role: "tool",
+      content: '{"x":1}',
+      tool_calls: null,
+      tool_results: null,
+      model: null,
+      input_tokens: null,
+      output_tokens: null,
+      created_at: 1710000009,
+    };
+    const { container } = render(() => <MessageBubble message={msg} />);
+    const bubble = container.querySelector(".justify-start");
+    expect(bubble).toBeTruthy();
+    // Should render JSON content in <pre>
+    const pre = bubble?.querySelector("pre");
+    expect(pre).toBeTruthy();
+    // JSON.stringify of '{"x":1}' produces escaped string
+    expect(pre?.textContent).toContain("x");
+  });
+
+  // ─── system 消息样式测试 ─────────────────────────────────────────────
+  it("system 消息含 italic + bg-warning/10", () => {
+    const msg: Message = {
+      id: "msg-11",
+      conversation_id: "conv-1",
+      role: "system",
+      content: "System prompt here.",
+      tool_calls: null,
+      tool_results: null,
+      model: null,
+      input_tokens: null,
+      output_tokens: null,
+      created_at: 1710000010,
+    };
+    const { container } = render(() => <MessageBubble message={msg} />);
+    const bubble = container.querySelector(".justify-start");
+    expect(bubble).toBeTruthy();
+    // italic class for system
+    const italicDiv = bubble?.querySelector(".italic");
+    expect(italicDiv).toBeTruthy();
+    // bg-warning/10 (using bg-warning/10 class)
+    expect(bubble?.innerHTML).toContain("warning");
   });
 });

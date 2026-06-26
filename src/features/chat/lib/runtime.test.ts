@@ -17,8 +17,6 @@ vi.mock("@mariozechner/pi-agent", () => {
           };
         },
         prompt: vi.fn().mockImplementation(async (_userContent: string) => {
-          // Simulate transport.run() yielding events by directly calling the handler
-          // (transport.run() is what pi-agent.Agent.prompt() calls internally)
           if (handler) {
             handler({ type: "agent_start" });
             handler({
@@ -106,22 +104,18 @@ describe("cancel()", () => {
 
   it("cancel() after run() starts does not throw", async () => {
     const runtime = createAgentRuntime();
-    // Just verify cancel() doesn't throw when called after runtime creation
-    // The actual abort behavior is tested implicitly - cancel() is safe to call anytime
     expect(() => runtime.cancel()).not.toThrow();
-    expect(() => runtime.cancel()).not.toThrow(); // multiple cancels are safe
+    expect(() => runtime.cancel()).not.toThrow();
   });
 });
 
 describe("error handling", () => {
   it("emits error event when prompt rejects", async () => {
-    // Save original mock factory
     const { Agent } = await import("@mariozechner/pi-agent");
     const mockedAgent = vi.mocked(Agent);
     const originalImpl = mockedAgent.getMockImplementation();
 
     try {
-      // Replace with rejecting mock
       mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
         return {
           subscribe: (_h: (evt: unknown) => void) => () => {},
@@ -144,7 +138,407 @@ describe("error handling", () => {
         "network failure",
       );
     } finally {
-      // Restore original mock (cast to constructor signature; may be undefined)
+      mockedAgent.mockImplementation(originalImpl as never);
+    }
+  });
+});
+
+describe("run() — tool_execution_end 事件", () => {
+  it("tool_execution_end 且 isError=true 时发出带 error 的 tool_result 事件", async () => {
+    const { Agent } = await import("@mariozechner/pi-agent");
+    const mockedAgent = vi.mocked(Agent);
+    const originalImpl = mockedAgent.getMockImplementation();
+
+    let capturedCallback: ((evt: unknown) => void) | undefined;
+    try {
+      mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+        return {
+          subscribe: (h: (evt: unknown) => void) => {
+            capturedCallback = h;
+            return () => {};
+          },
+          prompt: vi.fn().mockResolvedValue(undefined),
+          appendMessage: vi.fn(),
+        };
+      });
+
+      const runtime = createAgentRuntime();
+      const events: RuntimeEvent[] = [];
+      // 不 await，让微任务先跑，这样 capturedCallback 能被设置
+      const program = Stream.runForEach(
+        runtime.run({ context: mockContext, provider: mockProvider }),
+        (e) => Effect.sync(() => events.push(e)),
+      );
+      Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+      // 等待微任务队列清空，确保 subscribe 已被调用
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // 触发 tool_execution_end with isError=true
+      capturedCallback!({
+        type: "tool_execution_end",
+        toolCallId: "tc-1",
+        result: "failed-msg",
+        isError: true,
+      });
+
+      // 用 agent_end 关闭 stream
+      capturedCallback!({ type: "agent_end", messages: [] });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const toolResult = events.find((e) => e.type === "tool_result") as {
+        type: "tool_result";
+        toolCallId: string;
+        result: unknown;
+        error?: string;
+      };
+      expect(toolResult).toBeDefined();
+      expect(toolResult.toolCallId).toBe("tc-1");
+      expect(toolResult.error).toBe("failed-msg");
+    } finally {
+      mockedAgent.mockImplementation(originalImpl as never);
+    }
+  });
+
+  it("tool_execution_end 且 isError=false 时发出不带 error 的 tool_result 事件", async () => {
+    const { Agent } = await import("@mariozechner/pi-agent");
+    const mockedAgent = vi.mocked(Agent);
+    const originalImpl = mockedAgent.getMockImplementation();
+
+    let capturedCallback: ((evt: unknown) => void) | undefined;
+    try {
+      mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+        return {
+          subscribe: (h: (evt: unknown) => void) => {
+            capturedCallback = h;
+            return () => {};
+          },
+          prompt: vi.fn().mockResolvedValue(undefined),
+          appendMessage: vi.fn(),
+        };
+      });
+
+      const runtime = createAgentRuntime();
+      const events: RuntimeEvent[] = [];
+      const program = Stream.runForEach(
+        runtime.run({ context: mockContext, provider: mockProvider }),
+        (e) => Effect.sync(() => events.push(e)),
+      );
+      Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      capturedCallback!({
+        type: "tool_execution_end",
+        toolCallId: "tc-2",
+        result: { ok: 1 },
+        isError: false,
+      });
+
+      capturedCallback!({ type: "agent_end", messages: [] });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const toolResult = events.find((e) => e.type === "tool_result") as {
+        type: "tool_result";
+        toolCallId: string;
+        result: unknown;
+        error?: string;
+      };
+      expect(toolResult).toBeDefined();
+      expect(toolResult.toolCallId).toBe("tc-2");
+      expect(toolResult.result).toEqual({ ok: 1 });
+      expect(toolResult.error).toBeUndefined();
+    } finally {
+      mockedAgent.mockImplementation(originalImpl as never);
+    }
+  });
+});
+
+describe("run() — message_update 边界情况", () => {
+  it("message_update 含 toolCall block 时发出 tool_call 事件", async () => {
+    const { Agent } = await import("@mariozechner/pi-agent");
+    const mockedAgent = vi.mocked(Agent);
+    const originalImpl = mockedAgent.getMockImplementation();
+
+    let capturedCallback: ((evt: unknown) => void) | undefined;
+    try {
+      mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+        return {
+          subscribe: (h: (evt: unknown) => void) => {
+            capturedCallback = h;
+            return () => {};
+          },
+          prompt: vi.fn().mockResolvedValue(undefined),
+          appendMessage: vi.fn(),
+        };
+      });
+
+      const runtime = createAgentRuntime();
+      const events: RuntimeEvent[] = [];
+      const program = Stream.runForEach(
+        runtime.run({ context: mockContext, provider: mockProvider }),
+        (e) => Effect.sync(() => events.push(e)),
+      );
+      Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      capturedCallback!({
+        type: "message_update",
+        message: {
+          content: [
+            {
+              type: "toolCall",
+              id: "tc-1",
+              name: "get_balance",
+              arguments: { provider_id: "deepseek" },
+            },
+          ],
+        },
+      });
+
+      capturedCallback!({ type: "agent_end", messages: [] });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const toolCallEvent = events.find((e) => e.type === "tool_call") as {
+        type: "tool_call";
+        toolCall: { id: string; name: string; args: Record<string, unknown> };
+      };
+      expect(toolCallEvent).toBeDefined();
+      expect(toolCallEvent.toolCall.id).toBe("tc-1");
+      expect(toolCallEvent.toolCall.name).toBe("get_balance");
+      expect(toolCallEvent.toolCall.args).toEqual({ provider_id: "deepseek" });
+    } finally {
+      mockedAgent.mockImplementation(originalImpl as never);
+    }
+  });
+
+  it("message_update 的 content 非数组时提前返回，不发出事件", async () => {
+    const { Agent } = await import("@mariozechner/pi-agent");
+    const mockedAgent = vi.mocked(Agent);
+    const originalImpl = mockedAgent.getMockImplementation();
+
+    let capturedCallback: ((evt: unknown) => void) | undefined;
+    try {
+      mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+        return {
+          subscribe: (h: (evt: unknown) => void) => {
+            capturedCallback = h;
+            return () => {};
+          },
+          prompt: vi.fn().mockResolvedValue(undefined),
+          appendMessage: vi.fn(),
+        };
+      });
+
+      const runtime = createAgentRuntime();
+      const events: RuntimeEvent[] = [];
+      const program = Stream.runForEach(
+        runtime.run({ context: mockContext, provider: mockProvider }),
+        (e) => Effect.sync(() => events.push(e)),
+      );
+      Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // content 为字符串而非数组
+      capturedCallback!({
+        type: "message_update",
+        message: { content: "not-array" },
+      });
+
+      capturedCallback!({ type: "agent_end", messages: [] });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      // 没有发出 token 或 tool_call 事件（早期返回）
+      const tokenEvents = events.filter((e) => e.type === "token" || e.type === "tool_call");
+      expect(tokenEvents).toHaveLength(0);
+    } finally {
+      mockedAgent.mockImplementation(originalImpl as never);
+    }
+  });
+
+  it("message_update 无 message 字段时提前返回，不发出事件", async () => {
+    const { Agent } = await import("@mariozechner/pi-agent");
+    const mockedAgent = vi.mocked(Agent);
+    const originalImpl = mockedAgent.getMockImplementation();
+
+    let capturedCallback: ((evt: unknown) => void) | undefined;
+    try {
+      mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+        return {
+          subscribe: (h: (evt: unknown) => void) => {
+            capturedCallback = h;
+            return () => {};
+          },
+          prompt: vi.fn().mockResolvedValue(undefined),
+          appendMessage: vi.fn(),
+        };
+      });
+
+      const runtime = createAgentRuntime();
+      const events: RuntimeEvent[] = [];
+      const program = Stream.runForEach(
+        runtime.run({ context: mockContext, provider: mockProvider }),
+        (e) => Effect.sync(() => events.push(e)),
+      );
+      Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // 无 message 字段
+      capturedCallback!({ type: "message_update" });
+
+      capturedCallback!({ type: "agent_end", messages: [] });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const tokenEvents = events.filter((e) => e.type === "token" || e.type === "tool_call");
+      expect(tokenEvents).toHaveLength(0);
+    } finally {
+      mockedAgent.mockImplementation(originalImpl as never);
+    }
+  });
+});
+
+describe("run() — agent_end 事件", () => {
+  it("agent_end 含 assistant 消息和 toolCall block 时 done 事件包含 tool_calls", async () => {
+    const { Agent } = await import("@mariozechner/pi-agent");
+    const mockedAgent = vi.mocked(Agent);
+    const originalImpl = mockedAgent.getMockImplementation();
+
+    let capturedCallback: ((evt: unknown) => void) | undefined;
+    try {
+      mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+        return {
+          subscribe: (h: (evt: unknown) => void) => {
+            capturedCallback = h;
+            return () => {};
+          },
+          prompt: vi.fn().mockResolvedValue(undefined),
+          appendMessage: vi.fn(),
+        };
+      });
+
+      const runtime = createAgentRuntime();
+      const events: RuntimeEvent[] = [];
+      const program = Stream.runForEach(
+        runtime.run({ context: mockContext, provider: mockProvider }),
+        (e) => Effect.sync(() => events.push(e)),
+      );
+      Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      capturedCallback!({
+        type: "agent_end",
+        messages: [
+          {
+            content: [
+              { type: "text", text: "hi" },
+              { type: "toolCall", id: "tc-1", name: "get_balance", arguments: {} },
+            ],
+          },
+        ],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const doneEvent = events.find((e) => e.type === "done") as {
+        type: "done";
+        message: { content: string; tool_calls: unknown[] };
+      };
+      expect(doneEvent).toBeDefined();
+      expect(doneEvent.message.content).toBe("hi");
+      expect(doneEvent.message.tool_calls).toHaveLength(1);
+      expect((doneEvent.message.tool_calls[0] as { id: string }).id).toBe("tc-1");
+    } finally {
+      mockedAgent.mockImplementation(originalImpl as never);
+    }
+  });
+
+  it("agent_end 且 messages 为空数组时不发出 done 事件", async () => {
+    const { Agent } = await import("@mariozechner/pi-agent");
+    const mockedAgent = vi.mocked(Agent);
+    const originalImpl = mockedAgent.getMockImplementation();
+
+    let capturedCallback: ((evt: unknown) => void) | undefined;
+    try {
+      mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+        return {
+          subscribe: (h: (evt: unknown) => void) => {
+            capturedCallback = h;
+            return () => {};
+          },
+          prompt: vi.fn().mockResolvedValue(undefined),
+          appendMessage: vi.fn(),
+        };
+      });
+
+      const runtime = createAgentRuntime();
+      const events: RuntimeEvent[] = [];
+      const program = Stream.runForEach(
+        runtime.run({ context: mockContext, provider: mockProvider }),
+        (e) => Effect.sync(() => events.push(e)),
+      );
+      Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      capturedCallback!({ type: "agent_end", messages: [] });
+
+      // 再次发送 agent_end 带内容以触发 emit.end() 清理
+      capturedCallback!({
+        type: "agent_end",
+        messages: [{ content: [{ type: "text", text: "cleanup" }] }],
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const doneEvent = events.find((e) => e.type === "done");
+      expect(doneEvent).toBeUndefined();
+    } finally {
+      mockedAgent.mockImplementation(originalImpl as never);
+    }
+  });
+});
+
+describe("cancel() — abort controller", () => {
+  it("cancel() 调用 currentAbortController.abort()", async () => {
+    const { Agent } = await import("@mariozechner/pi-agent");
+    const mockedAgent = vi.mocked(Agent);
+    const originalImpl = mockedAgent.getMockImplementation();
+
+    let capturedCallback: ((evt: unknown) => void) | undefined;
+    try {
+      mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+        return {
+          subscribe: (h: (evt: unknown) => void) => {
+            capturedCallback = h;
+            return () => {};
+          },
+          prompt: vi.fn().mockResolvedValue(undefined),
+          appendMessage: vi.fn(),
+        };
+      });
+
+      const runtime = createAgentRuntime();
+      const program = Stream.runForEach(
+        runtime.run({ context: mockContext, provider: mockProvider }),
+        (_e) => Effect.sync(() => {}),
+      );
+      Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      // spy on AbortController.prototype.abort
+      const abortSpy = vi.spyOn(AbortController.prototype, "abort");
+
+      // 调用 cancel
+      runtime.cancel();
+
+      expect(abortSpy).toHaveBeenCalled();
+
+      // cleanup
+      capturedCallback!({ type: "agent_end", messages: [] });
+    } finally {
       mockedAgent.mockImplementation(originalImpl as never);
     }
   });

@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Effect } from "effect";
 import { getBalanceTool, getPlanQuotaTool } from "./billing";
 import * as registry from "./adapters";
+import { deepseekAdapter } from "./adapters/deepseek";
 import type { BillingAdapter, Balance, PlanQuota } from "./adapters/types";
 
 describe("billing tools", () => {
@@ -47,10 +48,14 @@ describe("billing tools", () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    // Re-register deepseek adapter (may have been deleted by previous tests)
+    registry.adapterRegistry.set("deepseek", deepseekAdapter);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // Restore deepseek adapter for subsequent tests
+    registry.adapterRegistry.set("deepseek", deepseekAdapter);
   });
 
   describe("getBalanceTool", () => {
@@ -124,6 +129,34 @@ describe("billing tools", () => {
         text: "Error: Connection refused",
       });
     });
+
+    it("adapter Effect.die 触发 runBalanceEffect 走非-Fail cause 分支", async () => {
+      // Create die adapter that uses Effect.die
+      const dieAdapter: BillingAdapter = {
+        id: "die-balance",
+        fetchBalance: () => Effect.die(new Error("die boom")),
+        fetchPlanQuota: () =>
+          Effect.fail({
+            kind: "Upstream" as const,
+            message: "Not supported",
+          }),
+      };
+
+      registry.adapterRegistry.set("die-balance", dieAdapter);
+
+      const result = await getBalanceTool.execute("test-call-id", {
+        provider_id: "die-balance",
+      });
+
+      expect(result.details).toMatchObject({ kind: "Upstream" });
+      expect(result.content[0]).toMatchObject({
+        type: "text",
+        text: expect.stringContaining("Error:"),
+      });
+
+      // Cleanup
+      registry.adapterRegistry.delete("die-balance");
+    });
   });
 
   describe("getPlanQuotaTool", () => {
@@ -158,6 +191,22 @@ describe("billing tools", () => {
       expect(result.details).toMatchObject({
         kind: "Upstream",
         message: "No adapter for unknown",
+      });
+    });
+
+    it("getPlanQuotaTool 调 deepseek adapter (无 plan_quota 支持) → Upstream", async () => {
+      // deepseekAdapter is registered in adapterRegistry by default
+      const result = await getPlanQuotaTool.execute("test-call-id", {
+        provider_id: "deepseek",
+      });
+
+      expect(result.details).toMatchObject({
+        kind: "Upstream",
+        message: expect.stringContaining("does not support plan_quota"),
+      });
+      expect(result.content[0]).toMatchObject({
+        type: "text",
+        text: expect.stringContaining("Error:"),
       });
     });
   });

@@ -11,6 +11,7 @@
     "typecheck:e2e": "tsc --noEmit -p tsconfig.e2e.json",
     "test": "vp run test:web",
     "test:web": "vitest --run",
+    "test:related": "vitest --run related",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --run --coverage",
     "tauri:dev": " vp run kill-port && tauri dev",
