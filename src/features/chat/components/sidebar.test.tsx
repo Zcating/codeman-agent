@@ -31,6 +31,7 @@ function makeConv(id: string, title: string, updatedAt = 1700000000): Conversati
     id,
     title,
     system_prompt: null,
+    workspace_id: "",
     created_at: 1700000000,
     updated_at: updatedAt,
     archived_at: null,

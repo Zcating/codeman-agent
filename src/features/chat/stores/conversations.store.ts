@@ -31,6 +31,7 @@ export interface ConversationState {
   id: string;
   title: string;
   system_prompt: string | null;
+  workspace_id: string;
   created_at: number;
   updated_at: number;
   archived_at: number | null;
@@ -69,6 +70,7 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
     id: conv.id,
     title: conv.title,
     system_prompt: conv.system_prompt,
+    workspace_id: conv.workspace_id,
     created_at: conv.created_at,
     updated_at: conv.updated_at,
     archived_at: conv.archived_at,
@@ -87,6 +89,13 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
 export function selectConversation(id: string): void {
   setActiveIdSignal(id);
   setStore("activeId", id);
+}
+
+// ─── clearActiveConversation: 清除 active ─────────────────────
+
+export function clearActiveConversation(): void {
+  setActiveIdSignal(null);
+  setStore("activeId", null);
 }
 
 // ─── sendMessage: append user msg + run + subscribe ───────────
@@ -326,4 +335,32 @@ export async function createConversation(
     setupConvState(result.value, []);
     selectConversation(result.value.id);
   }
+}
+
+// ─── createAndSendConversation: Home send flow ─────────────────
+
+/**
+ * Home send flow:
+ * 1. createConversation(workspaceId, title) → DB persist + selectConversation
+ * 2. activeId is set by createConversation (via selectConversation)
+ * 3. sendMessage(id, firstMessage, provider) → LLM streaming
+ *
+ * @param workspaceId - 用户选定的 workspace id
+ * @param title - 会话标题（from firstMessage.slice(0, 30)）
+ * @param firstMessage - 用户输入的第一条消息
+ * @param provider - ProviderConfig (与 sendMessage 同样的构造)
+ */
+export async function createAndSendConversation(
+  workspaceId: string,
+  title: string,
+  firstMessage: string,
+  provider: ProviderConfig,
+): Promise<void> {
+  await createConversation(workspaceId, title);
+  const id = activeId$();
+  if (!id) {
+    console.error("[conversations.store] createAndSendConversation: activeId is null after createConversation");
+    return;
+  }
+  await sendMessage(id, firstMessage, provider);
 }
