@@ -144,11 +144,12 @@ export function ChatView() {
           }
         >
           <div
-            class="max-w-prose p-3 rounded-lg leading-relaxed bg-card text-muted-foreground border border-border italic flex items-center gap-2"
+            class="max-w-prose pl-3 border-l-2 border-primary bg-card text-muted-foreground italic flex items-center gap-2"
             role="status"
             aria-live="polite"
+            data-testid="thinking-indicator"
           >
-            <span aria-hidden="true">⏳</span>
+            <span class="text-primary font-medium" aria-hidden="true">●●●</span>
             <span>正在思考…</span>
           </div>
         </Show>

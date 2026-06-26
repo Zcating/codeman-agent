@@ -444,8 +444,10 @@ describe("ChatView", () => {
     // Set last message content to empty string for thinking indicator condition
     mockStore.byId["conv-1"].messages[mockStore.byId["conv-1"].messages.length - 1].content = "";
     const { container } = render(() => <ChatView />);
-    const indicator = container.querySelector('[role="status"]');
+    const indicator = container.querySelector('[data-testid="thinking-indicator"]');
     expect(indicator).toBeTruthy();
+    expect(indicator?.getAttribute("role")).toBe("status");
+    expect(indicator?.getAttribute("aria-live")).toBe("polite");
     expect(indicator?.textContent).toContain("正在思考…");
   });
 
@@ -455,7 +457,7 @@ describe("ChatView", () => {
     const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null }> } }).store;
     mockStore.byId["conv-1"].streamingMessageId = null;
     const { container } = render(() => <ChatView />);
-    const indicator = container.querySelector('[role="status"]');
+    const indicator = container.querySelector('[data-testid="thinking-indicator"]');
     expect(indicator).toBeNull();
   });
 

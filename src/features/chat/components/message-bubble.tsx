@@ -5,6 +5,7 @@
 
 import { Show, For } from "solid-js";
 import { marked } from "marked";
+import { XCircle, CheckCircle2 } from "lucide-solid";
 import type { Message, ToolCall, ToolResult, FileMatch } from "../../../shared/lib/types";
 
 /** 转义用户提供的文本以防止 XSS。 */
@@ -63,7 +64,11 @@ export function MessageBubble(props: { message: Message }) {
             <For each={props.message.tool_results!}>
               {(tr: ToolResult) => (
                 <div class={`mt-1 text-xs ${tr.error ? "text-destructive" : "text-success"}`}>
-                  <code>{tr.tool_call_id}</code>: {tr.error ? "❌" : "✓"}{" "}
+                  <code>{tr.tool_call_id}</code>: {tr.error ? (
+                    <XCircle class="h-3 w-3 inline align-middle text-destructive" aria-label="error" data-testid="tool-error" />
+                  ) : (
+                    <CheckCircle2 class="h-3 w-3 inline align-middle text-success" aria-label="success" data-testid="tool-success" />
+                  )}{" "}
                   <Show
                     when={typeof tr.result === "string" && tr.result.length > 200}
                     fallback={<code class="text-foreground">{JSON.stringify(tr.result)}</code>}

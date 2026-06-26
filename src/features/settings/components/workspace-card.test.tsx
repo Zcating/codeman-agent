@@ -88,6 +88,16 @@ describe("WorkspaceCard", () => {
     expect(screen.getByText("Delete")).toBeInTheDocument();
   });
 
+  it("Browse button contains FolderOpen icon", () => {
+    render(() => (
+      <WorkspaceCard workspace={mockWorkspace} onUpdate={onUpdate} onRemove={onRemove} />
+    ));
+
+    const browseBtn = document.querySelector("[data-testid='workspace-browse']");
+    expect(browseBtn).toBeTruthy();
+    expect(browseBtn?.querySelector("svg")).toBeTruthy();
+  });
+
   it("renders disabled workspace correctly", () => {
     const disabled: Workspace = { ...mockWorkspace, enabled: false };
     render(() => <WorkspaceCard workspace={disabled} onUpdate={onUpdate} onRemove={onRemove} />);

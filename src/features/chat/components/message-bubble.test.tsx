@@ -73,7 +73,7 @@ describe("MessageBubble", () => {
     const summary = bubble?.querySelector("summary");
     expect(summary?.textContent).toBe("工具结果");
     // 显示带 ✓ 的工具结果项
-    expect(bubble?.textContent).toContain("✓");
+    expect(container.querySelector("[data-testid='tool-success']")).toBeTruthy();
   });
 
   it("system 角色：静音文本", () => {
@@ -142,7 +142,7 @@ describe("MessageBubble", () => {
     // text-destructive class for error
     const errorDiv = bubble?.querySelector(".text-destructive");
     expect(errorDiv).toBeTruthy();
-    expect(errorDiv?.textContent).toContain("❌");
+    expect(container.querySelector("[data-testid='tool-error']")).toBeTruthy();
     expect(errorDiv?.textContent).toContain("tc-1");
   });
 
@@ -168,7 +168,7 @@ describe("MessageBubble", () => {
     // text-success class for success
     const successDiv = bubble?.querySelector(".text-success");
     expect(successDiv).toBeTruthy();
-    expect(successDiv?.textContent).toContain("✓");
+    expect(container.querySelector("[data-testid='tool-success']")).toBeTruthy();
   });
 
   // ─── 长字符串 tool result 渲染 details 测试 ─────────────────────────

@@ -5,6 +5,7 @@
 
 import { createSignal } from "solid-js";
 import { Effect } from "effect";
+import { FolderOpen } from "lucide-solid";
 import type { Workspace } from "../../../shared/lib/types";
 import { appStore } from "../../../shared/stores/app.store";
 import { settingsSaver } from "../lib/settings-saver";
@@ -107,11 +108,14 @@ export function WorkspaceCard(props: WorkspaceCardProps) {
             />
             <button
               type="button"
-              class="h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"
+              class="h-9 px-3 rounded-md border border-input bg-background text-sm hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 flex items-center gap-2"
               onClick={handleBrowse}
               disabled={isPicking()}
               title="Browse for folder"
+              aria-label="Browse for folder"
+              data-testid="workspace-browse"
             >
+              <FolderOpen class="h-4 w-4" aria-hidden="true" />
               {isPicking() ? "…" : "Browse…"}
             </button>
           </div>
