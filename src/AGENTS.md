@@ -13,7 +13,7 @@ V1 是 Tauri 2 + Solid chat agent，**不是 V0 280x100 浮窗**。视觉层走 
 | `index.tsx`     | Solid 渲染入口（挂载 `<RouterProvider>`）                                          | 首行 `import "./index.css"`                                         |
 | `index.css`     | Tailwind v4 入口（`@import` + `@theme` + `@layer base`）                           | token 集中地                                                        |
 | `router.tsx`    | TanStack Router code-based 配置                                                    | 不用 `@tanstack/router-plugin`（ADR-0007）                          |
-| `test-setup.ts` | vitest setup（`vi.mock("@tauri-apps/api/core", ...)` + `scrollIntoView` polyfill） | mockState 唯一源在src/**mocks**/@tauri-apps/api/core.ts（ADR-0010） |
+| `vitest.setup.ts` | vitest setup（`vi.mock("@tauri-apps/api/core", ...)` + `scrollIntoView` polyfill） | mockState 唯一源在src/**mocks**/@tauri-apps/api/core.ts（ADR-0010） |
 | `vite-env.d.ts` | Vite 类型                                                                          | 不可删                                                              |
 
 ## src/ 子目录（5+1 白名单）

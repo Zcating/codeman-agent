@@ -81,7 +81,7 @@ import { mockState } from "src/__mocks__/@tauri-apps/api/core";
 import { mockState } from "@/shared/shared-mock-state";
 ```
 
-`src/test-setup.ts` 用 `vi.mock("@tauri-apps/api/core", () => ({ invoke: ... }))` 配置 invoke 默认行为，`mockState` 从 src/**mocks**/ 唯一源 import，运行时配置与测试 import 是同一引用。
+`vitest.setup.ts` 用 `vi.mock("@tauri-apps/api/core", () => ({ invoke: ... }))` 配置 invoke 默认行为，`mockState` 从 src/**mocks**/ 唯一源 import，运行时配置与测试 import 是同一引用。
 
 ## 测试策略
 
