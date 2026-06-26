@@ -58,8 +58,6 @@ pub fn run() {
             commands::list_messages,
             commands::append_message,
             commands::search_messages,
-            // T13: billing
-            commands::get_provider_snapshot,
             // T22: settings
             commands::clear_all_history,
             // T22: dialog
@@ -97,7 +95,9 @@ pub fn run() {
                 }
             });
 
-            // V0 调度器已删除；billing 轮询迁移至 TS（ADR-0012）。
+            // V0 调度器已删除;billing 业务整体下线 (V2)。
+            // V2 scheduler.rs: 如果未来需要任何后台轮询(例如 workspace auto-refresh),
+            // 唯一入口是 scheduler.rs,不要在此处另起循环。
 
             app.manage(state);
             info!("codeman-agent 已启动");

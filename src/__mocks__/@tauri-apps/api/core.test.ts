@@ -1,5 +1,7 @@
 //! Tests for the Tauri API mock (src/__mocks__/@tauri-apps/api/core.ts).
 //! These tests verify the V1.5+ mock implementation.
+//!
+//! V2: billing removed. All billing tests are deleted.
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { invoke, mockState, mockMinimaxProvider, mockDeepseekProvider, mockProvider } from "./core";
@@ -25,7 +27,6 @@ describe("Tauri API Mock - V1.5+ Schema", () => {
       system_prompt: { default: "You are a helpful assistant.", user_can_edit: true },
       conversations: { auto_archive_after_days: 30, max_history: 1000 },
       llm_providers: [],
-      billing_providers: [],
     };
     mockState.store = {};
     mockState.v0FixtureActive = false;
@@ -89,32 +90,6 @@ describe("Tauri API Mock - V1.5+ Schema", () => {
     });
   });
 
-  describe("list_billing_providers", () => {
-    it("derives from settings.providers.filter(p => p.billing)", async () => {
-      mockState.settings.providers = [mockMinimaxProvider, mockDeepseekProvider];
-
-      const result = await invoke("list_billing_providers");
-
-      expect(Array.isArray(result)).toBe(true);
-      const providers = result as any[];
-      expect(providers.length).toBe(2);
-      expect(providers.map((p) => p.id).sort()).toEqual(["deepseek", "minimax"]);
-    });
-
-    it("returns empty array when no providers have billing", async () => {
-      mockState.settings.providers = [
-        {
-          ...mockMinimaxProvider,
-          billing: undefined,
-        },
-      ];
-
-      const result = await invoke("list_billing_providers");
-
-      expect(result).toEqual([]);
-    });
-  });
-
   describe("unknown IPC command", () => {
     it("throws helpful error with available commands list", async () => {
       await expect(invoke("nonexistent_command")).rejects.toThrow(
@@ -157,16 +132,6 @@ describe("Tauri API Mock - V1.5+ Schema", () => {
       expect(provider.enabled).toBe(false);
       expect(provider.llm.default_model).toBe("custom-model");
     });
-
-    it("allows omitting optional billing", () => {
-      const provider = mockProvider({
-        id: "llm-only",
-        label: "LLM Only",
-        billing: undefined,
-      });
-
-      expect(provider.billing).toBeUndefined();
-    });
   });
 
   describe("clear_all_history", () => {
@@ -190,14 +155,6 @@ describe("Tauri API Mock - V1.5+ Schema", () => {
             api_key_ref: "llm_providers/deepseek/api_key",
           },
         ],
-        billing_providers: [
-          {
-            id: "deepseek",
-            enabled: true,
-            refresh_interval_secs: 300,
-            api_key_ref: "billing/deepseek/api_key",
-          },
-        ],
         default_llm_provider_id: "deepseek",
         user_language: "en",
         theme: "dark",
@@ -218,7 +175,6 @@ describe("Tauri API Mock - V1.5+ Schema", () => {
       expect((settings as any).providers).toHaveLength(1);
       expect((settings as any).providers[0].id).toBe("deepseek");
       expect((settings as any).providers[0].llm.default_model).toBe("deepseek-chat");
-      expect((settings as any).providers[0].billing.kind).toBe("balance");
       expect((settings as any).theme).toBe("dark");
     });
   });
@@ -226,10 +182,9 @@ describe("Tauri API Mock - V1.5+ Schema", () => {
   describe("mockState.calls tracking", () => {
     it("records all IPC calls", async () => {
       await invoke("get_settings");
-      await invoke("list_billing_providers");
       await invoke("fetch_models", { providerId: "minimax" });
 
-      expect(mockState.calls).toEqual(["get_settings", "list_billing_providers", "fetch_models"]);
+      expect(mockState.calls).toEqual(["get_settings", "fetch_models"]);
     });
   });
 });

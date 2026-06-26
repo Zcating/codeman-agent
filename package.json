@@ -1,7 +1,7 @@
 {
   "name": "codeman-agent",
   "version": "0.2.0",
-  "description": "Native Windows desktop AI agent with billing tools (DeepSeek, MiniMax)",
+  "description": "Native Windows desktop AI agent with file system tools (DeepSeek, MiniMax)",
   "license": "MIT",
   "type": "module",
   "scripts": {

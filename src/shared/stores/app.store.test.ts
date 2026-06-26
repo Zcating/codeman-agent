@@ -65,7 +65,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
       system_prompt: { default: "", user_can_edit: true },
       conversations: { auto_archive_after_days: 30, max_history: 1000 },
       llm_providers: [],
-      billing_providers: [],
     };
     await Effect.runPromise(appStore.refresh());
   });
@@ -111,7 +110,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
             models: [{ id: "old-model", label: "Old", deprecated: false, thinking: false }],
             models_endpoint: "https://api.example.com/v1/models",
           },
-          billing: { kind: "plan_quota" as const },
         },
       ],
     };
@@ -155,7 +153,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
             models: [{ id: "old-model", label: "Old", deprecated: false, thinking: false }],
             models_endpoint: "https://api.example.com/v1/models",
           },
-          billing: { kind: "plan_quota" as const },
         },
       ],
     };
@@ -188,7 +185,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
             models: [{ id: "kept-model", label: "Kept", deprecated: false, thinking: false }],
             models_endpoint: "https://api.example.com/v1/models",
           },
-          billing: { kind: "plan_quota" as const },
         },
       ],
     };
@@ -226,7 +222,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
             models: [],
             models_endpoint: "https://api.example.com/v1/models",
           },
-          billing: { kind: "plan_quota" as const },
         },
       ],
     };
@@ -294,7 +289,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
             models: [{ id: "some-model", label: "Some", deprecated: false, thinking: false }],
             models_endpoint: "https://api.example.com/v1/models",
           },
-          billing: { kind: "plan_quota" as const },
         },
       ],
     };
@@ -361,7 +355,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
             models: [],
             models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
           },
-          billing: { kind: "plan_quota" },
         },
         {
           id: "deepseek",
@@ -375,7 +368,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
             models: [],
             models_endpoint: "https://api.deepseek.com/models",
           },
-          billing: { kind: "balance" },
         },
       ],
     };
@@ -404,7 +396,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
             models: [],
             models_endpoint: "https://api.deepseek.com/models",
           },
-          billing: { kind: "balance" },
         },
       ],
     };
@@ -453,7 +444,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
             models: [],
             models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
           },
-          billing: { kind: "plan_quota" },
         },
       ],
     };

@@ -22,7 +22,6 @@ vi.mock("../lib/tauri", () => ({
       min_size: { width: 400, height: 300 },
     },
     system_prompt: { default: "", user_can_edit: true },
-    billing_providers: [],
     conversations: { auto_archive_after_days: 30, max_history: 1000 },
   }),
 }));

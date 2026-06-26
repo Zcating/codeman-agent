@@ -178,7 +178,24 @@ export class TauriPage {
 
   /** 重新注入 __cdp helper(page reload 后 window.__cdp 会丢失)。 */
   async reinjectCdp(): Promise<void> {
-    await this.evaluate(new Function(CDP_INJECT_SCRIPT) as any);
+    // 不能用 this.evaluate(fn) — new Function(CDP_INJECT_SCRIPT).toString()
+    // 序列化会破坏 IIFE 闭包。直接调 Runtime.evaluate 注入 script string 更可靠。
+    const result = await this.conn.send(
+      "Runtime.evaluate",
+      {
+        expression: CDP_INJECT_SCRIPT,
+        returnByValue: true,
+        awaitPromise: false,
+      },
+      this.sessionId,
+    );
+    if (result.exceptionDetails) {
+      throw new Error(
+        result.exceptionDetails.exception?.description ??
+          result.exceptionDetails.text ??
+          "reinjectCdp failed",
+      );
+    }
   }
 
   /** 在页面里跑 JS。函数会被序列化后通过 Runtime.evaluate 传过去。 */

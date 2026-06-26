@@ -97,7 +97,7 @@ describe("MessageBubble", () => {
 
   it("带 tool_calls 的 assistant 显示可展开工具调用详情", () => {
     const toolCalls: ToolCall[] = [
-      { id: "tc-1", name: "get_balance", args: { provider: "deepseek" } },
+      { id: "tc-1", name: "read_file", args: { path: "/tmp/x.txt" } },
     ];
     const msg: Message = {
       id: "msg-5",
@@ -116,7 +116,7 @@ describe("MessageBubble", () => {
     expect(details).toBeTruthy();
     const summary = details?.querySelector("summary");
     expect(summary?.textContent).toContain("工具调用 (1)");
-    expect(details?.textContent).toContain("get_balance");
+    expect(details?.textContent).toContain("read_file");
   });
 
   // ─── tool_results error/success 分支测试 ─────────────────────────────

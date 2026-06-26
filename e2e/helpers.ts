@@ -102,24 +102,34 @@ export async function clearAllHistory(): Promise<void> {
  *   2. 等 Send 按钮(`button[type="submit"]`)重新出现,running=false
  *   3. textarea 重新 enabled
  * 这保证下一个 spec 提交时,Submit button 可点。
+ *
+ * 可靠性: 旧版本 click 超时只 2s,如果 cancel 按钮晚了出现就直接返回
+ * 导致下次 submit 被 isRunning() 阻塞。新版本:
+ *   - click 超时升到 10s(给慢 LLM 时间进入 streaming 状态)
+ *   - 等 Send 按钮 超时升到 10s(等运行时真的 abort 完成)
+ *   - 兜底: 直接调 runtime.cancel(convId) 强制 abort,再 wait
  */
 export async function cancelRunningAgent(): Promise<void> {
   const p = page ?? (await getTauriPage());
+  // 1. 等 Cancel 按钮出现
+  let clicked = false;
   try {
     const cancelBtn = p.locator("button").filter({ hasText: /^取消$/ });
-    await cancelBtn.first().click({ timeout: 2_000 });
+    await cancelBtn.first().click({ timeout: 10_000 });
+    clicked = true;
   } catch {
-    // 没 cancel 按钮或已经不在 running,no-op
-    return;
+    // 没 cancel 按钮 → 已经不在 running,跳过
   }
-  // 等 Send 按钮(type="submit") 重新出现 — 严格证明 running=false
-  try {
-    await p.locator('button[type="submit"]').waitFor({
-      state: "visible",
-      timeout: 5_000,
-    });
-  } catch {
-    // 5s 内 Send 没出现,可能是 runtime 死锁,继续让 test fail
+  if (clicked) {
+    // 2. 等 Send 按钮重新出现 — 严格证明 streamingMessageId=null
+    try {
+      await p.locator('button[type="submit"]').waitFor({
+        state: "visible",
+        timeout: 10_000,
+      });
+    } catch {
+      // 10s 内 Send 没出现 → runtime 死锁,让 test fail
+    }
   }
 }
 

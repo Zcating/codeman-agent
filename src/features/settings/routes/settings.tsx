@@ -4,7 +4,7 @@
 //! footer Save 按钮调用 appStore.forceFlush()。不再有 local draft signal。
 //! "app" 选项卡不再有 start_minimized / close_behavior / hotkeys
 //!（这些在 V1.5 后端重构中已移除 — 见 ADR-0007）。
-//! "window" 和 "billing" 选项卡保留为占位符存根。
+//! "window" 选项卡保留为占位符存根。
 
 import { createSignal, Show, For, onMount } from "solid-js";
 import { Effect } from "effect";
@@ -18,7 +18,7 @@ import { invoke } from "../../../shared/lib/tauri";
 import { logger } from "../../../shared/lib/logger";
 import type { Provider, Workspace } from "../../../shared/lib/types";
 
-type Tab = "llm" | "app" | "window" | "billing" | "advanced";
+type Tab = "llm" | "app" | "window" | "advanced";
 
 export function SettingsPage() {
   const [tab, setTab] = createSignal<Tab>("llm");
@@ -102,7 +102,7 @@ export function SettingsPage() {
         <div class="w-12" />
       </header>
       <nav class="flex gap-1 p-2 border-b border-zinc-200 dark:border-zinc-700 overflow-x-auto bg-white dark:bg-zinc-800">
-        <For each={["llm", "app", "window", "billing", "advanced"] as const}>
+        <For each={["llm", "app", "window", "advanced"] as const}>
           {(t) => (
             <button
               type="button"
@@ -119,9 +119,7 @@ export function SettingsPage() {
                   ? "App"
                   : t === "window"
                     ? "Window"
-                    : t === "billing"
-                      ? "Billing"
-                      : "Advanced"}
+                    : "Advanced"}
             </button>
           )}
         </For>
@@ -258,12 +256,10 @@ export function SettingsPage() {
             </Show>
           </section>
         </Show>
-        <Show when={tab() === "window" || tab() === "billing"}>
+        <Show when={tab() === "window"}>
           <section>
             <p class="text-sm text-zinc-500 dark:text-zinc-400 italic">
-              {tab() === "window"
-                ? "Window settings (default size 1280×1280, min 800×800; position is remembered)"
-                : "Billing providers — see ProviderCard for LLM; billing tools via tools/billing."}
+              Window settings (default size 1280×1280, min 800×800; position is remembered)
             </p>
           </section>
         </Show>

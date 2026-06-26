@@ -40,8 +40,8 @@
     "active": true,
     "targets": ["msi", "nsis"],
     "category": "Utility",
-    "shortDescription": "LLM billing chat agent for DeepSeek and MiniMax",
-    "longDescription": "A single native main window chat agent that queries DeepSeek balance and MiniMax plan quota. Settings accessible via in-app route.",
+    "shortDescription": "LLM chat agent for DeepSeek and MiniMax with file system tools",
+    "longDescription": "A single native main window chat agent with file system tools (read/write/edit/search/delete). Settings accessible via in-app route.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

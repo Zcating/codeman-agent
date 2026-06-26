@@ -24,7 +24,7 @@
 
 import { createStore } from "solid-js/store";
 import { Effect } from "effect";
-import type { Settings, Provider, ProviderBilling, ModelMeta, AppError } from "../lib/types";
+import type { Settings, Provider, ModelMeta, AppError } from "../lib/types";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import {
   ProviderService,
@@ -56,9 +56,6 @@ const DEFAULT_MINIMAX_PROVIDER: Provider = {
     ],
     models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
   },
-  billing: {
-    kind: "plan_quota",
-  } as ProviderBilling,
 };
 
 export const defaultSettings: Settings = {
@@ -76,9 +73,7 @@ export const defaultSettings: Settings = {
   },
   system_prompt: {
     default:
-      "You are an AI assistant with access to billing tools and file system tools.\n" +
-      "\n## Billing Tools\n" +
-      "You can call get_balance and get_plan_quota to check provider billing state.\n" +
+      "You are an AI assistant with access to file system tools.\n" +
       "\n## File Tools\n" +
       "You have access to 5 file tools (read_file, write_file, edit_file, search_files, delete_file).\n" +
       "Each tool requires a workspace_id parameter — only operate within user-configured workspaces.\n" +
@@ -90,7 +85,6 @@ export const defaultSettings: Settings = {
   conversations: { auto_archive_after_days: 30, max_history: 1000 },
   workspaces: [],
   llm_providers: [],
-  billing_providers: [],
 };
 
 const [settings, setSettings] = createStore<{ value: Settings }>({

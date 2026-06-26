@@ -39,6 +39,35 @@ function bootstrap() {
       );
     }
   });
+
+  // Expose appStore on window for e2e tests — e2e specs (e.g. mock-provider)
+  // call invoke("update_settings", ...) to switch the active LLM provider, but
+  // the in-memory Solid signal is the chat-view's source of truth. After
+  // updating backend settings via raw IPC, the test must refresh appStore so
+  // the next handleSend() picks up the new provider.
+  // Production code never reads window.__appStore — this is test infra only.
+  //
+  // We expose `refreshAsync` (Promise-returning) rather than `refresh` (Effect-returning)
+  // so the e2e test can `await page.evaluate(() => window.__appStore.refreshAsync())`
+  // without needing to import Effect at the call site.
+  type WindowWithAppStore = {
+    __appStore?: {
+      refresh: () => Effect.Effect<unknown, unknown>;
+      refreshAsync: () => Promise<unknown>;
+    };
+  };
+  (window as unknown as WindowWithAppStore).__appStore = {
+    refresh: () => appStore.refresh(),
+    refreshAsync: () =>
+      Effect.runPromiseExit(appStore.refresh() as Effect.Effect<unknown, unknown>).then(
+        (exit) => {
+          if (Exit.isFailure(exit)) {
+            throw new Error("appStore.refresh failed");
+          }
+          return exit.value;
+        },
+      ),
+  };
 }
 
 bootstrap();

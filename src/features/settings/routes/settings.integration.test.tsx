@@ -84,9 +84,6 @@ const mockMiniMaxProvider: Provider = {
     ],
     models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
   },
-  billing: {
-    kind: "plan_quota",
-  },
 };
 
 const baseSettings: SettingsV15 = {
@@ -105,7 +102,6 @@ const baseSettings: SettingsV15 = {
   system_prompt: { default: "", user_can_edit: true },
   conversations: { auto_archive_after_days: 30, max_history: 1000 },
   llm_providers: [],
-  billing_providers: [],
 };
 
 // ─── Tests ────────────────────────────────────────────────────
@@ -313,19 +309,6 @@ describe("SettingsRoute integration — tab switching & handlers", () => {
 
     expect(
       screen.getByText(/Window settings \(default size 1280×1280, min 800×800; position is remembered\)/i),
-    ).toBeInTheDocument();
-  });
-
-  it("点击 'Billing' tab 显示 placeholder 文案", async () => {
-    const user = userEvent.setup();
-    render(() => <SettingsPage />);
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    await user.click(screen.getByRole("button", { name: "Billing" }));
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    expect(
-      screen.getByText(/Billing providers — see ProviderCard for LLM; billing tools via tools\/billing\./i),
     ).toBeInTheDocument();
   });
 

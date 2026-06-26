@@ -2,13 +2,12 @@
 //!
 //! `AppState` 是 `Clone`（所有字段都是 `Arc` / `parking_lot` 守卫），
 //! 因此可以移动到后台任务中，并通过 `tauri::State` 被 Tauri 命令读取。
+//!
+//! V2 简化: snapshots map + fetch_provider 删除 (billing tool 整体下线)。
 
 use crate::settings::Settings;
-use crate::types::{ProviderId, SnapshotEnvelope};
-use chrono::Utc;
 use log::warn;
 use parking_lot::RwLock;
-use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
@@ -21,7 +20,6 @@ const STORE_KEY: &str = "settings";
 pub struct AppState {
     pub settings: Arc<RwLock<Settings>>,
     pub wakeup: Arc<Notify>,
-    pub snapshots: Arc<RwLock<HashMap<ProviderId, SnapshotEnvelope>>>,
     pub app_handle: AppHandle,
 }
 
@@ -31,7 +29,6 @@ impl AppState {
         Self {
             settings: Arc::new(RwLock::new(settings)),
             wakeup: Arc::new(Notify::new()),
-            snapshots: Arc::new(RwLock::new(HashMap::new())),
             app_handle,
         }
     }
@@ -66,24 +63,6 @@ impl AppState {
             }
             Err(e) => warn!("打开设置存储失败：{e}"),
         }
-    }
-
-    /// 获取快照信封（V0 provider 枚举已删除，计费迁移至 TS）。
-    /// 返回错误表示该功能已弃用。
-    pub async fn fetch_provider(
-        &self,
-        id: ProviderId,
-    ) -> Result<SnapshotEnvelope, crate::types::ProviderError> {
-        // V0 provider 枚举已删除；billing fetch 走 TS 侧。
-        // 返回错误信封，TS 侧会接管真实的 fetch 逻辑。
-        let envelope = SnapshotEnvelope {
-            provider: id,
-            snapshot: None,
-            fetched_at: Utc::now(),
-            error: Some("Billing fetch moved to TypeScript (ADR-0012)".into()),
-        };
-        self.snapshots.write().insert(id, envelope.clone());
-        Ok(envelope)
     }
 }
 

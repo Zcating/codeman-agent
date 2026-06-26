@@ -202,7 +202,11 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       break;
     }
     case "error":
+      // 不论 cancel 还是真实 LLM 错误,都从 error path 进来。
+      // 这里必须清 streamingMessageId,否则 UI 永远 stuck in "running" 状态
+      // (Cancel 按钮不消失,Send 按钮不恢复 — e2e spec 09 D2 失败的原因)。
       console.error("[conversations.store] runtime error:", evt.error);
+      setStore("byId", convId, "streamingMessageId", null);
       break;
   }
 }

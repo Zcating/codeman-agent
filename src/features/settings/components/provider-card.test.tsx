@@ -1,5 +1,5 @@
 ﻿//! ProviderCard V1.7+ tests 鈥?ADR-0015 appStore refactor.
-//! Tests for appStore integration, toggle, refresh, dropdown, billing subform,
+//! Tests for appStore integration, toggle, refresh, dropdown,
 //! delete removes provider from appStore, API Key input, and no Save buttons.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -72,10 +72,9 @@ const mockProvider = {
     ],
     models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
   },
-  billing: { kind: "plan_quota" as const },
 };
 
-const mockProviderNoBilling = {
+const _mockProviderDisabled = {
   id: "deepseek",
   label: "DeepSeek",
   enabled: false,
@@ -88,6 +87,7 @@ const mockProviderNoBilling = {
     models_endpoint: "https://api.deepseek.com/models",
   },
 };
+void _mockProviderDisabled;
 
 // 鈹€鈹€鈹€ Import provider-card AFTER mocking 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 import { ProviderCard } from "./provider-card";
@@ -211,29 +211,14 @@ describe("ProviderCard", () => {
     );
   });
 
-  // 鈹€鈹€ Test 5: LLM-only provider hides billing subform 鈹€鈹€
-  it("LLM-only provider (no billing) hides billing subform", () => {
-    render(() => (
-      <ProviderCard provider={mockProviderNoBilling} onUpdate={vi.fn()} onDelete={vi.fn()} />
-    ));
-
-    // LLM section visible
-    expect(screen.getByText("LLM")).toBeInTheDocument();
-    // Billing section NOT visible
-    expect(screen.queryByText("Billing")).not.toBeInTheDocument();
-  });
-
-  // 鈹€鈹€ Test 6: provider with billing renders billing subform with kind dropdown 鈹€鈹€
-  it("provider with billing renders billing subform with kind dropdown", () => {
+  // ── Test 5: Provider card renders LLM section ──
+  it("renders LLM section with model + base_url + api key", () => {
     renderCard();
 
     expect(screen.getByText("LLM")).toBeInTheDocument();
-    expect(screen.getByText("Billing")).toBeInTheDocument();
-    expect(screen.getByText("Kind")).toBeInTheDocument();
-
+    // V2: model select only (billing subform removed)
     const selects = document.querySelectorAll("select");
-    // 2 selects: model + billing kind
-    expect(selects.length).toBeGreaterThanOrEqual(2);
+    expect(selects.length).toBe(1);
   });
 
   // ── Test 7 (V1.8+ ADR-0016 D4): delete button calls appStore.deleteProvider + onDelete ──
@@ -257,9 +242,9 @@ describe("ProviderCard", () => {
     const onUpdate = vi.fn();
     render(() => <ProviderCard provider={mockProvider} onUpdate={onUpdate} onDelete={vi.fn()} />);
 
-    // Find the first password input (LLM API Key)
+    // Find the LLM API Key password input (V2: only 1 — billing removed)
     const apiKeyInputs = document.querySelectorAll('input[type="password"]');
-    expect(apiKeyInputs.length).toBeGreaterThanOrEqual(2); // LLM + Billing
+    expect(apiKeyInputs.length).toBe(1);
 
     const llmApiKeyInput = apiKeyInputs[0] as HTMLInputElement;
     await user.clear(llmApiKeyInput);
@@ -274,8 +259,8 @@ describe("ProviderCard", () => {
     );
   });
 
-  // 鈹€鈹€ Test 9: No Save buttons in LLM or Billing subform sections 鈹€鈹€
-  it("no Save button appears in LLM or Billing subform sections", () => {
+  // ── Test 9: No Save buttons in LLM subform section ──
+  it("no Save button appears in LLM subform section", () => {
     renderCard();
 
     // There should be no button with text "Save" anywhere in the card
@@ -312,56 +297,7 @@ describe("ProviderCard", () => {
     );
   });
 
-  // ── Test 11: Billing kind dropdown triggers handleBillingKindChange ──
-  it("Billing kind dropdown triggers handleBillingKindChange and updates state", async () => {
-    const user = userEvent.setup();
-    const onUpdate = vi.fn();
-    render(() => <ProviderCard provider={mockProvider} onUpdate={onUpdate} onDelete={vi.fn()} />);
-
-    // Find the Billing Kind select (second select)
-    const selects = document.querySelectorAll("select");
-    expect(selects.length).toBeGreaterThanOrEqual(2);
-    const billingKindSelect = selects[1] as HTMLSelectElement;
-    expect(billingKindSelect.value).toBe("plan_quota"); // default
-
-    await user.selectOptions(billingKindSelect, "balance");
-
-    const lastSet = getLastSetCall();
-    expect(lastSet).toBeTruthy();
-    const updatedProviders = lastSet.providers;
-    expect(updatedProviders.find((p: any) => p.id === "minimax")?.billing?.kind).toBe("balance");
-    expect(onUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: "minimax",
-        billing: expect.objectContaining({ kind: "balance" }),
-      }),
-    );
-  });
-
-  // ── Test 12: Billing API Key input triggers appStore.set (与 LLM 同步) ──
-  it("Billing API Key input updates provider.api_key in state", async () => {
-    const user = userEvent.setup();
-    const onUpdate = vi.fn();
-    // mockProvider has billing kind=plan_quota, so billing subform is visible
-    render(() => <ProviderCard provider={mockProvider} onUpdate={onUpdate} onDelete={vi.fn()} />);
-
-    // Find the Billing API Key input (second password input)
-    const passwordInputs = document.querySelectorAll('input[type="password"]');
-    expect(passwordInputs.length).toBeGreaterThanOrEqual(2);
-    const billingApiKeyInput = passwordInputs[1] as HTMLInputElement;
-    expect(billingApiKeyInput).toBeTruthy();
-
-    await user.clear(billingApiKeyInput);
-    await user.type(billingApiKeyInput, "billing-secret-key");
-
-    const lastSet = getLastSetCall();
-    expect(lastSet).toBeTruthy();
-    const updatedProviders = lastSet.providers;
-    // Both LLM and Billing share the same api_key field (ADR-0015)
-    expect(updatedProviders.find((p: any) => p.id === "minimax")?.api_key).toBe("billing-secret-key");
-  });
-
-  // ── Test 13: delete confirm=false 时不调 deleteProvider ──
+  // ── Test 11: delete confirm=false 时不调 deleteProvider ──
   it("delete confirm=false 时不调 deleteProvider", async () => {
     const user = userEvent.setup();
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);

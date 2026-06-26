@@ -3,14 +3,13 @@
 
 pub mod filesystem;
 
-use log;
 use tauri_plugin_dialog::DialogExt;
 
 use crate::db::conversations;
 use crate::db::messages;
 use crate::settings::Settings;
 use crate::state::AppState;
-use crate::types::{AppError, ProviderId, SnapshotEnvelope};
+use crate::types::AppError;
 use tauri::State;
 use uuid::Uuid;
 
@@ -208,27 +207,6 @@ pub async fn search_messages(
             AppError::from(e)
         })?;
     log::info!("search_messages: 成功 count={}", result.len());
-    Ok(result)
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 计费快照 IPC（任务 13）
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[tauri::command]
-pub async fn get_provider_snapshot(
-    state: State<'_, AppState>,
-    provider: ProviderId,
-) -> Result<SnapshotEnvelope, AppError> {
-    log::debug!("get_provider_snapshot: 进入 provider={}", provider);
-    let result = state
-        .fetch_provider(provider)
-        .await
-        .map_err(|e| {
-            log::error!("get_provider_snapshot: 失败");
-            AppError::Upstream { message: e.to_string() }
-        })?;
-    log::info!("get_provider_snapshot: 成功");
     Ok(result)
 }
 

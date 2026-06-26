@@ -81,9 +81,6 @@ const mockMiniMaxProvider: Provider = {
     ],
     models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
   },
-  billing: {
-    kind: "plan_quota",
-  },
 };
 
 const mockDeepSeekProvider: Provider = {
@@ -97,9 +94,6 @@ const mockDeepSeekProvider: Provider = {
     api_type: "anthropic-messages",
     models: [{ id: "deepseek-chat", label: "DeepSeek Chat", deprecated: false, thinking: false }],
     models_endpoint: "https://api.deepseek.com/anthropic/v1/models",
-  },
-  billing: {
-    kind: "balance",
   },
 };
 
@@ -117,7 +111,6 @@ const baseSettings: SettingsV15 = {
     min_size: { width: 600, height: 400 },
   },
   system_prompt: { default: "You are a helpful assistant.", user_can_edit: true },
-  billing_providers: [],
   conversations: { auto_archive_after_days: 30, max_history: 1000 },
   llm_providers: [],
 };
@@ -186,7 +179,7 @@ describe("SettingsPage — V1.5 provider rendering", () => {
     const { container } = render(() => <SettingsPage />);
     await new Promise((resolve) => setTimeout(resolve, 10));
     const tabs = container.querySelectorAll("nav button");
-    expect(tabs.length).toBe(5);
+    expect(tabs.length).toBe(4); // V2: billing tab removed
   });
 
   it("header has Back link with correct text", async () => {

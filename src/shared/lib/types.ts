@@ -6,19 +6,12 @@
 // V1.5 Unified Provider Schema (ADR-0012)
 // ============================================================================
 
-export type BillingKind = "balance" | "plan_quota";
-
 export interface ModelMeta {
   id: string;
   label: string;
   context_window?: number;
   deprecated: boolean;
   thinking: boolean;
-}
-
-export interface ProviderBilling {
-  kind: BillingKind;
-  // billing_api_key_ref removed (ADR-0015) — Provider.api_key reused
 }
 
 export interface ProviderLlm {
@@ -36,7 +29,6 @@ export interface Provider {
   enabled: boolean;
   api_key: string; // ADR-0015: plaintext in Settings JSON
   llm: ProviderLlm;
-  billing?: ProviderBilling;
 }
 
 // ============================================================================
@@ -57,8 +49,6 @@ export interface Settings {
   conversations: ConversationSettings;
   /** @deprecated Use providers instead. Kept for V1 consumer backward-compatibility. */
   llm_providers: LLMProvider[];
-  /** @deprecated Use providers[].billing instead. Kept for V1 consumer backward-compatibility. */
-  billing_providers: BillingProviderConfig[];
   /** V2: workspaces list. V1→V2 migration defaults to empty array. */
   workspaces?: Workspace[];
 }
@@ -79,16 +69,6 @@ export interface LLMProvider {
   default_model?: string;
   base_url?: string;
   api_type: "anthropic-messages";
-  api_key_ref: string;
-}
-
-/**
- * @deprecated Use Provider.billing instead. Will be removed after T6-T11 migrations.
- */
-export interface BillingProviderConfig {
-  id: "deepseek" | "minimax";
-  enabled: boolean;
-  refresh_interval_secs: number;
   api_key_ref: string;
 }
 
@@ -163,27 +143,6 @@ export interface ToolResult {
   tool_call_id: string;
   result: unknown;
   error: string | null;
-}
-
-// ============================================================================
-// Billing snapshot (preserved)
-// ============================================================================
-
-export type Snapshot =
-  | { kind: "balance"; amount: number; currency: string; auto_recharge: boolean | null }
-  | {
-      kind: "plan_quota";
-      remaining: number;
-      total: number;
-      expires_at: number | null;
-      daily_avg: number | null;
-    };
-export type Balance = Extract<Snapshot, { kind: "balance" }>;
-export type PlanQuota = Extract<Snapshot, { kind: "plan_quota" }>;
-export interface BillingProviderMeta {
-  id: string;
-  label: string;
-  enabled: boolean;
 }
 
 // ============================================================================

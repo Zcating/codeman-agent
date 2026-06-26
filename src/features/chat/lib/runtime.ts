@@ -14,7 +14,6 @@ import { AnthropicTransport } from "./anthropic-transport";
 import type { AgentTransport } from "@mariozechner/pi-agent";
 import { Agent } from "@mariozechner/pi-agent";
 import type { Model, Message as PiMessage } from "@mariozechner/pi-ai";
-import { getBalanceTool, getPlanQuotaTool } from "../../billing/lib/billing";
 import { fileTools } from "../../file-tools/lib/file-tools";
 
 // ─── Runtime event types (5 variants,ADR-0017) ──────────────────
@@ -80,7 +79,7 @@ export function createAgentRuntime(): AgentRuntime {
           maxTokens: 8192,
         };
 
-        const tools = [getBalanceTool, getPlanQuotaTool, ...fileTools];
+        const tools = [...fileTools];
 
         const agent = new Agent({
           transport: transport as unknown as AgentTransport,
@@ -148,39 +147,47 @@ export function createAgentRuntime(): AgentRuntime {
                 break;
               }
               case "agent_end": {
+                // V2 ADR-0019: 必须无条件 emit done — 即使 msgs 为空 (例如 abort 在
+                // 第一个 token 到达前触发)。否则 conversations.store 的 streamingMessageId
+                // 卡在 set 状态,UI "Cancel" 按钮不消失,"Send" 按钮不恢复。
+                //   - msgs.length > 0: emit done with partial assistant text
+                //   - msgs.length === 0: emit done with empty text (UI 把 stub finalize 为空 assistant)
                 const msgs = e.messages ?? [];
-                if (msgs.length > 0) {
-                  const lastMsg = msgs[msgs.length - 1];
-                  const text = (lastMsg.content ?? [])
-                    .filter((b) => b.type === "text")
-                    .map((b) => b.text ?? "")
-                    .join("");
-                  const toolBlocks = (lastMsg.content ?? []).filter(
-                    (b) => b.type === "toolCall" && b.id !== undefined,
-                  );
-                  emit.single({
-                    type: "done",
-                    message: {
-                      id: crypto.randomUUID(),
-                      conversation_id: "",
-                      role: "assistant",
-                      content: text,
-                      tool_calls:
-                        toolBlocks.length > 0
-                          ? toolBlocks.map((b) => ({
-                              id: b.id!,
-                              name: b.name ?? "",
-                              args: b.arguments ?? {},
-                            }))
-                          : null,
-                      tool_results: null,
-                      model: provider.defaultModel || null,
-                      input_tokens: null,
-                      output_tokens: null,
-                      created_at: Date.now(),
-                    },
-                  });
-                }
+                const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
+                const text = lastMsg
+                  ? (lastMsg.content ?? [])
+                      .filter((b: { type: string }) => b.type === "text")
+                      .map((b: { text?: string }) => b.text ?? "")
+                      .join("")
+                  : "";
+                const toolBlocks = lastMsg
+                  ? (lastMsg.content ?? []).filter(
+                      (b: { type: string; id?: string }) =>
+                        b.type === "toolCall" && b.id !== undefined,
+                    )
+                  : [];
+                emit.single({
+                  type: "done",
+                  message: {
+                    id: crypto.randomUUID(),
+                    conversation_id: "",
+                    role: "assistant",
+                    content: text,
+                    tool_calls:
+                      toolBlocks.length > 0
+                        ? toolBlocks.map((b: { id?: string; name?: string; arguments?: Record<string, unknown> }) => ({
+                            id: b.id!,
+                            name: b.name ?? "",
+                            args: b.arguments ?? {},
+                          }))
+                        : null,
+                    tool_results: null,
+                    model: provider.defaultModel || null,
+                    input_tokens: null,
+                    output_tokens: null,
+                    created_at: Date.now(),
+                  },
+                });
                 emit.end();
                 sub();
                 if (currentAbortController === abortController) {

@@ -2,8 +2,8 @@
 //! vitest automatically uses __mocks__ when the module is imported.
 //! Configure return values via the exported mockState object.
 //!
-//! V1.5+ schema: Settings.providers[] (llm required, billing optional)
-//! V0 schema: Settings.llm_providers[] + Settings.billing_providers[] (dual arrays)
+//! V1.5+ schema: Settings.providers[] (llm only — billing removed V2)
+//! V0 schema: Settings.llm_providers[] (legacy, migrated on read)
 
 import { vi } from "vitest";
 
@@ -25,17 +25,12 @@ export interface ProviderLlm {
   models_endpoint: string;
 }
 
-export interface ProviderBilling {
-  kind: "balance" | "plan_quota";
-}
-
 export interface Provider {
   id: string;
   label: string;
   enabled: boolean;
   api_key: string;
   llm: ProviderLlm;
-  billing?: ProviderBilling;
 }
 
 // V1.5+ Settings shape
@@ -54,7 +49,7 @@ export interface SettingsV15 {
   };
   system_prompt: { default: string; user_can_edit: boolean };
   conversations: { auto_archive_after_days: number; max_history: number };
-  // V0 legacy fields (cleared after migration, mirrors Rust behavior)
+  // V0 legacy field (cleared after migration, mirrors Rust behavior)
   llm_providers: Array<{
     id: string;
     label: string;
@@ -62,12 +57,6 @@ export interface SettingsV15 {
     default_model?: string;
     base_url?: string;
     api_type: "anthropic-messages";
-    api_key_ref: string;
-  }>;
-  billing_providers: Array<{
-    id: "deepseek" | "minimax";
-    enabled: boolean;
-    refresh_interval_secs: number;
     api_key_ref: string;
   }>;
   // V2: workspaces (added in ADR-0013)
@@ -91,12 +80,6 @@ export interface SettingsV0 {
     api_type: "anthropic-messages";
     api_key_ref: string;
   }>;
-  billing_providers: Array<{
-    id: "deepseek" | "minimax";
-    enabled: boolean;
-    refresh_interval_secs: number;
-    api_key_ref: string;
-  }>;
   default_llm_provider_id?: string;
   user_language: "zh" | "en" | "auto";
   theme: "light" | "dark" | "system";
@@ -116,8 +99,6 @@ export interface SettingsV0 {
 export const mockProvider = (
   overrides: Partial<Provider> & { id: string; label: string },
 ): Provider => {
-  const billing = "billing" in overrides ? overrides.billing : { kind: "plan_quota" as const };
-
   return {
     id: overrides.id ?? "minimax",
     label: overrides.label ?? "MiniMax",
@@ -138,7 +119,6 @@ export const mockProvider = (
       ],
       models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
     },
-    ...(billing !== undefined ? { billing } : {}),
   };
 };
 
@@ -167,9 +147,6 @@ export const mockDeepseekProvider: Provider = mockProvider({
     ],
     models_endpoint: "https://api.deepseek.com/models",
   },
-  billing: {
-    kind: "balance",
-  },
 });
 
 const defaultSettingsV15: SettingsV15 = {
@@ -187,9 +164,8 @@ const defaultSettingsV15: SettingsV15 = {
   },
   system_prompt: { default: "You are a helpful assistant.", user_can_edit: true },
   conversations: { auto_archive_after_days: 30, max_history: 1000 },
-  // V0 legacy fields (empty for V1.5 default)
+  // V0 legacy field (empty for V1.5 default)
   llm_providers: [],
-  billing_providers: [],
 };
 
 // ─── Mock State ────────────────────────────────────────────────
@@ -241,14 +217,11 @@ const DEFAULT_MINIMAX_PROVIDER: Provider = {
     ],
     models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
   },
-  billing: {
-    kind: "plan_quota",
-  },
 };
 
 function migrateV0toV15(v0: SettingsV0): SettingsV15 {
-  // V0.5 detection: both arrays empty → fresh install, pre-fill MiniMax
-  if (v0.llm_providers.length === 0 && v0.billing_providers.length === 0) {
+  // V0.5 detection: empty llm_providers → fresh install, pre-fill MiniMax
+  if (v0.llm_providers.length === 0) {
     return {
       providers: [DEFAULT_MINIMAX_PROVIDER],
       schema_version: "1.5",
@@ -260,7 +233,6 @@ function migrateV0toV15(v0: SettingsV0): SettingsV15 {
       system_prompt: v0.system_prompt,
       conversations: v0.conversations,
       llm_providers: [],
-      billing_providers: [],
     };
   }
 
@@ -268,9 +240,6 @@ function migrateV0toV15(v0: SettingsV0): SettingsV15 {
 
   // Migrate each LLM provider
   for (const llm of v0.llm_providers) {
-    const billing = v0.billing_providers.find((b) => b.id === llm.id);
-    // Per ADR-0012: minimax uses plan_quota, deepseek uses balance
-    const billingKind = llm.id === "deepseek" ? "balance" : "plan_quota";
     providers.push({
       id: llm.id,
       label: llm.label,
@@ -283,35 +252,7 @@ function migrateV0toV15(v0: SettingsV0): SettingsV15 {
         models: [],
         models_endpoint: "",
       },
-      billing: billing
-        ? {
-            kind: billingKind,
-          }
-        : undefined,
     });
-  }
-
-  // Migrate billing-only providers (those without LLM)
-  for (const billing of v0.billing_providers) {
-    if (!providers.find((p) => p.id === billing.id)) {
-      const billingKind = billing.id === "deepseek" ? "balance" : "plan_quota";
-      providers.push({
-        id: billing.id,
-        label: billing.id === "deepseek" ? "DeepSeek" : "MiniMax",
-        enabled: billing.enabled,
-        api_key: billing.api_key_ref,
-        llm: {
-          default_model: "",
-          base_url: "",
-          api_type: "anthropic-messages",
-          models: [],
-          models_endpoint: "",
-        },
-        billing: {
-          kind: billingKind,
-        },
-      });
-    }
   }
 
   return {
@@ -324,9 +265,8 @@ function migrateV0toV15(v0: SettingsV0): SettingsV15 {
     window: v0.window,
     system_prompt: v0.system_prompt,
     conversations: v0.conversations,
-    // V0 legacy fields cleared after migration (mirrors Rust behavior)
+    // V0 legacy field cleared after migration (mirrors Rust behavior)
     llm_providers: [],
-    billing_providers: [],
   };
 }
 
@@ -348,7 +288,7 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
   },
 
   update_settings(args?: IPCArgs): unknown {
-    const newSettings = args?.new_settings as Partial<SettingsV15>;
+    const newSettings = (args?.newSettings ?? args?.new_settings) as Partial<SettingsV15> | undefined;
     if (newSettings) {
       // Merge with existing settings
       mockState.settings = {
@@ -359,16 +299,6 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
       };
     }
     return { ...mockState.settings };
-  },
-
-  list_billing_providers(): unknown {
-    return mockState.settings.providers
-      .filter((p) => p.billing !== undefined)
-      .map((p) => ({
-        id: p.id,
-        label: p.label,
-        enabled: p.enabled,
-      }));
   },
 
   clear_all_history(): void {
@@ -394,11 +324,6 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
   },
 
   edit_file(): unknown {
-    return mockState.resolved;
-  },
-
-  // ─── Billing IPC ───────────────────────────────────────────────
-  get_provider_snapshot(): unknown {
     return mockState.resolved;
   },
 

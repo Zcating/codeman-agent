@@ -75,61 +75,8 @@ codeman-agent/
 └── .agents/                       # 本地 agent skills
 ```
 
-**白名单规则速查**：
-
-- 每个 feature 允许的子目录：`stores` / `components` / `routes` / `hooks` / `lib`（按需创建）
-- shared 允许的子目录：`stores` / `components/ui` / `components/internal` / `hooks` / `lib`
-- feature 根级只允许 2 个文件：`index.ts`（barrel）+ `AGENTS.md`（规则）
-- 文件命名 kebab-case（**项目内唯一例外 `llm_providers` → `llm-providers` 已在 ADR-0010 修复**）
-- hooks 文件以 `use-` 前缀（`use-theme.ts` / `use-debounce.ts`）
-
-## Domain shape
-
-```txt
-Agent
-  ├── runtime          (Effect-TS layer wrapping pi-mono, src/features/chat/runtime.ts)
-  ├── bridge           (Effect → Solid signal translator, src/features/chat/store/)
-  └── tools[]          (LLM 可调函数，src/features/billing/tools/billing.ts)
-        ├── get_balance(provider_id)        → Snapshot
-        └── get_plan_quota(provider_id)     → Snapshot
-
-Conversation          (src/shared/types/index.ts)
-  ├── id, title, system_prompt?, created_at, updated_at, archived_at?
-  └── messages[]       (linear)
-        ├── id, role, content
-        ├── tool_calls[] / tool_results[]
-        ├── model, input_tokens, output_tokens
-        └── created_at
-
-LLM Provider             Billing Provider
-  (Settings.llm_providers) (Settings.billing_providers)
-  ├── id                  ├── id
-  ├── label               ├── label
-  ├── enabled             ├── enabled
-  ├── default_model       ├── refresh_interval_secs
-  ├── base_url?           └── api_key_ref (keyring)
-  └── api_key_ref (Tauri store)
-```
-
-## 查阅指南
-
-| 我要…                  | 看哪里                                                                                                               |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| 理解领域模型 / 词汇表  | `CONTEXT.md`                                                                                                         |
-| 知道为什么用 X 不用 Y  | `docs/adr/000N-*.md`                                                                                                 |
-| 新增 / 修改 Tauri 命令 | `src-tauri/src/commands.rs` + `src-tauri/src/lib.rs` invoke_handler + `src/shared/lib/tauri.ts` TS 镜像              |
-| 新增 / 修改设置项      | `src-tauri/src/settings.rs::Settings` + `sanitized()` + `Default`；TS 镜像在 `src/shared/types/index.ts`             |
-| 看 IPC 桥接            | `src/shared/lib/tauri.ts`（Service Tag + Live Layer） + `src/features/{chat,settings,billing}/store` 或 `subsystems` |
-| 看 Agent 循环          | `src/features/chat/runtime.ts`（Effect Stream 包装 pi-agent）                                                        |
-| 看前端组件             | `src/features/{chat,settings,billing}/components/*.tsx` + `src/shared/ui/*.tsx`（5 原子）                            |
-| 看厂商适配器           | `src-tauri/src/providers/<id>.rs`（详见子目录 AGENTS.md）                                                            |
-| 看持久化 / 搜索        | `src-tauri/src/db/`（详见子目录 AGENTS.md）                                                                          |
-| 写测试                 | vitest + @effect/vitest + jsdom；component 用 @solidjs/testing-library                                               |
-| 写 ui 原子             | 模仿 `src/shared/ui/button.tsx` + `src/shared/ui/AGENTS.md`                                                          |
 
 ## 命令
-
-禁止使用 pnpm
 
 ```bash
 vp run install
@@ -143,17 +90,3 @@ vp run typecheck         # tsc --noEmit
 vp run typecheck:e2e     # tsc --noEmit -p tsconfig.e2e.json
 vp run e2e               # Playwright + 真 Tauri 端到端 (本地)
 ```
-
-## 子目录知识库表
-
-| 路径                                  | 状态                   | 重点                                        |
-| ------------------------------------- | ---------------------- | ------------------------------------------- |
-| `./src/AGENTS.md`                     | 重写 → 移到 **本文件** | 顶层入口（本文件）                          |
-| `./src/shared/AGENTS.md`              | **新建**（本期）       | shared/ 规则 + 跨 feature 共享规范          |
-| `./src/shared/ui/AGENTS.md`           | **新建**（本期）       | 5 ui 原子契约 + 变体表 + 轻量测试约定       |
-| `./src/features/chat/AGENTS.md`       | **新建**（本期）       | chat 域规则                                 |
-| `./src/features/settings/AGENTS.md`   | **新建**（本期）       | settings 域规则                             |
-| `./src/features/billing/AGENTS.md`    | **新建**（本期）       | billing 域规则                              |
-| `./src-tauri/AGENTS.md`               | 重写                   | Rust 硬规则、AppState、调度器、能力清单     |
-| `./src-tauri/src/db/AGENTS.md`        | 新建                   | SQLite schema、迁移、FTS5 搜索实现          |
-| `./src-tauri/src/providers/AGENTS.md` | 更新                   | Provider trait 契约、新增厂商流程、测试模式 |

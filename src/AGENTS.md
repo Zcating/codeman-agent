@@ -40,12 +40,12 @@ V1 是 Tauri 2 + Solid chat agent，**不是 V0 280x100 浮窗**。视觉层走 
 
 - **文件命名 kebab-case，导出组件 PascalCase。** `message-bubble.tsx` 导出 `MessageBubble`。单词文件保持小写（`index.tsx` 不写 `Index.tsx`）。**唯一例外已修复**：`llm_providers.ts` → `llm-providers.ts`（ADR-0010）。
 - **`shared/lib/tauri.ts` 是唯一允许 `import { invoke } from "@tauri-apps/api"` 的地方。** 所有 IPC 走里面的 `invoke<T>()` 包装 + Service Tag。`invoke()` 写在别处 = 契约漂移。
-- **UI 层不导入 `effect`。** `src/features/*/components/*.tsx` 是 Solid 信号的纯消费者，订阅 `src/features/*/stores/*.ts` 暴露的 `Accessor<T>`。逻辑层（`lib/*.ts` / `stores/*.ts`）用 Effect-TS。详见 ADR-0003。
+- **UI 层不导入 `effect`。** `src/features/*/components/*.tsx` 是 Solid 信号的纯消费者，订阅 `src/features/*/stores/*.ts` 暴露的 `Accessor<T>`。逻辑层（`lib/*.ts` / `stores/*.ts`）用 Effect-TS。
 - **不要直接读 `tauri-plugin-store`。** 总是 `await getSettings()`（走 `SettingsService`），让 store mirror 到 Solid signal。组件订阅信号。
 - **`createSignal` 不许出现在 store 外。** 跨组件状态走 `src/features/<feature>/stores/*.ts`；组件内部局部信号可以。
-- **API key 不反射回 DOM。** 密码字段永不显示已存值；`setApiKey` 提交后立刻清空输入框。
 - **`as any` 禁止。** `tsconfig` 开了 `strict + noUnusedLocals + noUnusedParameters + noFallthroughCasesInSwitch`；逃逸这些 = 编译错误，**去修类型**。
-- **测视用 vitest + jsdom。** `import.meta.vitest` 风格的 in-source test 暂不用，测试都走 `*.test.ts(x)` 旁挂。test 文件位于被测文件同目录。
+- **测试用 vitest + jsdom。** `import.meta.vitest` 风格的 in-source test 暂不用，测试都走 `*.test.ts(x)` 旁挂。test 文件位于被测文件同目录。
+- **优先使用：** es-toolkit, ts-parttern, effect-ts 等工具，优先使用已存在的组件、工具函数等，目录在 `src/shared`
 
 ## Styling（Tailwind v4）
 
@@ -76,6 +76,7 @@ V1 是 Tauri 2 + Solid chat agent，**不是 V0 280x100 浮窗**。视觉层走 
 - **错误上抛是 `AppError` 判别联合。** UI 不 catch Effect-typed error；桥接层用 `Exit.isSuccess` 过滤，失败的 Effect 转成空数据 / 错误 toast。
 - **测试分两层。** Effect 服务测用 `it.effect()` + mock `Layer`；Solid store 测用 `@solidjs/testing-library` 跑 jsdom。两者分开不混。
 - **mockState 唯一源**在src/**mocks**/@tauri-apps/api/core.ts（vitest 约定路径）。`src/shared/shared-mock-state.ts` 已删除（ADR-0010 Q6 修复双源 bug）。
+- 优先使用 es-toolkit, ts-parttern, effect-ts 等工具，优先使用已存在的组件、工具函数等，目录在 `src/shared`
 
 ## 查阅指南
 
@@ -96,22 +97,6 @@ V1 是 Tauri 2 + Solid chat agent，**不是 V0 280x100 浮窗**。视觉层走 
 | 改样式                            | 改 `@theme` token（`src/index.css`）；组件只写 utility class                                                                       |
 | 改主题行为                        | 改 `src/shared/stores/theme.ts`（Solid effect 监听 `prefers-color-scheme`）                                                        |
 
-## 反模式（明确禁止）
-
-- 在 `shared/lib/tauri.ts` 之外 `import { invoke }` 或调 `invoke(...)`。
-- `import { Effect, Stream, ... }` 出现在 `src/features/*/components/` 或 `src/features/*/hooks/`。
-- 用 `as any` 绕过 `noUnusedLocals` / `strictNullChecks`——去修类型。
-- 组件代码里 `import 'node:*'`——那属于 `scripts/` 或 dev tooling。
-- 写 BEM class（`.chat-view__main`、`.bubble__content` 等）—— ADR-0006。
-- 写内联 `<style>{...}</style>` 块—— ADR-0006。
-- 加 React 的 `useState` / `useEffect`——这是 Solid，等价物是 `createSignal` / `createEffect` / `createMemo` / store。
-- `window.tauri` / `window.__TAURI__` 全局访问——总走 `shared/lib/tauri.ts` 包装。
-- 创建白名单外的子目录——`src/features/<feature>/` 下出现 `types/`、`subsystems/`、`tools/`、`mocks/`、`assets/`、`state/` 等非白名单目录一律禁止（ADR-0010）。
-- `src/shared/` 下创建 `types/`、`state/`、`ui/`（老命名）—— 走 `stores/`、`components/ui/`、`components/internal/`、`lib/`。
-- `src/shared/mocks/` 目录——已删除，唯一源在`src/__mocks__/`（ADR-0010 Q6）。
-- `src/assets/`、`src/styles/` 顶层杂目录——已删除，不要新增（ADR-0010）。
-- 创建空 feature 子目录只为"预留位"——5 个子目录是白名单可选，billing 只有 `lib/` 是合理的。
-- 前端新增 `console.log` / `console.warn` / `console.error` / `console.debug` —— 全部走 `@/shared/lib/logger` 的 `logger.{debug, info, warn, error}`（ADR-0018 D5）。logger 不算 service 操作（不调 invoke / Effect.gen yield\* / fetch），UI 层允许所有档；但**不得**包含完整 `Provider.api_key` 值（developer 自觉，详见 ADR-0018 D6）。
 
 ## 测试
 

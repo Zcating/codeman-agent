@@ -11,8 +11,6 @@ import {
   FileEdit,
   FileSearch,
   FileX,
-  Wallet,
-  Clock,
   Wrench,
 } from "lucide-solid";
 import type { ToolCall, ToolResult } from "../../../shared/lib/types";
@@ -26,8 +24,6 @@ const TOOL_ICONS: Record<string, Component<{ class?: string }>> = {
   edit_file: FileEdit,
   search_files: FileSearch,
   delete_file: FileX,
-  get_balance: Wallet,
-  get_plan_quota: Clock,
 };
 
 export function ToolCallCard(props: { toolCall: ToolCall; result?: ToolResult }) {

@@ -290,8 +290,8 @@ describe("run() — message_update 边界情况", () => {
             {
               type: "toolCall",
               id: "tc-1",
-              name: "get_balance",
-              arguments: { provider_id: "deepseek" },
+              name: "read_file",
+              arguments: { workspace_id: "main", path: "/tmp/x.txt" },
             },
           ],
         },
@@ -306,8 +306,8 @@ describe("run() — message_update 边界情况", () => {
       };
       expect(toolCallEvent).toBeDefined();
       expect(toolCallEvent.toolCall.id).toBe("tc-1");
-      expect(toolCallEvent.toolCall.name).toBe("get_balance");
-      expect(toolCallEvent.toolCall.args).toEqual({ provider_id: "deepseek" });
+      expect(toolCallEvent.toolCall.name).toBe("read_file");
+      expect(toolCallEvent.toolCall.args).toEqual({ workspace_id: "main", path: "/tmp/x.txt" });
     } finally {
       mockedAgent.mockImplementation(originalImpl as never);
     }
@@ -435,7 +435,7 @@ describe("run() — agent_end 事件", () => {
           {
             content: [
               { type: "text", text: "hi" },
-              { type: "toolCall", id: "tc-1", name: "get_balance", arguments: {} },
+              { type: "toolCall", id: "tc-1", name: "read_file", arguments: {} },
             ],
           },
         ],

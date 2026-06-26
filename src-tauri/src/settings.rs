@@ -3,8 +3,12 @@
 //! 插件在 OS app-data 目录下持久化一个 JSON 文件。我们在启动时读取它，
 //! 字段缺失时应用默认值，字段变更时将整个结构体写回。API 密钥永不存于此；
 //! 见 `secrets`。
+//!
+//! V2 简化: BillingProviderConfig + Provider.billing + 全部 billing-related
+//! schema 已移除。`billing_providers: Vec<BillingProviderConfig>` 字段保留为
+//! 兼容 V0 迁移输入,迁移后立即清空(不再写入 V2 settings.json)。
 
-use crate::types::{BillingKind, ModelMeta, Provider, ProviderBilling, ProviderLlm};
+use crate::types::{ModelMeta, Provider, ProviderLlm};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -36,33 +40,23 @@ impl Default for Size {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// UI 语言偏好。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum UserLanguage {
     Zh,
     En,
+    #[default]
     Auto,
 }
 
-impl Default for UserLanguage {
-    fn default() -> Self {
-        UserLanguage::Auto
-    }
-}
-
 /// 视觉主题。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Theme {
     Light,
     Dark,
+    #[default]
     System,
-}
-
-impl Default for Theme {
-    fn default() -> Self {
-        Theme::System
-    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -139,7 +133,10 @@ impl Default for SystemPromptSettings {
     }
 }
 
-/// 单个计费提供商配置。
+/// 单个计费提供商配置（V0 schema, V2 仅用于迁移输入）。
+///
+/// V2: 不再保留,仅供 V0 → V1.5 迁移读取 `Settings.billing_providers` 字段。
+/// 迁移完成后此 Vec 立即清空,不会出现在 V2 settings.json。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BillingProviderConfig {
     pub id: String,
@@ -195,10 +192,8 @@ pub struct Workspace {
 
 /// 完整的 V1.5 设置对象。
 ///
-/// 所有写入必须经过 `Settings::sanitized()` 以强制执行其列出的不变量。
 /// V1.5 schema：统一 `providers[]` 替代 `llm_providers[] + billing_providers[]` 双数组。
-/// 规范 schema（权威来源）见 `CONTEXT.md"Settings (V1.5 shape)"`，
-/// TS 镜像见 `src/lib/types.ts`。
+/// V2: `billing_providers` 字段保留为 V0 迁移输入,迁移后立即清空。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     // ─── V1.5 新字段 ───────────────────────────────────────────────────────────
@@ -210,7 +205,7 @@ pub struct Settings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub schema_version: Option<String>,
 
-    // ─── V1 遗留字段（迁移期间保留，V1.5 后逐渐废弃）───────────────────────────
+    // ─── V1 遗留字段（迁移期间保留, V1.5 后逐渐废弃）───────────────────────────
     /// @deprecated V1 schema。V1.5+ 使用 `providers`。
     #[serde(default)]
     pub llm_providers: Vec<LLMProvider>,
@@ -226,8 +221,9 @@ pub struct Settings {
     pub window: WindowSettings,
     pub system_prompt: SystemPromptSettings,
 
-    /// @deprecated V1 schema。V1.5+ 使用 `providers`。
-    #[serde(default)]
+    /// @deprecated V0 schema。V2 迁移输入,迁移后清空,不会写入 settings.json。
+    /// 保留字段以支持从老 settings 文件读取并迁移。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub billing_providers: Vec<BillingProviderConfig>,
 
     pub conversations: ConversationSettings,
@@ -261,10 +257,6 @@ impl Default for Settings {
                     }],
                     models_endpoint: "https://api.minimaxi.com/anthropic/v1/models".into(),
                 },
-                billing: Some(ProviderBilling {
-                    kind: BillingKind::PlanQuota,
-                    billing_api_key_ref: "billing/minimax/api_key".into(),
-                }),
             }],
             schema_version: Some(SCHEMA_VERSION_V15.to_string()),
             // V1 legacy fields (empty for fresh V1.5 install)
@@ -275,9 +267,9 @@ impl Default for Settings {
             start_at_login: true,
             window: WindowSettings::default(),
             system_prompt: SystemPromptSettings {
-                default: "You are an AI assistant with access to billing tools and file system tools.\n\
-\n## Billing Tools\nYou can call get_balance and get_plan_quota to check provider billing state.\n\
-\n## File Tools\nYou have access to 5 file tools (read_file, write_file, edit_file, search_files, delete_file).\n\
+                default: "You are an AI assistant with access to file system tools.\n\
+\n## File Tools\n\
+You have access to 5 file tools (read_file, write_file, edit_file, search_files, delete_file).\n\
 Each tool requires a workspace_id parameter — only operate within user-configured workspaces.\n\
 Paths outside any workspace will return a SandboxViolation error.\n\
 For edit_file, your old_text must match exactly once unless you set replace_all=true.\n\
@@ -293,12 +285,13 @@ Files are limited to 10 MB. Binary files, .exe/.dll/.sys files, and paths outsid
 
 impl Settings {
     /// 刷新间隔的下限（秒），避免疯狂请求提供商 API。
-    /// 决策 ADR-0011：从 5 提到 60——LLM 厂商余额变化以分钟/小时计，
-    /// 60s 满足"用户切换/打开窗口后 1 分钟内看到数据"。
+    /// V2: billing_providers 迁移后会清空,所以 refresh_interval 实际不参与调度。
+    /// 保留此方法以供 V0 迁移中钳制 billing_providers[i].refresh_interval_secs。
     pub const MIN_REFRESH_SECS: u64 = 60;
 
-    /// 返回所有已启用计费提供商中的最短刷新间隔，
-    /// 以 `MIN_REFRESH_SECS` 为下限。由调度器使用。
+    /// 返回所有已启用计费提供商中的最短刷新间隔,
+    /// 以 `MIN_REFRESH_SECS` 为下限。V2: 总是返回 MIN_REFRESH_SECS
+    /// (因为 billing_providers 总是空)。
     pub fn refresh_interval(&self) -> Duration {
         let secs = self
             .billing_providers
@@ -313,22 +306,20 @@ impl Settings {
 
     // ─────────────────────────────────────────────────────────────────────────
     // 清理不变量（全部为向上或范围钳制）：
-    //   1. refresh_interval_secs >= 60  （向上钳制，决策 ADR-0011）
-    //   2. low_quota_threshold_pct ∈ [0, 100]  （范围钳制）
-    //   3. low_balance_threshold >= 0   （向上钳制）
+    //   1. refresh_interval_secs >= 60  （向上钳制，决策 ADR-0011）— V0 迁移用
+    //   2. low_quota_threshold_pct ∈ [0, 100]  （范围钳制）— 删
+    //   3. low_balance_threshold >= 0   （向上钳制）— 删
     //   4. auto_archive_after_days >= 1  （向上钳制）
     //   5. max_history >= 10            （向上钳制）
     // ─────────────────────────────────────────────────────────────────────────
 
     pub fn sanitized(mut self) -> Self {
         // ─── V0/V1 → V1.5 迁移 ───────────────────────────────────────────────
-        // 注意：keyring → Tauri store key 迁移需要在 apply_settings() 中
-        // 调用 keyring I/O，这里只做 schema 迁移。
         if self.schema_version.as_deref() != Some(SCHEMA_VERSION_V15) {
             self = migrate_to_v1_5(self);
         }
 
-        // 不变量 1：refresh_interval_secs >= MIN_REFRESH_SECS（V1 legacy）
+        // 不变量 1：refresh_interval_secs >= MIN_REFRESH_SECS（V0 迁移期用）
         for provider in &mut self.billing_providers {
             if provider.refresh_interval_secs < Self::MIN_REFRESH_SECS {
                 provider.refresh_interval_secs = Self::MIN_REFRESH_SECS;
@@ -351,23 +342,17 @@ impl Settings {
 
 /// V0/V1 → V1.5 schema 迁移。
 ///
-/// 检测逻辑：
-/// - `schema_version == Some("1.5")` → 已迁移，no-op
-/// - `llm_providers` 非空 → V0/V1 schema，触发迁移
-/// - `llm_providers` 为空 → V0.5 或 V1.5 fresh install，预填 MiniMax
-///
-/// V1.5 迁移规则（ADR-0012）：
-/// - 每个 LLM provider → 新的 Provider 记录（llm 必选）
-/// - 匹配 id 的 billing provider → Provider.billing（可选）
-/// - billing provider 无匹配 LLM → 跳过（V1 设计不可能出现）
-/// - 迁移后 schema_version = "1.5"，旧字段清空
+/// V2: billing 子字段已删除。迁移时 V0 settings 的 `billing_providers` 字段
+/// 仍然读取(因为它有 `#[serde(default, skip_serializing_if = "Vec::is_empty")]`
+/// 反序列化支持),但 Provider 构造时不再设 `billing` 字段 — billing 业务在 V2
+/// 整体下线,前端不再有 get_balance / get_plan_quota 工具。
 fn migrate_to_v1_5(mut settings: Settings) -> Settings {
-    // 已是 V1.5，跳过迁移
+    // 已是 V1.5,跳过迁移
     if settings.schema_version.as_deref() == Some(SCHEMA_VERSION_V15) {
         return settings;
     }
 
-    // 检测 V0.5（llm_providers 为空）→ fresh install，预填 MiniMax
+    // 检测 V0.5（llm_providers 为空）→ fresh install,预填 MiniMax
     if settings.llm_providers.is_empty() && settings.billing_providers.is_empty() {
         let default_settings = Settings::default();
         settings.providers = default_settings.providers;
@@ -375,19 +360,12 @@ fn migrate_to_v1_5(mut settings: Settings) -> Settings {
         return settings;
     }
 
-    // V0/V1 schema 迁移
-    let billing_by_id: std::collections::HashMap<&str, &BillingProviderConfig> =
-        settings.billing_providers.iter().map(|p| (p.id.as_str(), p)).collect();
-
+    // V0/V1 schema 迁移。V2: 不再携带 billing 字段。
     let mut new_providers: Vec<Provider> = Vec::new();
 
     for llm in &settings.llm_providers {
-        let billing = billing_by_id.get(llm.id.as_str()).copied();
-
-        // 构建 ProviderLlm
         let provider_llm = ProviderLlm {
             default_model: llm.default_model.clone().unwrap_or_else(|| {
-                // V1 默认模型
                 if llm.id == "deepseek" {
                     "deepseek-chat".into()
                 } else {
@@ -405,7 +383,6 @@ fn migrate_to_v1_5(mut settings: Settings) -> Settings {
             llm_api_key_ref: llm.api_key_ref.clone().unwrap_or_else(|| {
                 format!("llm_providers/{}/api_key", llm.id)
             }),
-            // V0 → V1.5 不迁移 models（用户需要在 Settings UI 重新刷新）
             models: vec![ModelMeta {
                 id: llm.default_model.clone().unwrap_or_else(|| {
                     if llm.id == "deepseek" {
@@ -432,33 +409,19 @@ fn migrate_to_v1_5(mut settings: Settings) -> Settings {
             },
         };
 
-        // 构建 ProviderBilling（如果存在匹配的 billing provider）
-        let provider_billing = billing.map(|b| ProviderBilling {
-            kind: if llm.id == "deepseek" {
-                BillingKind::Balance
-            } else {
-                BillingKind::PlanQuota
-            },
-            // V1.5 billing key 引用改为 Tauri store 路径
-            billing_api_key_ref: b.api_key_ref.clone().unwrap_or_else(|| {
-                format!("billing/{}/api_key", b.id)
-            }),
-        });
-
         new_providers.push(Provider {
             id: llm.id.clone(),
             label: llm.label.clone(),
             enabled: llm.enabled,
             api_key: String::new(),
             llm: provider_llm,
-            billing: provider_billing,
         });
     }
 
     settings.providers = new_providers;
     settings.schema_version = Some(SCHEMA_VERSION_V15.to_string());
 
-    // 迁移完成后清空旧字段（避免重复迁移）
+    // 迁移完成后清空旧字段(避免重复迁移)
     settings.llm_providers.clear();
     settings.billing_providers.clear();
     settings.default_llm_provider_id = None;
@@ -479,14 +442,11 @@ mod tests {
     #[test]
     fn default_settings_sanity() {
         let s = Settings::default();
-        // V1.5 schema_version 已设置
         assert_eq!(s.schema_version, Some("1.5".to_string()));
         // MiniMax pre-fill (ADR-0011)
         assert_eq!(s.providers.len(), 1);
         assert_eq!(s.providers[0].id, "minimax");
         assert_eq!(s.providers[0].llm.api_type, "anthropic-messages");
-        assert!(s.providers[0].billing.is_some());
-        assert_eq!(s.providers[0].billing.as_ref().unwrap().kind, BillingKind::PlanQuota);
         // V1 legacy fields 已清空
         assert!(s.llm_providers.is_empty());
         assert!(s.billing_providers.is_empty());
@@ -510,7 +470,7 @@ mod tests {
 
     #[test]
     fn sanitized_v15_is_noop() {
-        let s = Settings::default(); // 已是 V1.5
+        let s = Settings::default();
         let s2 = s.sanitized();
         assert_eq!(s2.schema_version, Some("1.5".to_string()));
         assert_eq!(s2.providers.len(), 1);
@@ -522,7 +482,7 @@ mod tests {
         let mut s = Settings::default();
         s.user_language = UserLanguage::Zh;
         s.theme = Theme::Dark;
-        s.conversations.auto_archive_after_days = 0; // 会被钳制
+        s.conversations.auto_archive_after_days = 0;
         let s2 = s.sanitized();
         assert_eq!(s2.user_language, UserLanguage::Zh);
         assert_eq!(s2.theme, Theme::Dark);
@@ -533,41 +493,33 @@ mod tests {
 
     #[test]
     fn migrate_v0_minimax_settings_to_v15() {
-        // 构造 V0 settings fixture: llm_providers=[minimax], billing_providers=[minimax]
-        let v0_settings = Settings {
-            llm_providers: vec![LLMProvider {
-                id: "minimax".into(),
-                label: "MiniMax".into(),
-                enabled: true,
-                default_model: Some("MiniMax-M2.5-highspeed".into()),
-                base_url: Some("https://api.minimaxi.com/anthropic".into()),
-                api_key_ref: Some("llm_providers/minimax/api_key".into()),
-                api_type: "anthropic-messages".into(),
-            }],
-            billing_providers: vec![BillingProviderConfig {
-                id: "minimax".into(),
-                enabled: true,
-                refresh_interval_secs: 60,
-                api_key_ref: Some("billing/minimax/api_key".into()),
-            }],
-            ..Settings::default()
-        };
-        // 清除默认 pre-fill，保留 V0 字段
+        // V0 fixture: llm_providers=[minimax], billing_providers=[minimax]
+        // V2 迁移后 billing 字段被忽略 + 清空。
         let mut v0 = Settings::default();
-        v0.llm_providers = v0_settings.llm_providers;
-        v0.billing_providers = v0_settings.billing_providers;
+        v0.llm_providers = vec![LLMProvider {
+            id: "minimax".into(),
+            label: "MiniMax".into(),
+            enabled: true,
+            default_model: Some("MiniMax-M2.5-highspeed".into()),
+            base_url: Some("https://api.minimaxi.com/anthropic".into()),
+            api_key_ref: Some("llm_providers/minimax/api_key".into()),
+            api_type: "anthropic-messages".into(),
+        }];
+        v0.billing_providers = vec![BillingProviderConfig {
+            id: "minimax".into(),
+            enabled: true,
+            refresh_interval_secs: 60,
+            api_key_ref: Some("billing/minimax/api_key".into()),
+        }];
         v0.providers.clear();
         v0.schema_version = None;
 
         let migrated = v0.sanitized();
 
-        // 验证迁移结果
         assert_eq!(migrated.schema_version, Some("1.5".to_string()));
         assert_eq!(migrated.providers.len(), 1);
         assert_eq!(migrated.providers[0].id, "minimax");
         assert!(migrated.providers[0].llm.default_model.contains("MiniMax"));
-        assert!(migrated.providers[0].billing.is_some());
-        assert_eq!(migrated.providers[0].billing.as_ref().unwrap().kind, BillingKind::PlanQuota);
         // V1 legacy fields 已清空
         assert!(migrated.llm_providers.is_empty());
         assert!(migrated.billing_providers.is_empty());
@@ -600,15 +552,12 @@ mod tests {
         assert_eq!(migrated.providers.len(), 1);
         assert_eq!(migrated.providers[0].id, "deepseek");
         assert_eq!(migrated.providers[0].llm.default_model, "deepseek-chat");
-        assert!(migrated.providers[0].billing.is_some());
-        assert_eq!(migrated.providers[0].billing.as_ref().unwrap().kind, BillingKind::Balance);
     }
 
     // ─── V0.5（无 llm_providers）→ V1.5 fresh install 测试 ───────────────
 
     #[test]
     fn migrate_v05_empty_settings_to_v15_fresh_install() {
-        // V0.5: llm_providers 和 billing_providers 都为空
         let mut v05 = Settings::default();
         v05.llm_providers.clear();
         v05.billing_providers.clear();
@@ -617,18 +566,15 @@ mod tests {
 
         let migrated = v05.sanitized();
 
-        // V0.5 treated as fresh install → pre-filled MiniMax
         assert_eq!(migrated.schema_version, Some("1.5".to_string()));
         assert_eq!(migrated.providers.len(), 1);
         assert_eq!(migrated.providers[0].id, "minimax");
-        assert!(migrated.providers[0].billing.is_some());
     }
 
     // ─── 混合状态（仅有 llm 无 billing）迁移测试 ──────────────────────────
 
     #[test]
     fn migrate_llm_only_no_billing_to_v15() {
-        // 仅有 LLM provider，无 billing provider（如新加的第三方 provider）
         let mut v0 = Settings::default();
         v0.llm_providers = vec![LLMProvider {
             id: "openrouter".into(),
@@ -648,25 +594,23 @@ mod tests {
         assert_eq!(migrated.schema_version, Some("1.5".to_string()));
         assert_eq!(migrated.providers.len(), 1);
         assert_eq!(migrated.providers[0].id, "openrouter");
-        assert!(migrated.providers[0].billing.is_none()); // 无 billing
     }
 
     // ─── 已有 V1.5 schema 跳过迁移测试 ────────────────────────────────────
 
     #[test]
     fn already_v15_settings_not_migrated_again() {
-        let v15 = Settings::default(); // 已是 V1.5
+        let v15 = Settings::default();
         let original_providers = v15.providers.clone();
 
         let result = v15.sanitized();
 
         assert_eq!(result.schema_version, Some("1.5".to_string()));
         assert_eq!(result.providers, original_providers);
-        // 确认不是重新创建，而是保持原样
         assert_eq!(result.providers[0].llm.models.len(), 1);
     }
 
-    // ─── 已有测试（更新以适配 V1.5 schema）─────────────────────────────────
+    // ─── 已有测试 ────────────────────────────────────────────────────────
 
     #[test]
     fn sanitized_clamps_auto_archive_after_days() {
@@ -702,7 +646,6 @@ mod tests {
 
     #[test]
     fn settings_round_trip_via_serde() {
-        // V1.5 settings round-trip
         let s = Settings {
             providers: vec![Provider {
                 id: "deepseek".into(),
@@ -723,10 +666,6 @@ mod tests {
                     }],
                     models_endpoint: "https://api.deepseek.com/models".into(),
                 },
-                billing: Some(ProviderBilling {
-                    kind: BillingKind::Balance,
-                    billing_api_key_ref: "billing/deepseek/api_key".into(),
-                }),
             }],
             schema_version: Some("1.5".to_string()),
             llm_providers: Vec::new(),
@@ -770,12 +709,10 @@ mod tests {
 
     #[test]
     fn v1_to_v2_workspace_default() {
-        // V1 JSON 序列化（无 workspaces 字段），反序列化后 workspaces 应为空
         let v1_json = r#"{
             "providers": [],
             "schema_version": "1.5",
             "llm_providers": [],
-            "billing_providers": [],
             "user_language": "auto",
             "theme": "system",
             "start_at_login": true,

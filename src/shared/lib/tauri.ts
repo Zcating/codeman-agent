@@ -7,7 +7,6 @@
 //!   ConversationService.list(includeArchived): Effect<Conversation[], AppError>
 //!   MessageService.list(conversationId): Effect<Message[], AppError>
 //!   ProviderService.list(): Effect<Provider[], TauriError>
-//!   BillingService.fetchSnapshot(providerId, args): Effect<Snapshot, BillingError>
 
 import { Effect, Context, Layer } from "effect";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
@@ -18,8 +17,6 @@ import type {
   Message,
   Settings,
   LLMProvider,
-  BillingProviderMeta,
-  Snapshot,
   Provider,
   ModelMeta,
   Workspace,
@@ -38,31 +35,25 @@ export const TauriError = {
   IPC: (message: string): TauriError => ({ kind: "IPC" as const, message }),
 };
 
-/** Billing-specific errors */
-export type BillingError =
-  | { kind: "NotFound"; message: string }
-  | { kind: "Network"; message: string; cause?: string }
-  | { kind: "Unauthorized"; message: string }
-  | { kind: "InvalidResponse"; message: string }
-  | { kind: "Unknown"; message: string };
-
-/** 包装在 Effect 中的原始 Tauri invoke。 */
-export const invoke = <T>(
-  name: string,
-  args?: Record<string, unknown>,
-): Effect.Effect<T, AppError> =>
-  Effect.tryPromise({
-    try: () => tauriInvoke<T>(name, args),
-    catch: (e) => {
-      // 保留上游 AppError 形状(若有 kind 字段),否则退化为 Unknown。
-      // 否则 sandbox 错误会被 `String(e)` 打成 "[object Object]",错误种类丢失。
-      logger.error("IPC 调用失败", name, e);
-      if (e && typeof e === "object" && "kind" in e) {
-        return e as AppError;
-      }
-      return { kind: "Unknown" as const, message: String(e) };
-    },
-  });
+  /** 包装在 Effect 中的原始 Tauri invoke。 */
+  export const invoke = <T>(
+    name: string,
+    args?: Record<string, unknown>,
+  ): Effect.Effect<T, AppError> =>
+    Effect.tryPromise({
+      try: () => tauriInvoke<T>(name, args),
+      catch: (e) => {
+        // 保留上游 AppError 形状(若有 kind 字段),否则退化为 Unknown。
+        // 否则 sandbox 错误会被 `String(e)` 打成 "[object Object]",错误种类丢失。
+        // AppError 形状的 rejection 是预期行为(后端 sandbox violation / NotFound 等),
+        // 不再 console.error 噪音 — UI 层 tool_call_card 会自己渲染 detail。
+        if (e && typeof e === "object" && "kind" in e) {
+          return e as AppError;
+        }
+        logger.error("IPC 调用失败", name, e);
+        return { kind: "Unknown" as const, message: String(e) };
+      },
+    });
 
 // ─── Service 标签 ──────────────────────────────────────────
 export class ConversationService extends Context.Tag("ConversationService")<
@@ -106,38 +97,11 @@ export class ProviderService extends Context.Tag("ProviderService")<
   ProviderService,
   {
     readonly list: () => Effect.Effect<Provider[], TauriError>;
-    readonly listByKind: (kind: "llm" | "billing") => Effect.Effect<Provider[], TauriError>;
     readonly get: (id: string) => Effect.Effect<Provider, TauriError>;
     readonly getModels: (id: string) => Effect.Effect<ModelMeta[], TauriError>;
     readonly fetchModels: (id: string) => Effect.Effect<ModelMeta[], TauriError>;
     /** 删除 provider (V1.8+ ADR-0016 D4) — 占位 IPC, 实际删除走 client state mutation */
     readonly delete: (id: string) => Effect.Effect<void, TauriError>;
-  }
->() {}
-
-// ─── BillingService (V1.5) ──────────────────────────────────
-
-export class BillingService extends Context.Tag("BillingService")<
-  BillingService,
-  {
-    /** List providers that have billing configured */
-    readonly list: () => Effect.Effect<Provider[], BillingError>;
-    /** Fetch billing snapshot for a provider */
-    readonly fetchSnapshot: (
-      providerId: string,
-      args?: { force_refresh?: boolean },
-    ) => Effect.Effect<Snapshot | null, BillingError>;
-  }
->() {}
-
-/** @deprecated V1 stub — use BillingService from V1.5 */
-export class BillingServiceV1 extends Context.Tag("BillingServiceV1")<
-  BillingServiceV1,
-  {
-    readonly listProviders: () => Effect.Effect<BillingProviderMeta[], AppError>;
-    readonly getSnapshot: (providerId: string) => Effect.Effect<Snapshot, AppError>;
-    readonly hasKey: (providerId: string) => Effect.Effect<boolean, AppError>;
-    readonly setKey: (providerId: string, key: string) => Effect.Effect<void, AppError>;
   }
 >() {}
 
@@ -242,16 +206,6 @@ export const ProviderServiceLive = Layer.effect(
           return providers.filter((p) => p.enabled);
         }),
 
-      listByKind: (kind) =>
-        Effect.gen(function* () {
-          const providers = yield* getProviders;
-          if (kind === "llm") {
-            return providers.filter((p) => p.enabled && p.llm);
-          } else {
-            return providers.filter((p) => p.enabled && p.billing);
-          }
-        }),
-
       get: (id) => getProvider(id),
 
       getModels: (id) =>
@@ -312,89 +266,6 @@ export const ProviderServiceLive = Layer.effect(
     };
   }),
 );
-
-// BillingServiceLive
-export const BillingServiceLive = Layer.effect(
-  BillingService,
-  Effect.gen(function* () {
-    // Helper to get billing providers with BillingError type
-    const getBillingProviders = (): Effect.Effect<Provider[], BillingError> =>
-      Effect.gen(function* () {
-        const settings = yield* Effect.tryPromise({
-          try: () => tauriInvoke<{ providers: Provider[] }>("get_settings"),
-          catch: (e) => TauriError.IPC(String(e)),
-        });
-        return (settings.providers ?? []).filter((p) => p.enabled && p.billing);
-      }).pipe(
-        Effect.mapError((e) => {
-          const err = e as TauriError;
-          return {
-            kind: "Network" as const,
-            message: err.message,
-          } satisfies BillingError;
-        }),
-      );
-
-    return {
-      list: () => getBillingProviders(),
-
-      fetchSnapshot: (providerId) =>
-        Effect.gen(function* () {
-          // Inline type for SnapshotEnvelope (mirror of Rust SnapshotEnvelope)
-          interface SnapshotEnvelope {
-            provider: string;
-            snapshot: Snapshot | null;
-            fetched_at: string;
-            error: string | null;
-          }
-
-          // Get provider billing config
-          const providers = yield* getBillingProviders();
-          const provider = providers.find((p) => p.id === providerId);
-
-          if (!provider || !provider.billing) {
-            return yield* Effect.fail({
-              kind: "NotFound" as const,
-              message: `Billing provider not found: ${providerId}`,
-            } satisfies BillingError);
-          }
-
-          // Call Rust adapter via IPC
-          let envelope: SnapshotEnvelope;
-          try {
-            envelope = yield* Effect.tryPromise({
-              try: () =>
-                tauriInvoke<SnapshotEnvelope>("get_provider_snapshot", {
-                  provider: providerId,
-                }),
-              catch: (e) => {
-                const msg = String(e);
-                if (msg.includes("401") || msg.includes("unauthorized")) {
-                  throw { kind: "Unauthorized" as const, message: msg } satisfies BillingError;
-                }
-                if (msg.includes("network") || msg.includes("fetch")) {
-                  throw { kind: "Network" as const, message: msg } satisfies BillingError;
-                }
-                throw { kind: "Unknown" as const, message: msg } satisfies BillingError;
-              },
-            });
-          } catch (e) {
-            return yield* Effect.fail(e as BillingError);
-          }
-
-          return envelope.snapshot;
-        }),
-    };
-  }),
-);
-
-/** @deprecated V1 stub — use BillingServiceLive */
-export const BillingServiceV1Live = Layer.succeed(BillingServiceV1, {
-  listProviders: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
-  getSnapshot: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
-  hasKey: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
-  setKey: () => Effect.fail({ kind: "NotFound", message: "stub" } as AppError),
-});
 
 export const SettingsServiceLive = Layer.succeed(SettingsService, {
   getSettings: () => invoke<Settings>("get_settings"),

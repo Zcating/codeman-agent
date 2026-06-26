@@ -1,9 +1,8 @@
 ﻿//! ProviderCard — V1.8+ ADR-0015/0016 unified provider card.
-//! 1 card per provider with LLM subform (always) + Billing subform (if provider.billing).
+//! 1 card per provider with LLM subform (always).
 //! V1.8+ ADR-0016: all writes go through appStore (debounced 500ms auto-flush);
 //! handleRefreshModels + handleDelete 走 appStore.refreshProviderModels / appStore.deleteProvider,
 //! 不用 Effect.gen + ProviderService 也不再裸 invoke "delete_provider"。
-//! LLM API Key + Billing API Key collapsed to single Provider.api_key field.
 //! Uses Tailwind v4 utility classes only (ADR-0006). No BEM, no <style> blocks.
 
 import { createSignal, Show, For } from "solid-js";
@@ -90,22 +89,6 @@ export function ProviderCard(props: ProviderCardProps) {
       setRefreshMsg(`Refresh failed: ${formatAppError(exit.cause)}`);
     }
     setIsRefreshing(false);
-  };
-
-  const handleBillingKindChange = (kind: "balance" | "plan_quota") => {
-    if (!props.provider.billing) {
-      return;
-    }
-    const updated: Provider = {
-      ...props.provider,
-      billing: { ...props.provider.billing, kind },
-    };
-    const providers = appStore.state.value.providers!.map((p) =>
-      p.id === updated.id ? updated : p,
-    );
-    appStore.set({ providers });
-    settingsSaver.scheduleSave();
-    props.onUpdate(updated);
   };
 
   const handleDelete = async () => {
@@ -216,53 +199,6 @@ export function ProviderCard(props: ProviderCardProps) {
             />
           </div>
         </div>
-
-        {/* ─── Billing Subform (only if provider.billing exists) ─── */}
-        <Show when={props.provider.billing}>
-          <div class="space-y-3 rounded-md border border-border p-3">
-            <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Billing
-            </p>
-
-            {/* Billing kind */}
-            <div class="flex flex-col gap-1">
-              <label class="text-xs text-muted-foreground">Kind</label>
-              <select
-                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={props.provider.billing!.kind}
-                onChange={(e) =>
-                  handleBillingKindChange(e.currentTarget.value as "balance" | "plan_quota")
-                }
-              >
-                <option value="balance">Balance</option>
-                <option value="plan_quota">Plan Quota</option>
-              </select>
-            </div>
-
-            {/* Billing API Key */}
-            <div class="flex flex-col gap-1">
-              <label class="text-xs text-muted-foreground">Billing API Key</label>
-              <Input
-                type="password"
-                value={props.provider.api_key}
-                onInput={(e) => {
-                  const updated: Provider = { ...props.provider, api_key: e.currentTarget.value };
-                  const providers = appStore.state.value.providers!.map((p) =>
-                    p.id === updated.id ? updated : p,
-                  );
-                  appStore.set({ providers });
-                  settingsSaver.scheduleSave();
-                  props.onUpdate(updated);
-                }}
-                placeholder="sk-…"
-                class="flex-1"
-              />
-              <p class="text-xs text-muted-foreground">
-                Same key used for LLM and billing (ADR-0015)
-              </p>
-            </div>
-          </div>
-        </Show>
       </CardContent>
 
       {/* ─── Footer: delete ─── */}
