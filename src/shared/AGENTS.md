@@ -6,11 +6,11 @@
 
 | 子目录                 | 语义                                                                                                    | 现状                                                                                                          |
 | ---------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `lib/`                 | 纯函数 + 跨域类型：`cn.ts` / `logger.ts` / `tauri.ts` / `units.ts` / `types.ts` / `format-app-error.ts` | 6 个文件（ADR-0010 前：3 文件，types 是独立目录；ADR-0018 加 `logger.ts`；ADR-0016 加 `format-app-error.ts`） |
+| `lib/`                 | 纯函数 + 跨域类型：`cn.ts` / `logger.ts` / `tauri.ts` / `units.ts` / `types.ts` / `format-app-error.ts` / `design-tokens.ts` | 7 个文件（ADR-0010 前：3 文件；ADR-0018 加 `logger.ts`；ADR-0016 加 `format-app-error.ts`；**ADR-0022** 加 `design-tokens.ts`） |
 | `stores/`              | 跨域 Solid signal                                                                                       | `theme.ts`（从 `state/` 迁，ADR-0010）                                                                        |
 | `hooks/`               | 跨域 composable（`use-` 前缀）                                                                          | 空，V1 预留                                                                                                   |
 | `components/ui/`       | 跨域**设计系统原子**                                                                                    | 5 原子（Button / Card / Checkbox / Input / Textarea）+ `AGENTS.md`（从 `ui/` 迁）                             |
-| `components/internal/` | 跨域**业务组件**                                                                                        | 空，V1 预留（ErrorBoundary / LoadingSpinner / Provider wrappers / Layout atoms）                              |
+| `components/internal/` | 跨域**业务组件**——跟本应用业务绑定但被多个 feature 复用  | `agent-sidebar`（**ADR-0022** 首例，由 chat feature 消费；准入规则见 [ADR-0022 D1](../../docs/adr/0022-internal-components-and-design-tokens.md)） |
 
 **`shared/` 不允许**的子目录（旧命名已废弃，违反 ADR-0010 一律删除）：
 
@@ -27,7 +27,7 @@
 | `components/ui/`       | **跨域设计系统原子**——不依赖具体业务，可在其它项目里复用 | Button / Input / Textarea / Checkbox / Card（项目当前 5 原子）                       |
 | `components/internal/` | **跨域业务组件**——跟本应用业务绑定但被多个 feature 复用  | ErrorBoundary / LoadingSpinner / Toast / Provider wrappers / Layout atoms / AppShell |
 
-**为什么 `internal` 而不是 `app` 或 `feature-shared`**：与"设计系统（ui）"形成对照语义——"ui = 跨项目通用，internal = 跨 feature 通用但绑定本应用"。V1 当前空，未来首例添加时需新 ADR 跟进（命名 / 数量上限 / 维护者）。
+**为什么 `internal` 而不是 `app` 或 `feature-shared`**：与"设计系统（ui）"形成对照语义——"ui = 跨项目通用，internal = 跨 feature 通用但绑定本应用"。V1.5+ 开首例 `agent-sidebar`（chat feature 消费；详见 [ADR-0022 D1](../docs/adr/0022-internal-components-and-design-tokens.md)）。后续新增 internal 组件须保持严格 prop-driven，不依赖任何 feature 的 store / 类型。
 
 ## Import 方向规则
 

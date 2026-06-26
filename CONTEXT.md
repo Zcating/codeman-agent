@@ -7,7 +7,7 @@
 ### 领域
 
 - **Agent (代理)** — 产品本体。LLM 驱动的助手，运行在独立 Windows 桌面窗口中。_避免_：widget、app、client。
-- **Conversation (会话)** — 用户拥有的持久聊天线程。线性消息序列；不支持分支。每 Conversation 至多 1 个 active 流，多 Conversation 可并行 streaming。active 流定义：`run()` 已调用且 `done` / `error` / `cancel` 之一尚未触发。active 流的取消走 `AgentRuntime.cancel(conversationId)`。
+- **Conversation (会话)** — 用户拥有的持久聊天线程。线性消息序列；不支持分支。每 Conversation 至多 1 个 active 流，多 Conversation 可并行 streaming。每个 Conversation 创建时绑定 1 个 workspace (`workspace_id: string`，详见 `Workspace-Bound Conversation`)；旧 conv (V1.x 迁移) `workspace_id = ""` 视为 "needs workspace"，UI 灰标。active 流定义：`run()` 已调用且 `done` / `error` / `cancel` 之一尚未触发。active 流的取消走 `AgentRuntime.cancel(conversationId)`。
 - **Message (消息)** — 会话中的单轮消息。角色为 `user`、`assistant`、`tool` 或 `system` 之一。可能内联携带 tool call 与 tool result（JSON 形式）。
 - **Tool (工具)** — Agent 可调用的类型化函数。内置 2 个计费工具 + 5 个文件工具；注册表可扩展。
 - **Tool Call (工具调用)** — LLM 请求调用工具的指令。携带工具名与 JSON 参数。
@@ -29,7 +29,8 @@
 
 ### File IO
 
-- **Workspace (工作区)** — 用户在 Settings (`Settings.workspaces: Array<{ id, label, root_path, enabled }>`) 中配置的根目录，agent 的 file tool 仅在该目录树下操作。Agent 越界 (canonical path 不在 workspace root 内) 由 Tauri command 拒绝 (返回 `SandboxViolation` 错误)。_避免_: sandbox、root directory、project root。
+- **Workspace (工作区)** — 用户在 Settings (`Settings.workspaces: Array<{ id, label, root_path, enabled }>`) 中配置的根目录。**每个 Conversation 绑定 1 个 workspace** (per-Conv, `Conversation.workspace_id` 必填，详见 `Workspace-Bound Conversation`)；agent 的 file tool 仅在该目录树下操作，越界 (canonical path 不在 workspace root 内) 由 Tauri command 拒绝 (返回 `SandboxViolation` 错误)。_避免_: sandbox、root directory、project root。
+- **Workspace-Bound Conversation (绑定 workspace 的会话)** — 每个 Conversation 在创建时 (`createConversation(workspaceId, ...)`) 必须绑定 1 个 workspace (`workspace_id: string` 字段)，创建后不可更改。`workspace_id = ""` 表示 "needs workspace" (V1.x 迁移的旧 conv 状态，UI 灰标)。该绑定决定 file tool 沙箱边界；Home 上的 workspace 选择器决定新 conv 的绑定。_避免_: global workspace、workspace 切换 (per-Conv 锁定后不存在切换)。
 - **File Tool (文件工具)** — pi-agent 工具族，内置 5 个: `read_file` (读全文) / `write_file` (覆盖写) / `edit_file` (替换文本，支持 `replace_all`) / `search_files` (glob + content 搜索) / `delete_file` (移至回收站)。所有工具通过 Tauri command 调 Rust `std::fs`，沙箱由 workspace 边界约束。_避免_: fs tool、file operation (过载)。
 - **Sandbox Violation (越界错误)** — Tauri command 在 `canonicalize(path)` 后检测到 `path` 不在任何已启用 workspace 目录下时返回的错误。Agent 收到后必须重新规划 (改路径 / 让用户加 workspace) 而非重试原路径。
 
@@ -63,6 +64,7 @@
   **D4 硬规则（ADR-0016）**：**所有** service 操作（`Effect.gen(...yield* Service...)` / 裸 `invoke("...")` / 裸 `fetch`）只能在 Store 中出现。组件层 `.tsx` 文件**禁止**直接 import service 或调 IPC，全部走 `Effect.runPromiseExit(store.method(...))` + `Exit.match`。测试代码（`*.test.ts*`）不受 D4 约束。
 
 - **Stale (过期)** — `Snapshot` 时间戳超过 Billing Provider 的 `stale_after_seconds`；传统的"过期徽标"语义在 tool result 缓存场景保留。
+- **Last-Used Workspace (上次使用的 workspace)** — Settings 字段 `last_used_workspace_id?: string`。Home 落地时的预选 workspace；若该 workspace 已被删除/禁用，fallback 到 `workspaces` 数组中第一个 enabled 项；若 `workspaces` 全空，CTA 引导用户去 /settings 添加。用户在 Home 上选择 workspace 时即更新该字段。_避免_: default workspace、active workspace (避免与 per-Conv 锁定混淆)。
 
 ### 样式
 

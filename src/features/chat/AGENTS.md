@@ -20,8 +20,8 @@ src/features/chat/
 │   └── conversations.store.test.ts
 │
 ├── components/           # UI 组件
-│   ├── sidebar.tsx       # Conversation list + search + streaming 状态点
-│   ├── sidebar.test.tsx
+│   ├── home.tsx          # Codex-like 首页（无 active conv 时：AgentSidebar + CodexForm 两栏）
+│   ├── home.test.tsx
 │   ├── message-bubble.tsx # Role-aware message renderer
 │   ├── message-bubble.test.tsx
 │   ├── tool-call-card.tsx # Tool invocation card
@@ -57,7 +57,45 @@ src/features/chat/
   - UI 读 `store.byId[activeId()]?.messages`，Solid proxy 自动按路径细粒度反应式，跨 conv streaming 不互相重算。
   - ADR-0016 D4-D5-D6 的"组件不直接 import runtime"约束保留：组件调 `conversations.store.sendMessage(...)` / `conversations.store.cancel(convId)` / `conversations.store.archiveConversation(convId)`，不直接 import `lib/runtime.ts`。
 - **组件不调 IPC。** 所有 Tauri IPC 走 `src/shared/lib/tauri.ts` Service Tags，在 `conversations.store.ts` 内 `yield*` 使用。
-- **`Sidebar` 用 `createSignal` 做局部状态。** `query` / `debouncedQuery` / `setQuery/setDebouncedQuery` signals 是组件局部的。streaming 状态点（per-conv 反馈）走 `conversations.store`：读 `Object.values(store.byId).filter(c => c.streamingMessageId !== null)` 列出所有正在 streaming 的 conv，在 sidebar 列表项旁显示 ⏳ 徽标。
+- ~~**`Sidebar` 用 `createSignal` 做局部状态。**~~（V1.x sidebar 移除 — 由 `shared/components/internal/agent-sidebar` 替代，详见 [ADR-0022](../../docs/adr/0022-internal-components-and-design-tokens.md) D1 + D3）
+- **Home（无 active conv 时）渲染 AgentSidebar + CodexForm 两栏布局。** Home 是 `/` 路由在 `activeId === null` 时的形态。`AgentSidebar` 由 chat feature 喂数据（workspaces + items + handlers），不直接 import `conversations.store`；`CodexForm` 包含 input box（disabled until workspace 选中）+ workspace picker（必选解锁 input）。详见下方 "Home 路由 + Codex form" section。
+- **ChatView（有 active conv 时）满屏单页布局，** 顶部加 "← 返回首页" 按钮调 `navigate({ to: "/" })` 清空 `activeId$()`。chat-view 自身不变（消息列表 + input + provider select + send/cancel）。
+- **Home → ChatView 切换 = `selectConversation(id)` 设 activeId。** MainContent 切到 ChatView。Home 的 workspace 预选走 `Settings.last_used_workspace_id`。
+
+## Home 路由 + Codex form
+
+`/` 路由在 chat feature 落地为状态机（`src/features/chat/routes/index.tsx` + `src/features/chat/components/home.tsx`）：
+
+```
+ChatLayout
+  ├── AgentSidebar (左侧，always visible when no conv)
+  │     └── workspaces + items 由 home 喂 props
+  └── MainContent
+        ├── activeId === null → CodexForm (右侧居中)
+        │     ├── <input> (disabled until workspace 选中)
+        │     ├── WorkspacePicker (cards 列表，1 ws 时 auto-select)
+        │     └── <Button> 发送
+        └── activeId !== null → ChatView (满屏 + 返回按钮)
+```
+
+**Home send 流程**：
+
+1. 用户在 CodexForm 选 workspace + type + 点发送
+2. `createConversation(workspaceId, title, firstMessage)` 入 DB
+3. `appStore.set({ last_used_workspace_id: workspaceId })` 持久化
+4. `selectConversation(id)` → activeId 设 → MainContent 切到 ChatView
+5. `sendMessage(id, firstMessage, provider)` → LLM 立即 streaming
+
+**Workspace 预选状态机**：
+
+- 0 workspace → CodexForm 永久 disable input + "Add a workspace" CTA 跳 `/settings`
+- 1 workspace → `setSelectedWorkspaceId(唯一那个)` 自动选，input 立即可用
+- 2+ workspace → 无预选，input disable，用户点卡片后 input 解锁
+- `last_used_workspace_id` 被删除/禁用 → fallback 到第一个 enabled；若该 fallback 也无 → CTA 跳 `/settings`
+
+**返回首页**：
+
+ChatView 顶部 "← 返回首页" 按钮调 `navigate({ to: "/" })` 并清空 `activeId$()`。MainContent 切回 CodexForm，预选 `last_used_workspace_id`。
 
 ## 输入框下方的 provider 选择器
 
@@ -110,8 +148,16 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 
 ## 图标策略
 
-图标来自 **lucide-solid**（已是项目依赖）。新代码中不要使用 emoji。
-`components/tool-call-card.tsx` 中已有的 emoji（`⏳ ✓ ✗`）暂保留；新 UI 使用 lucide-solid。
+图标来自 **lucide-solid**（项目依赖）。**所有 UI 不使用 emoji**。统一映射：
+
+| 语义 | lucide icon | 用法 |
+|---|---|---|
+| running / streaming / thinking | `Loader2` (`class="animate-spin"`) | tool-call-card running, sidebar streaming 徽标, chat-view 思考中 |
+| success | `CheckCircle2` | tool-call-card success, message-bubble tool success |
+| error | `XCircle` | tool-call-card error, message-bubble tool error |
+| folder browse | `FolderOpen` | workspace-card "Browse…" 按钮 |
+
+**测试断言**：`expect(icon?.textContent).toBe("⏳")` 等 emoji 字符串形式已废止，改用 `data-testid` / `aria-label` 选择器（如 `aria-label="streaming"` / `aria-label="running"` / `data-testid="icon-success"`）。
 
 ## 跨 feature 引用
 
@@ -125,3 +171,4 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 - **Wave 4**（2026-06-14）：从 `src/agent/` → `src/features/chat/` 迁移
 - **Wave V1.5**（2026-06-15，ADR-0010）：`runtime.ts` 从根级入 `lib/`；`store/` → `stores/`；删空 `types/`
 - **Wave V2**（2026-06-25，ADR-0019）：`AgentRuntime` service 单例 + Map → `createAgentRuntime()` 工厂 + per-conv `ConversationState.runtime`；`messages.store` + `agent.store` 合并到 `conversations.store`；`createStore<{ activeId, byId }>` 取代全局 signal + Map；supersede ADR-0014 D1 + D4
+- **Wave V2.1**（2026-06-27，ADR-0022）：V1.x `sidebar.tsx` **删除**；新增 `home.tsx` (Codex-like 2 栏)；`/shared/components/ui/sidebar.tsx` primitive + `/shared/components/internal/agent-sidebar.tsx` 业务组合落地（首例 internal/）；emoji 全面迁移 lucide-solid (Loader2/CheckCircle2/XCircle/FolderOpen)；`Conversation.workspace_id` 必填（per-Conv 绑定）；`Settings.last_used_workspace_id` 引入
