@@ -7,6 +7,9 @@
 //! 跟 Playwright 一致,spec 文件改动最小（只换 `expect` 为 `assert.*`）。
 
 import { assert, connectTauri, TauriLocator, TauriPage } from "./cdp-driver";
+import * as path from "node:path";
+import * as os from "node:os";
+import type { Settings, Conversation } from "../src/shared/lib/types";
 
 let page: TauriPage | null = null;
 
@@ -185,14 +188,79 @@ export async function resetChatState(): Promise<void> {
 }
 
 /**
+ * V2.1 backward-compat shim: 直接通过 IPC 创建 conv + 设为 active。
+ * 现有 e2e spec 01-09 假设 click "新对话" 会创建 conv。新 UI 是 navigate home,
+ * 所以走 IPC 直接创建。
+ *
+ * @param p - TauriPage
+ * @param opts - { workspaceLabel?: string, workspaceRoot?: string, title?: string }
+ */
+export async function setupWorkspaceAndCreateConvViaIpc(
+  p: TauriPage,
+  opts: { workspaceLabel?: string; workspaceRoot?: string; title?: string } = {},
+): Promise<void> {
+  const label = opts.workspaceLabel ?? "E2E Test Workspace";
+  const root = opts.workspaceRoot ?? path.join(os.tmpdir(), "codeman-e2e-" + Date.now());
+  const title = opts.title ?? "E2E Test Conv";
+
+  // 1. Add workspace via IPC
+  const current = await invoke<Settings>("get_settings");
+  const newSettings = {
+    ...current,
+    workspaces: [
+      ...(current.workspaces ?? []),
+      { id: "e2e-ws", label, root_path: root, enabled: true },
+    ],
+    last_used_workspace_id: "e2e-ws",
+  };
+  await invoke("update_settings", { newSettings });
+
+  // 2. Create conversation via IPC
+  const _conv = await invoke<Conversation>("create_conversation", {
+    title,
+    systemPrompt: null,
+    workspaceId: "e2e-ws",
+  });
+
+  // 3. Refresh settings store (so appStore reflects new workspace)
+  await p.evaluate(() => {
+    // Trigger a window focus event to refresh stores
+    window.dispatchEvent(new Event("focus"));
+  });
+
+  // 4. Wait for ChatView to mount
+  await new Promise((r) => setTimeout(r, 500));
+}
+
+/**
+ * V2.1 CodexForm helpers for new 10-home-agent.spec.ts
+ */
+
+/**
+ * Click on a workspace card in the CodexForm workspace picker.
+ */
+export async function selectWorkspaceCard(p: TauriPage, workspaceId: string): Promise<void> {
+  await p.locator(`[data-testid='workspace-card-${workspaceId}']`).click();
+}
+
+/**
+ * Type into the CodexForm input and click send.
+ */
+export async function submitCodexForm(
+  p: TauriPage,
+  text: string,
+): Promise<void> {
+  await p.locator("[data-testid='codex-input']").fill(text);
+  await p.locator("[data-testid='codex-send']").click();
+}
+
+/**
  * Click "New conversation" 按钮,等 active item + messages load 完成,
  * 保证下一步 submit 不会跟 loadMessages IPC race。
+ *
+ * V2.1: Now uses IPC-based shim (setupWorkspaceAndCreateConvViaIpc) internally,
+ * since the UI no longer creates conv via "新对话" button click.
  */
 export async function clickNewConversationAndWait(p: TauriPage): Promise<void> {
-  await p.locator('button[title="新建会话"]').click();
-  const activeItem = p.locator("aside li.bg-primary").first();
-  await assert.visible(activeItem, { timeout: 5_000 });
-  // 等 ~500ms 让 create_conversation IPC + loadMessages IPC 都完成,
-  // 避免 race:loadMessages 完成后才让 appendUserMessage 加用户消息。
-  await new Promise((r) => setTimeout(r, 500));
+  await setupWorkspaceAndCreateConvViaIpc(p);
 }
