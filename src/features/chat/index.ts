@@ -4,7 +4,6 @@
 //! 都可从这单一入口点访问。内部实现细节（如 Effect Context tags）**不**导出。
 
 export { ChatView } from "./components/chat-view";
-export { Sidebar } from "./components/sidebar";
 export { MessageBubble } from "./components/message-bubble";
 export { ToolCallCard } from "./components/tool-call-card";
 
