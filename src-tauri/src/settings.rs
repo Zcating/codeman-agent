@@ -232,6 +232,13 @@ pub struct Settings {
     /// V2 工作区列表。V1→V2 迁移时若无此字段则默认空 Vec（用户 opt-in）。
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub workspaces: Vec<Workspace>,
+
+    /// Home 页上次选择的 workspace id (V2.1)。
+    /// 用户从 Home 落地时优先预选该 workspace；若该 workspace 已被删除/禁用，
+    /// fallback 到 workspaces 数组中第一个 enabled 项。
+    /// 详见 CONTEXT.md "Last-Used Workspace"。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_used_workspace_id: Option<String>,
 }
 
 impl Default for Settings {
@@ -279,6 +286,7 @@ Files are limited to 10 MB. Binary files, .exe/.dll/.sys files, and paths outsid
             billing_providers: Vec::new(),
             conversations: ConversationSettings::default(),
             workspaces: Vec::new(),
+            last_used_workspace_id: None,
         }
     }
 }
@@ -479,10 +487,15 @@ mod tests {
 
     #[test]
     fn sanitized_v15_preserves_fields() {
-        let mut s = Settings::default();
-        s.user_language = UserLanguage::Zh;
-        s.theme = Theme::Dark;
-        s.conversations.auto_archive_after_days = 0;
+        let s = Settings {
+            user_language: UserLanguage::Zh,
+            theme: Theme::Dark,
+            conversations: ConversationSettings {
+                auto_archive_after_days: 0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
         let s2 = s.sanitized();
         assert_eq!(s2.user_language, UserLanguage::Zh);
         assert_eq!(s2.theme, Theme::Dark);
@@ -495,24 +508,26 @@ mod tests {
     fn migrate_v0_minimax_settings_to_v15() {
         // V0 fixture: llm_providers=[minimax], billing_providers=[minimax]
         // V2 迁移后 billing 字段被忽略 + 清空。
-        let mut v0 = Settings::default();
-        v0.llm_providers = vec![LLMProvider {
-            id: "minimax".into(),
-            label: "MiniMax".into(),
-            enabled: true,
-            default_model: Some("MiniMax-M2.5-highspeed".into()),
-            base_url: Some("https://api.minimaxi.com/anthropic".into()),
-            api_key_ref: Some("llm_providers/minimax/api_key".into()),
-            api_type: "anthropic-messages".into(),
-        }];
-        v0.billing_providers = vec![BillingProviderConfig {
-            id: "minimax".into(),
-            enabled: true,
-            refresh_interval_secs: 60,
-            api_key_ref: Some("billing/minimax/api_key".into()),
-        }];
-        v0.providers.clear();
-        v0.schema_version = None;
+        let v0 = Settings {
+            llm_providers: vec![LLMProvider {
+                id: "minimax".into(),
+                label: "MiniMax".into(),
+                enabled: true,
+                default_model: Some("MiniMax-M2.5-highspeed".into()),
+                base_url: Some("https://api.minimaxi.com/anthropic".into()),
+                api_key_ref: Some("llm_providers/minimax/api_key".into()),
+                api_type: "anthropic-messages".into(),
+            }],
+            billing_providers: vec![BillingProviderConfig {
+                id: "minimax".into(),
+                enabled: true,
+                refresh_interval_secs: 60,
+                api_key_ref: Some("billing/minimax/api_key".into()),
+            }],
+            providers: vec![],
+            schema_version: None,
+            ..Default::default()
+        };
 
         let migrated = v0.sanitized();
 
@@ -527,24 +542,26 @@ mod tests {
 
     #[test]
     fn migrate_v0_deepseek_settings_to_v15() {
-        let mut v0 = Settings::default();
-        v0.llm_providers = vec![LLMProvider {
-            id: "deepseek".into(),
-            label: "DeepSeek".into(),
-            enabled: true,
-            default_model: Some("deepseek-chat".into()),
-            base_url: Some("https://api.deepseek.com/anthropic".into()),
-            api_key_ref: Some("llm_providers/deepseek/api_key".into()),
-            api_type: "anthropic-messages".into(),
-        }];
-        v0.billing_providers = vec![BillingProviderConfig {
-            id: "deepseek".into(),
-            enabled: true,
-            refresh_interval_secs: 60,
-            api_key_ref: Some("billing/deepseek/api_key".into()),
-        }];
-        v0.providers.clear();
-        v0.schema_version = None;
+        let v0 = Settings {
+            llm_providers: vec![LLMProvider {
+                id: "deepseek".into(),
+                label: "DeepSeek".into(),
+                enabled: true,
+                default_model: Some("deepseek-chat".into()),
+                base_url: Some("https://api.deepseek.com/anthropic".into()),
+                api_key_ref: Some("llm_providers/deepseek/api_key".into()),
+                api_type: "anthropic-messages".into(),
+            }],
+            billing_providers: vec![BillingProviderConfig {
+                id: "deepseek".into(),
+                enabled: true,
+                refresh_interval_secs: 60,
+                api_key_ref: Some("billing/deepseek/api_key".into()),
+            }],
+            providers: vec![],
+            schema_version: None,
+            ..Default::default()
+        };
 
         let migrated = v0.sanitized();
 
@@ -575,19 +592,21 @@ mod tests {
 
     #[test]
     fn migrate_llm_only_no_billing_to_v15() {
-        let mut v0 = Settings::default();
-        v0.llm_providers = vec![LLMProvider {
-            id: "openrouter".into(),
-            label: "OpenRouter".into(),
-            enabled: true,
-            default_model: Some("gpt-4o".into()),
-            base_url: Some("https://openrouter.ai/anthropic".into()),
-            api_key_ref: Some("llm_providers/openrouter/api_key".into()),
-            api_type: "anthropic-messages".into(),
-        }];
-        v0.billing_providers.clear();
-        v0.providers.clear();
-        v0.schema_version = None;
+        let v0 = Settings {
+            llm_providers: vec![LLMProvider {
+                id: "openrouter".into(),
+                label: "OpenRouter".into(),
+                enabled: true,
+                default_model: Some("gpt-4o".into()),
+                base_url: Some("https://openrouter.ai/anthropic".into()),
+                api_key_ref: Some("llm_providers/openrouter/api_key".into()),
+                api_type: "anthropic-messages".into(),
+            }],
+            billing_providers: vec![],
+            providers: vec![],
+            schema_version: None,
+            ..Default::default()
+        };
 
         let migrated = v0.sanitized();
 
@@ -681,6 +700,7 @@ mod tests {
             billing_providers: Vec::new(),
             conversations: ConversationSettings::default(),
             workspaces: Vec::new(),
+            last_used_workspace_id: None,
         };
         let json = serde_json::to_string(&s).unwrap();
         let back: Settings = serde_json::from_str(&json).unwrap();
@@ -732,6 +752,11 @@ mod tests {
             "V1 settings should have empty workspaces, got {:?}",
             sanitized.workspaces
         );
+        assert!(
+            sanitized.last_used_workspace_id.is_none(),
+            "V1 settings should have no last_used_workspace_id, got {:?}",
+            sanitized.last_used_workspace_id
+        );
     }
 
     #[test]
@@ -751,5 +776,24 @@ mod tests {
         assert_eq!(sanitized.workspaces[0].label, "test workspace");
         assert_eq!(sanitized.workspaces[0].root_path, PathBuf::from(r"C:\test"));
         assert!(sanitized.workspaces[0].enabled);
+    }
+
+    // ─── V2.1 last_used_workspace_id 测试 ─────────────────────────────────
+
+    #[test]
+    fn last_used_workspace_id_default_is_none() {
+        let s = Settings::default();
+        assert!(s.last_used_workspace_id.is_none());
+    }
+
+    #[test]
+    fn last_used_workspace_id_round_trips_via_serde() {
+        let s = Settings {
+            last_used_workspace_id: Some("ws-123".into()),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&s).unwrap();
+        let back: Settings = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.last_used_workspace_id.as_deref(), Some("ws-123"));
     }
 }

@@ -478,9 +478,7 @@ pub(crate) fn search_files_impl(
     // 4. Build glob matcher
     // globset Glob requires ** for recursive matching; we add ** prefix if not present
     // so that "*.txt" behaves as "**/*.txt" (matches subdirectories)
-    let effective_pattern = if glob_pattern.contains("**") {
-        glob_pattern.to_string()
-    } else if glob_pattern.starts_with("**") {
+    let effective_pattern = if glob_pattern.contains("**") || glob_pattern.starts_with("**") {
         glob_pattern.to_string()
     } else {
         format!("**/{}", glob_pattern)

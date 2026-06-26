@@ -156,6 +156,7 @@ pub async fn list_messages(
 }
 
 #[tauri::command(rename_all = "camelCase")]
+#[allow(clippy::too_many_arguments)]
 pub async fn append_message(
     pool: tauri::State<'_, sqlx::SqlitePool>,
     conversation_id: String,

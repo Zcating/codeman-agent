@@ -69,6 +69,7 @@ fn row_to_message(row: &SqliteRow) -> Result<Message, sqlx::Error> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// 追加消息并在同一事务中将其内容同步到 FTS5。
+#[allow(clippy::too_many_arguments)]
 pub async fn append_message(
     pool: &SqlitePool,
     conversation_id: Uuid,
