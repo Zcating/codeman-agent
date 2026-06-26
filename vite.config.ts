@@ -14,28 +14,29 @@ import { resolve } from "path";
 const isVitest = !!process.env.VITEST;
 const solidOptions = isVitest ? { hot: false } : undefined;
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   plugins: [solid(solidOptions), tailwindcss()],
-
   // `vp staged` runs on `git commit` (see `.vite-hooks/pre-commit`, installed
-  // by `vp config`). The wrapper script consumes vp-staged's positional file
-  // args so the typecheck stays full-project, and runs the FILTERED test +
-  // coverage gate (vitest `related <staged>` + one `--coverage.include=`
-  // per staged source → perFile 90% threshold check on staged files only,
-  // ~5-30s). Full coverage is still available via `vp run test:coverage`
-  // for CI / local thorough checks. We intentionally do not use
-  // `vp check --fix` here: it would invoke oxfmt/oxlint and reformat the
-  // entire codebase, conflicting with the existing Tailwind v4 utility style
-  // (see ADR-0006). The `.mjs` extension is included so edits to
-  // `scripts/precommit.mjs` itself also re-trigger the hook. Add a new entry
-  // here when introducing additional staged checks (e.g. a Rust check on
-  // `*.rs` would go in scripts/precommit.mjs).
+  // by `vp config`). Each glob pattern dispatches to a dedicated script:
+  //   - `*.{ts,tsx,mjs}` -> scripts/precommit.mjs (frontend gate: typecheck +
+  //     vitest related <staged> + --coverage.include per staged source +
+  //     perFile 90% statements threshold)
+  //   - `*.rs` -> scripts/precommit-rust.mjs (backend gate: cargo clippy
+  //     --all-targets -- -D warnings + cargo test + cargo llvm-cov +
+  //     perFile 90% lines threshold on staged sources)
+  //
+  // The file TYPE is already determined by the glob match, so each script
+  // receives ONLY files of its own type and doesn't need to filter by
+  // extension (e.g., precommit.mjs assumes all args are .ts/.tsx/.mjs,
+  // precommit-rust.mjs assumes all args are .rs). This avoids redundant
+  // type checks and keeps each script single-purpose. See ADR-0021 for
+  // the precommit gate architecture.
   staged: {
     "*.{ts,tsx,mjs}": "node scripts/precommit.mjs",
+    "*.rs": "node scripts/precommit-rust.mjs",
   },
   resolve: {
     conditions: ["browser", "development"],
