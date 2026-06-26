@@ -484,4 +484,62 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     appStore.setLastUsedWorkspaceId("ws-456");
     expect(appStore.getLastUsedWorkspaceId()).toBe("ws-456");
   });
+
+  // ─── T1.7: selectedWorkspaceId fallback chain ───
+
+  it("selectedWorkspaceId: last_used 指向 enabled workspace → 返回该 id", () => {
+    _resetAppStoreForTest();
+    appStore.set({
+      workspaces: [
+        { id: "ws-1", label: "A", root_path: "/a", enabled: true },
+        { id: "ws-2", label: "B", root_path: "/b", enabled: true },
+      ],
+    });
+    appStore.setLastUsedWorkspaceId("ws-1");
+    expect(appStore.selectedWorkspaceId()).toBe("ws-1");
+  });
+
+  it("selectedWorkspaceId: last_used 指向 disabled workspace → fallback 第一个 enabled", () => {
+    _resetAppStoreForTest();
+    appStore.set({
+      workspaces: [
+        { id: "ws-1", label: "A", root_path: "/a", enabled: false },
+        { id: "ws-2", label: "B", root_path: "/b", enabled: true },
+      ],
+    });
+    appStore.setLastUsedWorkspaceId("ws-1");
+    expect(appStore.selectedWorkspaceId()).toBe("ws-2");
+  });
+
+  it("selectedWorkspaceId: last_used 指向已删除 workspace → fallback 第一个 enabled", () => {
+    _resetAppStoreForTest();
+    appStore.set({
+      workspaces: [{ id: "ws-2", label: "B", root_path: "/b", enabled: true }],
+    });
+    appStore.setLastUsedWorkspaceId("ws-1"); // ws-1 no longer exists
+    expect(appStore.selectedWorkspaceId()).toBe("ws-2");
+  });
+
+  it("selectedWorkspaceId: workspaces 空数组 → 返回 null", () => {
+    _resetAppStoreForTest();
+    appStore.set({ workspaces: [] });
+    expect(appStore.selectedWorkspaceId()).toBeNull();
+  });
+
+  it("selectedWorkspaceId: 所有 workspace 均为 disabled → 返回 null", () => {
+    _resetAppStoreForTest();
+    appStore.set({
+      workspaces: [{ id: "ws-1", label: "A", root_path: "/a", enabled: false }],
+    });
+    expect(appStore.selectedWorkspaceId()).toBeNull();
+  });
+
+  it("selectedWorkspaceId: 无 last_used 且无 enabled workspace → 返回 null", () => {
+    _resetAppStoreForTest();
+    appStore.set({
+      workspaces: [{ id: "ws-1", label: "A", root_path: "/a", enabled: false }],
+    });
+    appStore.setLastUsedWorkspaceId(null);
+    expect(appStore.selectedWorkspaceId()).toBeNull();
+  });
 });

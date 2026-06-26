@@ -304,10 +304,22 @@ export async function loadConversations(includeArchived = false): Promise<void> 
 
 // ─── createConversation: DB 新建 + setupConvState ─────────────
 
-export async function createConversation(title: string, systemPrompt?: string): Promise<void> {
+/**
+ * 创建新 Conversation 并绑定 workspace。
+ *
+ * @param workspaceId - 用户选定的 workspace id（V2.1 per-Conv binding）。
+ *                       V1.x 迁移的旧 conv 才有 workspaceId='' ('Needs workspace')。
+ * @param title - 会话标题
+ * @param systemPrompt - 可选，覆盖 settings.system_prompt.default
+ */
+export async function createConversation(
+  workspaceId: string,
+  title: string,
+  systemPrompt?: string,
+): Promise<void> {
   const program = Effect.gen(function* () {
     const svc = yield* ConversationService;
-    return yield* svc.create(title, systemPrompt);
+    return yield* svc.create(title, systemPrompt ?? null, workspaceId);
   }).pipe(Effect.provide(ConversationServiceLive));
   const result = await Effect.runPromiseExit(program);
   if (Exit.isSuccess(result)) {

@@ -228,8 +228,8 @@ describe("Sidebar", () => {
     expect(badge).toBeNull();
   });
 
-  // H15: "新对话" button calls createConversation("新会话")
-  it("点击新对话按钮调用 createConversation(新会话)", async () => {
+  // H15: "新对话" button calls createConversation("", "新会话")
+  it("点击新对话按钮调用 createConversation('', 新会话)", async () => {
     const mod = await getMockedStore();
     vi.mocked(mod.conversations$).mockReturnValue([]);
     const { container } = render(() => <Sidebar />);
@@ -237,7 +237,7 @@ describe("Sidebar", () => {
     expect(btn).toBeTruthy();
     fireEvent.click(btn!);
     expect(mod.createConversation).toHaveBeenCalledTimes(1);
-    expect(mod.createConversation).toHaveBeenCalledWith("新会话");
+    expect(mod.createConversation).toHaveBeenCalledWith("", "新会话");
   });
 
   // H16: handleListKeyDown early-return when items.length === 0

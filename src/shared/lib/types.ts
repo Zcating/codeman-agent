@@ -120,6 +120,8 @@ export interface Conversation {
   id: string;
   title: string;
   system_prompt: string | null;
+  /** V2.1: per-Conv workspace binding. '' 表示 'Needs workspace' (V1.x 旧 conv 灰标). */
+  workspace_id: string;
   created_at: number;
   updated_at: number;
   archived_at: number | null;

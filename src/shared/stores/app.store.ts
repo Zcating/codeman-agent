@@ -262,6 +262,33 @@ export const appStore = {
   getLastUsedWorkspaceId(): string | null {
     return appStore.state.value.last_used_workspace_id ?? null;
   },
+
+  /**
+   * Home 落地时的预选 workspace id。fallback 链 (CONTEXT.md "Last-Used Workspace"):
+   * 1. last_used_workspace_id 引用 enabled workspace → 返回该 id
+   * 2. 否则返回第一个 enabled workspace id
+   * 3. workspaces 全空或全 disabled → 返回 null (Home 应 CTA 跳 /settings)
+   *
+   * 调用方负责 UI 渲染（badge / disabled state），此方法只决定 id。
+   */
+  selectedWorkspaceId(): string | null {
+    const settings = appStore.state.value;
+    const lastUsed = settings.last_used_workspace_id;
+    const workspaces = settings.workspaces ?? [];
+
+    // Case 1: last_used_workspace_id 指向 enabled workspace
+    if (lastUsed) {
+      const ws = workspaces.find((w) => w.id === lastUsed && w.enabled);
+      if (ws) return ws.id;
+    }
+
+    // Case 2: 第一个 enabled workspace
+    const firstEnabled = workspaces.find((w) => w.enabled);
+    if (firstEnabled) return firstEnabled.id;
+
+    // Case 3: 全空
+    return null;
+  },
 };
 
 /** Test-only: reset store state to defaultSettings (called from app.store.test.ts). */

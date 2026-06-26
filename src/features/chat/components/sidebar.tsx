@@ -85,7 +85,7 @@ export function Sidebar() {
   // "空画布跳过" 守卫在 `createConversation` 内部（看 conversations.store.ts）,
   // UI 不再做这个判断 —— 业务规则单点,不在每个调用方重复实现。
   const handleNewConversation = () => {
-    void createConversation("新会话");
+    void createConversation("", "新会话");
   };
 
   return (

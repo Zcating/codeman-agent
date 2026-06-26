@@ -342,11 +342,19 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
   },
 
   get_conversation(args?: IPCArgs): unknown {
-    return mockState.resolved ?? { id: (args?.id as string) ?? "", title: "", system_prompt: null, created_at: 0, updated_at: 0, archived_at: null };
+    return mockState.resolved ?? { id: (args?.id as string) ?? "", title: "", system_prompt: null, workspace_id: "", created_at: 0, updated_at: 0, archived_at: null };
   },
 
   create_conversation(args?: IPCArgs): unknown {
-    return mockState.resolved ?? { id: "new-conv-id", title: (args?.title as string) ?? "", system_prompt: (args?.systemPrompt as string | null) ?? null, created_at: Date.now(), updated_at: Date.now(), archived_at: null };
+    return mockState.resolved ?? {
+      id: "new-conv-id",
+      title: (args?.title as string) ?? "",
+      system_prompt: (args?.systemPrompt as string | null) ?? null,
+      workspace_id: (args?.workspaceId as string) ?? "",
+      created_at: Date.now(),
+      updated_at: Date.now(),
+      archived_at: null,
+    };
   },
 
   archive_conversation(): unknown {

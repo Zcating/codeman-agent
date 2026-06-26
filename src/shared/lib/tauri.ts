@@ -63,7 +63,8 @@ export class ConversationService extends Context.Tag("ConversationService")<
     readonly get: (id: string) => Effect.Effect<Conversation, AppError>;
     readonly create: (
       title: string,
-      systemPrompt?: string,
+      systemPrompt: string | null,
+      workspaceId: string,
     ) => Effect.Effect<Conversation, AppError>;
     readonly archive: (id: string) => Effect.Effect<void, AppError>;
     readonly delete: (id: string) => Effect.Effect<void, AppError>;
@@ -166,8 +167,8 @@ export class FileService extends Context.Tag("FileService")<
 export const ConversationServiceLive = Layer.succeed(ConversationService, {
   list: (includeArchived) => invoke<Conversation[]>("list_conversations", { includeArchived }),
   get: (id) => invoke<Conversation>("get_conversation", { id }),
-  create: (title, systemPrompt) =>
-    invoke<Conversation>("create_conversation", { title, systemPrompt: systemPrompt ?? null }),
+  create: (title, systemPrompt, workspaceId) =>
+    invoke<Conversation>("create_conversation", { title, systemPrompt, workspaceId }),
   archive: (id) => invoke<void>("archive_conversation", { id }),
   delete: (id) => invoke<void>("delete_conversation", { id }),
 });

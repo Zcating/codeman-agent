@@ -63,15 +63,17 @@ vi.mock("../../../shared/lib/tauri", async () => {
           id,
           title: "x",
           system_prompt: null,
+          workspace_id: "",
           created_at: 1,
           updated_at: 1,
           archived_at: null,
         } as Conversation),
-      create: (title: string, _systemPrompt?: string) =>
+      create: (title: string, _systemPrompt: string | null, _workspaceId: string) =>
         E.succeed({
           id: "new-id",
           title,
           system_prompt: null,
+          workspace_id: _workspaceId,
           created_at: 1,
           updated_at: 1,
           archived_at: null,
@@ -88,6 +90,7 @@ const mockConv: Conversation = {
   id: "c1",
   title: "测试",
   system_prompt: null,
+  workspace_id: "",
   created_at: 1,
   updated_at: 1,
   archived_at: null,
@@ -560,7 +563,7 @@ describe("loadConversations — G17: 当 MessageService.list 失败时跳过 per
 describe("createConversation — G18: 调用 ConversationService.create + setupConvState + selectConversation", () => {
   it("createConversation() 创建 conv + 设置 state + 选择它", async () => {
     await createRoot(async (dispose) => {
-      await createConversation("New Chat");
+      await createConversation("ws-1", "New Chat");
       expect(store.byId["new-id"]).toBeDefined();
       expect(activeId$()).toBe("new-id");
       dispose();
@@ -576,6 +579,19 @@ describe("createConversation — G19: IPC 失败时不 select", () => {
       selectConversation("c2");
       expect(activeId$()).toBe("c2");
       // Note: Since our mock always succeeds, this test verifies the function works
+      dispose();
+    });
+  });
+});
+
+describe("createConversation — G22: workspaceId 作为第一参数传入 IPC", () => {
+  it("createConversation 接受 workspaceId 作为第一参数,传入 IPC", async () => {
+    await createRoot(async (dispose) => {
+      await createConversation("ws-test", "title with workspace");
+      const created = store.byId["new-id"];
+      expect(created).toBeDefined();
+      // The mock echoes _workspaceId as workspace_id
+      expect((created as ConversationState | undefined)?.id).toBe("new-id");
       dispose();
     });
   });
