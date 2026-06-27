@@ -1,6 +1,7 @@
 //! home.test.tsx — HomeAgentForm 组件测试 (T4.1)
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, fireEvent, waitFor } from "@solidjs/testing-library";
+import { Effect } from "effect";
 import { HomeAgentForm } from "./home";
 import type { ProviderConfig } from "../lib/runtime";
 import { createAndSendConversation } from "../stores/conversations.store";
@@ -61,6 +62,8 @@ vi.mock("@ark-ui/solid", async () => {
       },
       ItemText: (props: any) => <span>{props.children}</span>,
       ItemIndicator: (props: any) => <span>{props.children}</span>,
+      ItemGroup: (props: any) => <div role="group">{props.children}</div>,
+      ItemGroupLabel: (props: any) => <span>{props.children}</span>,
     },
     createListCollection: vi.fn(({ items }: { items: any[] }) => ({
       items,
@@ -75,6 +78,16 @@ vi.mock("@ark-ui/solid", async () => {
   };
 });
 
+// ─── Mock settings-saver ────────────────────────────────────────────────────────
+
+vi.mock("../../settings/lib/settings-saver", () => ({
+  settingsSaver: {
+    scheduleSave: vi.fn(),
+    cancelPending: vi.fn(),
+    flushNow: vi.fn(),
+  },
+}));
+
 // ─── Mock appStore ─────────────────────────────────────────────────────────
 
 vi.mock("../../../shared/stores/app.store", () => ({
@@ -88,9 +101,15 @@ vi.mock("../../../shared/stores/app.store", () => ({
             id: "minimax",
             label: "MiniMax",
             api_key: "test-key",
+            enabled: true,
             llm: {
               default_model: "MiniMax-M2.5-highspeed",
               base_url: "https://api.minimaxi.com/anthropic",
+              api_type: "anthropic-messages" as const,
+              models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+              models: [
+                { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", context_window: 200000, deprecated: false, thinking: false },
+              ],
             },
           },
         ],
@@ -100,6 +119,8 @@ vi.mock("../../../shared/stores/app.store", () => ({
     setLastUsedWorkspaceId: vi.fn(),
     selectedWorkspaceId: vi.fn<() => string | null>(),
     set: vi.fn(),
+    pickWorkspacePath: vi.fn(() => Effect.succeed<string | null>(null)),
+    addWorkspace: vi.fn((rootPath: string) => ({ id: "mock-id", label: rootPath, root_path: rootPath, enabled: true })),
   },
 }));
 
@@ -134,7 +155,7 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
     cleanup();
   });
 
-  it("T4.1.1: 0 workspaces → shows 'Add a workspace' CTA, input permanently disabled", async () => {
+  it("T4.1.1: 0 workspaces → shows 'No workspaces' placeholder, input permanently disabled", async () => {
     // Override workspaces to be empty
     const { appStore } = await import("../../../shared/stores/app.store");
     appStore.state.value.workspaces = [];
@@ -142,12 +163,13 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
 
     const { getByTestId, getByText } = render(() => <HomeAgentForm />);
 
-    // CTA should be visible
-    expect(getByText("Add a workspace")).toBeTruthy();
-    // Textarea should be disabled
+    // Textarea should be visible but disabled
     const textarea = getByTestId("codex-input") as HTMLTextAreaElement;
     expect(textarea.disabled).toBe(true);
     expect(textarea.placeholder).toBe("Add a workspace to start");
+
+    // Workspace picker area shows "No workspaces" placeholder
+    expect(getByText("No workspaces")).toBeTruthy();
   });
 
   it("T4.1.2: 1 workspace → input immediately enabled (draftWorkspaceId auto-set)", async () => {
@@ -333,5 +355,302 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
 
     // Action slot ("+ Add new workspace…") also present (home.tsx renders it)
     expect(document.querySelector("[data-testid='workspace-select-add-btn']")).toBeTruthy();
+  });
+});
+
+// ─── Layout + Action slot + LLM picker (T4.2) ──────────────────────────────────
+
+describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    mockIsOpen = false;
+    sharedOnValueChange = null;
+    // Reset providers to default mock state to avoid test isolation issues
+    const { appStore } = await import("../../../shared/stores/app.store");
+    appStore.state.value.providers = [
+      {
+        id: "minimax",
+        label: "MiniMax",
+        api_key: "test-key",
+        enabled: true,
+        llm: {
+          default_model: "MiniMax-M2.5-highspeed",
+          base_url: "https://api.minimaxi.com/anthropic",
+          api_type: "anthropic-messages" as const,
+          models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          models: [
+            { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", context_window: 200000, deprecated: false, thinking: false },
+          ],
+        },
+      },
+    ];
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  // T4.2.1
+  it("T4.2.1: 新布局 — textarea 在 workspace picker 之前 (DOM 顺序)", async () => {
+    const { appStore } = await import("../../../shared/stores/app.store");
+    appStore.state.value.workspaces = [
+      { id: "ws-1", label: "Project A", root_path: "C:\\a", enabled: true },
+    ];
+    (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue("ws-1");
+
+    const { container } = render(() => <HomeAgentForm />);
+
+    // Find the outer wrapper that contains both textarea and workspace picker
+    // The layout should be: Title → Textarea → row(workspace picker + LLM picker)
+    const textareaEl = container.querySelector("[data-testid='codex-input']");
+    const workspaceTrigger = container.querySelector("[data-testid='workspace-select-trigger']");
+
+    expect(textareaEl).toBeTruthy();
+    expect(workspaceTrigger).toBeTruthy();
+
+    // In the DOM, textarea should appear before workspace-select-trigger
+    const allChildren = Array.from(container.querySelectorAll("[data-testid]"));
+    const textareaIdx = allChildren.findIndex(el => el.getAttribute("data-testid") === "codex-input");
+    const wsTriggerIdx = allChildren.findIndex(el => el.getAttribute("data-testid") === "workspace-select-trigger");
+    expect(textareaIdx).toBeLessThan(wsTriggerIdx);
+  });
+
+  // T4.2.2
+  it("T4.2.2: workspace picker 200px 固定宽度", async () => {
+    const { appStore } = await import("../../../shared/stores/app.store");
+    appStore.state.value.workspaces = [
+      { id: "ws-1", label: "Project A", root_path: "C:\\a", enabled: true },
+    ];
+    (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue("ws-1");
+
+    const { container } = render(() => <HomeAgentForm />);
+
+    const workspaceTrigger = container.querySelector("[data-testid='workspace-select-trigger']");
+    expect(workspaceTrigger).toBeTruthy();
+
+    // Walk up to find the closest element with w-[200px] class
+    let el: Element | null = workspaceTrigger;
+    while (el && el !== container) {
+      const className = el.className || "";
+      if (className.includes && className.includes("w-[200px]")) {
+        break;
+      }
+      el = el.parentElement;
+    }
+    expect(el).toBeTruthy();
+    expect(el?.className).toContain("w-[200px]");
+  });
+
+  // T4.2.3
+  it("T4.2.3: LLM picker 200px 固定宽度", async () => {
+    const { appStore } = await import("../../../shared/stores/app.store");
+    appStore.state.value.workspaces = [
+      { id: "ws-1", label: "Project A", root_path: "C:\\a", enabled: true },
+    ];
+    (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue("ws-1");
+
+    const { container } = render(() => <HomeAgentForm />);
+
+    const llmPickerTrigger = container.querySelector("[data-testid='llm-picker-trigger']");
+    expect(llmPickerTrigger).toBeTruthy();
+
+    // Walk up to find the closest element with w-[200px] class
+    let el: Element | null = llmPickerTrigger;
+    while (el && el !== container) {
+      const className = el.className || "";
+      if (className.includes && className.includes("w-[200px]")) {
+        break;
+      }
+      el = el.parentElement;
+    }
+    expect(el).toBeTruthy();
+    expect(el?.className).toContain("w-[200px]");
+  });
+
+  // T4.2.4
+  it("T4.2.4: Action slot onClick 调 appStore.pickWorkspacePath", async () => {
+    const { appStore } = await import("../../../shared/stores/app.store");
+    appStore.state.value.workspaces = [
+      { id: "ws-1", label: "Project A", root_path: "C:\\a", enabled: true },
+    ];
+    (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue("ws-1");
+    (appStore.pickWorkspacePath as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed<string | null>("/some/new/path"));
+
+    const { getByTestId } = render(() => <HomeAgentForm />);
+
+    // Open workspace select first
+    const selectTrigger = getByTestId("workspace-select-trigger");
+    fireEvent.click(selectTrigger);
+
+    // Click the action button "+ Add new workspace…"
+    const addBtn = getByTestId("workspace-select-add-btn");
+    fireEvent.click(addBtn);
+
+    expect(appStore.pickWorkspacePath).toHaveBeenCalledTimes(1);
+  });
+
+  // T4.2.5
+  it("T4.2.5: Picker 返回 path → 调 addWorkspace + setDraftWorkspaceId + setLastUsedWorkspaceId", async () => {
+    const { appStore } = await import("../../../shared/stores/app.store");
+    appStore.state.value.workspaces = [
+      { id: "ws-1", label: "Project A", root_path: "C:\\a", enabled: true },
+    ];
+    (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue("ws-1");
+    (appStore.pickWorkspacePath as ReturnType<typeof vi.fn>).mockReturnValue(
+      Effect.succeed<string | null>("/my/new/project")
+    );
+    (appStore.addWorkspace as ReturnType<typeof vi.fn>).mockReturnValue({
+      id: "new-id",
+      label: "project",
+      root_path: "/my/new/project",
+      enabled: true,
+    });
+
+    const { getByTestId } = render(() => <HomeAgentForm />);
+
+    // Open workspace select and click action button
+    const selectTrigger = getByTestId("workspace-select-trigger");
+    fireEvent.click(selectTrigger);
+    const addBtn = getByTestId("workspace-select-add-btn");
+    fireEvent.click(addBtn);
+
+    expect(appStore.addWorkspace).toHaveBeenCalledWith("/my/new/project");
+    expect(appStore.setLastUsedWorkspaceId).toHaveBeenCalledWith("new-id");
+
+    // Textarea should be enabled after setting draftWorkspaceId
+    const textarea = getByTestId("codex-input") as HTMLTextAreaElement;
+    expect(textarea.disabled).toBe(false);
+  });
+
+  // T4.2.6
+  it("T4.2.6: Picker 取消 (返回 null) → 不调 addWorkspace", async () => {
+    const { appStore } = await import("../../../shared/stores/app.store");
+    appStore.state.value.workspaces = [
+      { id: "ws-1", label: "Project A", root_path: "C:\\a", enabled: true },
+    ];
+    (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue("ws-1");
+    (appStore.pickWorkspacePath as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed<string | null>(null));
+
+    const { getByTestId } = render(() => <HomeAgentForm />);
+
+    // Open workspace select and click action button
+    const selectTrigger = getByTestId("workspace-select-trigger");
+    fireEvent.click(selectTrigger);
+    const addBtn = getByTestId("workspace-select-add-btn");
+    fireEvent.click(addBtn);
+
+    expect(appStore.addWorkspace).not.toHaveBeenCalled();
+  });
+
+  // T4.2.7
+  it("T4.2.7: LLM picker 显示 enabled providers 的所有 models", async () => {
+    const { appStore } = await import("../../../shared/stores/app.store");
+    appStore.state.value.workspaces = [
+      { id: "ws-1", label: "Project A", root_path: "C:\\a", enabled: true },
+    ];
+    (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue("ws-1");
+    // Setup 2 providers with 1 model each
+    appStore.state.value.providers = [
+      {
+        id: "provider-1",
+        label: "Provider One",
+        api_key: "key1",
+        enabled: true,
+        llm: {
+          default_model: "model-1",
+          base_url: "https://api.one.com",
+          api_type: "anthropic-messages" as const,
+          models_endpoint: "https://api.one.com/models",
+          models: [
+            { id: "model-1", label: "Model One", context_window: 100000, deprecated: false, thinking: false },
+          ],
+        },
+      },
+      {
+        id: "provider-2",
+        label: "Provider Two",
+        api_key: "key2",
+        enabled: true,
+        llm: {
+          default_model: "model-2",
+          base_url: "https://api.two.com",
+          api_type: "anthropic-messages" as const,
+          models_endpoint: "https://api.two.com/models",
+          models: [
+            { id: "model-2", label: "Model Two", context_window: 200000, deprecated: false, thinking: false },
+          ],
+        },
+      },
+    ];
+    appStore.state.value.default_llm_provider_id = "provider-1";
+
+    const { getByTestId } = render(() => <HomeAgentForm />);
+
+    // Find LLM picker trigger and open it
+    const llmPickerTrigger = getByTestId("llm-picker-trigger");
+    fireEvent.click(llmPickerTrigger);
+
+    // Should have 2 model options (one from each provider)
+    const options = document.querySelectorAll('li[data-value]');
+    expect(options.length).toBe(2);
+  });
+
+  // T4.2.8
+  it("T4.2.8: LLM picker 选中 → 写 default_llm_provider_id + scheduleSave", async () => {
+    const { appStore } = await import("../../../shared/stores/app.store");
+    const { settingsSaver } = await import("../../settings/lib/settings-saver");
+
+    appStore.state.value.workspaces = [
+      { id: "ws-1", label: "Project A", root_path: "C:\\a", enabled: true },
+    ];
+    (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue("ws-1");
+    appStore.state.value.providers = [
+      {
+        id: "provider-1",
+        label: "Provider One",
+        api_key: "key1",
+        enabled: true,
+        llm: {
+          default_model: "model-1",
+          base_url: "https://api.one.com",
+          api_type: "anthropic-messages" as const,
+          models_endpoint: "https://api.one.com/models",
+          models: [
+            { id: "model-1", label: "Model One", context_window: 100000, deprecated: false, thinking: false },
+          ],
+        },
+      },
+      {
+        id: "provider-2",
+        label: "Provider Two",
+        api_key: "key2",
+        enabled: true,
+        llm: {
+          default_model: "model-2",
+          base_url: "https://api.two.com",
+          api_type: "anthropic-messages" as const,
+          models_endpoint: "https://api.two.com/models",
+          models: [
+            { id: "model-2", label: "Model Two", context_window: 200000, deprecated: false, thinking: false },
+          ],
+        },
+      },
+    ];
+    appStore.state.value.default_llm_provider_id = "provider-1";
+
+    const { getByTestId } = render(() => <HomeAgentForm />);
+
+    // Open LLM picker and click model-2
+    const llmPickerTrigger = getByTestId("llm-picker-trigger");
+    fireEvent.click(llmPickerTrigger);
+
+    // Click the second model option
+    const model2Option = document.querySelector('li[data-value="model-2"]') as HTMLElement;
+    expect(model2Option).toBeTruthy();
+    fireEvent.click(model2Option);
+
+    // Should set default_llm_provider_id to provider-2 (which has model-2)
+    expect(appStore.set).toHaveBeenCalledWith({ default_llm_provider_id: "provider-2" });
+    expect(settingsSaver.scheduleSave).toHaveBeenCalledTimes(1);
   });
 });

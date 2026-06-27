@@ -1,11 +1,12 @@
 //! HomeAgentForm — Home 页：无 active conv 时渲染的居中表单 (V2.1 ADR-0022 + V2.1 polish ADR-0023)。
 //!
-/*! CodemanSidebar 由 routes/index.tsx 单独渲染，不在本组件内部。 */
+//! CodemanSidebar 由 routes/index.tsx 单独渲染，不在本组件内部。
 //!
-//! 布局：
+//! 布局 (D6-H4):
 //! - 顶部标题 + 子标题
-//! - Workspace picker (CodemanSelect dropdown, ADR-0023 D4-S)
-//! - Textarea + Send button
+//! - Textarea (top, full width) — 新布局
+//! - row: workspace picker (200px) + LLM picker (200px), gap-2, left-aligned
+//! - Send button row: flex justify-end
 //!
 //! 状态机：
 //! - 0 workspaces → input disabled + "Add workspace" CTA
@@ -14,16 +15,67 @@
 
 import { createMemo, createSignal, Show, type JSX } from "solid-js";
 import { FolderPlus, Send } from "lucide-solid";
+import { Effect, Exit } from "effect";
 import { appStore } from "../../../shared/stores/app.store";
 import { Button } from "../../../shared/components/ui/button";
 import { CodemanSelect } from "../../../shared/components/ui/codeman-select";
+import { CodemanGroupSelect } from "../../../shared/components/ui/codeman-group-select";
 import type { CodemanSidebarWorkspace } from "../../../shared/components/internal/codeman-sidebar";
 import {
   createAndSendConversation,
 } from "../stores/conversations.store";
 import type { ProviderConfig } from "../lib/runtime";
+import { buildEnabledProviders } from "../lib/build-enabled-providers";
+import { settingsSaver } from "../../settings/lib/settings-saver";
 
+// ─── LlmPicker (D6-H5) ─────────────────────────────────────────────────────────
 
+function LlmPicker(): JSX.Element {
+  const groups = createMemo(() =>
+    buildEnabledProviders(appStore.state.value.providers ?? []).map((p) => ({
+      label: p.label,
+      options: p.models.map((m) => ({ label: m.label, value: m.id })),
+    }))
+  );
+
+  const currentModelId = (): string | null => {
+    const providerId = appStore.state.value.default_llm_provider_id;
+    const enabled = buildEnabledProviders(appStore.state.value.providers ?? []);
+    const provider = enabled.find((p) => p.id === providerId);
+    if (!provider) return enabled[0]?.models[0]?.id ?? null;
+    return provider.models[0]?.id ?? null;
+  };
+
+  const handleChange = (modelId: string) => {
+    if (!modelId) return;
+    const provider = buildEnabledProviders(appStore.state.value.providers ?? []).find((p) =>
+      p.models.some((m) => m.id === modelId),
+    );
+    if (provider) {
+      appStore.set({ default_llm_provider_id: provider.id });
+      settingsSaver.scheduleSave();
+    }
+  };
+
+  return (
+    <Show
+      when={groups().length > 0}
+      fallback={<span class="text-xs text-muted-foreground">无 provider</span>}
+    >
+      <div class="w-[200px]">
+        <CodemanGroupSelect
+          groups={groups()}
+          value={currentModelId()}
+          onChange={handleChange}
+          placeholder="选择模型"
+          disabled={false}
+          aria-label="选择 LLM provider"
+          data-testid="llm-picker"
+        />
+      </div>
+    </Show>
+  );
+}
 
 // ─── HomeAgentForm ──────────────────────────────────────────────────────────────
 
@@ -50,6 +102,7 @@ export function HomeAgentForm(): JSX.Element {
   });
 
   const [input, setInput] = createSignal("");
+  let textareaRef: HTMLTextAreaElement | undefined;
 
   const handleSend = async (e: Event) => {
     e.preventDefault();
@@ -80,57 +133,14 @@ export function HomeAgentForm(): JSX.Element {
           <p class="text-sm text-muted-foreground">选个 workspace,开始新对话</p>
         </div>
 
-        {/* Workspace picker — C10: replace with CodemanSelect */}
-        <Show
-          when={wsCount() > 0}
-          fallback={
-            <div class="text-center p-8 border border-dashed border-border rounded-lg space-y-3">
-              <FolderPlus class="h-12 w-12 mx-auto text-muted-foreground/50" aria-hidden="true" />
-              <p class="text-sm text-muted-foreground">No workspaces configured.</p>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  window.location.href = "/settings";
-                }}
-              >
-                Add a workspace
-              </Button>
-            </div>
-          }
-        >
-          <CodemanSelect
-            options={workspaces().map((w) => ({ label: w.label, value: w.id }))}
-            value={draftWorkspaceId()}
-            onChange={(id) => {
-              setDraftWorkspaceId(id);
-              appStore.setLastUsedWorkspaceId(id);
-            }}
-            placeholder="Select a workspace…"
-            disabled={false}
-            data-testid="workspace-select"
-          >
-            {/* Action slot: "+ Add new workspace" button */}
-            <hr role="separator" />
-            <button
-              type="button"
-              data-testid="workspace-select-add-btn"
-              class="w-full px-3 py-2 text-left text-sm hover:bg-accent"
-              onClick={() => {
-                window.location.href = "/settings";
-              }}
-            >
-              + Add new workspace…
-            </button>
-          </CodemanSelect>
-        </Show>
-
-        {/* Input form */}
+        {/* Form — always rendered (D6-H4: textarea top, pickers row, send row) */}
         <form onSubmit={handleSend} class="space-y-2">
+          {/* Textarea — top, full width (D6-H4) */}
           <label for="codex-input" class="sr-only">
             发条消息
           </label>
           <textarea
+            ref={textareaRef}
             id="codex-input"
             data-testid="codex-input"
             rows={3}
@@ -146,6 +156,63 @@ export function HomeAgentForm(): JSX.Element {
             }
             class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
           />
+
+          {/* Row: workspace picker + LLM picker (D6-H4) */}
+          <div class="flex items-center gap-2">
+            {/* Workspace picker area — CTA or picker */}
+            <Show
+              when={wsCount() > 0}
+              fallback={
+                <div class="w-[200px]">
+                  <div class="flex h-10 items-center justify-center rounded-md border border-dashed border-input bg-background px-3 py-2 text-sm text-muted-foreground">
+                    <FolderPlus class="h-4 w-4 mr-2" aria-hidden="true" />
+                    No workspaces
+                  </div>
+                </div>
+              }
+            >
+              <div class="w-[200px]">
+                <CodemanSelect
+                  options={workspaces().map((w) => ({ label: w.label, value: w.id }))}
+                  value={draftWorkspaceId()}
+                  onChange={(id) => {
+                    setDraftWorkspaceId(id);
+                    appStore.setLastUsedWorkspaceId(id);
+                  }}
+                  placeholder="Select a workspace…"
+                  disabled={false}
+                  data-testid="workspace-select"
+                >
+                  {/* Action slot: "+ Add new workspace" button (D6-H1) */}
+                  <hr role="separator" />
+                  <button
+                    type="button"
+                    data-testid="workspace-select-add-btn"
+                    class="w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                    onClick={async () => {
+                      const exit = await Effect.runPromiseExit(appStore.pickWorkspacePath());
+                      if (Exit.isFailure(exit)) return;
+                      const rootPath = exit.value;
+                      if (rootPath === null || rootPath === undefined) return;
+                      const newWs = appStore.addWorkspace(rootPath);
+                      if (newWs) {
+                        setDraftWorkspaceId(newWs.id);
+                        appStore.setLastUsedWorkspaceId(newWs.id);
+                        textareaRef?.focus();
+                      }
+                    }}
+                  >
+                    + Add new workspace…
+                  </button>
+                </CodemanSelect>
+              </div>
+            </Show>
+
+            {/* LLM picker (D6-H5) */}
+            <LlmPicker />
+          </div>
+
+          {/* Send button row: right-aligned (D6-H4) */}
           <div class="flex justify-end">
             <Button
               type="submit"
