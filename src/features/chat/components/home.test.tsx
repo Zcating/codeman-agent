@@ -8,7 +8,7 @@ import { createAndSendConversation } from "../stores/conversations.store";
 
 // Mock @ark-ui/solid Select for jsdom — same pattern as codeman-select.test.tsx
 let mockIsOpen = false;
-let sharedOnValueChange: ((details: { value: string[] }) => void) | null = null;
+let sharedOnValueChanges: ((details: { value: string[] }) => void)[] = [];
 
 vi.mock("@ark-ui/solid", async () => {
   const actual = await vi.importActual("@ark-ui/solid");
@@ -16,7 +16,7 @@ vi.mock("@ark-ui/solid", async () => {
     ...actual,
     Select: {
       Root: (props: any) => {
-        sharedOnValueChange = props.onValueChange ?? null;
+        if (props.onValueChange) sharedOnValueChanges.push(props.onValueChange);
         return <>{props.children}</>;
       },
       Control: (props: any) => <>{props.children}</>,
@@ -51,7 +51,10 @@ vi.mock("@ark-ui/solid", async () => {
             data-value={itemValue}
             onClick={() => {
               if (!props.item?.disabled) {
-                if (sharedOnValueChange) sharedOnValueChange({ value: [itemValue] });
+                // Dispatch to ALL registered Roots (test scenarios only have one open at a time anyway)
+                for (const handler of sharedOnValueChanges) {
+                  handler({ value: [itemValue] });
+                }
                 mockIsOpen = false;
               }
             }}
@@ -148,7 +151,7 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockIsOpen = false;
-    sharedOnValueChange = null;
+    sharedOnValueChanges = [];
   });
 
   afterEach(() => {
@@ -364,7 +367,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
   beforeEach(async () => {
     vi.clearAllMocks();
     mockIsOpen = false;
-    sharedOnValueChange = null;
+    sharedOnValueChanges = [];
     // Reset providers to default mock state to avoid test isolation issues
     const { appStore } = await import("../../../shared/stores/app.store");
     appStore.state.value.providers = [
@@ -514,8 +517,11 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
     const addBtn = getByTestId("workspace-select-add-btn");
     fireEvent.click(addBtn);
 
-    expect(appStore.addWorkspace).toHaveBeenCalledWith("/my/new/project");
-    expect(appStore.setLastUsedWorkspaceId).toHaveBeenCalledWith("new-id");
+    // Async onClick handler calls pickWorkspacePath → addWorkspace → setLastUsedWorkspaceId
+    await waitFor(() => {
+      expect(appStore.addWorkspace).toHaveBeenCalledWith("/my/new/project");
+      expect(appStore.setLastUsedWorkspaceId).toHaveBeenCalledWith("new-id");
+    });
 
     // Textarea should be enabled after setting draftWorkspaceId
     const textarea = getByTestId("codex-input") as HTMLTextAreaElement;
@@ -591,7 +597,9 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
     fireEvent.click(llmPickerTrigger);
 
     // Should have 2 model options (one from each provider)
-    const options = document.querySelectorAll('li[data-value]');
+    const llmContent = document.querySelector('[data-testid="llm-picker-content"]');
+    expect(llmContent).toBeTruthy();
+    const options = llmContent!.querySelectorAll('li[data-value]');
     expect(options.length).toBe(2);
   });
 
