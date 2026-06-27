@@ -24,7 +24,7 @@ V1 是 Tauri 2 + Solid chat agent，**不是 V0 280x100 浮窗**。视觉层走 
 - `stores/` — 跨域 Solid signal
 - `hooks/` — 跨域 composable（`use-` 前缀，V1 预留位）
 - `components/ui/` — 跨域设计系统原子
-- `components/internal/` — 跨域业务组件（V1 预留位）
+- `components/internal/` — 跨域业务组件——codeman-* prefix（[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-N）；当前已落地 `codeman-sidebar`（首例，[ADR-0022](../docs/adr/0022-internal-components-and-design-tokens.md)）
 
 **`features/`**：业务域。允许子目录（白名单，按需创建）：
 
@@ -85,12 +85,13 @@ V1 是 Tauri 2 + Solid chat agent，**不是 V0 280x100 浮窗**。视觉层走 
 | 新增 Tauri 命令包装               | `shared/lib/tauri.ts`（加 invoke 包装 + Service method + Live Layer）；类型在 `shared/lib/types.ts`                                |
 | 新增跨域类型                      | `shared/lib/types.ts`（镜像 Rust `src-tauri/src/types.rs`）                                                                        |
 | 新增设置项                        | `src-tauri/src/settings.rs::Settings` + `sanitized()` + `Default`（**先改后端**），然后同步 `shared/lib/types.ts`                  |
-| 新增 sidebar 组件                 | 改 `shared/components/ui/sidebar.tsx`（primitive） + `shared/components/internal/codeman-sidebar.tsx`（业务组合），遵循 [ADR-0022](../docs/adr/0022-internal-components-and-design-tokens.md) |
+| 新增 sidebar 组件                 | 改 `shared/components/ui/sidebar.tsx`（primitive） + `shared/components/internal/codeman-sidebar.tsx`（业务组合），遵循 [ADR-0022](../docs/adr/0022-internal-components-and-design-tokens.md) + [ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md)（codeman-* namespace） |
 | 改 Home 布局 / Codex form         | 改 `src/features/chat/routes/index.tsx`（状态机）+ `src/features/chat/components/home.tsx`（Codex form）                            |
 | 改 `Conversation.workspace_id`    | 改 `src-tauri/src/db/conversations.rs`（Rust struct） + `src/shared/lib/types.ts`（TS 镜像）+ `src-tauri/src/db/migrations/<seq>_add_workspace_id.sql`（DB 迁移） |
 | 改 `last_used_workspace_id`       | 改 `src-tauri/src/settings.rs::Settings`（Rust）+ `src/shared/lib/types.ts`（TS）+ `src/shared/stores/app.store.ts`（default）       |
-| 新增跨域设计系统原子              | `shared/components/ui/<Name>.tsx`（PascalCase）+ 同名 `<Name>.test.tsx`                                                            |
-| 新增跨域业务组件                  | `shared/components/internal/<Name>.tsx`（**ADR-0022** 首例 `codeman-sidebar`，新组件须严格 prop-driven）                              |
+| 新增跨域设计系统原子              | `shared/components/ui/<Name>.tsx`（PascalCase）+ 同名 `<Name>.test.tsx`；Select primitive 走 @ark-ui/solid 包装（[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-S）            |
+| 新增跨域业务组件                  | `shared/components/internal/codeman-<Name>.tsx`（**ADR-0022** 首例 `codeman-sidebar`；[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-N codeman-* prefix 锁定；新组件须严格 prop-driven）      |
+| 新增跨域 Select wrapper          | `shared/components/ui/codeman-select.tsx`（flat options）或 `codeman-group-select.tsx`（groups）；内部用 @ark-ui/solid Select（[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-S） |
 | 新增跨域 Solid signal             | `shared/stores/<name>.ts`（Accessor 暴露）                                                                                         |
 | 新增跨域 composable               | `shared/hooks/use-<name>.ts`（V1 预留）                                                                                            |
 | 新增 feature 子组件               | `features/<feature>/components/<name>.tsx`（kebab-case + PascalCase 导出）                                                         |
