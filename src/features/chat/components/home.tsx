@@ -1,21 +1,22 @@
-//! HomeAgentForm — Home 页：无 active conv 时渲染的居中表单 (V2.1 ADR-0022)。
+//! HomeAgentForm — Home 页：无 active conv 时渲染的居中表单 (V2.1 ADR-0022 + V2.1 polish ADR-0023)。
 //!
 /*! CodemanSidebar 由 routes/index.tsx 单独渲染，不在本组件内部。 */
 //!
 //! 布局：
 //! - 顶部标题 + 子标题
-//! - Workspace picker (cards grid)
+//! - Workspace picker (CodemanSelect dropdown, ADR-0023 D4-S)
 //! - Textarea + Send button
 //!
 //! 状态机：
 //! - 0 workspaces → input disabled + "Add workspace" CTA
 //! - 1 workspace  → auto-select, input enabled immediately
-//! - 2+ workspaces → no pre-select, input disabled until user picks card
+//! - 2+ workspaces → no pre-select, input disabled until user picks
 
 import { createMemo, createSignal, Show, type JSX } from "solid-js";
 import { FolderPlus, Send } from "lucide-solid";
 import { appStore } from "../../../shared/stores/app.store";
 import { Button } from "../../../shared/components/ui/button";
+import { CodemanSelect } from "../../../shared/components/ui/codeman-select";
 import type { CodemanSidebarWorkspace } from "../../../shared/components/internal/codeman-sidebar";
 import {
   createAndSendConversation,
@@ -39,12 +40,6 @@ export function HomeAgentForm(): JSX.Element {
   const selectedWorkspaceId = (): string | null => appStore.selectedWorkspaceId();
 
   const [draftWorkspaceId, setDraftWorkspaceId] = createSignal<string | null>(selectedWorkspaceId());
-
-  const handleSelectWorkspace = (id: string) => {
-    setDraftWorkspaceId(id);
-    appStore.setLastUsedWorkspaceId(id);
-  };
-  void handleSelectWorkspace; // TODO C10: used by CodemanSelect onChange
 
   const wsCount = createMemo(() => workspaces().length);
 
@@ -104,7 +99,30 @@ export function HomeAgentForm(): JSX.Element {
             </div>
           }
         >
-          <span data-testid="workspace-select-placeholder" />
+          <CodemanSelect
+            options={workspaces().map((w) => ({ label: w.label, value: w.id }))}
+            value={draftWorkspaceId()}
+            onChange={(id) => {
+              setDraftWorkspaceId(id);
+              appStore.setLastUsedWorkspaceId(id);
+            }}
+            placeholder="Select a workspace…"
+            disabled={false}
+            data-testid="workspace-select"
+          >
+            {/* Action slot: "+ Add new workspace" button */}
+            <hr role="separator" />
+            <button
+              type="button"
+              data-testid="workspace-select-add-btn"
+              class="w-full px-3 py-2 text-left text-sm hover:bg-accent"
+              onClick={() => {
+                window.location.href = "/settings";
+              }}
+            >
+              + Add new workspace…
+            </button>
+          </CodemanSelect>
         </Show>
 
         {/* Input form */}

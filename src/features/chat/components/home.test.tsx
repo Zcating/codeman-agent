@@ -5,6 +5,76 @@ import { HomeAgentForm } from "./home";
 import type { ProviderConfig } from "../lib/runtime";
 import { createAndSendConversation } from "../stores/conversations.store";
 
+// Mock @ark-ui/solid Select for jsdom — same pattern as codeman-select.test.tsx
+let mockIsOpen = false;
+let sharedOnValueChange: ((details: { value: string[] }) => void) | null = null;
+
+vi.mock("@ark-ui/solid", async () => {
+  const actual = await vi.importActual("@ark-ui/solid");
+  return {
+    ...actual,
+    Select: {
+      Root: (props: any) => {
+        sharedOnValueChange = props.onValueChange ?? null;
+        return <>{props.children}</>;
+      },
+      Control: (props: any) => <>{props.children}</>,
+      Trigger: (props: any) => (
+        <button
+          {...(props["data-testid"] ? { "data-testid": props["data-testid"] } : {})}
+          data-state={mockIsOpen ? "open" : "closed"}
+          disabled={props.disabled}
+          onClick={() => { mockIsOpen = !mockIsOpen; }}
+          aria-label={props["aria-label"]}
+        >
+          {props.children}
+        </button>
+      ),
+      ValueText: (props: any) => <span>{props.placeholder || props.children}</span>,
+      Indicator: (props: any) => <span>{props.children}</span>,
+      Positioner: (props: any) => <div data-part="positioner" style={{ display: mockIsOpen ? "block" : "none" }}>{props.children}</div>,
+      Content: (props: any) => (
+        <div
+          data-testid={props["data-testid"]}
+          data-part="content"
+          data-state={mockIsOpen ? "open" : "closed"}
+        >
+          {props.children}
+        </div>
+      ),
+      List: (props: any) => <ul>{props.children}</ul>,
+      Item: (props: any) => {
+        const itemValue = props.item?.value ?? props.value;
+        return (
+          <li
+            data-value={itemValue}
+            onClick={() => {
+              if (!props.item?.disabled) {
+                if (sharedOnValueChange) sharedOnValueChange({ value: [itemValue] });
+                mockIsOpen = false;
+              }
+            }}
+          >
+            {props.children}
+          </li>
+        );
+      },
+      ItemText: (props: any) => <span>{props.children}</span>,
+      ItemIndicator: (props: any) => <span>{props.children}</span>,
+    },
+    createListCollection: vi.fn(({ items }: { items: any[] }) => ({
+      items,
+      filteredItems: items,
+      getItemValue: (item: any) => item.value,
+      getItemDisabled: (item: any) => item.disabled ?? false,
+      stringifyItem: (item: any) => item.label,
+    })),
+    useSelectContext: vi.fn(() => () => ({
+      setOpen: (open: boolean) => { mockIsOpen = open; }
+    })),
+  };
+});
+
 // ─── Mock appStore ─────────────────────────────────────────────────────────
 
 vi.mock("../../../shared/stores/app.store", () => ({
@@ -56,6 +126,8 @@ vi.mock("../stores/conversations.store", () => ({
 describe("HomeAgentForm — workspace pre-selection logic", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIsOpen = false;
+    sharedOnValueChange = null;
   });
 
   afterEach(() => {
@@ -78,9 +150,20 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
     expect(textarea.placeholder).toBe("Add a workspace to start");
   });
 
-  it.todo("T4.1.2: 1 workspace → input immediately enabled, workspace card auto-selected — TODO C10: rewrite for codeman-select dropdown", async () => {
-    // C10: CodemanSelect dropdown replaces WorkspaceCard grid
-    // This test needs to be rewritten to test the select component instead
+  it("T4.1.2: 1 workspace → input immediately enabled (draftWorkspaceId auto-set)", async () => {
+    const { appStore } = await import("../../../shared/stores/app.store");
+    appStore.state.value.workspaces = [
+      { id: "ws-1", label: "Project A", root_path: "C:\\a", enabled: true },
+    ];
+    // selectedWorkspaceId returns ws-1 (last-used), which seeds draftWorkspaceId
+    (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue("ws-1");
+
+    const { getByTestId } = render(() => <HomeAgentForm />);
+
+    // Textarea must be enabled because draftWorkspaceId is pre-set
+    const textarea = getByTestId("codex-input") as HTMLTextAreaElement;
+    expect(textarea.disabled).toBe(false);
+    expect(textarea.placeholder).toBe("发条消息…");
   });
 
   it("T4.1.3: 2+ workspaces → input disabled until user picks", async () => {
@@ -98,9 +181,33 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
     expect(textarea.placeholder).toBe("Select a workspace above");
   });
 
-  it.todo("T4.1.4: User picks workspace → input enabled + setLastUsedWorkspaceId called — TODO C10: rewrite for codeman-select dropdown", async () => {
-    // C10: CodemanSelect dropdown replaces WorkspaceCard grid
-    // This test needs to be rewritten to test the select component's onChange instead
+  it("T4.1.4: 2+ workspaces → no pre-select; clicking workspace Select option enables input + calls setLastUsedWorkspaceId", async () => {
+    const { appStore } = await import("../../../shared/stores/app.store");
+    appStore.state.value.workspaces = [
+      { id: "ws-1", label: "Project A", root_path: "C:\\a", enabled: true },
+      { id: "ws-2", label: "Project B", root_path: "C:\\b", enabled: true },
+    ];
+    // No last-used workspace
+    (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue(null);
+
+    const { getByTestId } = render(() => <HomeAgentForm />);
+
+    // Input disabled initially
+    const textarea = getByTestId("codex-input") as HTMLTextAreaElement;
+    expect(textarea.disabled).toBe(true);
+
+    // Open the workspace Select (mock toggles mockIsOpen on click)
+    const selectTrigger = getByTestId("workspace-select-trigger");
+    fireEvent.click(selectTrigger);
+
+    // Click the "Project A" option in the dropdown (uses mock data-value selector)
+    const firstOption = document.querySelector('li[data-value="ws-1"]') as HTMLElement;
+    expect(firstOption).toBeTruthy();
+    fireEvent.click(firstOption);
+
+    // After selection: setLastUsedWorkspaceId called with the workspace id
+    expect(appStore.setLastUsedWorkspaceId).toHaveBeenCalledWith("ws-1");
+    expect(textarea.disabled).toBe(false);
   });
 
   it("T4.1.5: Send button disabled when input is empty", async () => {
@@ -197,5 +304,34 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
     expect(sendBtn).toBeDisabled(); // disabled because no workspace picked
     fireEvent.click(sendBtn);
     expect(createAndSendConversation).not.toHaveBeenCalled();
+  });
+
+  it("T4.1.9: workspace Select renders with all enabled workspaces as options", async () => {
+    const { appStore } = await import("../../../shared/stores/app.store");
+    appStore.state.value.workspaces = [
+      { id: "ws-1", label: "Alpha", root_path: "/a", enabled: true },
+      { id: "ws-2", label: "Beta", root_path: "/b", enabled: true },
+      { id: "ws-3", label: "Gamma", root_path: "/c", enabled: false }, // disabled — should not appear
+    ];
+    (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue(null);
+
+    const { getByTestId } = render(() => <HomeAgentForm />);
+
+    // Open the select dropdown
+    const selectTrigger = getByTestId("workspace-select-trigger");
+    fireEvent.click(selectTrigger);
+
+    // Mock renders items as <li data-value="...">
+    const options = document.querySelectorAll('li[data-value]');
+    const labels = Array.from(options).map((o) => o.textContent?.trim());
+
+    // Only enabled workspaces appear (Gamma filtered out by home.tsx)
+    expect(labels).toContain("Alpha");
+    expect(labels).toContain("Beta");
+    expect(labels).not.toContain("Gamma");
+    expect(options.length).toBe(2);
+
+    // Action slot ("+ Add new workspace…") also present (home.tsx renders it)
+    expect(document.querySelector("[data-testid='workspace-select-add-btn']")).toBeTruthy();
   });
 });
