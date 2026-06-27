@@ -24,7 +24,7 @@
 
 import { createStore } from "solid-js/store";
 import { Effect } from "effect";
-import type { Settings, Provider, ModelMeta, AppError } from "../lib/types";
+import type { Settings, Provider, ModelMeta, AppError, Workspace } from "../lib/types";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import {
   ProviderService,
@@ -34,6 +34,8 @@ import {
   SettingsService,
   SettingsServiceLive,
 } from "../lib/tauri";
+import { deriveLabelFromPath } from "../lib/derive-label-from-path";
+import { settingsSaver } from "../../features/settings/lib/settings-saver";
 
 // ─── Default Settings (ADR-0015) ──────────────────────────────────────
 const DEFAULT_MINIMAX_PROVIDER: Provider = {
@@ -226,6 +228,37 @@ export const appStore = {
    */
   pickWorkspacePath(): Effect.Effect<string | null, AppError> {
     return pickWorkspacePathEffect;
+  },
+
+  /**
+   * Breaks appStore 'void | Effect<A,E,never>' return contract (ADR-0016 D4) per ADR-0023 D6-H2 amendment.
+   * Returns sync value because this is purely client-side state mutation with debounced flush.
+   *
+   * @param rootPath - workspace root path
+   * @returns new Workspace or existing Workspace if root_path dedup, null if rootPath is empty/whitespace
+   */
+  addWorkspace(rootPath: string): Workspace | null {
+    if (!rootPath || !rootPath.trim()) {
+      return null;
+    }
+
+    const workspaces = settings.value.workspaces ?? [];
+    const existing = workspaces.find((w) => w.root_path === rootPath);
+    if (existing) {
+      return existing;
+    }
+
+    const newWs: Workspace = {
+      id: crypto.randomUUID(),
+      label: deriveLabelFromPath(rootPath),
+      root_path: rootPath,
+      enabled: true,
+    };
+
+    applyPatch({ workspaces: [...workspaces, newWs] });
+    settingsSaver.scheduleSave();
+
+    return newWs;
   },
 
   /**

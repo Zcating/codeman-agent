@@ -42,6 +42,17 @@ vi.mock("solid-js/store", () => {
   return { createStore: () => [storeProxy, setStore] };
 });
 
+// Mock settingsSaver BEFORE appStore import
+const { scheduleSaveMock } = vi.hoisted(() => ({
+  scheduleSaveMock: vi.fn(),
+}));
+
+vi.mock("../../features/settings/lib/settings-saver", () => ({
+  settingsSaver: {
+    scheduleSave: scheduleSaveMock,
+  },
+}));
+
 import { appStore, _resetAppStoreForTest } from "./app.store";
 
 describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
@@ -72,6 +83,7 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
   afterEach(() => {
     _resetAppStoreForTest();
     vi.clearAllMocks();
+    scheduleSaveMock.mockReset();
     mockState.rejected = undefined;
   });
 
@@ -541,5 +553,64 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     });
     appStore.setLastUsedWorkspaceId(null);
     expect(appStore.selectedWorkspaceId()).toBeNull();
+  });
+
+  // ─── J13: addWorkspace 新路径 → 创建并返回新 ws ───
+  it("addWorkspace 新路径 → 创建并返回新 ws", () => {
+    _resetAppStoreForTest();
+    appStore.set({ workspaces: [] });
+    const result = appStore.addWorkspace("/new/project");
+    expect(result).not.toBeNull();
+    expect(result!.label).toBe("project");
+    expect(result!.root_path).toBe("/new/project");
+    expect(result!.enabled).toBe(true);
+    expect(result!.id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    );
+    expect(appStore.state.value.workspaces!.length).toBe(1);
+  });
+
+  // ─── J14: addWorkspace 同 root_path → 返回已有 ws, 不创建新 ───
+  it("addWorkspace 同 root_path → 返回已有 ws, 不创建新", () => {
+    _resetAppStoreForTest();
+    appStore.set({
+      workspaces: [{ id: "existing", label: "Old", root_path: "/same", enabled: true }],
+    });
+    const result = appStore.addWorkspace("/same");
+    expect(result!.id).toBe("existing");
+    expect(appStore.state.value.workspaces!.length).toBe(1); // no new record
+  });
+
+  // ─── J15: addWorkspace("") → 返回 null, 无 state 变更 ───
+  it("addWorkspace('') → 返回 null, 无 state 变更", () => {
+    _resetAppStoreForTest();
+    appStore.set({ workspaces: [] });
+    const result = appStore.addWorkspace("");
+    expect(result).toBeNull();
+    expect(appStore.state.value.workspaces!.length).toBe(0);
+  });
+
+  // ─── J16: addWorkspace 调 settingsSaver.scheduleSave ───
+  it("addWorkspace 调 settingsSaver.scheduleSave", () => {
+    _resetAppStoreForTest();
+    appStore.set({ workspaces: [] });
+    appStore.addWorkspace("/test/path");
+    expect(scheduleSaveMock).toHaveBeenCalledTimes(1);
+  });
+
+  // ─── J17: addWorkspace Windows 路径 → label 自动派生 ───
+  it("addWorkspace Windows 路径 → label 自动派生", () => {
+    _resetAppStoreForTest();
+    appStore.set({ workspaces: [] });
+    const result = appStore.addWorkspace("C:\\projects\\my-app");
+    expect(result!.label).toBe("my-app");
+  });
+
+  // ─── J18: addWorkspace 派生 basename fallback "Untitled workspace" ───
+  it("addWorkspace 派生 basename fallback 'Untitled workspace'", () => {
+    _resetAppStoreForTest();
+    appStore.set({ workspaces: [] });
+    const result = appStore.addWorkspace("C:\\");
+    expect(result!.label).toBe("Untitled workspace");
   });
 });
