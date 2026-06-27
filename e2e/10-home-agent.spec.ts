@@ -107,6 +107,9 @@ test.describe("10 — HomeAgentForm Home", () => {
     const trigger = page.locator("[data-testid='workspace-select-trigger']");
     await expect(trigger).toBeVisible();
     await expect(trigger).toContainText("Solo WS");
+    // Count verification: exactly one trigger should exist
+    const triggerCount = await page.locator("[data-testid='workspace-select-trigger']").count();
+    await expect(triggerCount).toBe(1);
 
     // Input should be enabled (last_used_workspace_id is set → auto-select)
     const isEnabled = await page.evaluate(
@@ -163,6 +166,10 @@ test.describe("10 — HomeAgentForm Home", () => {
       "[data-testid='codex-input']",
     );
     await expect(isEnabledAfterSelect).toBe(true);
+
+    // Verify the trigger shows the selected workspace
+    const triggerAfterSelect = page.locator("[data-testid='workspace-select-trigger']");
+    await expect(triggerAfterSelect).toContainText("Workspace A");
   });
 
   test("submit HomeAgentForm: creates conv + transitions to ChatView", async () => {
