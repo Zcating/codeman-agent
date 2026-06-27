@@ -12,8 +12,8 @@
 //! - 1 workspace  → auto-select, input enabled immediately
 //! - 2+ workspaces → no pre-select, input disabled until user picks card
 
-import { createMemo, createSignal, For, Show, type JSX } from "solid-js";
-import { Folder, FolderPlus, Send } from "lucide-solid";
+import { createMemo, createSignal, Show, type JSX } from "solid-js";
+import { FolderPlus, Send } from "lucide-solid";
 import { appStore } from "../../../shared/stores/app.store";
 import { Button } from "../../../shared/components/ui/button";
 import type { AgentSidebarWorkspace } from "../../../shared/components/internal/agent-sidebar";
@@ -22,34 +22,7 @@ import {
 } from "../stores/conversations.store";
 import type { ProviderConfig } from "../lib/runtime";
 
-interface WorkspaceCardProps {
-  id: string;
-  label: string;
-  rootPath: string;
-  selected: boolean;
-  onSelect: (id: string) => void;
-}
 
-function WorkspaceCard(props: WorkspaceCardProps): JSX.Element {
-  return (
-    <button
-      type="button"
-      onClick={() => props.onSelect(props.id)}
-      class={`flex items-start gap-3 p-4 rounded-lg border transition-all text-left w-full ${
-        props.selected
-          ? "border-primary bg-primary/10 ring-2 ring-primary/30"
-          : "border-border hover:border-primary/50 hover:bg-accent"
-      }`}
-      data-testid={`workspace-card-${props.id}`}
-    >
-      <Folder class="h-5 w-5 text-primary shrink-0 mt-0.5" aria-hidden="true" />
-      <div class="flex-1 min-w-0">
-        <div class="font-medium truncate">{props.label}</div>
-        <div class="text-xs text-muted-foreground truncate font-mono">{props.rootPath}</div>
-      </div>
-    </button>
-  );
-}
 
 // ─── HomeAgentForm ──────────────────────────────────────────────────────────────
 
@@ -71,6 +44,7 @@ export function HomeAgentForm(): JSX.Element {
     setDraftWorkspaceId(id);
     appStore.setLastUsedWorkspaceId(id);
   };
+  void handleSelectWorkspace; // TODO C10: used by CodemanSelect onChange
 
   const wsCount = createMemo(() => workspaces().length);
 
@@ -111,41 +85,27 @@ export function HomeAgentForm(): JSX.Element {
           <p class="text-sm text-muted-foreground">选个 workspace,开始新对话</p>
         </div>
 
-        {/* Workspace picker */}
-        <div>
-          <Show
-            when={wsCount() > 0}
-            fallback={
-              <div class="text-center p-8 border border-dashed border-border rounded-lg space-y-3">
-                <FolderPlus class="h-12 w-12 mx-auto text-muted-foreground/50" aria-hidden="true" />
-                <p class="text-sm text-muted-foreground">No workspaces configured.</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    window.location.href = "/settings";
-                  }}
-                >
-                  Add a workspace
-                </Button>
-              </div>
-            }
-          >
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3" data-testid="workspace-picker">
-              <For each={workspaces()}>
-                {(ws) => (
-                  <WorkspaceCard
-                    id={ws.id}
-                    label={ws.label}
-                    rootPath={ws.rootPath}
-                    selected={draftWorkspaceId() === ws.id}
-                    onSelect={handleSelectWorkspace}
-                  />
-                )}
-              </For>
+        {/* Workspace picker — C10: replace with CodemanSelect */}
+        <Show
+          when={wsCount() > 0}
+          fallback={
+            <div class="text-center p-8 border border-dashed border-border rounded-lg space-y-3">
+              <FolderPlus class="h-12 w-12 mx-auto text-muted-foreground/50" aria-hidden="true" />
+              <p class="text-sm text-muted-foreground">No workspaces configured.</p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  window.location.href = "/settings";
+                }}
+              >
+                Add a workspace
+              </Button>
             </div>
-          </Show>
-        </div>
+          }
+        >
+          <span data-testid="workspace-select-placeholder" />
+        </Show>
 
         {/* Input form */}
         <form onSubmit={handleSend} class="space-y-2">
