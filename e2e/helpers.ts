@@ -189,8 +189,29 @@ export async function resetChatState(): Promise<void> {
 
 /**
  * V2.1 backward-compat shim: 直接通过 IPC 创建 conv + 设为 active。
- * 现有 e2e spec 01-09 假设 click "新对话" 会创建 conv。新 UI 是 navigate home,
- * 所以走 IPC 直接创建。
+ *
+ * ## Why this exists (V2.1 polish backward compat)
+ * After V2.1 polish, the new HomeAgentForm UI (rendered when activeId===null)
+ * no longer auto-creates a conversation on "新对话" click — it navigates home.
+ * Specs 05–09 were written assuming a conversation would exist after clicking
+ * "新对话". Rather than rewriting all 9 pre-existing specs, this shim creates
+ * a workspace + conversation entirely over IPC (bypassing the HomeAgentForm UI).
+ *
+ * ## Which specs use it
+ * - 05-chat-message-bubble, 05-file-tools, 06-llm-round-trip, 07-mock-provider,
+ *   08-file-tools-mock, 09-per-conv-runtime — call clickNewConversationAndWait()
+ *   which wraps this shim internally.
+ * - 01-app-launch is a launch canary (no conversation needed).
+ * - 02-settings-api-key and 04-theme-toggle drive state via IPC directly.
+ * - 10-home-agent.spec.ts is the new spec (does NOT use this shim).
+ *
+ * ## Why it bypasses HomeAgentForm UI
+ * Uses `create_conversation` + `update_settings` IPC commands directly.
+ * Does NOT click any UI button — avoids HomeAgentForm state machine entirely.
+ *
+ * ## Expected pass condition
+ * All 9 pre-existing specs (05–09) pass WITHOUT modification after V2.1 polish.
+ * If they fail, the shim or the IPC bridge is broken — not the individual spec.
  *
  * @param p - TauriPage
  * @param opts - { workspaceLabel?: string, workspaceRoot?: string, title?: string }
