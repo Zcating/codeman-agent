@@ -72,6 +72,11 @@
 - **Theme (主题)** — 用户在 Settings 中选择的三态视觉模式（`light` / `dark` / `system`）；通过 `<html class="dark">` 切换（无 `prefers-color-scheme` 媒体查询 —— `system` 模式由 `src/shared/stores/theme.ts` 中的 Solid effect 读取）。_避免_：color scheme、appearance、mode。
 - **Style Token (样式令牌)** — 在 `@theme` 块中定义的语义名（例如 `primary-500`、`zinc-900`），组件引用而非裸 hex。_避免_：design token（与 Material / Apple / IBM 词汇过载）、CSS variable（实现细节）。
 
+### 组件
+
+- **Codeman Component (内部组件)** — `shared/components/internal/` 目录下所有组件文件以 `codeman-` 为前缀（如 `codeman-sidebar` / `codeman-select` / `codeman-group-select`）。命名空间规则由 ADR-0022 D5 锁定。`internal/` 准入条件 + prop-driven 强约束保留（每个 codeman-* 组件必须纯 props 输入，不依赖任何 `features/*/stores/*`）。_避免_：feature-prefixed 命名（如 `agent-sidebar` / `settings-panel`），破坏跨域复用识别。
+- **UI Primitive (设计系统原子)** — `shared/components/ui/` 目录下的纯展示组件（Button / Card / Checkbox / Input / Textarea / **Select** / ...）。Select 由 ADR-0022 D4 引入：shadcn-svelte 风格手写（`SelectRoot` / `SelectTrigger` / `SelectValue` / `SelectContent` / `SelectItem` / `SelectFooter` 子件 + Popover + portal + 键盘导航 + ARIA），0 外部依赖。`SelectFooter` 是预留 slot，承载"非 option" 元素（如 workspace picker 的"+ Add new" 项）。_避免_：引入 Radix / Kobalte / 其它 headless 依赖（V2 决定保持 hand-roll）。
+
 ### Localization
 
 - **Developer Language (开发者语言)** — 标识符、注释、治理文档的语言。分层：identifier 保持英文（与 Tauri / Solid / Effect-TS / pi-mono / Tailwind / Vite / Vitest / Playwright 生态对齐），prose 与注释走中文。Canonical 词汇表是 `CONTEXT.md`。_避免_：bilingual inline annotations、翻译 identifier。
