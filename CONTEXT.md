@@ -74,8 +74,12 @@
 
 ### 组件
 
-- **Codeman Component (内部组件)** — `shared/components/internal/` 目录下所有组件文件以 `codeman-` 为前缀（如 `codeman-sidebar` / `codeman-select` / `codeman-group-select`）。命名空间规则由 ADR-0022 D5 锁定。`internal/` 准入条件 + prop-driven 强约束保留（每个 codeman-* 组件必须纯 props 输入，不依赖任何 `features/*/stores/*`）。_避免_：feature-prefixed 命名（如 `agent-sidebar` / `settings-panel`），破坏跨域复用识别。
-- **UI Primitive (设计系统原子)** — `shared/components/ui/` 目录下的纯展示组件（Button / Card / Checkbox / Input / Textarea / **Select** / ...）。Select 由 ADR-0022 D4 引入：shadcn-svelte 风格手写（`SelectRoot` / `SelectTrigger` / `SelectValue` / `SelectContent` / `SelectItem` / `SelectFooter` 子件 + Popover + portal + 键盘导航 + ARIA），0 外部依赖。`SelectFooter` 是预留 slot，承载"非 option" 元素（如 workspace picker 的"+ Add new" 项）。_避免_：引入 Radix / Kobalte / 其它 headless 依赖（V2 决定保持 hand-roll）。
+- **Codeman Component (codeman-* namespace)** — `shared/components/internal/` 目录下所有组件文件以 `codeman-` 为前缀（如 `codeman-sidebar`）。命名空间规则由 [ADR-0023](./adr/0023-codeman-prefix-and-ark-ui-select.md) D4-N 锁定（从 ADR-0022 治理权迁移）。`internal/` 准入条件 + prop-driven 强约束保留（每个 codeman-* 组件必须纯 props 输入，不依赖任何 `features/*/stores/*`）。_避免_：feature-prefixed 命名（如 `agent-sidebar` / `settings-panel`），破坏跨域复用识别。
+- **UI Primitive (design system atoms)** — `shared/components/ui/` 目录下的纯展示组件（Button / Card / Checkbox / Input / Textarea / **Select** / ...）。Select 由 [ADR-0023](./adr/0023-codeman-prefix-and-ark-ui-select.md) D4-S 引入：基于 `@ark-ui/solid@^5.37.x` 的两个 wrapper：
+  - `codeman-select.tsx` — single-list Select，props = `options: {label, value}[]` + `value: string | null` + `onChange: (value) => void` + 可选 `Action` slot（用于"+ Add new" 等非 option 元素，放 `<Select.List>` 之后、`Select.Content` 内部，下方加 `<hr role="separator">`）
+  - `codeman-group-select.tsx` — grouped Select，props = `groups: Array<{label, options: {label, value}[]}>`,使用 `Select.ItemGroup` + `Select.ItemGroupLabel` 实现 provider 分组等场景
+
+  Action slot 走 `useSelectContext().setOpen(false)` 关闭 dropdown；不是 listbox role，**不可通过 ↑/↓ 键到达**（折衷，V2.2 考虑 composite role）。_避免_：手写 Select 基础设施（Popover / portal / 键盘 / ARIA / Floating UI 定位），全部由 `@ark-ui/solid` 提供；不要引入 Radix / Kobalte / 其它 headless 库。
 
 ### Localization
 
