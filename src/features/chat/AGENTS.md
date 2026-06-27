@@ -73,7 +73,7 @@ ChatLayout
   └── MainContent
         ├── activeId === null → HomeAgentForm (右侧居中)
         │     ├── <input> (disabled until workspace 选中)
-        │     ├── WorkspacePicker (cards 列表，1 ws 时 auto-select)
+        │     ├── WorkspacePicker (codeman-select dropdown，1 ws 时 auto-select)
         │     └── <Button> 发送
         └── activeId !== null → ChatView (满屏 + 返回按钮)
 ```
@@ -90,7 +90,7 @@ ChatLayout
 
 - 0 workspace → HomeAgentForm 永久 disable input + "Add a workspace" CTA 跳 `/settings`
 - 1 workspace → `setSelectedWorkspaceId(唯一那个)` 自动选，input 立即可用
-- 2+ workspace → 无预选，input disable，用户点卡片后 input 解锁
+- 2+ workspace → 无预选，input disable，用户从下拉选 workspace 后 input 解锁
 - `last_used_workspace_id` 被删除/禁用 → fallback 到第一个 enabled；若该 fallback 也无 → CTA 跳 `/settings`
 
 **返回首页**：
@@ -102,7 +102,7 @@ ChatView 顶部 "← 返回首页" 按钮调 `navigate({ to: "/" })` 并清空 `
 V1.x 起 ChatView 在 textarea 下方（form 第二行）渲染一个 `<select id="provider-select">`，让用户在不进 Settings 的情况下切换活跃 LLM provider。
 
 **数据源**：`appStore.state.value.providers[]`（V1.5 unified schema, ADR-0012 + ADR-0015）。
-`ProviderSelect` 内部 filter: `providers.filter(p => p.enabled && p.llm)` — enabled 且有 LLM 配置的 provider 才列出。
+`ProviderSelect` 现在用 `codeman-group-select` 包装（`shared/components/ui/codeman-group-select.tsx`），按 provider 分组渲染（ItemGroup + ItemGroupLabel）；enabled + llm filter 由 `buildEnabledProviders` 提取（`src/features/chat/lib/build-enabled-providers.ts`）；组件位于 `chat-view.tsx` 内作为本地子组件。
 billing-only / disabled / 无 llm 的 provider 不显示。
 
 **写路径**：
@@ -120,7 +120,7 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 
 **空状态**：所有 provider 都 disabled / 没 LLM 时，`<select>` 不渲染，改渲染 "无 provider — 前往 settings" 链接（指向 `/settings`），引导用户去配置。
 
-**实现位置**：`ProviderSelect` 是 `chat-view.tsx` 内的本地子组件（非 feature 共享）。它直接读 `appStore` 状态而不是通过 `SettingsService` IPC,避免在每次组件渲染时都触发 IPC。debounced flush 走 `settingsSaver.scheduleSave()`（settings feature 的 lib, 跨 feature import 允许）。
+**实现位置**：`ProviderSelect` 是 `chat-view.tsx` 内的本地子组件（非 feature 共享），内部用 `codeman-group-select` 渲染。它直接读 `appStore` 状态而不是通过 `SettingsService` IPC,避免在每次组件渲染时都触发 IPC。debounced flush 走 `settingsSaver.scheduleSave()`（settings feature 的 lib, 跨 feature import 允许）。
 
 ## Runtime 事件（5 变体）
 
@@ -165,6 +165,7 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 - **File tools**：`src/features/file-tools/lib/file-tools.ts` 导出 `fileTools`（5 个：read / write / edit / search / delete），本 feature `lib/runtime.ts` 注册到 `Agent`（与 billingTools 并列）。
 - **跨域类型**：从 `src/shared/lib/types.ts` 导入（ADR-0010 后从 `shared/types/` 迁）。
 - **跨域 IPC**：从 `src/shared/lib/tauri.ts` 导入 Service Tags。
+- **`codeman-select` / `codeman-group-select` wrappers from `shared/components/ui/`** — used by HomeAgentForm (workspace picker) + chat-view ProviderSelect (provider picker)
 
 ## Wave 笔记
 
@@ -172,3 +173,4 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 - **Wave V1.5**（2026-06-15，ADR-0010）：`runtime.ts` 从根级入 `lib/`；`store/` → `stores/`；删空 `types/`
 - **Wave V2**（2026-06-25，ADR-0019）：`AgentRuntime` service 单例 + Map → `createAgentRuntime()` 工厂 + per-conv `ConversationState.runtime`；`messages.store` + `agent.store` 合并到 `conversations.store`；`createStore<{ activeId, byId }>` 取代全局 signal + Map；supersede ADR-0014 D1 + D4
 - **Wave V2.1**（2026-06-27，ADR-0022）：V1.x `sidebar.tsx` **删除**；新增 `home.tsx` (Codex-like 2 栏)；`/shared/components/ui/sidebar.tsx` primitive + `/shared/components/internal/codeman-sidebar.tsx` 业务组合落地（首例 internal/）；emoji 全面迁移 lucide-solid (Loader2/CheckCircle2/XCircle/FolderOpen)；`Conversation.workspace_id` 必填（per-Conv 绑定）；`Settings.last_used_workspace_id` 引入
+- **Wave V2.1 polish**（2026-06-27，ADR-0023）：`agent-sidebar` → `codeman-sidebar` 原子重命名；`agent-sidebar` → `codeman-sidebar` 全部原子化（单 commit + 全部 consumer 同步）；home.tsx `WorkspaceCard` 卡片网格 → `codeman-select` 下拉（含 Action slot "+ Add new workspace…"）；chat-view.tsx `ProviderSelect` 本地 `<select>` → `codeman-group-select`（按 provider 分组）；`buildEnabledProviders` helper 抽取到 `src/features/chat/lib/build-enabled-providers.ts`；e2e spec 10 重写；CONTEXT.md 加 Codeman Component + UI Primitive 词条；src/shared/AGENTS.md 加 codeman-* 命名空间规则 + Naming convention for internal/ 段。
