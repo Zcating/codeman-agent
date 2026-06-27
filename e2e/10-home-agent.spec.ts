@@ -16,7 +16,6 @@ import {
   getTauriPage,
   invoke,
   submitHomeAgentForm,
-  selectWorkspaceCard,
 } from "./helpers";
 import type { Settings } from "../src/shared/lib/types";
 
@@ -85,17 +84,85 @@ test.describe("10 — HomeAgentForm Home", () => {
       "[data-testid='codex-input']",
     );
     await expect(isDisabled).toBe(true);
-    await assert.visible(page.getByText("Add a workspace"), { timeout: 3_000 });
+    // "Add a workspace" CTA should be visible and link to /settings
+    await assert.visible(page.getByText("Add a workspace", { exact: false }), { timeout: 3_000 });
+    const settingsLink = page.locator("a[href='/settings']").filter({ hasText: /add a workspace/i });
+    await expect(settingsLink).toBeVisible();
   });
 
-  test.skip("1 workspace: input enabled after click, card has active class — TODO C11: rewrite for Select interaction", async () => {
-    // C11: Select interaction replaces WorkspaceCard click
-    // This test needs to be rewritten to test the CodemanSelect component
+  test("1 workspace: auto-select triggers + input enabled immediately", async () => {
+    const page = await getTauriPage();
+    const wsId = "test-ws-1ws";
+    const current = await invoke<Settings>("get_settings");
+    await invoke("update_settings", {
+      newSettings: {
+        ...current,
+        workspaces: [{ id: wsId, label: "Solo WS", root_path: "/tmp/solo-ws", enabled: true }],
+        last_used_workspace_id: wsId,
+      },
+    });
+    await reloadPageForSettings(page);
+
+    // The trigger should show "Solo WS" as the selected value
+    const trigger = page.locator("[data-testid='workspace-select-trigger']");
+    await expect(trigger).toBeVisible();
+    await expect(trigger).toContainText("Solo WS");
+
+    // Input should be enabled (last_used_workspace_id is set → auto-select)
+    const isEnabled = await page.evaluate(
+      (sel) => {
+        const el = document.querySelector(sel) as HTMLTextAreaElement | null;
+        return el ? !el.disabled : false;
+      },
+      "[data-testid='codex-input']",
+    );
+    await expect(isEnabled).toBe(true);
   });
 
-  test.skip("2+ workspaces: input disabled until user picks a card — TODO C11: rewrite for Select interaction", async () => {
-    // C11: Select interaction replaces WorkspaceCard click
-    // This test needs to be rewritten to test the CodemanSelect dropdown behavior
+  test("2+ workspaces: no pre-select; clicking option enables input", async () => {
+    const page = await getTauriPage();
+    const current = await invoke<Settings>("get_settings");
+    await invoke("update_settings", {
+      newSettings: {
+        ...current,
+        workspaces: [
+          { id: "ws-a", label: "Workspace A", root_path: "/tmp/ws-a", enabled: true },
+          { id: "ws-b", label: "Workspace B", root_path: "/tmp/ws-b", enabled: true },
+        ],
+        last_used_workspace_id: null, // No auto-select
+      },
+    });
+    await reloadPageForSettings(page);
+
+    // Input should be disabled initially (no workspace selected)
+    const isDisabledInitially = await page.evaluate(
+      (sel) => {
+        const el = document.querySelector(sel) as HTMLTextAreaElement | null;
+        return el ? el.disabled : false;
+      },
+      "[data-testid='codex-input']",
+    );
+    await expect(isDisabledInitially).toBe(true);
+
+    // Click the workspace select trigger
+    const trigger = page.locator("[data-testid='workspace-select-trigger']");
+    await trigger.click();
+
+    // The content should now be open — click "Workspace A" option
+    const content = page.locator("[data-testid='workspace-select-content']");
+    await assert.visible(content, { timeout: 3_000 });
+    const option = content.locator("[role='option']").filter({ hasText: "Workspace A" });
+    await option.click();
+
+    // After selecting, input should be enabled
+    const isEnabledAfterSelect = await page.evaluate(
+      (sel) => {
+        const el = document.querySelector(sel) as HTMLTextAreaElement | null;
+        return el ? !el.disabled : false;
+      },
+      "[data-testid='codex-input']",
+    );
+    await expect(isEnabledAfterSelect).toBe(true);
   });
 
   test("submit HomeAgentForm: creates conv + transitions to ChatView", async () => {
@@ -120,6 +187,7 @@ test.describe("10 — HomeAgentForm Home", () => {
       "[data-testid='codex-input']",
     );
     console.log(`[diag] submit test - input enabled before send: ${isEnabled}`);
+    await expect(isEnabled).toBe(true);
 
     await submitHomeAgentForm(page, "Hello from HomeAgentForm e2e");
 
@@ -129,7 +197,6 @@ test.describe("10 — HomeAgentForm Home", () => {
     console.log(`[diag] page content snippet: ${pageContent.slice(0, 500)}`);
 
     // ChatView should appear with the user's message in a bubble
-    // Use { exact: false } because getByText defaults to exact match
     await assert.visible(page.getByText("Hello from HomeAgentForm e2e", { exact: false }), { timeout: 15_000 });
 
     // After send, a new conversation is created. Verify the textarea is gone
