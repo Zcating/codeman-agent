@@ -103,12 +103,12 @@ describe("ChatLayout — state machine", () => {
     cleanup();
   });
 
-  it("T4.3.1: Renders CodexForm when activeId$() === null", async () => {
+  it("T4.3.1: Renders HomeAgentForm when activeId$() === null", async () => {
     const { activeId$ } = await import("../stores/conversations.store") as any;
     activeId$.mockReturnValue(null);
 
     const { getByTestId, queryByTestId } = render(() => <ChatLayout />);
-    // CodexForm should be visible
+    // HomeAgentForm should be visible
     expect(getByTestId("codex-input")).toBeTruthy();
     // Back button should NOT be visible
     expect(queryByTestId("back-to-home")).toBeNull();

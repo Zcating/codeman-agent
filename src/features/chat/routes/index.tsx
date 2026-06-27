@@ -1,7 +1,7 @@
 //! / — Chat 布局状态机 (V2.1 ADR-0022)。
 //!
 //! 状态机：
-//! - activeId === null → CodexForm (右侧居中)
+//! - activeId === null → HomeAgentForm (右侧居中)
 //! - activeId !== null → ChatView (满屏 + 返回按钮)
 //!
 //! AgentSidebar 始终显示（workspaces 存在时），负责 workspace 选择和会话列表。
@@ -10,7 +10,7 @@ import { Show, type JSX } from "solid-js";
 import { ArrowLeft, Settings as SettingsIcon } from "lucide-solid";
 import { Link } from "@tanstack/solid-router";
 import { ChatView } from "../components/chat-view";
-import { CodexForm } from "../components/home";
+import { HomeAgentForm } from "../components/home";
 import { AgentSidebar, type AgentSidebarWorkspace, type AgentSidebarItem } from "../../../shared/components/internal/agent-sidebar";
 import {
   store,
@@ -104,7 +104,7 @@ export function ChatLayout(): JSX.Element {
 
         {/* Main content area — state machine */}
         <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
-          <Show when={activeId$() !== null} fallback={<CodexForm />}>
+          <Show when={activeId$() !== null} fallback={<HomeAgentForm />}>
             <ChatView />
           </Show>
         </div>

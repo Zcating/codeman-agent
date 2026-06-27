@@ -1,7 +1,7 @@
-//! home.test.tsx — CodexForm 组件测试 (T4.1)
+//! home.test.tsx — HomeAgentForm 组件测试 (T4.1)
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, fireEvent, waitFor } from "@solidjs/testing-library";
-import { CodexForm } from "./home";
+import { HomeAgentForm } from "./home";
 import type { ProviderConfig } from "../lib/runtime";
 import { createAndSendConversation } from "../stores/conversations.store";
 
@@ -53,7 +53,7 @@ vi.mock("../stores/conversations.store", () => ({
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
-describe("CodexForm — workspace pre-selection logic", () => {
+describe("HomeAgentForm — workspace pre-selection logic", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -68,7 +68,7 @@ describe("CodexForm — workspace pre-selection logic", () => {
     appStore.state.value.workspaces = [];
     (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue(null);
 
-    const { getByTestId, getByText } = render(() => <CodexForm />);
+    const { getByTestId, getByText } = render(() => <HomeAgentForm />);
 
     // CTA should be visible
     expect(getByText("Add a workspace")).toBeTruthy();
@@ -85,7 +85,7 @@ describe("CodexForm — workspace pre-selection logic", () => {
     ];
     (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue("ws-1");
 
-    const { getByTestId } = render(() => <CodexForm />);
+    const { getByTestId } = render(() => <HomeAgentForm />);
 
     const textarea = getByTestId("codex-input") as HTMLTextAreaElement;
     expect(textarea.disabled).toBe(false);
@@ -102,7 +102,7 @@ describe("CodexForm — workspace pre-selection logic", () => {
     ];
     (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue(null);
 
-    const { getByTestId } = render(() => <CodexForm />);
+    const { getByTestId } = render(() => <HomeAgentForm />);
 
     const textarea = getByTestId("codex-input") as HTMLTextAreaElement;
     expect(textarea.disabled).toBe(true);
@@ -117,7 +117,7 @@ describe("CodexForm — workspace pre-selection logic", () => {
     ];
     (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue(null);
 
-    const { getByTestId } = render(() => <CodexForm />);
+    const { getByTestId } = render(() => <HomeAgentForm />);
 
     // Click on ws-2 card
     const ws2Card = getByTestId("workspace-card-ws-2");
@@ -138,7 +138,7 @@ describe("CodexForm — workspace pre-selection logic", () => {
     ];
     (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue("ws-1");
 
-    const { getByTestId } = render(() => <CodexForm />);
+    const { getByTestId } = render(() => <HomeAgentForm />);
 
     const sendButton = getByTestId("codex-send") as HTMLButtonElement;
     expect(sendButton.disabled).toBe(true);
@@ -175,7 +175,7 @@ describe("CodexForm — workspace pre-selection logic", () => {
     ];
     appStore.state.value.system_prompt = { default: "system msg here", user_can_edit: true };
 
-    const { container } = render(() => <CodexForm />);
+    const { container } = render(() => <HomeAgentForm />);
 
     // Input enabled because 1 workspace → auto-selected
     const textarea = container.querySelector("[data-testid='codex-input']") as HTMLTextAreaElement;
@@ -201,7 +201,7 @@ describe("CodexForm — workspace pre-selection logic", () => {
     ];
     (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue("ws-1");
 
-    const { container } = render(() => <CodexForm />);
+    const { container } = render(() => <HomeAgentForm />);
 
     const sendBtn = container.querySelector("[data-testid='codex-send']") as HTMLButtonElement;
     // Send button is disabled when input is empty
@@ -219,7 +219,7 @@ describe("CodexForm — workspace pre-selection logic", () => {
     ];
     (appStore.selectedWorkspaceId as ReturnType<typeof vi.fn>).mockReturnValue(null);
 
-    const { container } = render(() => <CodexForm />);
+    const { container } = render(() => <HomeAgentForm />);
 
     const sendBtn = container.querySelector("[data-testid='codex-send']") as HTMLButtonElement;
     expect(sendBtn).toBeDisabled(); // disabled because no workspace picked

@@ -1,4 +1,4 @@
-//! 10 — CodexForm Home page e2e (V2.1)
+//! 10 — HomeAgentForm Home page e2e (V2.1)
 //!
 //! Tests the new Codex-like home page rendered when activeId===null:
 //! - Workspace picker state machine (0/1/2+ workspaces)
@@ -15,7 +15,7 @@ import {
   disposeTauriPage,
   getTauriPage,
   invoke,
-  submitCodexForm,
+  submitHomeAgentForm,
   selectWorkspaceCard,
 } from "./helpers";
 import type { Settings } from "../src/shared/lib/types";
@@ -57,7 +57,7 @@ async function reloadPageForSettings(p: Awaited<ReturnType<typeof getTauriPage>>
   }
 }
 
-test.describe("10 — CodexForm Home", () => {
+test.describe("10 — HomeAgentForm Home", () => {
   test.beforeEach(async () => {
     const page = await getTauriPage();
     page.on("console", (msg) => {
@@ -156,7 +156,7 @@ test.describe("10 — CodexForm Home", () => {
     await assert.enabled(input);
   });
 
-  test("submit CodexForm: creates conv + transitions to ChatView", async () => {
+  test("submit HomeAgentForm: creates conv + transitions to ChatView", async () => {
     const page = await getTauriPage();
     const wsId = "test-ws-submit";
     const current = await invoke<Settings>("get_settings");
@@ -179,7 +179,7 @@ test.describe("10 — CodexForm Home", () => {
     );
     console.log(`[diag] submit test - input enabled before send: ${isEnabled}`);
 
-    await submitCodexForm(page, "Hello from CodexForm e2e");
+    await submitHomeAgentForm(page, "Hello from HomeAgentForm e2e");
 
     // Wait a bit and check what's on the page
     await new Promise((r) => setTimeout(r, 2000));
@@ -188,11 +188,11 @@ test.describe("10 — CodexForm Home", () => {
 
     // ChatView should appear with the user's message in a bubble
     // Use { exact: false } because getByText defaults to exact match
-    await assert.visible(page.getByText("Hello from CodexForm e2e", { exact: false }), { timeout: 15_000 });
+    await assert.visible(page.getByText("Hello from HomeAgentForm e2e", { exact: false }), { timeout: 15_000 });
 
     // After send, a new conversation is created. Verify the textarea is gone
-    // (we're now in ChatView, not CodexForm) by checking the send button is gone
-    // (CodexForm send button has data-testid='codex-send', ChatView uses button[type="submit"])
+    // (we're now in ChatView, not HomeAgentForm) by checking the send button is gone
+    // (HomeAgentForm send button has data-testid='codex-send', ChatView uses button[type="submit"])
     const codexSendGone = await page.evaluate(() => !document.querySelector("[data-testid='codex-send']"));
     await expect(codexSendGone).toBe(true);
   });

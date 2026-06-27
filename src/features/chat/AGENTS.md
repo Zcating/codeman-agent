@@ -20,7 +20,7 @@ src/features/chat/
 │   └── conversations.store.test.ts
 │
 ├── components/           # UI 组件
-│   ├── home.tsx          # Codex-like 首页（无 active conv 时：AgentSidebar + CodexForm 两栏）
+│   ├── home.tsx          # Codex-like 首页（无 active conv 时：AgentSidebar + HomeAgentForm 两栏）
 │   ├── home.test.tsx
 │   ├── message-bubble.tsx # Role-aware message renderer
 │   ├── message-bubble.test.tsx
@@ -58,7 +58,7 @@ src/features/chat/
   - ADR-0016 D4-D5-D6 的"组件不直接 import runtime"约束保留：组件调 `conversations.store.sendMessage(...)` / `conversations.store.cancel(convId)` / `conversations.store.archiveConversation(convId)`，不直接 import `lib/runtime.ts`。
 - **组件不调 IPC。** 所有 Tauri IPC 走 `src/shared/lib/tauri.ts` Service Tags，在 `conversations.store.ts` 内 `yield*` 使用。
 - ~~**`Sidebar` 用 `createSignal` 做局部状态。**~~（V1.x sidebar 移除 — 由 `shared/components/internal/agent-sidebar` 替代，详见 [ADR-0022](../../docs/adr/0022-internal-components-and-design-tokens.md) D1 + D3）
-- **Home（无 active conv 时）渲染 AgentSidebar + CodexForm 两栏布局。** Home 是 `/` 路由在 `activeId === null` 时的形态。`AgentSidebar` 由 chat feature 喂数据（workspaces + items + handlers），不直接 import `conversations.store`；`CodexForm` 包含 input box（disabled until workspace 选中）+ workspace picker（必选解锁 input）。详见下方 "Home 路由 + Codex form" section。
+- **Home（无 active conv 时）渲染 AgentSidebar + HomeAgentForm 两栏布局。** Home 是 `/` 路由在 `activeId === null` 时的形态。`AgentSidebar` 由 chat feature 喂数据（workspaces + items + handlers），不直接 import `conversations.store`；`HomeAgentForm` 包含 input box（disabled until workspace 选中）+ workspace picker（必选解锁 input）。详见下方 "Home 路由 + Codex form" section。
 - **ChatView（有 active conv 时）满屏单页布局，** 顶部加 "← 返回首页" 按钮调 `navigate({ to: "/" })` 清空 `activeId$()`。chat-view 自身不变（消息列表 + input + provider select + send/cancel）。
 - **Home → ChatView 切换 = `selectConversation(id)` 设 activeId。** MainContent 切到 ChatView。Home 的 workspace 预选走 `Settings.last_used_workspace_id`。
 
@@ -71,7 +71,7 @@ ChatLayout
   ├── AgentSidebar (左侧，always visible when no conv)
   │     └── workspaces + items 由 home 喂 props
   └── MainContent
-        ├── activeId === null → CodexForm (右侧居中)
+        ├── activeId === null → HomeAgentForm (右侧居中)
         │     ├── <input> (disabled until workspace 选中)
         │     ├── WorkspacePicker (cards 列表，1 ws 时 auto-select)
         │     └── <Button> 发送
@@ -80,7 +80,7 @@ ChatLayout
 
 **Home send 流程**：
 
-1. 用户在 CodexForm 选 workspace + type + 点发送
+1. 用户在 HomeAgentForm 选 workspace + type + 点发送
 2. `createConversation(workspaceId, title, firstMessage)` 入 DB
 3. `appStore.set({ last_used_workspace_id: workspaceId })` 持久化
 4. `selectConversation(id)` → activeId 设 → MainContent 切到 ChatView
@@ -88,14 +88,14 @@ ChatLayout
 
 **Workspace 预选状态机**：
 
-- 0 workspace → CodexForm 永久 disable input + "Add a workspace" CTA 跳 `/settings`
+- 0 workspace → HomeAgentForm 永久 disable input + "Add a workspace" CTA 跳 `/settings`
 - 1 workspace → `setSelectedWorkspaceId(唯一那个)` 自动选，input 立即可用
 - 2+ workspace → 无预选，input disable，用户点卡片后 input 解锁
 - `last_used_workspace_id` 被删除/禁用 → fallback 到第一个 enabled；若该 fallback 也无 → CTA 跳 `/settings`
 
 **返回首页**：
 
-ChatView 顶部 "← 返回首页" 按钮调 `navigate({ to: "/" })` 并清空 `activeId$()`。MainContent 切回 CodexForm，预选 `last_used_workspace_id`。
+ChatView 顶部 "← 返回首页" 按钮调 `navigate({ to: "/" })` 并清空 `activeId$()`。MainContent 切回 HomeAgentForm，预选 `last_used_workspace_id`。
 
 ## 输入框下方的 provider 选择器
 

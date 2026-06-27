@@ -1,4 +1,4 @@
-//! CodexForm — Home 页：无 active conv 时渲染的居中表单 (V2.1 ADR-0022)。
+//! HomeAgentForm — Home 页：无 active conv 时渲染的居中表单 (V2.1 ADR-0022)。
 //!
 /*! AgentSidebar 由 routes/index.tsx 单独渲染，不在本组件内部。 */
 //!
@@ -51,9 +51,9 @@ function WorkspaceCard(props: WorkspaceCardProps): JSX.Element {
   );
 }
 
-// ─── CodexForm ──────────────────────────────────────────────────────────────
+// ─── HomeAgentForm ──────────────────────────────────────────────────────────────
 
-export function CodexForm(): JSX.Element {
+export function HomeAgentForm(): JSX.Element {
   const workspaces = createMemo((): AgentSidebarWorkspace[] => {
     const list = appStore.state.value.workspaces ?? [];
     return list.filter((w) => w.enabled).map((w) => ({
