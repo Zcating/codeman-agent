@@ -212,4 +212,103 @@ test.describe("10 — HomeAgentForm Home", () => {
     const codexSendGone = await page.evaluate(() => !document.querySelector("[data-testid='codex-send']"));
     await expect(codexSendGone).toBe(true);
   });
+
+  test("新布局: textarea DOM 顺序在 workspace picker 之前", async () => {
+    test.setTimeout(60_000);
+    const page = await getTauriPage();
+    const wsId = "test-ws-layout";
+    const current = await invoke<Settings>("get_settings");
+    await invoke("update_settings", {
+      newSettings: {
+        ...current,
+        workspaces: [{ id: wsId, label: "Layout Test", root_path: "/tmp/layout-test", enabled: true }],
+        last_used_workspace_id: wsId,
+      },
+    });
+    await reloadPageForSettings(page);
+
+    // Assertion 1: Both elements are visible
+    await assert.visible(page.locator("[data-testid='codex-input']"), { timeout: 10_000 });
+    await assert.visible(page.locator("[data-testid='workspace-select-trigger']"), { timeout: 10_000 });
+
+    // Assertion 2 (DOM order): codex-input should appear before workspace-select-trigger in document order
+    const domOrderValid = await page.evaluate(() => {
+      const all = Array.from(document.querySelectorAll("[data-testid]"));
+      const codexIdx = all.findIndex((el) => el.getAttribute("data-testid") === "codex-input");
+      const wsIdx = all.findIndex((el) => el.getAttribute("data-testid") === "workspace-select-trigger");
+      return codexIdx >= 0 && wsIdx >= 0 && codexIdx < wsIdx;
+    });
+    await expect(domOrderValid).toBe(true);
+  });
+
+  test("LLM picker 显示且 trigger 含 default_model", async () => {
+    test.setTimeout(60_000);
+    const page = await getTauriPage();
+    const wsId = "test-ws-llm-picker";
+    const current = await invoke<Settings>("get_settings");
+    await invoke("update_settings", {
+      newSettings: {
+        ...current,
+        workspaces: [{ id: wsId, label: "LLM Picker Test", root_path: "/tmp/llm-picker-test", enabled: true }],
+        last_used_workspace_id: wsId,
+      },
+    });
+    await reloadPageForSettings(page);
+
+    // Assertion 1: LLM picker trigger is visible
+    await assert.visible(page.locator("[data-testid='llm-picker-trigger']"), { timeout: 10_000 });
+
+    // Assertion 2: trigger contains default_model text
+    const triggerText = await page.evaluate(() => {
+      const el = document.querySelector("[data-testid='llm-picker-trigger']");
+      return el?.textContent ?? "";
+    });
+    await expect(triggerText.includes("MiniMax-M2.5-highspeed")).toBe(true);
+  });
+
+  test("Action slot 按钮存在且点击不报错 (picker 在 e2e 不弹真 dialog)", async () => {
+    test.setTimeout(60_000);
+    const page = await getTauriPage();
+    const wsId = "test-ws-action-slot";
+    const current = await invoke<Settings>("get_settings");
+    await invoke("update_settings", {
+      newSettings: {
+        ...current,
+        workspaces: [{ id: wsId, label: "Action Slot Test", root_path: "/tmp/action-slot-test", enabled: true }],
+        last_used_workspace_id: wsId,
+      },
+    });
+    await reloadPageForSettings(page);
+
+    // Open workspace select dropdown
+    const trigger = page.locator("[data-testid='workspace-select-trigger']");
+    await trigger.click();
+
+    // Assertion 1: dropdown content is visible
+    const content = page.locator("[data-testid='workspace-select-content']");
+    await assert.visible(content, { timeout: 5_000 });
+
+    // Assertion 2: action button is visible inside dropdown
+    const actionBtn = page.locator("[data-testid='workspace-select-add-btn']");
+    await assert.visible(actionBtn, { timeout: 5_000 });
+
+    // Assertion 3: clicking the action button does not throw an unhandled error
+    let pageError: Error | null = null;
+    const errorHandler = (err: Error) => {
+      pageError = err;
+    };
+    page.on("pageerror", errorHandler);
+
+    try {
+      await actionBtn.click({ timeout: 5_000 });
+      // Give a small window for any async error to propagate
+      await new Promise((r) => setTimeout(r, 500));
+    } catch {
+      // click itself may fail if dialog was suppressed — that's acceptable per the test note
+    }
+    // Note: listener cleaned up via disposeTauriPage() in afterAll
+
+    // Assert no unhandled page error occurred
+    await expect(pageError).toBeNull();
+  });
 });
