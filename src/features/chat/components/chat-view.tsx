@@ -3,7 +3,7 @@
 //! V2 后不再 import messages.store / agent.store,全部走 conversations.store
 //! 的 store / sendMessage / cancel。running 派生自 byId[activeId].streamingMessageId。
 
-import { createSignal, createEffect, For, Show, onMount } from "solid-js";
+import { createSignal, createEffect, createMemo, For, Show, onMount } from "solid-js";
 import { X, Send } from "lucide-solid";
 import { MessageBubble } from "./message-bubble";
 import { store, activeId$, sendMessage, cancel } from "../stores/conversations.store";
@@ -13,11 +13,12 @@ import { Textarea } from "../../../shared/components/ui/textarea";
 import { startThemeSync } from "../../../shared/stores/theme";
 import { appStore } from "../../../shared/stores/app.store";
 import { settingsSaver } from "../../settings/lib/settings-saver";
-import type { Provider } from "../../../shared/lib/types";
+import { buildEnabledProviders } from "../lib/build-enabled-providers";
 
 function ProviderSelect() {
-  const enabledProviders = (): Provider[] =>
-    (appStore.state.value.providers ?? []).filter((p) => p.enabled && p.llm);
+  const enabledProviders = createMemo(() =>
+    buildEnabledProviders(appStore.state.value.providers ?? [])
+  );
   const currentId = (): string => {
     const id = appStore.state.value.default_llm_provider_id;
     if (id && enabledProviders().some((p) => p.id === id)) {
