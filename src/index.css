@@ -54,7 +54,7 @@
   --color-input: oklch(0.92 0.005 230);
   --color-ring: oklch(0.685 0.169 230);
 
-  /* Sidebar (V2.1, shadcn-style) — used by ui/sidebar primitive + internal/agent-sidebar */
+  /* Sidebar (V2.1, shadcn-style) — used by ui/sidebar primitive + internal/codeman-sidebar */
   --color-sidebar:                    oklch(0.985 0.003 230);
   --color-sidebar-foreground:         oklch(0.18 0.008 230);
   --color-sidebar-primary:            oklch(0.685 0.169 230);
