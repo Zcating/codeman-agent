@@ -144,6 +144,10 @@ V1.x 期间 `features/chat/components/sidebar.tsx` = Layer 3（业务 + 数据�
 
 总改动 ≥ 8 处代码 + 3 处文档。成本有意义 → 不可逆标记成立。
 
+## Pointer to ADR-0023
+
+Naming conventions for `internal/` components (codeman-* prefix) and the @ark-ui/solid Select primitive adoption are now governed by [ADR-0023](./0023-codeman-prefix-and-ark-ui-select.md). ADR-0022 retains governance of the `internal/` directory infrastructure (准入条件 + prop-driven 强约束) and the dual-layer design tokens (CSS colors + TS constants).
+
 ## References
 
 - ADR-0010 (frontend 5+1 folder whitelist) Q4 (`components/ui` vs `components/internal` 边界)
