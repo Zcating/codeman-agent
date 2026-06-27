@@ -14,26 +14,45 @@ import { startThemeSync } from "../../../shared/stores/theme";
 import { appStore } from "../../../shared/stores/app.store";
 import { settingsSaver } from "../../settings/lib/settings-saver";
 import { buildEnabledProviders } from "../lib/build-enabled-providers";
+import { CodemanGroupSelect } from "../../../shared/components/ui/codeman-group-select";
 
 function ProviderSelect() {
   const enabledProviders = createMemo(() =>
     buildEnabledProviders(appStore.state.value.providers ?? [])
   );
-  const currentId = (): string => {
-    const id = appStore.state.value.default_llm_provider_id;
-    if (id && enabledProviders().some((p) => p.id === id)) {
-      return id;
+
+  // Convert enabled providers to CodemanGroupSelect groups format
+  const groups = createMemo(() =>
+    enabledProviders().map((p) => ({
+      label: p.label,
+      options: p.models.map((m) => ({ label: m.label, value: m.id })),
+    }))
+  );
+
+  // Current selected provider's default model id
+  const currentModelId = (): string | null => {
+    const providerId = appStore.state.value.default_llm_provider_id;
+    const provider = enabledProviders().find((p) => p.id === providerId);
+    if (!provider) {
+      return enabledProviders()[0]?.models[0]?.id ?? null;
     }
-    return enabledProviders()[0]?.id ?? "";
+    return provider.models[0]?.id ?? null;
   };
-  const handleChange = (e: Event & { currentTarget: HTMLSelectElement }) => {
-    const next = e.currentTarget.value;
-    if (!next) {
+
+  const handleChange = (modelId: string) => {
+    if (!modelId) {
       return;
     }
-    appStore.set({ default_llm_provider_id: next });
-    settingsSaver.scheduleSave();
+    // Find provider that contains this model and update default_llm_provider_id
+    const provider = enabledProviders().find((p) =>
+      p.models.some((m) => m.id === modelId)
+    );
+    if (provider) {
+      appStore.set({ default_llm_provider_id: provider.id });
+      settingsSaver.scheduleSave();
+    }
   };
+
   return (
     <Show
       when={enabledProviders().length > 0}
@@ -47,16 +66,15 @@ function ProviderSelect() {
         </a>
       }
     >
-      <select
-        id="provider-select"
-        class="h-9 max-w-[14rem] truncate rounded-md border border-input bg-background px-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-        value={currentId()}
+      <CodemanGroupSelect
+        groups={groups()}
+        value={currentModelId()}
         onChange={handleChange}
+        placeholder="选择模型"
+        disabled={false}
         aria-label="选择 LLM provider"
         data-testid="provider-select"
-      >
-        <For each={enabledProviders()}>{(p) => <option value={p.id}>{p.label}</option>}</For>
-      </select>
+      />
     </Show>
   );
 }
