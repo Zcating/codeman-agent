@@ -233,17 +233,6 @@ export async function setupWorkspaceAndCreateConvViaIpc(
 }
 
 /**
- * V2.1 HomeAgentForm helpers for new 10-home-agent.spec.ts
- */
-
-/**
- * Click on a workspace card in the HomeAgentForm workspace picker.
- */
-export async function selectWorkspaceCard(p: TauriPage, workspaceId: string): Promise<void> {
-  await p.locator(`[data-testid='workspace-card-${workspaceId}']`).click();
-}
-
-/**
  * Type into the HomeAgentForm input and click send.
  */
 export async function submitHomeAgentForm(
