@@ -20,7 +20,7 @@ src/features/chat/
 │   └── conversations.store.test.ts
 │
 ├── components/           # UI 组件
-│   ├── home.tsx          # Codex-like 首页（无 active conv 时：AgentSidebar + HomeAgentForm 两栏）
+│   ├── home.tsx          # Codex-like 首页（无 active conv 时：CodemanSidebar + HomeAgentForm 两栏）
 │   ├── home.test.tsx
 │   ├── message-bubble.tsx # Role-aware message renderer
 │   ├── message-bubble.test.tsx
@@ -57,8 +57,8 @@ src/features/chat/
   - UI 读 `store.byId[activeId()]?.messages`，Solid proxy 自动按路径细粒度反应式，跨 conv streaming 不互相重算。
   - ADR-0016 D4-D5-D6 的"组件不直接 import runtime"约束保留：组件调 `conversations.store.sendMessage(...)` / `conversations.store.cancel(convId)` / `conversations.store.archiveConversation(convId)`，不直接 import `lib/runtime.ts`。
 - **组件不调 IPC。** 所有 Tauri IPC 走 `src/shared/lib/tauri.ts` Service Tags，在 `conversations.store.ts` 内 `yield*` 使用。
-- ~~**`Sidebar` 用 `createSignal` 做局部状态。**~~（V1.x sidebar 移除 — 由 `shared/components/internal/agent-sidebar` 替代，详见 [ADR-0022](../../docs/adr/0022-internal-components-and-design-tokens.md) D1 + D3）
-- **Home（无 active conv 时）渲染 AgentSidebar + HomeAgentForm 两栏布局。** Home 是 `/` 路由在 `activeId === null` 时的形态。`AgentSidebar` 由 chat feature 喂数据（workspaces + items + handlers），不直接 import `conversations.store`；`HomeAgentForm` 包含 input box（disabled until workspace 选中）+ workspace picker（必选解锁 input）。详见下方 "Home 路由 + Codex form" section。
+- ~~**`Sidebar` 用 `createSignal` 做局部状态。**~~（V1.x sidebar 移除 — 由 `shared/components/internal/codeman-sidebar` 替代，详见 [ADR-0022](../../docs/adr/0022-internal-components-and-design-tokens.md) D1 + D3）
+- **Home（无 active conv 时）渲染 CodemanSidebar + HomeAgentForm 两栏布局。** Home 是 `/` 路由在 `activeId === null` 时的形态。`CodemanSidebar` 由 chat feature 喂数据（workspaces + items + handlers），不直接 import `conversations.store`；`HomeAgentForm` 包含 input box（disabled until workspace 选中）+ workspace picker（必选解锁 input）。详见下方 "Home 路由 + Codex form" section。
 - **ChatView（有 active conv 时）满屏单页布局，** 顶部加 "← 返回首页" 按钮调 `navigate({ to: "/" })` 清空 `activeId$()`。chat-view 自身不变（消息列表 + input + provider select + send/cancel）。
 - **Home → ChatView 切换 = `selectConversation(id)` 设 activeId。** MainContent 切到 ChatView。Home 的 workspace 预选走 `Settings.last_used_workspace_id`。
 
@@ -68,7 +68,7 @@ src/features/chat/
 
 ```
 ChatLayout
-  ├── AgentSidebar (左侧，always visible when no conv)
+  ├── CodemanSidebar (左侧，always visible when no conv)
   │     └── workspaces + items 由 home 喂 props
   └── MainContent
         ├── activeId === null → HomeAgentForm (右侧居中)
@@ -171,4 +171,4 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 - **Wave 4**（2026-06-14）：从 `src/agent/` → `src/features/chat/` 迁移
 - **Wave V1.5**（2026-06-15，ADR-0010）：`runtime.ts` 从根级入 `lib/`；`store/` → `stores/`；删空 `types/`
 - **Wave V2**（2026-06-25，ADR-0019）：`AgentRuntime` service 单例 + Map → `createAgentRuntime()` 工厂 + per-conv `ConversationState.runtime`；`messages.store` + `agent.store` 合并到 `conversations.store`；`createStore<{ activeId, byId }>` 取代全局 signal + Map；supersede ADR-0014 D1 + D4
-- **Wave V2.1**（2026-06-27，ADR-0022）：V1.x `sidebar.tsx` **删除**；新增 `home.tsx` (Codex-like 2 栏)；`/shared/components/ui/sidebar.tsx` primitive + `/shared/components/internal/agent-sidebar.tsx` 业务组合落地（首例 internal/）；emoji 全面迁移 lucide-solid (Loader2/CheckCircle2/XCircle/FolderOpen)；`Conversation.workspace_id` 必填（per-Conv 绑定）；`Settings.last_used_workspace_id` 引入
+- **Wave V2.1**（2026-06-27，ADR-0022）：V1.x `sidebar.tsx` **删除**；新增 `home.tsx` (Codex-like 2 栏)；`/shared/components/ui/sidebar.tsx` primitive + `/shared/components/internal/codeman-sidebar.tsx` 业务组合落地（首例 internal/）；emoji 全面迁移 lucide-solid (Loader2/CheckCircle2/XCircle/FolderOpen)；`Conversation.workspace_id` 必填（per-Conv 绑定）；`Settings.last_used_workspace_id` 引入

@@ -1,8 +1,8 @@
 import { render, fireEvent, cleanup } from "@solidjs/testing-library";
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { AgentSidebar, type AgentSidebarProps } from "./agent-sidebar";
+import { CodemanSidebar, type CodemanSidebarProps } from "./codeman-sidebar";
 
-function defaultProps(overrides: Partial<AgentSidebarProps> = {}): AgentSidebarProps {
+function defaultProps(overrides: Partial<CodemanSidebarProps> = {}): CodemanSidebarProps {
   return {
     workspaces: [],
     selectedWorkspaceId: null,
@@ -17,13 +17,13 @@ function defaultProps(overrides: Partial<AgentSidebarProps> = {}): AgentSidebarP
   };
 }
 
-describe("AgentSidebar (Layer 2 business composition)", () => {
+describe("CodemanSidebar (Layer 2 business composition)", () => {
   afterEach(() => cleanup());
 
   describe("Workspace group", () => {
     it("renders workspaces list when provided", () => {
       const { container } = render(() => (
-        <AgentSidebar {...defaultProps({
+        <CodemanSidebar {...defaultProps({
           workspaces: [
             { id: "ws-1", label: "Frontend", rootPath: "/path/frontend" },
             { id: "ws-2", label: "Backend", rootPath: "/path/backend" },
@@ -38,7 +38,7 @@ describe("AgentSidebar (Layer 2 business composition)", () => {
     it("calls onSelectWorkspace when workspace clicked", () => {
       const onSelect = vi.fn();
       const { container } = render(() => (
-        <AgentSidebar {...defaultProps({
+        <CodemanSidebar {...defaultProps({
           workspaces: [{ id: "ws-1", label: "Frontend", rootPath: "/p" }],
           onSelectWorkspace: onSelect,
         })} />
@@ -50,7 +50,7 @@ describe("AgentSidebar (Layer 2 business composition)", () => {
 
     it("active workspace has sidebar-primary bg", () => {
       const { container } = render(() => (
-        <AgentSidebar {...defaultProps({
+        <CodemanSidebar {...defaultProps({
           workspaces: [
             { id: "ws-1", label: "Active WS", rootPath: "/p1" },
             { id: "ws-2", label: "Other WS", rootPath: "/p2" },
@@ -67,7 +67,7 @@ describe("AgentSidebar (Layer 2 business composition)", () => {
     it("empty workspaces shows fallback with add button when onAddWorkspace provided", () => {
       const onAdd = vi.fn();
       const { container } = render(() => (
-        <AgentSidebar {...defaultProps({ workspaces: [], onAddWorkspace: onAdd })} />
+        <CodemanSidebar {...defaultProps({ workspaces: [], onAddWorkspace: onAdd })} />
       ));
       const addBtn = container.querySelector("[aria-label='Add workspace']") as HTMLElement;
       expect(addBtn).toBeTruthy();
@@ -79,7 +79,7 @@ describe("AgentSidebar (Layer 2 business composition)", () => {
   describe("Items (conversations) group", () => {
     it("renders items with labels", () => {
       const { container } = render(() => (
-        <AgentSidebar {...defaultProps({
+        <CodemanSidebar {...defaultProps({
           items: [
             { id: "c-1", label: "First chat", subLabel: "2024-01-15" },
             { id: "c-2", label: "Second chat", subLabel: "2024-01-16" },
@@ -92,14 +92,14 @@ describe("AgentSidebar (Layer 2 business composition)", () => {
     });
 
     it("empty items shows fallback text", () => {
-      const { container } = render(() => <AgentSidebar {...defaultProps()} />);
+      const { container } = render(() => <CodemanSidebar {...defaultProps()} />);
       expect(container.textContent).toContain("暂无会话");
     });
 
     it("calls onSelectItem when item clicked", () => {
       const onSelect = vi.fn();
       const { container } = render(() => (
-        <AgentSidebar {...defaultProps({
+        <CodemanSidebar {...defaultProps({
           items: [{ id: "c-1", label: "Chat 1" }],
           onSelectItem: onSelect,
         })} />
@@ -111,7 +111,7 @@ describe("AgentSidebar (Layer 2 business composition)", () => {
 
     it("active item has sidebar-primary bg", () => {
       const { container } = render(() => (
-        <AgentSidebar {...defaultProps({
+        <CodemanSidebar {...defaultProps({
           items: [
             { id: "c-1", label: "Active" },
             { id: "c-2", label: "Other" },
@@ -125,7 +125,7 @@ describe("AgentSidebar (Layer 2 business composition)", () => {
 
     it("streaming item shows Loader2 spinner with aria-label=streaming", () => {
       const { container } = render(() => (
-        <AgentSidebar {...defaultProps({
+        <CodemanSidebar {...defaultProps({
           items: [{ id: "c-1", label: "Streaming chat", isStreaming: true }],
         })} />
       ));
@@ -138,7 +138,7 @@ describe("AgentSidebar (Layer 2 business composition)", () => {
   describe("Inline delete confirm", () => {
     it("clicking delete button shows confirm UI", () => {
       const { container } = render(() => (
-        <AgentSidebar {...defaultProps({
+        <CodemanSidebar {...defaultProps({
           items: [{ id: "c-1", label: "Chat 1" }],
           onDeleteItem: vi.fn(),
         })} />
@@ -152,7 +152,7 @@ describe("AgentSidebar (Layer 2 business composition)", () => {
     it("confirming delete calls onDeleteItem", () => {
       const onDelete = vi.fn();
       const { container } = render(() => (
-        <AgentSidebar {...defaultProps({
+        <CodemanSidebar {...defaultProps({
           items: [{ id: "c-1", label: "Chat 1" }],
           onDeleteItem: onDelete,
         })} />
@@ -164,7 +164,7 @@ describe("AgentSidebar (Layer 2 business composition)", () => {
 
     it("cancel delete hides confirm UI", () => {
       const { container } = render(() => (
-        <AgentSidebar {...defaultProps({
+        <CodemanSidebar {...defaultProps({
           items: [{ id: "c-1", label: "Chat 1" }],
           onDeleteItem: vi.fn(),
         })} />
@@ -176,7 +176,7 @@ describe("AgentSidebar (Layer 2 business composition)", () => {
 
     it("disabled item has no delete action", () => {
       const { container } = render(() => (
-        <AgentSidebar {...defaultProps({
+        <CodemanSidebar {...defaultProps({
           items: [{ id: "c-1", label: "Old conv", isDisabled: true }],
           onDeleteItem: vi.fn(),
         })} />
@@ -189,7 +189,7 @@ describe("AgentSidebar (Layer 2 business composition)", () => {
     it("renders create button when onCreateItem provided", () => {
       const onCreate = vi.fn();
       const { container } = render(() => (
-        <AgentSidebar {...defaultProps({ onCreateItem: onCreate })} />
+        <CodemanSidebar {...defaultProps({ onCreateItem: onCreate })} />
       ));
       const btn = container.querySelector("[aria-label='新对话']") as HTMLElement;
       expect(btn).toBeTruthy();
@@ -199,8 +199,8 @@ describe("AgentSidebar (Layer 2 business composition)", () => {
 
     it("hides create button when onCreateItem omitted", () => {
       const props = defaultProps();
-      delete (props as Partial<AgentSidebarProps>).onCreateItem;
-      const { container } = render(() => <AgentSidebar {...props} />);
+      delete (props as Partial<CodemanSidebarProps>).onCreateItem;
+      const { container } = render(() => <CodemanSidebar {...props} />);
       expect(container.querySelector("[aria-label='新对话']")).toBeNull();
     });
   });

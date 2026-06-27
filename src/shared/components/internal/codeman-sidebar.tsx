@@ -1,4 +1,4 @@
-//! AgentSidebar — Layer 2 business composition (per ADR-0022 D3).
+//! CodemanSidebar — Layer 2 business composition (per ADR-0022 D3).
 //! Consumes Layer 1 (`ui/sidebar.tsx`), adds chat-aware layout.
 //! Strictly prop-driven. ZERO business logic, ZERO feature/store imports.
 
@@ -21,13 +21,13 @@ import { cn } from "../../lib/cn";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-export interface AgentSidebarWorkspace {
+export interface CodemanSidebarWorkspace {
   id: string;
   label: string;
   rootPath: string; // Display path, e.g., "C:\\Users\\foo\\projects\\bar"
 }
 
-export interface AgentSidebarItem {
+export interface CodemanSidebarItem {
   id: string;
   label: string;
   subLabel?: string; // e.g., "2024-01-15" formatted date
@@ -36,14 +36,14 @@ export interface AgentSidebarItem {
   disabledReason?: string;
 }
 
-export interface AgentSidebarProps {
+export interface CodemanSidebarProps {
   // Workspace group
-  workspaces: AgentSidebarWorkspace[];
+  workspaces: CodemanSidebarWorkspace[];
   selectedWorkspaceId: string | null;
   onSelectWorkspace: (id: string) => void;
 
   // Items (conversations filtered by parent)
-  items: AgentSidebarItem[];
+  items: CodemanSidebarItem[];
   selectedItemId: string | null;
   onSelectItem: (id: string) => void;
   onDeleteItem?: (id: string) => void;
@@ -59,7 +59,7 @@ export interface AgentSidebarProps {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function AgentSidebar(props: AgentSidebarProps): JSX.Element {
+export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
   // Internal UI state for inline delete confirm — NOT data state
   const [confirmingId, setConfirmingId] = createSignal<string | null>(null);
 

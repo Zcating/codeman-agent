@@ -4,14 +4,14 @@
 //! - activeId === null → HomeAgentForm (右侧居中)
 //! - activeId !== null → ChatView (满屏 + 返回按钮)
 //!
-//! AgentSidebar 始终显示（workspaces 存在时），负责 workspace 选择和会话列表。
+//! CodemanSidebar 始终显示（workspaces 存在时），负责 workspace 选择和会话列表。
 
 import { Show, type JSX } from "solid-js";
 import { ArrowLeft, Settings as SettingsIcon } from "lucide-solid";
 import { Link } from "@tanstack/solid-router";
 import { ChatView } from "../components/chat-view";
 import { HomeAgentForm } from "../components/home";
-import { AgentSidebar, type AgentSidebarWorkspace, type AgentSidebarItem } from "../../../shared/components/internal/agent-sidebar";
+import { CodemanSidebar, type CodemanSidebarWorkspace, type CodemanSidebarItem } from "../../../shared/components/internal/codeman-sidebar";
 import {
   store,
   activeId$,
@@ -24,7 +24,7 @@ import { appStore } from "../../../shared/stores/app.store";
 
 // ─── Data mapping helpers ───────────────────────────────────────────────────
 
-function workspacesFromApp(): AgentSidebarWorkspace[] {
+function workspacesFromApp(): CodemanSidebarWorkspace[] {
   const list = appStore.state.value.workspaces ?? [];
   return list
     .filter((w) => w.enabled)
@@ -35,7 +35,7 @@ function workspacesFromApp(): AgentSidebarWorkspace[] {
     }));
 }
 
-function itemsFromConversations(): AgentSidebarItem[] {
+function itemsFromConversations(): CodemanSidebarItem[] {
   const selectedWsId = appStore.selectedWorkspaceId();
   if (!selectedWsId) return [];
   return conversations$()
@@ -53,8 +53,8 @@ function itemsFromConversations(): AgentSidebarItem[] {
 // ─── ChatLayout ─────────────────────────────────────────────────────────────
 
 export function ChatLayout(): JSX.Element {
-  const workspaces = (): AgentSidebarWorkspace[] => workspacesFromApp();
-  const items = (): AgentSidebarItem[] => itemsFromConversations();
+  const workspaces = (): CodemanSidebarWorkspace[] => workspacesFromApp();
+  const items = (): CodemanSidebarItem[] => itemsFromConversations();
   const selectedWorkspaceId = (): string | null => appStore.selectedWorkspaceId();
   const selectedItemId = (): string | null => activeId$();
 
@@ -70,9 +70,9 @@ export function ChatLayout(): JSX.Element {
 
   return (
     <main class="flex h-screen w-full bg-background text-foreground">
-      {/* AgentSidebar — visible when workspaces exist or we're on home */}
+      {/* CodemanSidebar — visible when workspaces exist or we're on home */}
       <Show when={workspaces().length > 0 || activeId$() !== null}>
-        <AgentSidebar
+        <CodemanSidebar
           workspaces={workspaces()}
           selectedWorkspaceId={selectedWorkspaceId()}
           onSelectWorkspace={handleSelectWorkspace}

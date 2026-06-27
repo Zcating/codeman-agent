@@ -58,11 +58,11 @@ vi.mock("../stores/conversations.store", () => ({
   loadConversations: vi.fn(),
 }));
 
-// ─── Mock AgentSidebar (internal component) ────────────────────────────────
+// ─── Mock CodemanSidebar (internal component) ────────────────────────────────
 
-vi.mock("../../../shared/components/internal/agent-sidebar", () => ({
-  AgentSidebar: (props: any) => (
-    <div data-testid="agent-sidebar">
+vi.mock("../../../shared/components/internal/codeman-sidebar", () => ({
+  CodemanSidebar: (props: any) => (
+    <div data-testid="codeman-sidebar">
       <button
         data-testid="sidebar-ws-ws-1"
         onClick={() => props.onSelectWorkspace?.("ws-1")}
@@ -139,7 +139,7 @@ describe("ChatLayout — state machine", () => {
     expect(clearActiveConversation).toHaveBeenCalledTimes(1);
   });
 
-  it("T4.3.5: AgentSidebar visible when workspaces exist", async () => {
+  it("T4.3.5: CodemanSidebar visible when workspaces exist", async () => {
     const { appStore } = await import("../../../shared/stores/app.store") as any;
     appStore.state.value.workspaces = [
       { id: "ws-1", label: "My Project", root_path: "C:\\projects", enabled: true },
@@ -147,7 +147,7 @@ describe("ChatLayout — state machine", () => {
     appStore.selectedWorkspaceId.mockReturnValue("ws-1");
 
     const { getByTestId } = render(() => <ChatLayout />);
-    expect(getByTestId("agent-sidebar")).toBeTruthy();
+    expect(getByTestId("codeman-sidebar")).toBeTruthy();
   });
 
   it("T4.3.6: Click workspace in sidebar → setLastUsedWorkspaceId called", async () => {
@@ -187,13 +187,13 @@ describe("ChatLayout — state machine", () => {
     expect(selectConversation).toHaveBeenCalledWith("conv-1");
   });
 
-  it("T4.3.8: AgentSidebar hidden when no workspaces AND no active conv", async () => {
+  it("T4.3.8: CodemanSidebar hidden when no workspaces AND no active conv", async () => {
     const { appStore } = await import("../../../shared/stores/app.store") as any;
     appStore.state.value.workspaces = [];
     const { activeId$ } = await import("../stores/conversations.store") as any;
     activeId$.mockReturnValue(null);
 
     const { queryByTestId } = render(() => <ChatLayout />);
-    expect(queryByTestId("agent-sidebar")).toBeNull();
+    expect(queryByTestId("codeman-sidebar")).toBeNull();
   });
 });

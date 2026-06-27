@@ -1,6 +1,6 @@
 //! HomeAgentForm — Home 页：无 active conv 时渲染的居中表单 (V2.1 ADR-0022)。
 //!
-/*! AgentSidebar 由 routes/index.tsx 单独渲染，不在本组件内部。 */
+/*! CodemanSidebar 由 routes/index.tsx 单独渲染，不在本组件内部。 */
 //!
 //! 布局：
 //! - 顶部标题 + 子标题
@@ -16,7 +16,7 @@ import { createMemo, createSignal, Show, type JSX } from "solid-js";
 import { FolderPlus, Send } from "lucide-solid";
 import { appStore } from "../../../shared/stores/app.store";
 import { Button } from "../../../shared/components/ui/button";
-import type { AgentSidebarWorkspace } from "../../../shared/components/internal/agent-sidebar";
+import type { CodemanSidebarWorkspace } from "../../../shared/components/internal/codeman-sidebar";
 import {
   createAndSendConversation,
 } from "../stores/conversations.store";
@@ -27,7 +27,7 @@ import type { ProviderConfig } from "../lib/runtime";
 // ─── HomeAgentForm ──────────────────────────────────────────────────────────────
 
 export function HomeAgentForm(): JSX.Element {
-  const workspaces = createMemo((): AgentSidebarWorkspace[] => {
+  const workspaces = createMemo((): CodemanSidebarWorkspace[] => {
     const list = appStore.state.value.workspaces ?? [];
     return list.filter((w) => w.enabled).map((w) => ({
       id: w.id,

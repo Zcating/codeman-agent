@@ -1,4 +1,4 @@
-# 0022 — Open `internal/` for AgentSidebar + Dual-Layer Design Tokens
+# 0022 — Open `internal/` for CodemanSidebar + Dual-Layer Design Tokens
 
 **Status**: accepted (2026-06-27)
 **Date**: 2026-06-27
@@ -20,9 +20,9 @@ V2 启动 Codex-like home 改造时遇到两个新需求：
 
 grill-with-docs session (2026-06-27) 锁定：
 
-- Sidebar 抽到 `internal/agent-sidebar` + `ui/sidebar` 两层
+- Sidebar 抽到 `internal/codeman-sidebar` + `ui/sidebar` 两层
 - Design token 走 CSS 颜色 + TS 尺寸双层
-- `internal/` 首例 = `agent-sidebar`，由 chat feature (Home) 消费
+- `internal/` 首例 = `codeman-sidebar`，由 chat feature (Home) 消费
 
 ## Decision
 
@@ -30,7 +30,7 @@ grill-with-docs session (2026-06-27) 锁定：
 
 **采用**：开 `shared/components/internal/`，准入规则：
 
-- 业务耦合但跨 feature 复用 (e.g., AgentSidebar 绑 chat 域但 layout 可被 settings / billing 复用)
+- 业务耦合但跨 feature 复用 (e.g., CodemanSidebar 绑 chat 域但 layout 可被 settings / billing 复用)
 - **不**依赖任何具体 feature 的 store / 类型 / 行为
 - 严格 prop-driven（数据 + handlers 通过 props 传入）
 - 测试用 mock props，不 mock store
@@ -38,13 +38,13 @@ grill-with-docs session (2026-06-27) 锁定：
 **拒绝**：
 
 - A. 维持 `internal/` 预留 — Sidebar 必须找到归属，强行放 `ui/` 会污染设计系统层
-- B. 把 `agent-sidebar` 放 `features/chat/` — 跟 V1.x sidebar 同位置，跨域复用无门
+- B. 把 `codeman-sidebar` 放 `features/chat/` — 跟 V1.x sidebar 同位置，跨域复用无门
 - C. 跳过 internal 直接用 `ui/` — 违反 ADR-0010 Q4
 
 **理由**：
 
 - AGENTS.md 已锁 `internal/` 语义（"跨域业务组件"），本次仅是开首例
-- 单一首例（agent-sidebar）足以证明 pattern 价值，盲目铺开多个组件会引入维护成本
+- 单一首例（codeman-sidebar）足以证明 pattern 价值，盲目铺开多个组件会引入维护成本
 - "业务耦合但跨 feature 复用" 边界已收紧（prop-driven 强约束），避免内部腐烂
 
 ### D2. Design token 双层
@@ -67,9 +67,9 @@ grill-with-docs session (2026-06-27) 锁定：
 - TS 尺寸常量让 "折叠/展开动效" 等需要 JS 控制的属性有单点来源
 - 0 状态 token 通过 utility class 表达（如 `bg-sidebar/50` 透明度），无需单独建
 
-### D3. `agent-sidebar` 形态
+### D3. `codeman-sidebar` 形态
 
-- 路径：`shared/components/internal/agent-sidebar.tsx`
+- 路径：`shared/components/internal/codeman-sidebar.tsx`
 - 严格 prop-driven，**不** import 任何 `features/*/stores/*`
 - 知道 "workspace group + conv group" 布局，但数据由父组件传入
 - 内部维护 `confirmingId` signal 实现 inline delete confirm
@@ -81,7 +81,7 @@ grill-with-docs session (2026-06-27) 锁定：
 
 详见 grill-with-docs 2026-06-27 session。本 ADR 锁定 D1 + D3 路径：
 
-- `ui/sidebar` (Layer 1) + `internal/agent-sidebar` (Layer 2) + **删除** `features/chat/components/sidebar.tsx` (Layer 3)
+- `ui/sidebar` (Layer 1) + `internal/codeman-sidebar` (Layer 2) + **删除** `features/chat/components/sidebar.tsx` (Layer 3)
 - Layer 1 = 纯 layout primitive，零业务
 - Layer 2 = 业务组合，知道布局形状但不持有数据
 - 父组件（chat feature 的 home route）直接喂 props 给 Layer 2
@@ -102,22 +102,22 @@ V1.x 期间 `features/chat/components/sidebar.tsx` = Layer 3（业务 + 数据�
 
 - `internal/` 首例落地，pattern 可复用（未来 ErrorBoundary / LoadingSpinner 等可循例）
 - Design token 双层，CSS / TS 各自有单点真相
-- Sidebar 从 chat feature 解耦，未来其它 feature 可消费 `agent-sidebar` 同样的 "workspace + item list" 布局
+- Sidebar 从 chat feature 解耦，未来其它 feature 可消费 `codeman-sidebar` 同样的 "workspace + item list" 布局
 - shadcn-style sub-component API（`Sidebar` / `SidebarMenu` / `SidebarMenuItem` 等）让 consumer 自由组合
 
 ### 负面
 
 - `internal/` 新增维护责任（命名 / 数量 / 维护者规范待后续 ADR 跟进，本 ADR 仅开首例）
 - Design token 跨 CSS + TS，开发者需知两边
-- Sidebar 从 chat feature 删除后，chat feature 内部直接消费 `agent-sidebar`，跨域 import 边界要在 review 守护
+- Sidebar 从 chat feature 删除后，chat feature 内部直接消费 `codeman-sidebar`，跨域 import 边界要在 review 守护
 
 ### 跨文件影响
 
 | 文件 | 改动 |
 |---|---|
 | `docs/adr/0022-internal-components-and-design-tokens.md` | 本 ADR |
-| `src/shared/components/internal/agent-sidebar.tsx` | 新建 |
-| `src/shared/components/internal/agent-sidebar.test.tsx` | 新建 |
+| `src/shared/components/internal/codeman-sidebar.tsx` | 新建 |
+| `src/shared/components/internal/codeman-sidebar.test.tsx` | 新建 |
 | `src/shared/components/ui/sidebar.tsx` | 新建（primitive） |
 | `src/shared/components/ui/sidebar.test.tsx` | 新建 |
 | `src/shared/lib/design-tokens.ts` | 新建 |
@@ -135,7 +135,7 @@ V1.x 期间 `features/chat/components/sidebar.tsx` = Layer 3（业务 + 数据�
 
 推翻本 ADR 需：
 
-- 删 `internal/agent-sidebar` + `ui/sidebar` + `design-tokens.ts`
+- 删 `internal/codeman-sidebar` + `ui/sidebar` + `design-tokens.ts`
 - 恢复 `features/chat/components/sidebar.tsx`
 - 撤销 ADR 0022 + 重新激活 "internal/ 预留" 状态
 - 改 `src/shared/AGENTS.md` 5+1 白名单 + `src/index.css` @theme

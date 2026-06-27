@@ -1,6 +1,6 @@
 //! Sidebar — shadcn-style layout primitive (Layer 1).
 //! Pure layout, ZERO business logic, ZERO feature imports.
-//! Per ADR-0022 D3: Layer 1 = this file, Layer 2 = internal/agent-sidebar.tsx.
+//! Per ADR-0022 D3: Layer 1 = this file, Layer 2 = internal/codeman-sidebar.tsx.
 
 import { type JSX, type ParentProps, mergeProps, splitProps } from "solid-js";
 import { cn } from "../../lib/cn";
