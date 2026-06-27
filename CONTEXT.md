@@ -31,6 +31,8 @@
 
 - **Workspace (工作区)** — 用户在 Settings (`Settings.workspaces: Array<{ id, label, root_path, enabled }>`) 中配置的根目录。**每个 Conversation 绑定 1 个 workspace** (per-Conv, `Conversation.workspace_id` 必填，详见 `Workspace-Bound Conversation`)；agent 的 file tool 仅在该目录树下操作，越界 (canonical path 不在 workspace root 内) 由 Tauri command 拒绝 (返回 `SandboxViolation` 错误)。_避免_: sandbox、root directory、project root。
 - **Workspace-Bound Conversation (绑定 workspace 的会话)** — 每个 Conversation 在创建时 (`createConversation(workspaceId, ...)`) 必须绑定 1 个 workspace (`workspace_id: string` 字段)，创建后不可更改。`workspace_id = ""` 表示 "needs workspace" (V1.x 迁移的旧 conv 状态，UI 灰标)。该绑定决定 file tool 沙箱边界；Home 上的 workspace 选择器决定新 conv 的绑定。_避免_: global workspace、workspace 切换 (per-Conv 锁定后不存在切换)。
+- **Add Workspace (添加 Workspace)** — 用户在 Home 的 workspace picker dropdown 中通过 "+ Add new workspace…" Action slot 触发；调 `appStore.pickWorkspacePath()` 弹 OS 原生 folder picker；picker 关闭后若返回非 null 路径，调用 `appStore.addWorkspace(rootPath)` 自动派生 label + dedup（同 root_path 重复时静默忽略并自动选已有） + 写入 `Settings.workspaces[]` + 立即预选（`setDraftWorkspaceId` + `setLastUsedWorkspaceId`） + 关闭 dropdown + focus textarea。Home **不**再跳 /settings。_避免_: Navigate-to-Settings（V2.1 polish 早期设计，已废止）。
+- **Workspace Label Derivation (workspace label 派生)** — 通过 OS folder picker 添加 workspace 时（`Add Workspace` 流程），`label` 从 `root_path` 自动派生：调用 `deriveLabelFromPath(rootPath)` (位于 `src/shared/lib/derive-label-from-path.ts`) 取路径最后非空段作为 label；空结果（`C:\`、`/`）fallback `"Untitled workspace"`。后续用户可在 /settings 自由修改 label。_避免_: 强制用户在 picker 关闭后输入 label（增加 UI 阻塞；违反"calm/professional"原则）。
 - **File Tool (文件工具)** — pi-agent 工具族，内置 5 个: `read_file` (读全文) / `write_file` (覆盖写) / `edit_file` (替换文本，支持 `replace_all`) / `search_files` (glob + content 搜索) / `delete_file` (移至回收站)。所有工具通过 Tauri command 调 Rust `std::fs`，沙箱由 workspace 边界约束。_避免_: fs tool、file operation (过载)。
 - **Sandbox Violation (越界错误)** — Tauri command 在 `canonicalize(path)` 后检测到 `path` 不在任何已启用 workspace 目录下时返回的错误。Agent 收到后必须重新规划 (改路径 / 让用户加 workspace) 而非重试原路径。
 
@@ -58,13 +60,14 @@
   - `appStore.refresh()` — 从后端重载
   - `appStore.refreshProviderModels(id)` — 调 `ProviderService.fetchModels` 拉新 models 列表并写 state（含 `default_model` 自动 fallback 不变量）
   - `appStore.pickWorkspacePath()` — 调 OS folder picker，返回选中路径或 `null`
+  - `appStore.addWorkspace(rootPath)` — 派生 label + dedup + 写入 `Settings.workspaces[]` + 设置 `last_used_workspace_id`；返回新建（或已存在）的 `Workspace`，picker 添加专用（见 `Add Workspace` 词条）
   - `appStore.deleteProvider(id)` — 从 `providers[]` 移除指定记录
   - `appStore.clearAllHistory()` — 清 SQLite conversation 表（settings 路由 advanced tab 调用）
 
   **D4 硬规则（ADR-0016）**：**所有** service 操作（`Effect.gen(...yield* Service...)` / 裸 `invoke("...")` / 裸 `fetch`）只能在 Store 中出现。组件层 `.tsx` 文件**禁止**直接 import service 或调 IPC，全部走 `Effect.runPromiseExit(store.method(...))` + `Exit.match`。测试代码（`*.test.ts*`）不受 D4 约束。
 
 - **Stale (过期)** — `Snapshot` 时间戳超过 Billing Provider 的 `stale_after_seconds`；传统的"过期徽标"语义在 tool result 缓存场景保留。
-- **Last-Used Workspace (上次使用的 workspace)** — Settings 字段 `last_used_workspace_id?: string`。Home 落地时的预选 workspace；若该 workspace 已被删除/禁用，fallback 到 `workspaces` 数组中第一个 enabled 项；若 `workspaces` 全空，CTA 引导用户去 /settings 添加。用户在 Home 上选择 workspace 时即更新该字段。_避免_: default workspace、active workspace (避免与 per-Conv 锁定混淆)。
+- **Last-Used Workspace (上次使用的 workspace)** — Settings 字段 `last_used_workspace_id?: string`。Home 落地时的预选 workspace；若该 workspace 已被删除/禁用，fallback 到 `workspaces` 数组中第一个 enabled 项；若 `workspaces` 全空，CTA 引导用户去 /settings 添加。用户在 Home 上选择 workspace 时即更新该字段；通过 `Add Workspace` 流程添加的新 workspace 也立即写入该字段（picker 关闭后 `setLastUsedWorkspaceId(newId)`）。_避免_: default workspace、active workspace (避免与 per-Conv 锁定混淆)。
 
 ### 样式
 
