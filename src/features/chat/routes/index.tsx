@@ -6,28 +6,31 @@
 //!
 //! CodemanSidebar 始终显示（workspaces 存在时），负责 workspace 选择和会话列表。
 
-import { Show, type JSX } from "solid-js";
+import { createSignal, Show, type JSX } from "solid-js";
 import { ArrowLeft, Settings as SettingsIcon } from "lucide-solid";
 import { Link } from "@tanstack/solid-router";
 import { ChatView } from "../components/chat-view";
 import { HomeAgentForm } from "../components/home";
+import { WorkspaceRenameDialog } from "../components/workspace-rename-dialog";
+import { WorkspaceDeleteDialog } from "../components/workspace-delete-dialog";
 import { CodemanSidebar, type WorkspaceNode } from "../../../shared/components/internal/codeman-sidebar";
 import {
   store,
   activeId$,
+  workspaces$,
   conversations$,
   selectConversation,
   deleteConversation,
   clearActiveConversation,
-} from "../stores/conversations.store";
-import { appStore } from "../../../shared/stores/app.store";
+  setSelectedWorkspaceId,
+} from "../stores/chat.store";
 
 // ─── Data mapping helpers ───────────────────────────────────────────────────
 
 function buildSidebarNodes(): WorkspaceNode[] {
-  const workspaces = appStore.state.value.workspaces?.filter((w) => w.enabled) ?? [];
   const allConvs = conversations$() ?? [];
-  return workspaces.map((ws) => {
+  const wsList = workspaces$() ?? [];
+  return wsList.map((ws) => {
     const wsConvs = allConvs
       .filter((c) => c.workspace_id === ws.id) // 自动过滤 workspace_id === ""
       .sort((a, b) => b.updated_at - a.updated_at);
@@ -49,7 +52,7 @@ function buildSidebarNodes(): WorkspaceNode[] {
 }
 
 function workspacesExist(): boolean {
-  return (appStore.state.value.workspaces?.filter((w) => w.enabled).length ?? 0) > 0;
+  return (workspaces$()?.length ?? 0) > 0;
 }
 
 // ─── ChatLayout ─────────────────────────────────────────────────────────────
@@ -64,8 +67,31 @@ export function ChatLayout(): JSX.Element {
   const handleBackToHome = () => clearActiveConversation();
 
   const handleEmptyWorkspaceClick = (wsId: string) => {
-    appStore.setLastUsedWorkspaceId(wsId);
+    setSelectedWorkspaceId(wsId);
     clearActiveConversation();
+  };
+
+  // Dialog state for workspace rename/delete
+  const [dialogType, setDialogType] = createSignal<"rename" | "delete" | null>(null);
+  const [dialogWorkspaceId, setDialogWorkspaceId] = createSignal<string>("");
+  const [dialogWorkspaceLabel, setDialogWorkspaceLabel] = createSignal<string>("");
+
+  const handleRenameWorkspace = (workspaceId: string, currentLabel: string) => {
+    setDialogWorkspaceId(workspaceId);
+    setDialogWorkspaceLabel(currentLabel);
+    setDialogType("rename");
+  };
+
+  const handleDeleteWorkspace = (workspaceId: string, label: string) => {
+    setDialogWorkspaceId(workspaceId);
+    setDialogWorkspaceLabel(label);
+    setDialogType("delete");
+  };
+
+  const closeDialog = () => {
+    setDialogType(null);
+    setDialogWorkspaceId("");
+    setDialogWorkspaceLabel("");
   };
 
   return (
@@ -82,6 +108,8 @@ export function ChatLayout(): JSX.Element {
             window.location.href = "/settings";
           }}
           onEmptyWorkspaceClick={handleEmptyWorkspaceClick}
+          onRenameWorkspace={handleRenameWorkspace}
+          onDeleteWorkspace={handleDeleteWorkspace}
         />
       </Show>
 
@@ -123,6 +151,24 @@ export function ChatLayout(): JSX.Element {
           </Link>
         </footer>
       </section>
+
+      {/* Workspace rename/delete dialogs */}
+      <Show when={dialogType() === "rename"}>
+        <WorkspaceRenameDialog
+          workspaceId={dialogWorkspaceId()}
+          initialLabel={dialogWorkspaceLabel()}
+          open={dialogType() === "rename"}
+          onClose={closeDialog}
+        />
+      </Show>
+      <Show when={dialogType() === "delete"}>
+        <WorkspaceDeleteDialog
+          workspaceId={dialogWorkspaceId()}
+          label={dialogWorkspaceLabel()}
+          open={dialogType() === "delete"}
+          onClose={closeDialog}
+        />
+      </Show>
     </main>
   );
 }

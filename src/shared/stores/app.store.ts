@@ -29,13 +29,11 @@ import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import {
   ProviderService,
   ProviderServiceLive,
-  WorkspaceService,
-  WorkspaceServiceLive,
   SettingsService,
   SettingsServiceLive,
 } from "../lib/tauri";
-import { deriveLabelFromPath } from "../lib/derive-label-from-path";
-import { settingsSaver } from "../../features/settings/lib/settings-saver";
+import { WorkspaceService, WorkspaceServiceLive } from "../../features/chat/lib/workspace-service";
+// Note: settingsSaver import removed - was used by deprecated addWorkspace method
 
 // ─── Default Settings (ADR-0015) ──────────────────────────────────────
 const DEFAULT_MINIMAX_PROVIDER: Provider = {
@@ -85,7 +83,6 @@ export const defaultSettings: Settings = {
     user_can_edit: true,
   },
   conversations: { auto_archive_after_days: 30, max_history: 1000 },
-  workspaces: [],
   llm_providers: [],
 };
 
@@ -158,7 +155,6 @@ const pickWorkspacePathEffect = Effect.gen(function* () {
   return yield* svc.pickPath();
 })
   .pipe(Effect.provide(WorkspaceServiceLive))
-  .pipe(Effect.provide(SettingsServiceLive))
   .pipe(Effect.mapError((e: unknown) => toAppError(e)));
 
 /** V1.8+ ADR-0016 D4: 从 providers[] 移除指定记录 + 触发后端 delete IPC (V0 占位)。 */
@@ -231,34 +227,15 @@ export const appStore = {
   },
 
   /**
-   * Breaks appStore 'void | Effect<A,E,never>' return contract (ADR-0016 D4) per ADR-0023 D6-H2 amendment.
-   * Returns sync value because this is purely client-side state mutation with debounced flush.
-   *
-   * @param rootPath - workspace root path
-   * @returns new Workspace or existing Workspace if root_path dedup, null if rootPath is empty/whitespace
+   * @deprecated D8-W: Workspaces are now managed by WorkspaceService (Rust backend).
+   * This method is a stub - actual workspace creation goes through WorkspaceService.add().
+   * This method is kept for backward compatibility and will be removed in a future wave.
    */
-  addWorkspace(rootPath: string): Workspace | null {
-    if (!rootPath || !rootPath.trim()) {
-      return null;
-    }
-
-    const workspaces = settings.value.workspaces ?? [];
-    const existing = workspaces.find((w) => w.root_path === rootPath);
-    if (existing) {
-      return existing;
-    }
-
-    const newWs: Workspace = {
-      id: crypto.randomUUID(),
-      label: deriveLabelFromPath(rootPath),
-      root_path: rootPath,
-      enabled: true,
-    };
-
-    applyPatch({ workspaces: [...workspaces, newWs] });
-    settingsSaver.scheduleSave();
-
-    return newWs;
+  addWorkspace(_rootPath: string): Workspace | null {
+    // D8-W: Workspaces are now managed by Rust backend via WorkspaceService
+    // The UI should use WorkspaceService.pickPath() + WorkspaceService.add() instead
+    console.warn("appStore.addWorkspace is deprecated - use WorkspaceService instead");
+    return null;
   },
 
   /**
@@ -278,48 +255,29 @@ export const appStore = {
   },
 
   /**
-   * 设置 Home 上次选中的 workspace id。
-   * 用户在 Home 选 workspace 时调用；写入 in-memory state 后由 settingsSaver.scheduleSave() 触发
-   * debounced IPC flush。详见 CONTEXT.md "Last-Used Workspace"。
+   * @deprecated D8-W: last_used_workspace_id is removed from Settings.
+   * Workspace selection is now transient (in-memory only) in the chat domain.
    */
-  setLastUsedWorkspaceId(id: string | null): void {
-    applyPatch({ last_used_workspace_id: id ?? undefined });
+  setLastUsedWorkspaceId(_id: string | null): void {
+    // D8-W: last_used_workspace_id removed - workspace selection is now in-memory only
   },
 
   /**
-   * 读取 Home 上次选中的 workspace id。
-   * 返回 `null` 表示从未设置过（首次启动 / 用户未在 Home 选过）。
-   * 注意：调用方需配合 `Settings.workspaces[]` 做 fallback（删除/禁用检测），
-   * 不能假设返回值在 workspaces[] 中存在。
+   * @deprecated D8-W: last_used_workspace_id is removed from Settings.
+   * Always returns null - workspace selection is now transient.
    */
   getLastUsedWorkspaceId(): string | null {
-    return appStore.state.value.last_used_workspace_id ?? null;
+    // D8-W: last_used_workspace_id removed
+    return null;
   },
 
   /**
-   * Home 落地时的预选 workspace id。fallback 链 (CONTEXT.md "Last-Used Workspace"):
-   * 1. last_used_workspace_id 引用 enabled workspace → 返回该 id
-   * 2. 否则返回第一个 enabled workspace id
-   * 3. workspaces 全空或全 disabled → 返回 null (Home 应 CTA 跳 /settings)
-   *
-   * 调用方负责 UI 渲染（badge / disabled state），此方法只决定 id。
+   * @deprecated D8-W: Workspaces are now managed by Rust backend.
+   * This method always returns null - workspace selection is now done via WorkspaceService.list().
    */
   selectedWorkspaceId(): string | null {
-    const settings = appStore.state.value;
-    const lastUsed = settings.last_used_workspace_id;
-    const workspaces = settings.workspaces ?? [];
-
-    // Case 1: last_used_workspace_id 指向 enabled workspace
-    if (lastUsed) {
-      const ws = workspaces.find((w) => w.id === lastUsed && w.enabled);
-      if (ws) return ws.id;
-    }
-
-    // Case 2: 第一个 enabled workspace
-    const firstEnabled = workspaces.find((w) => w.enabled);
-    if (firstEnabled) return firstEnabled.id;
-
-    // Case 3: 全空
+    // D8-W: Workspaces are now managed by Rust backend via WorkspaceService
+    // Home should use WorkspaceService.list() and manage selection in-memory
     return null;
   },
 };

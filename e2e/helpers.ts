@@ -12,9 +12,10 @@
 //! 跟 Playwright 一致，spec 文件改动最小（只换 `expect` 为 `assert.*`）。
 
 import { assert, TauriLocator, TauriPage } from "./cdp-driver";
+import type { Workspace } from "../src/shared/lib/types";
 import * as path from "node:path";
 import * as os from "node:os";
-import type { Settings, Conversation } from "../src/shared/lib/types";
+
 
 export { TauriLocator, TauriPage, assert };
 
@@ -52,7 +53,7 @@ export async function invoke<T = unknown>(
       } catch (e) {
         // 重抛为 Error 实例,让 cdp-driver 的 exceptionDetails 拿到干净的
         // 消息字符串（原生的 Tauri rejection 会变成 "Uncaught (in promise)"）。
-        const msg = e instanceof Error ? e.message : String(e);
+        const msg = e instanceof Error ? e.message : typeof e === "object" && e !== null ? JSON.stringify(e) : String(e);
         throw new Error(`Tauri invoke(${c}) failed: ${msg}`);
       }
     },
@@ -219,11 +220,10 @@ async function waitForAppStore(p: TauriPage, timeoutMs = 15_000): Promise<void> 
  * drive the actual UI handlers, matching the conversation.store API).
  *
  * ## Why workspace is still via IPC
- * Workspace CRUD lives in the settings domain (Settings.workspaces[]).
- * There's no in-app "create workspace" button without first visiting
- * `/settings`. Using `update_settings` IPC to ensure the workspace
- * exists is the cheapest way to set up the precondition; the chat
- * conv itself goes through the UI.
+ * Workspace CRUD uses WorkspaceService (SQLite-backed) via IPC commands
+ * (`add_workspace`, `list_workspaces`, `delete_workspace`). Using
+ * `add_workspace` IPC is the canonical way to provision a workspace in
+ * tests; the chat conv itself goes through the UI.
  *
  * ## Which specs use it
  * - 05-chat-message-bubble, 05-file-tools, 06-llm-round-trip, 07-mock-provider,
@@ -247,7 +247,6 @@ export async function setupWorkspaceAndCreateConvViaIpc(
   const label = opts.workspaceLabel ?? "E2E Test Workspace";
   const root = opts.workspaceRoot ?? path.join(os.tmpdir(), "codeman-e2e-" + Date.now());
   const title = opts.title ?? "E2E Test Conv";
-  const wsId = "e2e-ws";
 
   // 0. Ensure the Tauri webview is fully loaded before any IPC call.
   //    `goto` (in cdp-driver) now polls until `__TAURI_INTERNALS__` is
@@ -260,47 +259,43 @@ export async function setupWorkspaceAndCreateConvViaIpc(
   //     after page load.
   await waitForAppStore(p);
 
-  // 1. Ensure workspace exists (idempotent IPC update — avoid duplicates
-  //    accumulating across test runs).
-  const current = await invoke<Settings>(p, "get_settings");
-  const existing = (current.workspaces ?? []).find((w) => w.id === wsId);
-  if (!existing) {
-    const newSettings = {
-      ...current,
-      workspaces: [
-        ...(current.workspaces ?? []),
-        { id: wsId, label, root_path: root, enabled: true },
-      ],
-      last_used_workspace_id: wsId,
-    };
-    await invoke(p, "update_settings", { newSettings });
-  } else if (current.last_used_workspace_id !== wsId) {
-    await invoke(p, "update_settings", {
-      newSettings: { ...current, last_used_workspace_id: wsId },
-    });
+  // 0c. D8-W: Clean old workspaces first so the home form sees exactly 1
+  //     workspace (avoids "Select a workspace…" when wsCount > 1).
+  try {
+    const oldWorkspaces = await invoke<{ id: string }[]>(p, "list_workspaces");
+    for (const ws of oldWorkspaces) {
+      await invoke(p, "delete_workspace", { id: ws.id });
+    }
+  } catch {
+    // best-effort
   }
 
-  // 2. Refresh appStore so the Solid signal picks up the new/updated
-  //    workspace. Home form's `draftWorkspaceId` is a `createMemo`
-  //    derived from `selectedWorkspaceId()` (home.tsx line ~99), so it
-  //    auto-updates as soon as `appStore` changes — no manual picker
-  //    click needed. With exactly 1 workspace, the input unlocks
-  //    immediately.
-  await p.evaluate(async () => {
-    const w = window as unknown as {
-      __appStore?: { refreshAsync: () => Promise<unknown> };
-    };
-    if (w.__appStore) {
-      await w.__appStore.refreshAsync();
-    }
-  });
+  // 1. Create a fresh workspace via WorkspaceService IPC.
+  const actualWsId = (await invoke<Workspace>(p, "add_workspace", { label, rootPath: root })).id;
 
-  // 3. Navigate to / — re-mounts after appStore update. With exactly 1
-  //    workspace, the memo re-computes to wsId and the input unlocks.
+  // 2. D8-W: Load workspaces into chat.store so the home form sees the new
+  //    workspace. Workspaces are now managed by chat.store (not appStore).
+  //    The home form uses `workspaces$()` to determine input enabled state.
+  //    Also set selectedWorkspaceId so the input unlocks (home.tsx checks
+  //    selectedWorkspaceId() !== null, it does NOT auto-select).
+  await p.evaluate(async (id: string) => {
+    const w = window as unknown as {
+      __chatStore?: {
+        loadWorkspaces: () => Promise<void>;
+        setSelectedWorkspaceId: (id: string | null) => void;
+      };
+    };
+    if (w.__chatStore) {
+      await w.__chatStore.loadWorkspaces();
+      w.__chatStore.setSelectedWorkspaceId(id);
+    }
+  }, actualWsId);
+
+  // 3. Navigate to / — re-mounts home form. With exactly 1 workspace,
+  //    draftWorkspaceId auto-selects and the input unlocks.
   await p.goto("/");
 
-  // 4. Wait for the input to be enabled (memo updated, wsCount=1,
-  //    draftWorkspaceId=wsId → isInputDisabled() = false).
+  // 4. Wait for the input to be enabled (wsCount=1, draftWorkspaceId=wsId).
   await assert.enabled(p.locator('[data-testid="codex-input"]'), {
     timeout: 10_000,
   });
@@ -361,7 +356,7 @@ export async function setupWorkspaceAndCreateConvViaIpc(
     );
   }
 
-  return { workspaceId: wsId, convId };
+  return { workspaceId: actualWsId, convId };
 }
 
 /**
@@ -390,7 +385,10 @@ export async function submitHomeAgentForm(p: TauriPage, text: string): Promise<v
  * @returns the new conv's id (for tests that need to address the conv by
  *          its data-conv-id selector).
  */
-export async function clickNewConversationAndWait(p: TauriPage): Promise<{ convId: string }> {
+export async function clickNewConversationAndWait(
+  p: TauriPage,
+  opts: { workspaceId?: string } = {},
+): Promise<{ convId: string }> {
   // 1. Click "back to home" to clear activeId (if on ChatView).
   //    HomeAgentForm renders when activeId$() === null.
   try {
@@ -399,21 +397,58 @@ export async function clickNewConversationAndWait(p: TauriPage): Promise<{ convI
     // Already on home (no back button) — proceed
   }
 
-  // 2. Wait for home form
+  // 2. D8-W: load workspaces into chat.store so the sidebar renders.
+  //    Without this, workspaces$() is empty and the sidebar won't show convs.
+  await p.evaluate(async () => {
+    const w = window as unknown as {
+      __chatStore?: { loadWorkspaces: () => Promise<void> };
+    };
+    await w.__chatStore?.loadWorkspaces();
+  });
+
+  // 3. D8-W: set selectedWorkspaceId so the input unlocks.
+  //    home.tsx checks selectedWorkspaceId() !== null to enable input.
+  //    If caller provided workspaceId, use it; otherwise use list_workspaces.
+  let wsId = opts.workspaceId;
+  if (!wsId) {
+    const wsList = await invoke<{ id: string }[]>(p, "list_workspaces");
+    wsId = wsList[0]?.id;
+  }
+  if (wsId) {
+    await p.evaluate((id: string) => {
+      const w = window as unknown as {
+        __chatStore?: { setSelectedWorkspaceId: (id: string | null) => void };
+      };
+      w.__chatStore?.setSelectedWorkspaceId(id);
+    }, wsId);
+  }
+
+  // 4. Wait for home form input to be enabled (workspace now selected).
+  //    If input can't be enabled, the home form UI path is broken — let the test fail fast.
   await assert.visible(p.locator('[data-testid="codex-input"]'), { timeout: 5_000 });
 
-  // 3. Type + send via home form (production code path)
-  const text = "E2E Test Conv";
-  await p.locator('[data-testid="codex-input"]').fill(text);
-  await p.locator('[data-testid="codex-send"]').click();
+  // 5. D8-W: create conversation via IPC bridge (no LLM message sent).
+  //    Previously this typed + clicked send via the home form, which triggered
+  //    createAndSendConversation → sendMessage (LLM). That consumed mock LLM queue
+  //    entries and produced unwanted bubbles. Using the bridge avoids LLM entirely.
+  const title = "E2E Test Conv";
+  await p.evaluate(async (args: { wsId: string; title: string }) => {
+    const w = window as unknown as {
+      __chatStore?: {
+        createConversationOnly: (workspaceId: string, title?: string) => Promise<void>;
+      };
+    };
+    await w.__chatStore?.createConversationOnly(args.wsId, args.title);
+  }, { wsId, title });
 
-  // 4. Wait for ChatView to mount
+  // 5. Wait for ChatView to mount (activeId set by createConversation → selectConversation).
+  //    The textarea with placeholder "发条消息…" proves ChatView rendered.
   await assert.visible(
     p.locator('textarea[placeholder="发条消息\u2026"]'),
     { timeout: 15_000 },
   );
 
-  // 5. Read convId from sidebar
+  // 6. Read convId from sidebar (active conv has data-conv-id)
   const convId = await p.evaluate(() => {
     const el = document.querySelector("aside [data-conv-id]");
     return el?.getAttribute("data-conv-id") ?? null;
@@ -422,8 +457,21 @@ export async function clickNewConversationAndWait(p: TauriPage): Promise<{ convI
     throw new Error("clickNewConversationAndWait: convId not found in sidebar");
   }
 
-  // 6. D7-CS: expand workspace so convs become visible in sidebar
-  await expandWorkspace(p, "e2e-ws");
+  // 7. D8-W: expand workspace so convs become visible in sidebar.
+  //    Workspace IDs are now UUIDs from Rust, not hardcoded "e2e-ws".
+  //    If caller didn't pass workspaceId, look up first existing workspace.
+  let workspaceId = opts.workspaceId;
+  if (!workspaceId) {
+    const workspaces = await invoke<{ id: string }[]>(p, "list_workspaces");
+    if (workspaces.length === 0) {
+      throw new Error(
+        "clickNewConversationAndWait: no workspace exists. " +
+          "Call setupWorkspaceAndCreateConvViaIpc first or pass opts.workspaceId.",
+      );
+    }
+    workspaceId = workspaces[0]!.id;
+  }
+  await expandWorkspace(p, workspaceId);
 
   return { convId };
 }
@@ -444,26 +492,14 @@ export async function ensureWorkspaceByPath(
   p: TauriPage,
   opts: { rootPath: string; label?: string; selectAsLastUsed?: boolean },
 ): Promise<string> {
-  const current = await invoke<Settings>(p, "get_settings");
-  const existing = (current.workspaces ?? []).find((ws) => ws.root_path === opts.rootPath);
+  const workspaces = await invoke<{ id: string; root_path: string }[]>(p, "list_workspaces");
+  const existing = workspaces.find((ws) => ws.root_path === opts.rootPath);
   if (existing) {
-    if (opts.selectAsLastUsed) {
-      await invoke(p, "update_settings", {
-        newSettings: { ...current, last_used_workspace_id: existing.id },
-      });
-    }
     return existing.id;
   }
-  // Create new workspace with deterministic id based on rootPath hash
-  const id = `ws-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  // Create new workspace via IPC — id is generated on the Rust side
   const label = opts.label ?? opts.rootPath.split(/[/\\]/).pop() ?? "E2E WS";
-  const newWs = { id, root_path: opts.rootPath, label, enabled: true };
-  const newSettings: Settings = {
-    ...current,
-    workspaces: [...(current.workspaces ?? []), newWs],
-    ...(opts.selectAsLastUsed ? { last_used_workspace_id: id } : {}),
-  };
-  await invoke(p, "update_settings", { newSettings });
+  const id = (await invoke<Workspace>(p, "add_workspace", { label, rootPath: opts.rootPath })).id;
   return id;
 }
 
@@ -540,10 +576,10 @@ export async function nthConv(
 export async function resetSidebar(p: TauriPage): Promise<void> {
   await clearAllHistory(p);
   try {
-    const current = await invoke<Settings>(p, "get_settings");
-    await invoke(p, "update_settings", {
-      newSettings: { ...current, workspaces: [], last_used_workspace_id: null },
-    });
+    const workspaces = await invoke<{ id: string }[]>(p, "list_workspaces");
+    for (const ws of workspaces) {
+      await invoke(p, "delete_workspace", { id: ws.id });
+    }
   } catch {
     // best-effort
   }

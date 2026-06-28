@@ -19,7 +19,6 @@ import type {
   LLMProvider,
   Provider,
   ModelMeta,
-  Workspace,
   FileMatch,
 } from "./types";
 
@@ -113,24 +112,6 @@ export class SettingsService extends Context.Tag("SettingsService")<
     readonly updateSettings: (patch: unknown) => Effect.Effect<Settings, AppError>;
     readonly clearAllHistory: () => Effect.Effect<void, AppError>;
     readonly getActiveLlmProvider: () => Effect.Effect<LLMProvider | null, AppError>;
-  }
->() {}
-
-// ─── WorkspaceService (V2 File IO — ADR-0013) ─────────────────────────────
-
-export class WorkspaceService extends Context.Tag("WorkspaceService")<
-  WorkspaceService,
-  {
-    /** Returns all workspaces from settings */
-    readonly list: () => Effect.Effect<Workspace[], AppError>;
-    /** Adds a new workspace to settings */
-    readonly add: (workspace: Workspace) => Effect.Effect<void, AppError>;
-    /** Updates an existing workspace by id */
-    readonly update: (id: string, patch: Partial<Workspace>) => Effect.Effect<void, AppError>;
-    /** Removes a workspace by id */
-    readonly remove: (id: string) => Effect.Effect<void, AppError>;
-    /** 弹出 OS folder picker (V1.8+ ADR-0016 D4) — 返回选中路径或 null */
-    readonly pickPath: () => Effect.Effect<string | null, AppError>;
   }
 >() {}
 
@@ -340,48 +321,6 @@ export const SettingsServiceImpl = {
     }),
 } as const;
 
-// WorkspaceServiceLive
-export const WorkspaceServiceLive = Layer.effect(
-  WorkspaceService,
-  Effect.gen(function* () {
-    const settingsSvc = yield* SettingsService;
-
-    return {
-      list: () =>
-        Effect.gen(function* () {
-          const settings = yield* settingsSvc.getSettings();
-          return settings.workspaces ?? [];
-        }),
-
-      add: (workspace) =>
-        Effect.gen(function* () {
-          const settings = yield* settingsSvc.getSettings();
-          const workspaces = [...(settings.workspaces ?? []), workspace];
-          yield* settingsSvc.updateSettings({ workspaces });
-        }),
-
-      update: (id, patch) =>
-        Effect.gen(function* () {
-          const settings = yield* settingsSvc.getSettings();
-          const workspaces = (settings.workspaces ?? []).map((ws) =>
-            ws.id === id ? { ...ws, ...patch } : ws,
-          );
-          yield* settingsSvc.updateSettings({ workspaces });
-        }),
-
-      remove: (id) =>
-        Effect.gen(function* () {
-          const settings = yield* settingsSvc.getSettings();
-          const workspaces = (settings.workspaces ?? []).filter((ws) => ws.id !== id);
-          yield* settingsSvc.updateSettings({ workspaces });
-        }),
-
-      // V1.8+ ADR-0016 D4: pick workspace path — 弹 OS folder picker
-      pickPath: () => invoke<string | null>("pick_workspace_path"),
-    };
-  }),
-);
-
 // FileServiceLive — thin IPC wrappers, no Effect.gen needed since no deps.
 // Use Layer.succeed (Effect v3 API) with the static service value; Layer.fromEffect
 // was removed in v3 (renamed to Layer.effect, which takes an Effect<Service, E, R>).
@@ -441,42 +380,5 @@ export async function clearAllHistoryBridge(): Promise<void> {
     const svc = yield* SettingsService;
     yield* svc.clearAllHistory();
   }).pipe(Effect.provide(SettingsServiceLive));
-  await Effect.runPromise(program);
-}
-
-// ─── Workspace Bridge Functions ────────────────────────────────
-// 注意:WorkspaceServiceLive 内部依赖 SettingsService(workspace 存于 settings store),
-// Effect.runPromise 要求 R=never,所以必须把 SettingsServiceLive 一并串到 provide 链里。
-// 否则运行时报 "Service not found: SettingsService"。
-
-export async function getWorkspacesBridge(): Promise<Workspace[]> {
-  const program = Effect.gen(function* () {
-    const svc = yield* WorkspaceService;
-    return yield* svc.list();
-  }).pipe(Effect.provide(WorkspaceServiceLive.pipe(Layer.provide(SettingsServiceLive))));
-  return Effect.runPromise(program);
-}
-
-export async function addWorkspaceBridge(workspace: Workspace): Promise<void> {
-  const program = Effect.gen(function* () {
-    const svc = yield* WorkspaceService;
-    yield* svc.add(workspace);
-  }).pipe(Effect.provide(WorkspaceServiceLive.pipe(Layer.provide(SettingsServiceLive))));
-  await Effect.runPromise(program);
-}
-
-export async function updateWorkspaceBridge(id: string, patch: Partial<Workspace>): Promise<void> {
-  const program = Effect.gen(function* () {
-    const svc = yield* WorkspaceService;
-    yield* svc.update(id, patch);
-  }).pipe(Effect.provide(WorkspaceServiceLive.pipe(Layer.provide(SettingsServiceLive))));
-  await Effect.runPromise(program);
-}
-
-export async function removeWorkspaceBridge(id: string): Promise<void> {
-  const program = Effect.gen(function* () {
-    const svc = yield* WorkspaceService;
-    yield* svc.remove(id);
-  }).pipe(Effect.provide(WorkspaceServiceLive.pipe(Layer.provide(SettingsServiceLive))));
   await Effect.runPromise(program);
 }

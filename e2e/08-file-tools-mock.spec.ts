@@ -12,50 +12,32 @@
 //! 这些测试是确定性的,跟 05-file-tools 不同,它们不依赖真实 LLM。
 
 import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
+import type { Workspace } from "../src/shared/lib/types";
 import { useMockProvider, enqueueMockResponse, clearMockQueue } from "./mock-provider";
-import type { Settings } from "../src/shared/lib/types";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 
 test.describe("08 — 文件工具 (mock LLM)", () => {
   const e2eRoot = path.join(os.tmpdir(), "codeman-mock-e2e-" + Date.now());
+  let workspaceId = "";
 
   let consoleErrors: string[] = [];
 
   test.beforeAll(async ({ tauriEnv }) => {
     const { page } = tauriEnv;
+    fs.mkdirSync(e2eRoot, { recursive: true });
+
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
 
-    // 确保 mock provider 已配置,并注入测试 workspace
-    const current = await invoke<Settings>(page, "get_settings");
-    const mainWorkspace = {
-      id: "main",
+    // D8-W: workspace provisioned via WorkspaceService IPC
+    workspaceId = (await invoke<Workspace>(page, "add_workspace", {
       label: "Mock E2E Test Workspace",
-      root_path: e2eRoot,
-      enabled: true,
-    };
-    await invoke(page, "update_settings", {
-      newSettings: {
-        ...current,
-        workspaces: [mainWorkspace],
-      },
-    });
+      rootPath: e2eRoot,
+    })).id;
 
-    // 切换到 mock provider
-    await useMockProvider(page, { workspace: false });
-
-    // 重新注入 workspace（useMockProvider 可能会被覆盖）
-    const current2 = await invoke<Settings>(page, "get_settings");
-    await invoke(page, "update_settings", {
-      newSettings: {
-        ...current2,
-        workspaces: [mainWorkspace],
-      },
-    });
-
-    fs.mkdirSync(e2eRoot, { recursive: true });
+    await useMockProvider(page);
   });
 
   test.beforeEach(async ({ tauriEnv }) => {
@@ -91,7 +73,7 @@ test.describe("08 — 文件工具 (mock LLM)", () => {
       toolCalls: [
         {
           name: "write_file",
-          input: { workspaceId: "main", path: "e2e-mock-test.txt", content: "hello from mock" },
+          input: { workspaceId, path: "e2e-mock-test.txt", content: "hello from mock" },
         },
       ],
     });
@@ -99,7 +81,7 @@ test.describe("08 — 文件工具 (mock LLM)", () => {
       toolCalls: [
         {
           name: "read_file",
-          input: { workspaceId: "main", path: "e2e-mock-test.txt" },
+          input: { workspaceId, path: "e2e-mock-test.txt" },
         },
       ],
     });
@@ -142,7 +124,7 @@ test.describe("08 — 文件工具 (mock LLM)", () => {
         {
           name: "read_file",
           input: {
-            workspaceId: "main",
+            workspaceId,
             path: "C:WindowsSystem32driversetchosts",
           },
         },

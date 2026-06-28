@@ -15,14 +15,18 @@
 
 import { createMemo, createSignal, Show, type JSX } from "solid-js";
 import { FolderPlus, Send } from "lucide-solid";
-import { Effect, Exit } from "effect";
+import { Effect } from "effect";
 import { appStore } from "../../../shared/stores/app.store";
 import { Button } from "../../../shared/components/ui/button";
 import { CodemanSelect } from "../../../shared/components/ui/codeman-select";
 import { CodemanGroupSelect } from "../../../shared/components/ui/codeman-group-select";
 import {
+  workspaces$,
+  selectedWorkspaceId$,
+  setSelectedWorkspaceId,
+  addWorkspace,
   createAndSendConversation,
-} from "../stores/conversations.store";
+} from "../stores/chat.store";
 import type { ProviderConfig } from "../lib/runtime";
 import { buildEnabledProviders } from "../lib/build-enabled-providers";
 import { settingsSaver } from "../../settings/lib/settings-saver";
@@ -86,41 +90,21 @@ interface HomeWorkspaceItem {
 
 export function HomeAgentForm(): JSX.Element {
   const workspaces = createMemo((): HomeWorkspaceItem[] => {
-    const list = appStore.state.value.workspaces ?? [];
-    return list.filter((w) => w.enabled).map((w) => ({
+    const list = workspaces$() ?? [];
+    return list.map((w) => ({
       id: w.id,
       label: w.label,
       rootPath: w.root_path,
     }));
   });
 
-  const selectedWorkspaceId = (): string | null => appStore.selectedWorkspaceId();
-
-  // V2.1 (post-ADR-0023) bug fix: `draftWorkspaceId` was a one-time snapshot
-  // of `selectedWorkspaceId()` at mount. If `appStore.last_used_workspace_id`
-  // changed AFTER mount (e.g. a test creates a workspace via IPC then calls
-  // `__appStore.refreshAsync()`), the local signal stayed at its initial
-  // value, so:
-  //   - 1 workspace case: auto-select never fired (input stayed disabled)
-  //   - 2+ workspace case: picker showed the new option but the form still
-  //     thought no workspace was selected
-  // The picker + "+ Add new workspace" button also wrote to
-  // `setDraftWorkspaceId(id)` to keep it in sync — but the signal was a
-  // snapshot so the writes were no-ops once `appStore` was the source of
-  // truth.
-  //
-  // Fix: make `draftWorkspaceId` a `createMemo` derived from
-  // `selectedWorkspaceId()`. Now any `appStore.setLastUsedWorkspaceId(id)`
-  // (whether from the picker, the add-workspace button, or an IPC write +
-  // `__appStore.refreshAsync()`) automatically updates this memo. No more
-  // `setDraftWorkspaceId` — single source of truth is `appStore`.
-  const draftWorkspaceId = createMemo(() => selectedWorkspaceId());
+  const selectedWorkspaceId = (): string | null => selectedWorkspaceId$();
 
   const wsCount = createMemo(() => workspaces().length);
 
   const isInputDisabled = createMemo(() => {
     if (wsCount() === 0) return true;
-    if (draftWorkspaceId() === null) return true;
+    if (selectedWorkspaceId() === null) return true;
     return false;
   });
 
@@ -130,7 +114,7 @@ export function HomeAgentForm(): JSX.Element {
   const handleSend = async (e: Event) => {
     e.preventDefault();
     const text = input().trim();
-    const wsId = draftWorkspaceId();
+    const wsId = selectedWorkspaceId();
     if (!text || !wsId) return;
 
     // Build ProviderConfig from appStore
@@ -173,7 +157,7 @@ export function HomeAgentForm(): JSX.Element {
             placeholder={
               wsCount() === 0
                 ? "Add a workspace to start"
-                : draftWorkspaceId() === null
+                : selectedWorkspaceId() === null
                   ? "Select a workspace above"
                   : "发条消息…"
             }
@@ -197,13 +181,9 @@ export function HomeAgentForm(): JSX.Element {
               <div class="w-[200px]">
                 <CodemanSelect
                   options={workspaces().map((w) => ({ label: w.label, value: w.id }))}
-                  value={draftWorkspaceId()}
+                  value={selectedWorkspaceId()}
                   onChange={(id) => {
-                    // draftWorkspaceId is now a derived memo (line ~99),
-                    // re-computed from `selectedWorkspaceId()`. So we only
-                    // need to update the source of truth (`appStore`); the
-                    // memo picks it up on the next reactive tick.
-                    appStore.setLastUsedWorkspaceId(id);
+                    setSelectedWorkspaceId(id);
                   }}
                   placeholder="Select a workspace…"
                   disabled={false}
@@ -216,18 +196,9 @@ export function HomeAgentForm(): JSX.Element {
                     data-testid="workspace-select-add-btn"
                     class="w-full px-3 py-2 text-left text-sm hover:bg-accent"
                     onClick={async () => {
-                      const exit = await Effect.runPromiseExit(appStore.pickWorkspacePath());
-                      if (Exit.isFailure(exit)) return;
-                      const rootPath = exit.value;
-                      if (rootPath === null || rootPath === undefined) return;
-                      const newWs = appStore.addWorkspace(rootPath);
-                      if (newWs) {
-                        // draftWorkspaceId is a derived memo (line ~99) — only
-                        // need to update the source of truth. The picker
-                        // will pick up the new workspace via appStore.
-                        appStore.setLastUsedWorkspaceId(newWs.id);
-                        textareaRef?.focus();
-                      }
+                      const exit = await Effect.runPromiseExit(addWorkspace());
+                      if (exit._tag === "Failure") return;
+                      textareaRef?.focus();
                     }}
                   >
                     + Add new workspace…

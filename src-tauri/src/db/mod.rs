@@ -8,6 +8,7 @@ use tauri::{AppHandle, Manager};
 
 pub mod conversations;
 pub mod messages;
+pub mod workspaces;
 
 pub async fn init(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     sqlx::migrate!("./src/db/migrations")

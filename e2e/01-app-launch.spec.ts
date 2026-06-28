@@ -11,7 +11,8 @@
 //! errors. It proves webview loaded, SPA mounted, IPC working — without
 //! coupling to a specific layout.
 
-import { test, assert, expect } from "./fixtures";
+import { test, assert, expect, invoke } from "./fixtures";
+import type { Workspace } from "../src/shared/lib/types";
 
 test.describe("01 — application launch", () => {
   let consoleErrors: string[] = [];
@@ -76,5 +77,16 @@ test.describe("01 — application launch", () => {
     if (consoleErrors.length > 0) {
       throw new Error(`Console errors during startup:\n${consoleErrors.join("\n")}`);
     }
+  });
+
+  test("D8-W: WorkspaceService usable immediately on app boot", async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
+    await page.goto("/");
+    await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
+    const workspaces = await invoke<Workspace[]>(page, "list_workspaces");
+    expect(Array.isArray(workspaces)).toBe(true);
+    await invoke(page, "add_workspace", { label: "Boot Test", rootPath: "/tmp/boot-test" });
+    const after = await invoke<Workspace[]>(page, "list_workspaces");
+    expect(after.some((w) => w.label === "Boot Test")).toBe(true);
   });
 });

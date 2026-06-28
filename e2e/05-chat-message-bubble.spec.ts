@@ -65,18 +65,14 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
       timeout: 15_000,
     });
 
-    // 2. 创建全新会话。ChatView 拒绝在没有 activeId 的情况下发送,
-    //    所以这是硬性前提,不是可选项。
-    const newConvButton = page.locator('button[title="新建会话"]');
-    await assert.visible(newConvButton);
-    await newConvButton.click();
+    // 2. 创建全新会话 via HomeAgentForm send (V2.1 D8-W flow)。
+    //    clickNewConversationAndWait 返回 convId 即 active conv 的 id。
+    const { convId } = await clickNewConversationAndWait(page);
 
-    // 3. 从 sidebar 的 active 列表项捕获 active conversation id —
-    //    我们需要它来进行 IPC `list_messages` 调用。
-    //    active 项是带 primary-500 背景的 <li>。
-    const activeItem = page.locator("aside li.bg-primary").first();
-    await assert.visible(activeItem, { timeout: 5_000 });
-    const activeTitle = await activeItem.locator("span").first().textContent();
+    // 3. Verify the conv appears in sidebar (use convId from step 2).
+    const sidebarConv = page.locator(`aside [data-conv-id="${convId}"]`).first();
+    await assert.visible(sidebarConv, { timeout: 5_000 });
+    const activeTitle = await sidebarConv.locator("span").first().textContent();
     expect(activeTitle, "active conversation 应有一个标题").toBeTruthy();
 
     // 4. 输入到 textarea 并提交。我们先等待 textarea
@@ -145,28 +141,15 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
     //    指标坏了,即使 bubble 渲染了)。
     await assert.value(textarea, "");
 
-    // 7. 严格:同一消息持久化到 SQLite。我们通过 messages 列表
-    //    从 store 获取 active conversation 的第一条消息;
-    //    最稳定的方式是通过 IPC list_conversations 查找。
-    //
-    //    Title → ID 映射在 DOM 中没有直接暴露,
-    //    所以我们规避:用标题查找匹配 conversation。
-    const convos = await invoke<Array<{ id: string; title: string }>>("list_conversations", {
-      includeArchived: false,
-    });
-    const matching = convos.find((c) => c.title === (activeTitle ?? "").trim());
-    expect(matching, `找不到标题为 "${activeTitle}" 的会话`).toBeTruthy();
-    if (!matching) {
-      return;
-    } // 为 TS 缩小类型
-
-    const messages = await invoke<MessageRow[]>("list_messages", {
-      conversationId: matching.id,
+    // 7. 严格:同一消息持久化到 SQLite。直接用 clickNewConversationAndWait
+    //    返回的 convId 查询，跳过 DOM 依赖。
+    const messages = await invoke<MessageRow[]>(page, "list_messages", {
+      conversationId: convId,
     });
     const userRow = messages.find((m) => m.role === "user" && m.content === USER_INPUT);
     expect(
       userRow,
-      `content 为 "${USER_INPUT}" 的 user message 必须持久化在会话 ${matching.id} 中`,
+      `content 为 "${USER_INPUT}" 的 user message 必须持久化在会话 ${convId} 中`,
     ).toBeTruthy();
   });
 

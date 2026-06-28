@@ -10,7 +10,6 @@
 
 use crate::types::{ModelMeta, Provider, ProviderLlm};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use std::time::Duration;
 
 const SCHEMA_VERSION_V15: &str = "1.5";
@@ -177,15 +176,6 @@ impl Default for ConversationSettings {
     }
 }
 
-/// V2 工作区配置（ADR-0013）。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Workspace {
-    pub id: String,
-    pub label: String,
-    pub root_path: PathBuf,
-    pub enabled: bool,
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // 设置
 // ─────────────────────────────────────────────────────────────────────────────
@@ -227,18 +217,6 @@ pub struct Settings {
     pub billing_providers: Vec<BillingProviderConfig>,
 
     pub conversations: ConversationSettings,
-
-    // ─── V2 新字段 ───────────────────────────────────────────────────────────
-    /// V2 工作区列表。V1→V2 迁移时若无此字段则默认空 Vec（用户 opt-in）。
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub workspaces: Vec<Workspace>,
-
-    /// Home 页上次选择的 workspace id (V2.1)。
-    /// 用户从 Home 落地时优先预选该 workspace；若该 workspace 已被删除/禁用，
-    /// fallback 到 workspaces 数组中第一个 enabled 项。
-    /// 详见 CONTEXT.md "Last-Used Workspace"。
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub last_used_workspace_id: Option<String>,
 }
 
 impl Default for Settings {
@@ -285,8 +263,6 @@ Files are limited to 10 MB. Binary files, .exe/.dll/.sys files, and paths outsid
             },
             billing_providers: Vec::new(),
             conversations: ConversationSettings::default(),
-            workspaces: Vec::new(),
-            last_used_workspace_id: None,
         }
     }
 }
@@ -699,8 +675,6 @@ mod tests {
             },
             billing_providers: Vec::new(),
             conversations: ConversationSettings::default(),
-            workspaces: Vec::new(),
-            last_used_workspace_id: None,
         };
         let json = serde_json::to_string(&s).unwrap();
         let back: Settings = serde_json::from_str(&json).unwrap();
@@ -725,75 +699,4 @@ mod tests {
         assert_eq!(sz, back);
     }
 
-    // ─── V2 工作区迁移测试 ────────────────────────────────────────────────
-
-    #[test]
-    fn v1_to_v2_workspace_default() {
-        let v1_json = r#"{
-            "providers": [],
-            "schema_version": "1.5",
-            "llm_providers": [],
-            "user_language": "auto",
-            "theme": "system",
-            "start_at_login": true,
-            "window": {
-                "remember_position": true,
-                "remember_size": true,
-                "default_size": {"width": 1280, "height": 1280},
-                "min_size": {"width": 800, "height": 800}
-            },
-            "system_prompt": {"default": "", "user_can_edit": true},
-            "conversations": {"auto_archive_after_days": 30, "max_history": 1000}
-        }"#;
-        let loaded: Settings = serde_json::from_str(v1_json).unwrap();
-        let sanitized = loaded.sanitized();
-        assert!(
-            sanitized.workspaces.is_empty(),
-            "V1 settings should have empty workspaces, got {:?}",
-            sanitized.workspaces
-        );
-        assert!(
-            sanitized.last_used_workspace_id.is_none(),
-            "V1 settings should have no last_used_workspace_id, got {:?}",
-            sanitized.last_used_workspace_id
-        );
-    }
-
-    #[test]
-    fn workspace_preserved_through_sanitization() {
-        let settings_with_workspace = Settings {
-            workspaces: vec![Workspace {
-                id: "w1".into(),
-                label: "test workspace".into(),
-                root_path: PathBuf::from(r"C:\test"),
-                enabled: true,
-            }],
-            ..Settings::default()
-        };
-        let sanitized = settings_with_workspace.sanitized();
-        assert_eq!(sanitized.workspaces.len(), 1);
-        assert_eq!(sanitized.workspaces[0].id, "w1");
-        assert_eq!(sanitized.workspaces[0].label, "test workspace");
-        assert_eq!(sanitized.workspaces[0].root_path, PathBuf::from(r"C:\test"));
-        assert!(sanitized.workspaces[0].enabled);
-    }
-
-    // ─── V2.1 last_used_workspace_id 测试 ─────────────────────────────────
-
-    #[test]
-    fn last_used_workspace_id_default_is_none() {
-        let s = Settings::default();
-        assert!(s.last_used_workspace_id.is_none());
-    }
-
-    #[test]
-    fn last_used_workspace_id_round_trips_via_serde() {
-        let s = Settings {
-            last_used_workspace_id: Some("ws-123".into()),
-            ..Default::default()
-        };
-        let json = serde_json::to_string(&s).unwrap();
-        let back: Settings = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.last_used_workspace_id.as_deref(), Some("ws-123"));
-    }
 }

@@ -10,7 +10,7 @@
 import { createStore } from "solid-js/store";
 import { createSignal, type Accessor } from "solid-js";
 import { Effect, Stream, Exit } from "effect";
-import type { Conversation, Message } from "../../../shared/lib/types";
+import type { AppError, Conversation, Message, Workspace } from "../../../shared/lib/types";
 import {
   createAgentRuntime,
   type AgentRuntime,
@@ -23,8 +23,13 @@ import {
   MessageService,
   MessageServiceLive,
 } from "../../../shared/lib/tauri";
+import {
+  WorkspaceService,
+  WorkspaceServiceLive,
+} from "../lib/workspace-service";
+import { deriveLabelFromPath } from "../../../shared/lib/derive-label-from-path";
 
-// ─── ConversationState 类型 (inline 在 conversations.store) ──────
+// ─── ConversationState 类型 (inline 在 chat.store) ──────
 
 export interface ConversationState {
   // DB-backed fields (mirror shared/lib/types.ts Conversation)
@@ -47,9 +52,11 @@ export interface ConversationState {
 const [store, setStore] = createStore<{
   activeId: string | null;
   byId: Record<string, ConversationState>;
+  workspaces: Workspace[];
 }>({
   activeId: null,
   byId: {},
+  workspaces: [],
 });
 
 export { store, setStore };
@@ -61,6 +68,18 @@ export const activeId$: Accessor<string | null> = activeId;
 
 const [conversations, setConversationsSignal] = createSignal<ConversationState[]>([]);
 export const conversations$: Accessor<ConversationState[]> = conversations;
+
+// ─── Workspace state (D8-W) ──────────────────────────────────────────
+
+const [workspaces, setWorkspacesSignal] = createSignal<Workspace[]>([]);
+export const workspaces$: Accessor<Workspace[]> = workspaces;
+
+const [selectedWorkspaceId, setSelectedWorkspaceIdSignal] = createSignal<string | null>(null);
+export const selectedWorkspaceId$: Accessor<string | null> = selectedWorkspaceId;
+
+export function setSelectedWorkspaceId(id: string | null): void {
+  setSelectedWorkspaceIdSignal(id);
+}
 
 // ─── setupConvState: 初始化 ConvState ────────────────────────
 
@@ -134,7 +153,7 @@ export async function sendMessage(
   const program = Stream.runForEach(stream, (evt) => Effect.sync(() => handleEvent(convId, evt)));
   const result = await Effect.runPromiseExit(program.pipe(Effect.scoped));
   if (Exit.isFailure(result)) {
-    console.error("[conversations.store] sendMessage stream failure:", result.cause);
+    console.error("[chat.store] sendMessage stream failure:", result.cause);
   }
 }
 
@@ -214,7 +233,7 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       // 不论 cancel 还是真实 LLM 错误,都从 error path 进来。
       // 这里必须清 streamingMessageId,否则 UI 永远 stuck in "running" 状态
       // (Cancel 按钮不消失,Send 按钮不恢复 — e2e spec 09 D2 失败的原因)。
-      console.error("[conversations.store] runtime error:", evt.error);
+      console.error("[chat.store] runtime error:", evt.error);
       setStore("byId", convId, "streamingMessageId", null);
       break;
   }
@@ -359,8 +378,55 @@ export async function createAndSendConversation(
   await createConversation(workspaceId, title);
   const id = activeId$();
   if (!id) {
-    console.error("[conversations.store] createAndSendConversation: activeId is null after createConversation");
+    console.error("[chat.store] createAndSendConversation: activeId is null after createConversation");
     return;
   }
   await sendMessage(id, firstMessage, provider);
 }
+
+// ─── Workspace CRUD (D8-W) ──────────────────────────────────────────
+
+export const pickWorkspacePath = (): Effect.Effect<string | null, AppError, never> =>
+  Effect.gen(function* () {
+    const svc = yield* WorkspaceService;
+    return yield* svc.pickPath();
+  }).pipe(Effect.provide(WorkspaceServiceLive));
+
+export const loadWorkspaces = (): Effect.Effect<void, AppError, never> =>
+  Effect.gen(function* () {
+    const svc = yield* WorkspaceService;
+    const result = yield* svc.list();
+    setStore("workspaces", result);
+    setWorkspacesSignal(Object.values(store.workspaces));
+  }).pipe(Effect.provide(WorkspaceServiceLive));
+
+export const addWorkspace = (): Effect.Effect<Workspace | null, AppError, never> =>
+  Effect.gen(function* () {
+    const rootPath = yield* pickWorkspacePath();
+    if (rootPath === null) return null;
+    const label = deriveLabelFromPath(rootPath);
+    const svc = yield* WorkspaceService;
+    const result = yield* svc.add(label, rootPath);
+    setStore("workspaces", (ws) => [...ws, result]);
+    setWorkspacesSignal(Object.values(store.workspaces));
+    setSelectedWorkspaceIdSignal(result.id);
+    return result;
+  }).pipe(Effect.provide(WorkspaceServiceLive));
+
+export const removeWorkspace = (id: string): Effect.Effect<void, AppError, never> =>
+  Effect.gen(function* () {
+    const svc = yield* WorkspaceService;
+    yield* svc.remove(id);
+    // CASCADE deletes conversations with this workspace_id in SQLite
+    setStore("workspaces", (ws) => ws.filter((w) => w.id !== id));
+    setWorkspacesSignal(Object.values(store.workspaces));
+    if (selectedWorkspaceId() === id) setSelectedWorkspaceIdSignal(null);
+  }).pipe(Effect.provide(WorkspaceServiceLive));
+
+export const renameWorkspace = (id: string, label: string): Effect.Effect<void, AppError, never> =>
+  Effect.gen(function* () {
+    const svc = yield* WorkspaceService;
+    yield* svc.rename(id, label);
+    setStore("workspaces", (ws) => ws.map((w) => (w.id === id ? { ...w, label } : w)));
+    setWorkspacesSignal(Object.values(store.workspaces));
+  }).pipe(Effect.provide(WorkspaceServiceLive));

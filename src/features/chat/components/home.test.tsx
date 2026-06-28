@@ -4,7 +4,7 @@ import { render, cleanup, fireEvent, waitFor } from "@solidjs/testing-library";
 import { Effect } from "effect";
 import { HomeAgentForm } from "./home";
 import type { ProviderConfig } from "../lib/runtime";
-import { createAndSendConversation } from "../stores/conversations.store";
+import { createAndSendConversation } from "../stores/chat.store";
 
 // Mock @ark-ui/solid Select for jsdom — same pattern as codeman-select.test.tsx
 let mockIsOpen = false;
@@ -127,9 +127,15 @@ vi.mock("../../../shared/stores/app.store", () => ({
   },
 }));
 
-// ─── Mock conversations.store ────────────────────────────────────────────────
+// ─── Mock chat.store ────────────────────────────────────────────────────
+const mockWorkspaces = vi.hoisted(() => [] as Array<{ id: string; label: string; root_path: string }>);
+let mockSelectedWsId: string | null = null;
 
-vi.mock("../stores/conversations.store", () => ({
+vi.mock("../stores/chat.store", () => ({
+  workspaces$: vi.fn(() => mockWorkspaces),
+  selectedWorkspaceId$: vi.fn(() => mockSelectedWsId),
+  setSelectedWorkspaceId: vi.fn((id: string) => { mockSelectedWsId = id; }),
+  addWorkspace: vi.fn(() => Effect.succeed({ id: "new-id", label: "New Workspace", root_path: "/new/path" })),
   store: { byId: {} },
   activeId$: vi.fn<() => string | null>(),
   conversations$: vi.fn<() => never[]>(),

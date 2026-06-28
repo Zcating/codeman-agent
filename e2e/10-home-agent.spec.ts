@@ -9,8 +9,7 @@
 //! keep using clickNewConversationAndWait (now IPC-based shim) for
 //! backward compat.
 
-import { test, expect, assert, invoke, submitHomeAgentForm, type TauriPage } from "./fixtures";
-import type { Settings } from "../src/shared/lib/types";
+import { test, expect, assert, invoke, submitHomeAgentForm, resetSidebar, type TauriPage } from "./fixtures";
 
 /**
  * Reload the page to ensure a fresh app state.
@@ -101,6 +100,14 @@ async function selectWorkspaceInPicker(
 }
 
 test.describe("10 — HomeAgentForm Home", () => {
+  test.beforeAll(async ({ tauriEnv }) => {
+    // D8-W: clean up any workspaces from previous e2e runs to avoid UNIQUE
+    // constraint violations on root_path.
+    const { page } = tauriEnv;
+    await page.goto("/");
+    await resetSidebar(page);
+  });
+
   test.beforeEach(async ({ tauriEnv }) => {
     const { page } = tauriEnv;
     page.on("console", (msg) => {
@@ -108,12 +115,10 @@ test.describe("10 — HomeAgentForm Home", () => {
     });
   });
 
-  test("0 workspaces: input disabled + 'Add a workspace' CTA visible", async ({ tauriEnv }) => {
+  test("0 workspaces: input disabled + 'No workspaces' placeholder visible", async ({ tauriEnv }) => {
     const { page } = tauriEnv;
-    const current = await invoke<Settings>(page, "get_settings");
-    await invoke(page, "update_settings", {
-      newSettings: { ...current, workspaces: [], last_used_workspace_id: null },
-    });
+    // D8-W: clear all workspaces via WorkspaceService IPC
+    await resetSidebar(page);
     await reloadPageForSettings(page);
     // Check input is disabled
     const isDisabled = await page.evaluate(
@@ -124,32 +129,18 @@ test.describe("10 — HomeAgentForm Home", () => {
       "[data-testid='codex-input']",
     );
     await expect(isDisabled).toBe(true);
-    // V2.1 home page shows "No workspaces" placeholder when wsCount === 0;
-    // the add-workspace button lives in the SIDEBAR (not the home form).
-    // Sidebar empty state has data-workspace-id="" or no items, plus an
-    // "Add workspace" button that navigates to /settings.
+    // D8-W sidebar hides when 0 workspaces && no active conv.
+    // The "No workspaces" text in the home form confirms wsCount === 0.
     await assert.visible(
       page.getByText("No workspaces", { exact: false }),
       { timeout: 3_000 },
     );
-    // The sidebar's add-workspace button should be reachable.
-    const addWorkspaceBtn = page.getByRole("button", {
-      name: /add workspace/i,
-    });
-    await assert.visible(addWorkspaceBtn.first());
   });
 
   test("1 workspace: auto-select triggers + input enabled immediately", async ({ tauriEnv }) => {
     const { page } = tauriEnv;
-    const wsId = "test-ws-1ws";
-    const current = await invoke<Settings>(page, "get_settings");
-    await invoke(page, "update_settings", {
-      newSettings: {
-        ...current,
-        workspaces: [{ id: wsId, label: "Solo WS", root_path: "/tmp/solo-ws", enabled: true }],
-        last_used_workspace_id: wsId,
-      },
-    });
+    // D8-W: provision workspace via WorkspaceService IPC
+    await invoke(page, "add_workspace", { label: "Solo WS", rootPath: "/tmp/solo-ws" });
     await reloadPageForSettings(page);
 
     // V2.1's HomeAgentForm initializes draftWorkspaceId at mount time, before
@@ -185,17 +176,9 @@ test.describe("10 — HomeAgentForm Home", () => {
 
   test("2+ workspaces: no pre-select; clicking option enables input", async ({ tauriEnv }) => {
     const { page } = tauriEnv;
-    const current = await invoke<Settings>(page, "get_settings");
-    await invoke(page, "update_settings", {
-      newSettings: {
-        ...current,
-        workspaces: [
-          { id: "ws-a", label: "Workspace A", root_path: "/tmp/ws-a", enabled: true },
-          { id: "ws-b", label: "Workspace B", root_path: "/tmp/ws-b", enabled: true },
-        ],
-        last_used_workspace_id: null, // No auto-select
-      },
-    });
+    // D8-W: provision 2 workspaces via WorkspaceService IPC
+    await invoke(page, "add_workspace", { label: "Workspace A", rootPath: "/tmp/ws-a" });
+    await invoke(page, "add_workspace", { label: "Workspace B", rootPath: "/tmp/ws-b" });
     await reloadPageForSettings(page);
 
     // Input should be disabled initially (no workspace selected)
@@ -239,15 +222,8 @@ test.describe("10 — HomeAgentForm Home", () => {
 
   test("submit HomeAgentForm: creates conv + transitions to ChatView", async ({ tauriEnv }) => {
     const { page } = tauriEnv;
-    const wsId = "test-ws-submit";
-    const current = await invoke<Settings>(page, "get_settings");
-    await invoke(page, "update_settings", {
-      newSettings: {
-        ...current,
-        workspaces: [{ id: wsId, label: "Submit Test", root_path: "/tmp/submit", enabled: true }],
-        last_used_workspace_id: wsId,
-      },
-    });
+    // D8-W: provision workspace via WorkspaceService IPC
+    await invoke(page, "add_workspace", { label: "Submit Test", rootPath: "/tmp/submit" });
     await reloadPageForSettings(page);
 
     // Drive the workspace select signal manually (V2.1 auto-select race).
@@ -289,15 +265,8 @@ test.describe("10 — HomeAgentForm Home", () => {
   test("新布局: textarea DOM 顺序在 workspace picker 之前", async ({ tauriEnv }) => {
     test.setTimeout(60_000);
     const { page } = tauriEnv;
-    const wsId = "test-ws-layout";
-    const current = await invoke<Settings>(page, "get_settings");
-    await invoke(page, "update_settings", {
-      newSettings: {
-        ...current,
-        workspaces: [{ id: wsId, label: "Layout Test", root_path: "/tmp/layout-test", enabled: true }],
-        last_used_workspace_id: wsId,
-      },
-    });
+    // D8-W: provision workspace via WorkspaceService IPC
+    await invoke(page, "add_workspace", { label: "Layout Test", rootPath: "/tmp/layout-test" });
     await reloadPageForSettings(page);
 
     // Drive workspace select manually (V2.1 auto-select race)
@@ -320,15 +289,8 @@ test.describe("10 — HomeAgentForm Home", () => {
   test("LLM picker 显示且 trigger 含 default_model", async ({ tauriEnv }) => {
     test.setTimeout(60_000);
     const { page } = tauriEnv;
-    const wsId = "test-ws-llm-picker";
-    const current = await invoke<Settings>(page, "get_settings");
-    await invoke(page, "update_settings", {
-      newSettings: {
-        ...current,
-        workspaces: [{ id: wsId, label: "LLM Picker Test", root_path: "/tmp/llm-picker-test", enabled: true }],
-        last_used_workspace_id: wsId,
-      },
-    });
+    // D8-W: provision workspace via WorkspaceService IPC
+    await invoke(page, "add_workspace", { label: "LLM Picker Test", rootPath: "/tmp/llm-picker-test" });
     await reloadPageForSettings(page);
 
     // Drive workspace select manually (V2.1 auto-select race)
@@ -358,15 +320,8 @@ test.describe("10 — HomeAgentForm Home", () => {
   test("Action slot 按钮存在且点击不报错 (picker 在 e2e 不弹真 dialog)", async ({ tauriEnv }) => {
     test.setTimeout(60_000);
     const { page } = tauriEnv;
-    const wsId = "test-ws-action-slot";
-    const current = await invoke<Settings>(page, "get_settings");
-    await invoke(page, "update_settings", {
-      newSettings: {
-        ...current,
-        workspaces: [{ id: wsId, label: "Action Slot Test", root_path: "/tmp/action-slot-test", enabled: true }],
-        last_used_workspace_id: wsId,
-      },
-    });
+    // D8-W: provision workspace via WorkspaceService IPC
+    await invoke(page, "add_workspace", { label: "Action Slot Test", rootPath: "/tmp/action-slot-test" });
     await reloadPageForSettings(page);
 
     // Open workspace select dropdown

@@ -6,6 +6,7 @@ import { router } from "./router";
 import { appStore } from "./shared/stores/app.store";
 import { Effect, Exit } from "effect";
 import { logger } from "./shared/lib/logger";
+import * as chatStore from "./features/chat/stores/chat.store";
 
 // Render the RouterProvider FIRST with the in-memory defaultSettings, so the SPA
 // is visible immediately even if the Rust backend is slow or `get_settings` IPC
@@ -40,6 +41,16 @@ function bootstrap() {
     }
   });
 
+  // D8-W: 首次加载 workspace 列表到 chat.store
+  Effect.runPromiseExit(chatStore.loadWorkspaces()).then((exit) => {
+    if (Exit.isFailure(exit)) {
+      logger.warn(
+        "[index.tsx] loadWorkspaces failed — workspaces signal will be empty:",
+        formatAppError(exit.cause),
+      );
+    }
+  });
+
   // Expose appStore on window for e2e tests — e2e specs (e.g. mock-provider)
   // call invoke("update_settings", ...) to switch the active LLM provider, but
   // the in-memory Solid signal is the chat-view's source of truth. After
@@ -67,6 +78,30 @@ function bootstrap() {
           return exit.value;
         },
       ),
+  };
+
+  // D8-W: e2e bridge for chatStore workspace methods
+  type WindowWithChatStore = {
+    __chatStore?: {
+      loadWorkspaces: () => Promise<void>;
+      setSelectedWorkspaceId: (id: string | null) => void;
+      /** Create a conversation without sending a message (avoids LLM consumption). */
+      createConversationOnly: (workspaceId: string, title?: string) => Promise<void>;
+    };
+  };
+  (window as unknown as WindowWithChatStore).__chatStore = {
+    loadWorkspaces: () =>
+      Effect.runPromiseExit(chatStore.loadWorkspaces()).then((exit) => {
+        if (Exit.isFailure(exit)) {
+          throw new Error("loadWorkspaces failed");
+        }
+      }),
+    setSelectedWorkspaceId: (id: string | null) => {
+      chatStore.setSelectedWorkspaceId(id);
+    },
+    createConversationOnly: async (workspaceId: string, title?: string) => {
+      await chatStore.createConversation(workspaceId, title ?? "E2E Test Conv");
+    },
   };
 }
 

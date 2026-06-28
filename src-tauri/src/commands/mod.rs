@@ -7,6 +7,7 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::db::conversations;
 use crate::db::messages;
+use crate::db::workspaces;
 use crate::settings::Settings;
 use crate::state::AppState;
 use crate::types::AppError;
@@ -276,4 +277,69 @@ pub async fn pick_workspace_path(app: tauri::AppHandle) -> Result<Option<String>
     })?;
     log::info!("pick_workspace_path: 成功");
     Ok(result)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// D8-W: workspace IPC
+// ─────────────────────────────────────────────────────────────────────────────
+
+#[tauri::command(rename_all = "camelCase")]
+pub async fn list_workspaces(
+    pool: tauri::State<'_, sqlx::SqlitePool>,
+) -> Result<Vec<workspaces::Workspace>, AppError> {
+    log::debug!("list_workspaces: 进入");
+    let result = workspaces::list_workspaces(pool.inner()).await
+        .map_err(|e| {
+            log::error!("list_workspaces: 失败");
+            AppError::from(e)
+        })?;
+    log::info!("list_workspaces: 成功 count={}", result.len());
+    Ok(result)
+}
+
+#[tauri::command(rename_all = "camelCase")]
+pub async fn add_workspace(
+    pool: tauri::State<'_, sqlx::SqlitePool>,
+    label: String,
+    root_path: String,
+) -> Result<workspaces::Workspace, AppError> {
+    log::debug!("add_workspace: 进入 label={} root_path={}", label, root_path);
+    let result = workspaces::create_workspace(pool.inner(), &label, &root_path).await
+        .map_err(|e| {
+            log::error!("add_workspace: 失败");
+            AppError::from(e)
+        })?;
+    log::info!("add_workspace: 成功 id={}", result.id);
+    Ok(result)
+}
+
+#[tauri::command(rename_all = "camelCase")]
+pub async fn rename_workspace(
+    pool: tauri::State<'_, sqlx::SqlitePool>,
+    id: String,
+    label: String,
+) -> Result<(), AppError> {
+    log::debug!("rename_workspace: 进入 id={} label={}", id, label);
+    workspaces::rename_workspace(pool.inner(), &id, &label).await
+        .map_err(|e| {
+            log::error!("rename_workspace: 失败");
+            AppError::from(e)
+        })?;
+    log::info!("rename_workspace: 成功");
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_workspace(
+    pool: tauri::State<'_, sqlx::SqlitePool>,
+    id: String,
+) -> Result<(), AppError> {
+    log::debug!("delete_workspace: 进入 id={}", id);
+    workspaces::delete_workspace(pool.inner(), &id).await
+        .map_err(|e| {
+            log::error!("delete_workspace: 失败");
+            AppError::from(e)
+        })?;
+    log::info!("delete_workspace: 成功");
+    Ok(())
 }

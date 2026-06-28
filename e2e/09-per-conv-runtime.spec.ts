@@ -39,7 +39,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
     // 切到 mock provider — 后续测试全靠 mock 队列,不需要 .env 里的真实 key
-    await useMockProvider(page, { workspace: false });
+    await useMockProvider(page);
     // 验证 mock provider 已配置(避免前 spec 残留的真实 LLM provider 被优先使用)
     const settings = await invoke<{ default_llm_provider_id?: string }>(page, "get_settings");
     if (settings.default_llm_provider_id !== "mock") {

@@ -445,4 +445,77 @@ describe("CodemanSidebar (D7-CS cascade tree, @ark-ui/solid Accordion 驱动)", 
       expect(container.textContent).toContain("No workspaces");
     });
   });
+
+  // ─── workspace hover rename + delete ─────────────────────────────────────────
+
+  describe("Workspace hover actions", () => {
+    it("renders rename and delete buttons on workspace hover", () => {
+      const { container } = render(() => (
+        <CodemanSidebar {...defaultProps({
+          nodes: [makeWs("ws-1", "My Workspace")],
+          onRenameWorkspace: vi.fn(),
+          onDeleteWorkspace: vi.fn(),
+        })} />
+      ));
+      const item = queryWorkspaceItem(container, "ws-1")!;
+      const trigger = item.querySelector('[data-part="item-trigger"]') as HTMLElement;
+      // Hover the workspace trigger
+      fireEvent.mouseEnter(trigger);
+      const renameBtn = container.querySelector("[aria-label='Rename My Workspace']") as HTMLElement;
+      const deleteBtn = container.querySelector("[aria-label='Delete My Workspace']") as HTMLElement;
+      expect(renameBtn).toBeTruthy();
+      expect(deleteBtn).toBeTruthy();
+    });
+
+    it("rename button click calls onRenameWorkspace(id, label)", () => {
+      const onRename = vi.fn();
+      const { container } = render(() => (
+        <CodemanSidebar {...defaultProps({
+          nodes: [makeWs("ws-1", "My Workspace")],
+          onRenameWorkspace: onRename,
+        })} />
+      ));
+      const item = queryWorkspaceItem(container, "ws-1")!;
+      const trigger = item.querySelector('[data-part="item-trigger"]') as HTMLElement;
+      fireEvent.mouseEnter(trigger);
+      const renameBtn = container.querySelector("[aria-label='Rename My Workspace']") as HTMLElement;
+      fireEvent.click(renameBtn);
+      expect(onRename).toHaveBeenCalledWith("ws-1", "My Workspace");
+    });
+
+    it("delete button click calls onDeleteWorkspace(id, label)", () => {
+      const onDelete = vi.fn();
+      const { container } = render(() => (
+        <CodemanSidebar {...defaultProps({
+          nodes: [makeWs("ws-1", "My Workspace")],
+          onDeleteWorkspace: onDelete,
+        })} />
+      ));
+      const item = queryWorkspaceItem(container, "ws-1")!;
+      const trigger = item.querySelector('[data-part="item-trigger"]') as HTMLElement;
+      fireEvent.mouseEnter(trigger);
+      const deleteBtn = container.querySelector("[aria-label='Delete My Workspace']") as HTMLElement;
+      fireEvent.click(deleteBtn);
+      expect(onDelete).toHaveBeenCalledWith("ws-1", "My Workspace");
+    });
+
+    it("buttons do not trigger accordion expand/collapse", () => {
+      const { container } = render(() => (
+        <CodemanSidebar {...defaultProps({
+          nodes: [makeWs("ws-1", "WS", [{ kind: "conv", id: "c-1", label: "Chat 1" }])],
+          onRenameWorkspace: vi.fn(),
+          onDeleteWorkspace: vi.fn(),
+        })} />
+      ));
+      const item = queryWorkspaceItem(container, "ws-1")!;
+      const trigger = item.querySelector('[data-part="item-trigger"]') as HTMLElement;
+      // Initially collapsed
+      expect(trigger.getAttribute("aria-expanded")).toBe("false");
+      // Click rename button (should NOT expand)
+      fireEvent.mouseEnter(trigger);
+      const renameBtn = container.querySelector("[aria-label='Rename WS']") as HTMLElement;
+      fireEvent.click(renameBtn);
+      expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    });
+  });
 });

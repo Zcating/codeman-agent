@@ -4,14 +4,15 @@
 //! Mock 队列由 e2e mock LLM 消费,确定性返回 tool call + text,不依赖网络。
 
 import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
+import type { Workspace } from "../src/shared/lib/types";
 import { useMockProvider, enqueueMockResponse, clearMockQueue } from "./mock-provider";
-import type { Settings } from "../src/shared/lib/types";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 
 test.describe("05 — 文件工具 (mock LLM)", () => {
   const e2eRoot = path.join(os.tmpdir(), "codeman-e2e-mock-" + Date.now());
+  let workspaceId = "";
 
   let consoleErrors: string[] = [];
 
@@ -22,23 +23,13 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
 
-    const current = await invoke<Settings>(page, "get_settings");
-    const mainWorkspace = {
-      id: "main",
+    // D8-W: workspace provisioned via WorkspaceService IPC
+    workspaceId = (await invoke<Workspace>(page, "add_workspace", {
       label: "Mock E2E Test Workspace",
-      root_path: e2eRoot,
-      enabled: true,
-    };
-    await invoke(page, "update_settings", {
-      newSettings: { ...current, workspaces: [mainWorkspace] },
-    });
+      rootPath: e2eRoot,
+    })).id;
 
-    await useMockProvider(page, { workspace: false });
-
-    const current2 = await invoke<Settings>(page, "get_settings");
-    await invoke(page, "update_settings", {
-      newSettings: { ...current2, workspaces: [mainWorkspace] },
-    });
+    await useMockProvider(page);
   });
 
   test.beforeEach(async ({ tauriEnv }) => {
@@ -78,7 +69,7 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
         {
           name: "edit_file",
           input: {
-            workspaceId: "main",
+            workspaceId,
             path: "target.txt",
             oldText: "TODO",
             newText: "TASK",
@@ -127,7 +118,7 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
       toolCalls: [
         {
           name: "search_files",
-          input: { workspaceId: "main", glob: "**/*.ts", contentPattern: "TODO" },
+          input: { workspaceId, glob: "**/*.ts", contentPattern: "TODO" },
         },
       ],
     });

@@ -49,10 +49,6 @@ export interface Settings {
   conversations: ConversationSettings;
   /** @deprecated Use providers instead. Kept for V1 consumer backward-compatibility. */
   llm_providers: LLMProvider[];
-  /** V2: workspaces list. V1→V2 migration defaults to empty array. */
-  workspaces?: Workspace[];
-  /** V2.1: last selected workspace id shown on Home. null means never set (first launch). */
-  last_used_workspace_id?: string;
 }
 
 // ============================================================================
@@ -101,7 +97,7 @@ export interface Workspace {
   id: string;
   label: string;
   root_path: string; // PathBuf in Rust, string in TS
-  enabled: boolean;
+  created_at: number;
 }
 
 /** Mirror of Rust `FileMatch` struct from T9 */

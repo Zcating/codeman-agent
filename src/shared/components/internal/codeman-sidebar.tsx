@@ -9,7 +9,7 @@
 //!   符合 ADR-0023 D7-CS2「组件内部 signal，不持久化、不耦合 appStore」。
 
 import { createSignal, For, Show, type JSX } from "solid-js";
-import { ChevronRight, Folder, MessageSquare, Loader2, Plus, FolderPlus } from "lucide-solid";
+import { ChevronRight, Folder, MessageSquare, Loader2, Plus, FolderPlus, Pencil, Trash2 } from "lucide-solid";
 import { Accordion } from "@ark-ui/solid";
 import {
   Sidebar,
@@ -55,6 +55,8 @@ export interface CodemanSidebarProps {
   onCreateItem?: () => void;
   onAddWorkspace?: () => void;
   onEmptyWorkspaceClick?: (workspaceId: string) => void; // D7-CS6
+  onRenameWorkspace?: (workspaceId: string, currentLabel: string) => void;
+  onDeleteWorkspace?: (workspaceId: string, label: string) => void;
 
   // Customization
   createLabel?: string; // default: "新对话"
@@ -144,7 +146,40 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
                           aria-hidden="true"
                         />
                         <Folder class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        <span class="truncate">{ws.label}</span>
+                        <span class="truncate flex-1">{ws.label}</span>
+                        <Show when={props.onRenameWorkspace || props.onDeleteWorkspace}>
+                          <span
+                            class="pointer-events-auto flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Show when={props.onRenameWorkspace}>
+                              <button
+                                type="button"
+                                class="flex h-4 w-4 items-center justify-center rounded-md hover:bg-accent"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  props.onRenameWorkspace?.(ws.id, ws.label);
+                                }}
+                                aria-label={`Rename ${ws.label}`}
+                              >
+                                <Pencil class="h-3 w-3" aria-hidden="true" />
+                              </button>
+                            </Show>
+                            <Show when={props.onDeleteWorkspace}>
+                              <button
+                                type="button"
+                                class="flex h-4 w-4 items-center justify-center rounded-md hover:bg-accent hover:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  props.onDeleteWorkspace?.(ws.id, ws.label);
+                                }}
+                                aria-label={`Delete ${ws.label}`}
+                              >
+                                <Trash2 class="h-3 w-3" aria-hidden="true" />
+                              </button>
+                            </Show>
+                          </span>
+                        </Show>
                       </Accordion.ItemTrigger>
 
                       <Accordion.ItemContent>

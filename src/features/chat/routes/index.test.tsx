@@ -13,43 +13,17 @@ vi.mock("@tanstack/solid-router", () => ({
   useRouter: () => ({ navigate: vi.fn() }),
 }));
 
-// ─── Mock appStore ─────────────────────────────────────────────────────────
+// ─── Mock chat.store ────────────────────────────────────────────────
 
-vi.mock("../../../shared/stores/app.store", () => ({
-  appStore: {
-    state: {
-      value: {
-        workspaces: [] as Array<{ id: string; label: string; root_path: string; enabled: boolean }>,
-        default_llm_provider_id: "minimax",
-        providers: [
-          {
-            id: "minimax",
-            label: "MiniMax",
-            api_key: "test-key",
-            llm: {
-              default_model: "MiniMax-M2.5-highspeed",
-              base_url: "https://api.minimaxi.com/anthropic",
-            },
-          },
-        ],
-        system_prompt: { default: "You are a helpful assistant." },
-      },
-    },
-    setLastUsedWorkspaceId: vi.fn<(id: string) => void>(),
-    selectedWorkspaceId: vi.fn<() => string | null>(),
-    set: vi.fn(),
-  },
-}));
-
-// ─── Mock conversations.store ────────────────────────────────────────────────
-
-vi.mock("../stores/conversations.store", () => ({
+vi.mock("../stores/chat.store", () => ({
   store: { byId: {} },
   activeId$: vi.fn<() => string | null>(),
+  workspaces$: vi.fn<() => Array<{ id: string; label: string; root_path: string }>>(),
   conversations$: vi.fn<() => Conversation[]>(),
   selectConversation: vi.fn<(id: string) => void>(),
   deleteConversation: vi.fn(),
   clearActiveConversation: vi.fn<() => void>(),
+  setSelectedWorkspaceId: vi.fn<(id: string | null) => void>(),
   createConversation: vi.fn(),
   sendMessage: vi.fn(),
   cancel: vi.fn(),
@@ -103,7 +77,7 @@ describe("ChatLayout — state machine", () => {
   });
 
   it("T4.3.1: Renders HomeAgentForm when activeId$() === null", async () => {
-    const { activeId$ } = await import("../stores/conversations.store") as any;
+    const { activeId$ } = await import("../stores/chat.store") as any;
     activeId$.mockReturnValue(null);
 
     const { getByTestId, queryByTestId } = render(() => <ChatLayout />);
@@ -114,7 +88,7 @@ describe("ChatLayout — state machine", () => {
   });
 
   it("T4.3.2: Back button shows when activeId$() !== null", async () => {
-    const { activeId$ } = await import("../stores/conversations.store") as any;
+    const { activeId$ } = await import("../stores/chat.store") as any;
     activeId$.mockReturnValue("conv-1");
 
     const { getByTestId } = render(() => <ChatLayout />);
@@ -122,7 +96,7 @@ describe("ChatLayout — state machine", () => {
   });
 
   it("T4.3.3: Back button hidden when activeId$() === null", async () => {
-    const { activeId$ } = await import("../stores/conversations.store") as any;
+    const { activeId$ } = await import("../stores/chat.store") as any;
     activeId$.mockReturnValue(null);
 
     const { queryByTestId } = render(() => <ChatLayout />);
@@ -130,7 +104,7 @@ describe("ChatLayout — state machine", () => {
   });
 
   it("T4.3.4: Click back button → clearActiveConversation called", async () => {
-    const { activeId$, clearActiveConversation } = await import("../stores/conversations.store") as any;
+    const { activeId$, clearActiveConversation } = await import("../stores/chat.store") as any;
     activeId$.mockReturnValue("conv-1");
 
     const { getByTestId } = render(() => <ChatLayout />);
@@ -139,37 +113,32 @@ describe("ChatLayout — state machine", () => {
   });
 
   it("T4.3.5: CodemanSidebar visible when workspaces exist", async () => {
-    const { appStore } = await import("../../../shared/stores/app.store") as any;
-    appStore.state.value.workspaces = [
-      { id: "ws-1", label: "My Project", root_path: "C:\\projects", enabled: true },
-    ];
-    appStore.selectedWorkspaceId.mockReturnValue("ws-1");
+    const { workspaces$ } = await import("../stores/chat.store") as any;
+    workspaces$.mockReturnValue([
+      { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
+    ]);
 
     const { getByTestId } = render(() => <ChatLayout />);
     expect(getByTestId("codeman-sidebar")).toBeTruthy();
   });
 
-  it("T4.3.6: Click empty workspace in sidebar → setLastUsedWorkspaceId called (D7-CS)", async () => {
-    const { appStore } = await import("../../../shared/stores/app.store") as any;
-    appStore.state.value.workspaces = [
-      { id: "ws-1", label: "My Project", root_path: "C:\\projects", enabled: true },
-    ];
-    appStore.selectedWorkspaceId.mockReturnValue("ws-1");
+  it("T4.3.6: Click empty workspace in sidebar → setSelectedWorkspaceId called (D7-CS)", async () => {
+    const { workspaces$, setSelectedWorkspaceId } = await import("../stores/chat.store") as any;
+    workspaces$.mockReturnValue([
+      { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
+    ]);
 
     const { getByTestId } = render(() => <ChatLayout />);
     // D7-CS: workspace header click expands/collapses; empty ws click triggers handleEmptyWorkspaceClick
     fireEvent.click(getByTestId("sidebar-ws-ws-1"));
-    expect(appStore.setLastUsedWorkspaceId).toHaveBeenCalledWith("ws-1");
+    expect(setSelectedWorkspaceId).toHaveBeenCalledWith("ws-1");
   });
 
   it("T4.3.7: Click conversation item in sidebar → selectConversation called", async () => {
-    const { appStore } = await import("../../../shared/stores/app.store") as any;
-    appStore.state.value.workspaces = [
-      { id: "ws-1", label: "My Project", root_path: "C:\\projects", enabled: true },
-    ];
-    appStore.selectedWorkspaceId.mockReturnValue("ws-1");
-
-    const { conversations$, selectConversation } = await import("../stores/conversations.store") as any;
+    const { workspaces$, conversations$, selectConversation } = await import("../stores/chat.store") as any;
+    workspaces$.mockReturnValue([
+      { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
+    ]);
     conversations$.mockReturnValue([
       {
         id: "conv-1",
@@ -188,9 +157,9 @@ describe("ChatLayout — state machine", () => {
   });
 
   it("T4.3.8: CodemanSidebar hidden when no workspaces AND no active conv", async () => {
-    const { appStore } = await import("../../../shared/stores/app.store") as any;
-    appStore.state.value.workspaces = [];
-    const { activeId$ } = await import("../stores/conversations.store") as any;
+    const { workspaces$ } = await import("../stores/chat.store") as any;
+    workspaces$.mockReturnValue([]);
+    const { activeId$ } = await import("../stores/chat.store") as any;
     activeId$.mockReturnValue(null);
 
     const { queryByTestId } = render(() => <ChatLayout />);

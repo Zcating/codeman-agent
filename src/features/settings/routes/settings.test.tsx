@@ -9,7 +9,7 @@ import { render, screen, cleanup } from "@solidjs/testing-library";
 import { Effect } from "effect";
 import { SettingsPage } from "./settings";
 import { mockState, SettingsV15 } from "../../../__mocks__/@tauri-apps/api/core";
-import type { Provider, Workspace } from "../../../shared/lib/types";
+import type { Provider } from "../../../shared/lib/types";
 
 // Mock solid-js/store — SettingsPage 导入 appStore, appStore 用 createStore。
 // jsdom 没有 Solid reactive context,需要这个 mock。
@@ -197,94 +197,4 @@ describe("SettingsPage — V1.5 provider rendering", () => {
   });
 });
 
-describe("SettingsPage — workspaces section", () => {
-  const mockWorkspace1: Workspace = {
-    id: "ws-001",
-    label: "Project A",
-    root_path: "C:\\Projects\\A",
-    enabled: true,
-  };
 
-  const mockWorkspace2: Workspace = {
-    id: "ws-002",
-    label: "Project B",
-    root_path: "C:\\Projects\\B",
-    enabled: false,
-  };
-
-  beforeEach(() => {
-    mockState.settings = {
-      ...baseSettings,
-      providers: [mockMiniMaxProvider],
-      workspaces: [mockWorkspace1, mockWorkspace2],
-    };
-    mockState.resolved = undefined;
-    mockState.v0FixtureActive = false;
-  });
-
-  afterEach(() => {
-    cleanup();
-    vi.clearAllMocks();
-  });
-
-  it("renders workspace section heading", async () => {
-    render(() => <SettingsPage />);
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    expect(screen.getByText("Workspaces")).toBeInTheDocument();
-  });
-
-  it("renders 2 workspace cards when 2 workspaces exist", async () => {
-    render(() => <SettingsPage />);
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    // Both workspace labels visible
-    expect(screen.getByText("Project A")).toBeInTheDocument();
-    expect(screen.getByText("Project B")).toBeInTheDocument();
-    // IDs visible
-    expect(screen.getByText("ws-001")).toBeInTheDocument();
-    expect(screen.getByText("ws-002")).toBeInTheDocument();
-    // Root paths visible
-    expect(screen.getByDisplayValue("C:\\Projects\\A")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("C:\\Projects\\B")).toBeInTheDocument();
-  });
-
-  it("shows empty state when workspaces is empty", async () => {
-    mockState.settings.workspaces = [];
-    await Effect.runPromise(appStore.refresh());
-
-    render(() => <SettingsPage />);
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    expect(screen.getByText(/No workspaces configured/i)).toBeInTheDocument();
-  });
-
-  it("shows Add workspace button", async () => {
-    render(() => <SettingsPage />);
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    expect(screen.getByText(/Add workspace/i)).toBeInTheDocument();
-  });
-
-  it("clicking Add workspace adds a new workspace card", async () => {
-    // Mock confirm to always return true
-    const originalConfirm = window.confirm;
-    window.confirm = vi.fn().mockReturnValue(true);
-
-    render(() => <SettingsPage />);
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    // Initially 2 workspaces (verified via appStore state — DOM 不可见因为 mock 的 createStore 不触发 Solid reactivity)
-    expect(appStore.state.value.workspaces!.length).toBe(2);
-
-    // Click "Add workspace"
-    screen.getByText(/Add workspace/i).click();
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    // appStore state 应该有 3 个 workspace（mock 状态实际更新了,只是 DOM 不重渲染）
-    expect(appStore.state.value.workspaces!.length).toBe(3);
-    expect(appStore.state.value.workspaces![2].label).toBe("New Workspace");
-
-    window.confirm = originalConfirm;
-  });
-});

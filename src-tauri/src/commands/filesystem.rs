@@ -4,44 +4,27 @@
 //! T7-T10: 骨架（待实现）
 
 use log;
+use crate::db::workspaces;
 use crate::filesystem::sandbox::validate_path_in_workspace;
-use crate::settings::Settings;
-use crate::state::AppState;
 use crate::types::AppError;
 use std::path::Path;
-use tauri::State;
 
 const MAX_FILE_SIZE: u64 = 10 * 1024 * 1024; // 10 MB
 
 /// Pure logic for read_file. Testable without AppState.
 pub(crate) fn read_file_impl(
-    settings: &Settings,
-    workspace_id: &str,
+    workspace: &workspaces::Workspace,
     path: &str,
 ) -> Result<String, AppError> {
-    // 1. Find workspace
-    let workspace = settings
-        .workspaces
-        .iter()
-        .find(|w| w.id == workspace_id)
-        .ok_or_else(|| AppError::NotFound {
-            message: format!("Workspace not found: {}", workspace_id),
-        })?;
+    let root = Path::new(&workspace.root_path);
 
-    // 2. Check enabled
-    if !workspace.enabled {
-        return Err(AppError::InvalidConfig {
-            message: "Workspace disabled".into(),
-        });
-    }
-
-    // 3. Check file exists first (NotFound), before sandbox check.
+    // 1. Check file exists first (NotFound), before sandbox check.
     //    Using metadata() instead of canonicalize() so non-existent files
     //    return NotFound rather than SandboxViolation.
     let absolute_path = if Path::new(path).is_absolute() {
         Path::new(path).to_path_buf()
     } else {
-        workspace.root_path.join(path)
+        root.join(path)
     };
     std::fs::metadata(&absolute_path).map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
@@ -55,7 +38,7 @@ pub(crate) fn read_file_impl(
 
     // 4. Sandbox check (resolves symlinks + checks containment)
     let canonical_path =
-        validate_path_in_workspace(Path::new(path), &workspace.root_path)?;
+        validate_path_in_workspace(Path::new(path), root)?;
 
     // 5. Size check
     let metadata =
@@ -76,13 +59,24 @@ pub(crate) fn read_file_impl(
 
 #[tauri::command(rename_all = "camelCase")]
 pub async fn read_file(
-    state: State<'_, AppState>,
+    pool: tauri::State<'_, sqlx::SqlitePool>,
     workspace_id: String,
     path: String,
 ) -> Result<String, AppError> {
     log::debug!("read_file: 进入 workspace_id={} path={}", workspace_id, path);
-    let settings = state.get_settings();
-    let result = read_file_impl(&settings, &workspace_id, &path);
+    let workspace = workspaces::get_workspace_by_id(pool.inner(), &workspace_id)
+        .await
+        .map_err(|e| {
+            log::error!("read_file: 失败 workspace_id={} path={}", workspace_id, path);
+            AppError::from(e)
+        })?
+        .ok_or_else(|| {
+            log::warn!("read_file: 失败 workspace_id={} path={}", workspace_id, path);
+            AppError::NotFound {
+                message: format!("Workspace not found: {}", workspace_id),
+            }
+        })?;
+    let result = read_file_impl(&workspace, &path);
     match &result {
         Ok(_) => {
             log::info!("read_file: 成功 workspace_id={} path={}", workspace_id, path);
@@ -105,28 +99,13 @@ pub async fn read_file(
 
 /// Pure logic for write_file. Testable without AppState.
 pub(crate) fn write_file_impl(
-    settings: &Settings,
-    workspace_id: &str,
+    workspace: &workspaces::Workspace,
     path: &str,
     content: &str,
 ) -> Result<(), AppError> {
-    // 1. Find workspace
-    let workspace = settings
-        .workspaces
-        .iter()
-        .find(|w| w.id == workspace_id)
-        .ok_or_else(|| AppError::NotFound {
-            message: format!("Workspace not found: {}", workspace_id),
-        })?;
+    let root = Path::new(&workspace.root_path);
 
-    // 2. Check enabled
-    if !workspace.enabled {
-        return Err(AppError::InvalidConfig {
-            message: "Workspace disabled".into(),
-        });
-    }
-
-    // 3. Check blocked extensions BEFORE sandbox
+    // 1. Check blocked extensions BEFORE sandbox
     let path_lower = path.to_lowercase();
     let blocked = ["exe", "dll", "sys", "ini"];
     if let Some(last) = path_lower.rsplit('/').next() {
@@ -143,7 +122,7 @@ pub(crate) fn write_file_impl(
     // Canonicalize workspace root (always exists), then:
     // - For relative paths: use starts_with on the joined path (no re-canonicalize needed)
     // - For absolute paths: use the same sandbox validate_path_in_workspace
-    let canonical_root = std::fs::canonicalize(&workspace.root_path).map_err(|e| {
+    let canonical_root = std::fs::canonicalize(root).map_err(|e| {
         AppError::Upstream {
             message: format!("Cannot canonicalize workspace root: {}", e),
         }
@@ -172,7 +151,7 @@ pub(crate) fn write_file_impl(
     let absolute_target: std::path::PathBuf =
         if Path::new(path).is_absolute() {
             // Absolute path: canonicalize and validate via sandbox
-            let canonical = validate_path_in_workspace(Path::new(path), &workspace.root_path)?;
+            let canonical = validate_path_in_workspace(Path::new(path), root)?;
             // Use the canonical path for the atomic write
             canonical
         } else {
@@ -237,14 +216,25 @@ pub(crate) fn write_file_impl(
 
 #[tauri::command(rename_all = "camelCase")]
 pub async fn write_file(
-    state: State<'_, AppState>,
+    pool: tauri::State<'_, sqlx::SqlitePool>,
     workspace_id: String,
     path: String,
     content: String,
 ) -> Result<(), AppError> {
     log::debug!("write_file: 进入 workspace_id={} path={}", workspace_id, path);
-    let settings = state.get_settings();
-    let result = write_file_impl(&settings, &workspace_id, &path, &content);
+    let workspace = workspaces::get_workspace_by_id(pool.inner(), &workspace_id)
+        .await
+        .map_err(|e| {
+            log::error!("write_file: 失败 workspace_id={} path={}", workspace_id, path);
+            AppError::from(e)
+        })?
+        .ok_or_else(|| {
+            log::warn!("write_file: 失败 workspace_id={} path={}", workspace_id, path);
+            AppError::NotFound {
+                message: format!("Workspace not found: {}", workspace_id),
+            }
+        })?;
+    let result = write_file_impl(&workspace, &path, &content);
     match &result {
         Ok(_) => {
             log::info!("write_file: 成功 workspace_id={} path={}", workspace_id, path);
@@ -267,30 +257,15 @@ pub async fn write_file(
 
 /// Pure logic for edit_file. Testable without AppState.
 pub(crate) fn edit_file_impl(
-    settings: &Settings,
-    workspace_id: &str,
+    workspace: &workspaces::Workspace,
     path: &str,
     old_text: &str,
     new_text: &str,
     replace_all: bool,
 ) -> Result<(), AppError> {
-    // 1. Find workspace
-    let workspace = settings
-        .workspaces
-        .iter()
-        .find(|w| w.id == workspace_id)
-        .ok_or_else(|| AppError::NotFound {
-            message: format!("Workspace not found: {}", workspace_id),
-        })?;
+    let root = Path::new(&workspace.root_path);
 
-    // 2. Check enabled
-    if !workspace.enabled {
-        return Err(AppError::InvalidConfig {
-            message: "Workspace disabled".into(),
-        });
-    }
-
-    // 3. Check blocked extensions BEFORE sandbox
+    // 1. Check blocked extensions BEFORE sandbox
     let path_lower = path.to_lowercase();
     let blocked = ["exe", "dll", "sys", "ini"];
     if let Some(last) = path_lower.rsplit('/').next() {
@@ -303,8 +278,8 @@ pub(crate) fn edit_file_impl(
         }
     }
 
-    // 4. Canonicalize workspace root
-    let canonical_root = std::fs::canonicalize(&workspace.root_path).map_err(|e| {
+    // 2. Canonicalize workspace root
+    let canonical_root = std::fs::canonicalize(root).map_err(|e| {
         AppError::Upstream {
             message: format!("Cannot canonicalize workspace root: {}", e),
         }
@@ -312,7 +287,7 @@ pub(crate) fn edit_file_impl(
 
     // 5. Determine absolute target path and validate sandbox
     let absolute_target: std::path::PathBuf = if Path::new(path).is_absolute() {
-        let canonical = validate_path_in_workspace(Path::new(path), &workspace.root_path)?;
+        let canonical = validate_path_in_workspace(Path::new(path), root)?;
         canonical
     } else {
         let joined = canonical_root.join(path);
@@ -414,7 +389,7 @@ pub(crate) fn edit_file_impl(
 
 #[tauri::command(rename_all = "camelCase")]
 pub async fn edit_file(
-    state: State<'_, AppState>,
+    pool: tauri::State<'_, sqlx::SqlitePool>,
     workspace_id: String,
     path: String,
     old_text: String,
@@ -422,8 +397,19 @@ pub async fn edit_file(
     replace_all: bool,
 ) -> Result<(), AppError> {
     log::debug!("edit_file: 进入 workspace_id={} path={}", workspace_id, path);
-    let settings = state.get_settings();
-    let result = edit_file_impl(&settings, &workspace_id, &path, &old_text, &new_text, replace_all);
+    let workspace = workspaces::get_workspace_by_id(pool.inner(), &workspace_id)
+        .await
+        .map_err(|e| {
+            log::error!("edit_file: 失败 workspace_id={} path={}", workspace_id, path);
+            AppError::from(e)
+        })?
+        .ok_or_else(|| {
+            log::warn!("edit_file: 失败 workspace_id={} path={}", workspace_id, path);
+            AppError::NotFound {
+                message: format!("Workspace not found: {}", workspace_id),
+            }
+        })?;
+    let result = edit_file_impl(&workspace, &path, &old_text, &new_text, replace_all);
     match &result {
         Ok(_) => {
             log::info!("edit_file: 成功 workspace_id={} path={}", workspace_id, path);
@@ -446,32 +432,17 @@ pub async fn edit_file(
 
 /// Pure logic for search_files. Testable without AppState.
 pub(crate) fn search_files_impl(
-    settings: &Settings,
-    workspace_id: &str,
+    workspace: &workspaces::Workspace,
     glob_pattern: &str,
     content_pattern: Option<&str>,
 ) -> Result<Vec<crate::filesystem::types::FileMatch>, AppError> {
-    // 1. Find workspace
-    let workspace = settings
-        .workspaces
-        .iter()
-        .find(|w| w.id == workspace_id)
-        .ok_or_else(|| AppError::NotFound {
-            message: format!("Workspace not found: {}", workspace_id),
-        })?;
+    let root = Path::new(&workspace.root_path);
 
-    // 2. Check enabled
-    if !workspace.enabled {
-        return Err(AppError::InvalidConfig {
-            message: "Workspace disabled".into(),
-        });
-    }
-
-    // 3. Validate workspace root exists (sanity check via sandbox)
+    // 1. Validate workspace root exists (sanity check via sandbox)
     let _canonical_root =
-        validate_path_in_workspace(workspace.root_path.as_path(), workspace.root_path.as_path())
+        validate_path_in_workspace(root, root)
             .map_err(|_| AppError::SandboxViolation {
-                path: workspace.root_path.display().to_string(),
+                path: Path::new(&workspace.root_path).display().to_string(),
                 workspace_label: workspace.label.clone(),
             })?;
 
@@ -589,14 +560,25 @@ fn is_skipped(entry: &walkdir::DirEntry) -> bool {
 
 #[tauri::command(rename_all = "camelCase")]
 pub async fn search_files(
-    state: State<'_, AppState>,
+    pool: tauri::State<'_, sqlx::SqlitePool>,
     workspace_id: String,
     glob: String,
     content_pattern: Option<String>,
 ) -> Result<Vec<crate::filesystem::types::FileMatch>, AppError> {
     log::debug!("search_files: 进入 workspace_id={} glob={}", workspace_id, glob);
-    let settings = state.get_settings();
-    let result = search_files_impl(&settings, &workspace_id, &glob, content_pattern.as_deref());
+    let workspace = workspaces::get_workspace_by_id(pool.inner(), &workspace_id)
+        .await
+        .map_err(|e| {
+            log::error!("search_files: 失败 workspace_id={} glob={}", workspace_id, glob);
+            AppError::from(e)
+        })?
+        .ok_or_else(|| {
+            log::warn!("search_files: 失败 workspace_id={} glob={}", workspace_id, glob);
+            AppError::NotFound {
+                message: format!("Workspace not found: {}", workspace_id),
+            }
+        })?;
+    let result = search_files_impl(&workspace, &glob, content_pattern.as_deref());
     match &result {
         Ok(matches) => {
             log::info!("search_files: 成功 workspace_id={} glob={} count={}", workspace_id, glob, matches.len());
@@ -619,27 +601,12 @@ pub async fn search_files(
 
 /// Pure logic for delete_file. Testable without AppState.
 pub(crate) fn delete_file_impl(
-    settings: &Settings,
-    workspace_id: &str,
+    workspace: &workspaces::Workspace,
     path: &str,
 ) -> Result<(), AppError> {
-    // 1. Find workspace
-    let workspace = settings
-        .workspaces
-        .iter()
-        .find(|w| w.id == workspace_id)
-        .ok_or_else(|| AppError::NotFound {
-            message: format!("Workspace not found: {}", workspace_id),
-        })?;
+    let root = Path::new(&workspace.root_path);
 
-    // 2. Check enabled
-    if !workspace.enabled {
-        return Err(AppError::InvalidConfig {
-            message: "Workspace disabled".into(),
-        });
-    }
-
-    // 3. Check blocked extensions
+    // 1. Check blocked extensions
     let path_lower = path.to_lowercase();
     let blocked = ["exe", "dll", "sys", "ini"];
     if let Some(last) = path_lower.rsplit('/').next() {
@@ -652,9 +619,9 @@ pub(crate) fn delete_file_impl(
         }
     }
 
-    // 4. Sandbox check — canonicalize and verify containment
+    // 2. Sandbox check — canonicalize and verify containment
     let canonical_path =
-        validate_path_in_workspace(Path::new(path), &workspace.root_path)?;
+        validate_path_in_workspace(Path::new(path), root)?;
 
     // 5. Reject directory (V2: file-only)
     let metadata = std::fs::metadata(&canonical_path).map_err(|e| {
@@ -685,13 +652,24 @@ pub(crate) fn delete_file_impl(
 
 #[tauri::command(rename_all = "camelCase")]
 pub async fn delete_file(
-    state: State<'_, AppState>,
+    pool: tauri::State<'_, sqlx::SqlitePool>,
     workspace_id: String,
     path: String,
 ) -> Result<(), AppError> {
     log::debug!("delete_file: 进入 workspace_id={} path={}", workspace_id, path);
-    let settings = state.get_settings();
-    let result = delete_file_impl(&settings, &workspace_id, &path);
+    let workspace = workspaces::get_workspace_by_id(pool.inner(), &workspace_id)
+        .await
+        .map_err(|e| {
+            log::error!("delete_file: 失败 workspace_id={} path={}", workspace_id, path);
+            AppError::from(e)
+        })?
+        .ok_or_else(|| {
+            log::warn!("delete_file: 失败 workspace_id={} path={}", workspace_id, path);
+            AppError::NotFound {
+                message: format!("Workspace not found: {}", workspace_id),
+            }
+        })?;
+    let result = delete_file_impl(&workspace, &path);
     match &result {
         Ok(_) => {
             log::info!("delete_file: 成功 workspace_id={} path={}", workspace_id, path);
@@ -715,18 +693,15 @@ pub async fn delete_file(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::settings::{Settings, Workspace};
+    use crate::db::workspaces;
     use tempfile::TempDir;
 
-    fn make_settings(workspace_id: &str, root: &std::path::Path, enabled: bool) -> Settings {
-        Settings {
-            workspaces: vec![Workspace {
-                id: workspace_id.into(),
-                label: "test".into(),
-                root_path: root.to_path_buf(),
-                enabled,
-            }],
-            ..Settings::default()
+    fn make_workspace(id: &str, root: &std::path::Path) -> workspaces::Workspace {
+        workspaces::Workspace {
+            id: id.into(),
+            label: "test".into(),
+            root_path: root.to_string_lossy().to_string(),
+            created_at: 0,
         }
     }
 
@@ -736,11 +711,11 @@ mod tests {
         let file_path = tempdir.path().join("hello.txt");
         std::fs::write(&file_path, "hello world").unwrap();
 
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
         // Use absolute path so sandbox canonicalization finds the file inside workspace
         let absolute_path = file_path.to_string_lossy().to_string();
 
-        let result = read_file_impl(&settings, "ws1", &absolute_path);
+        let result = read_file_impl(&ws, &absolute_path);
 
         assert!(result.is_ok(), "Expected Ok, got {:?}", result);
         assert_eq!(result.unwrap(), "hello world");
@@ -753,10 +728,10 @@ mod tests {
         let outside_file = tempdir_b.path().join("secret.txt");
         std::fs::write(&outside_file, "secret").unwrap();
 
-        let settings = make_settings("ws1", tempdir_a.path(), true);
+        let ws = make_workspace("ws1", tempdir_a.path());
         let absolute_outside_path = outside_file.to_string_lossy().to_string();
 
-        let result = read_file_impl(&settings, "ws1", &absolute_outside_path);
+        let result = read_file_impl(&ws, &absolute_outside_path);
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -770,10 +745,10 @@ mod tests {
         let content: Vec<u8> = vec![b'a'; 11 * 1024 * 1024];
         std::fs::write(&big_file, content).unwrap();
 
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
         let absolute_path = big_file.to_string_lossy().to_string();
 
-        let result = read_file_impl(&settings, "ws1", &absolute_path);
+        let result = read_file_impl(&ws, &absolute_path);
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -787,25 +762,13 @@ mod tests {
     #[test]
     fn read_file_not_found() {
         let tempdir = TempDir::new().unwrap();
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
 
-        let result = read_file_impl(&settings, "ws1", "nonexistent.txt");
+        let result = read_file_impl(&ws, "nonexistent.txt");
 
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(matches!(err, AppError::NotFound { .. }));
-    }
-
-    #[test]
-    fn read_file_disabled_workspace() {
-        let tempdir = TempDir::new().unwrap();
-        let settings = make_settings("ws1", tempdir.path(), false);
-
-        let result = read_file_impl(&settings, "ws1", "any.txt");
-
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(matches!(err, AppError::InvalidConfig { .. }));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -815,11 +778,11 @@ mod tests {
     #[test]
     fn write_file_happy_path() {
         let tempdir = TempDir::new().unwrap();
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
         // Use relative path so sandbox canonicalizes to a path inside workspace
         let relative_path = "out.txt";
 
-        let result = write_file_impl(&settings, "ws1", relative_path, "new content");
+        let result = write_file_impl(&ws, relative_path, "new content");
 
         assert!(result.is_ok(), "Expected Ok, got {:?}", result);
         let file_path = tempdir.path().join("out.txt");
@@ -843,10 +806,10 @@ mod tests {
         let outside_file = tempdir_b.path().join("target.txt");
         std::fs::write(&outside_file, "secret").unwrap();
 
-        let settings = make_settings("ws1", tempdir_a.path(), true);
+        let ws = make_workspace("ws1", tempdir_a.path());
         let absolute_outside_path = outside_file.to_string_lossy().to_string();
 
-        let result = write_file_impl(&settings, "ws1", &absolute_outside_path, "content");
+        let result = write_file_impl(&ws, &absolute_outside_path, "content");
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -859,11 +822,11 @@ mod tests {
     #[test]
     fn write_file_content_too_large() {
         let tempdir = TempDir::new().unwrap();
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
         let relative_path = "big.txt";
         let content: Vec<u8> = vec![b'a'; 11 * 1024 * 1024];
 
-        let result = write_file_impl(&settings, "ws1", relative_path, &String::from_utf8_lossy(&content));
+        let result = write_file_impl(&ws, relative_path, &String::from_utf8_lossy(&content));
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -879,9 +842,9 @@ mod tests {
     #[test]
     fn write_file_blocked_extension() {
         let tempdir = TempDir::new().unwrap();
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
 
-        let result = write_file_impl(&settings, "ws1", "malware.exe", "MZ...");
+        let result = write_file_impl(&ws, "malware.exe", "MZ...");
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -901,10 +864,10 @@ mod tests {
         // Make target a directory so rename fails
         std::fs::create_dir(&target_path).unwrap();
 
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
         let relative_path = "target.txt";
 
-        let result = write_file_impl(&settings, "ws1", relative_path, "content");
+        let result = write_file_impl(&ws, relative_path, "content");
 
         assert!(result.is_err(), "Expected Err due to rename failure, got {:?}", result);
 
@@ -928,10 +891,10 @@ mod tests {
         let file_path = tempdir.path().join("target.txt");
         std::fs::write(&file_path, "foo bar").unwrap();
 
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
         let absolute_path = file_path.to_string_lossy().to_string();
 
-        let result = edit_file_impl(&settings, "ws1", &absolute_path, "foo", "baz", false);
+        let result = edit_file_impl(&ws, &absolute_path, "foo", "baz", false);
 
         assert!(result.is_ok(), "Expected Ok, got {:?}", result);
         let content = std::fs::read_to_string(&file_path).unwrap();
@@ -944,10 +907,10 @@ mod tests {
         let file_path = tempdir.path().join("target.txt");
         std::fs::write(&file_path, "hello").unwrap();
 
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
         let absolute_path = file_path.to_string_lossy().to_string();
 
-        let result = edit_file_impl(&settings, "ws1", &absolute_path, "xyz", "abc", false);
+        let result = edit_file_impl(&ws, &absolute_path, "xyz", "abc", false);
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -967,10 +930,10 @@ mod tests {
         let file_path = tempdir.path().join("target.txt");
         std::fs::write(&file_path, "foo foo foo").unwrap();
 
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
         let absolute_path = file_path.to_string_lossy().to_string();
 
-        let result = edit_file_impl(&settings, "ws1", &absolute_path, "foo", "baz", false);
+        let result = edit_file_impl(&ws, &absolute_path, "foo", "baz", false);
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -990,10 +953,10 @@ mod tests {
         let file_path = tempdir.path().join("target.txt");
         std::fs::write(&file_path, "foo foo foo").unwrap();
 
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
         let absolute_path = file_path.to_string_lossy().to_string();
 
-        let result = edit_file_impl(&settings, "ws1", &absolute_path, "foo", "baz", true);
+        let result = edit_file_impl(&ws, &absolute_path, "foo", "baz", true);
 
         assert!(result.is_ok(), "Expected Ok, got {:?}", result);
         let content = std::fs::read_to_string(&file_path).unwrap();
@@ -1007,10 +970,10 @@ mod tests {
         let outside_file = tempdir_b.path().join("target.txt");
         std::fs::write(&outside_file, "hello").unwrap();
 
-        let settings = make_settings("ws1", tempdir_a.path(), true);
+        let ws = make_workspace("ws1", tempdir_a.path());
         let absolute_outside_path = outside_file.to_string_lossy().to_string();
 
-        let result = edit_file_impl(&settings, "ws1", &absolute_outside_path, "hello", "bye", false);
+        let result = edit_file_impl(&ws, &absolute_outside_path, "hello", "bye", false);
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -1032,9 +995,9 @@ mod tests {
         std::fs::create_dir(tempdir.path().join("sub")).unwrap();
         std::fs::write(tempdir.path().join("sub/c.txt"), "nested").unwrap();
 
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
 
-        let result = search_files_impl(&settings, "ws1", "*.txt", None);
+        let result = search_files_impl(&ws, "*.txt", None);
 
         assert!(result.is_ok(), "Expected Ok, got {:?}", result);
         let matches = result.unwrap();
@@ -1053,9 +1016,9 @@ mod tests {
         std::fs::write(tempdir.path().join("a.txt"), "TODO: fix\nOK").unwrap();
         std::fs::write(tempdir.path().join("b.md"), "no issue").unwrap();
 
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
 
-        let result = search_files_impl(&settings, "ws1", "*", Some("TODO"));
+        let result = search_files_impl(&ws, "*", Some("TODO"));
 
         assert!(result.is_ok(), "Expected Ok, got {:?}", result);
         let matches = result.unwrap();
@@ -1073,9 +1036,9 @@ mod tests {
         std::fs::write(tempdir.path().join("b.ts"), "no issue").unwrap();
         std::fs::write(tempdir.path().join("c.rs"), "TODO: elsewhere").unwrap();
 
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
 
-        let result = search_files_impl(&settings, "ws1", "*.ts", Some("TODO"));
+        let result = search_files_impl(&ws, "*.ts", Some("TODO"));
 
         assert!(result.is_ok(), "Expected Ok, got {:?}", result);
         let matches = result.unwrap();
@@ -1090,9 +1053,9 @@ mod tests {
         std::fs::write(tempdir.path().join("a.txt"), "hello").unwrap();
         std::fs::write(tempdir.path().join("b.md"), "world").unwrap();
 
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
 
-        let result = search_files_impl(&settings, "ws1", "*.json", None);
+        let result = search_files_impl(&ws, "*.json", None);
 
         assert!(result.is_ok(), "Expected Ok, got {:?}", result);
         let matches = result.unwrap();
@@ -1105,9 +1068,9 @@ mod tests {
         let tempdir = TempDir::new().unwrap();
         let nonexistent = tempdir.path().join("does_not_exist");
 
-        let settings = make_settings("ws1", &nonexistent, true);
+        let ws = make_workspace("ws1", &nonexistent);
 
-        let result = search_files_impl(&settings, "ws1", "*", None);
+        let result = search_files_impl(&ws, "*", None);
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -1127,10 +1090,10 @@ mod tests {
         // Canonicalize before delete so we can check existence after
         let canonical = std::fs::canonicalize(&file_path).unwrap();
 
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
         let absolute_path = file_path.to_string_lossy().to_string();
 
-        let result = delete_file_impl(&settings, "ws1", &absolute_path);
+        let result = delete_file_impl(&ws, &absolute_path);
 
         assert!(result.is_ok(), "Expected Ok, got {:?}", result);
         assert!(
@@ -1146,10 +1109,10 @@ mod tests {
         let outside_file = tempdir_b.path().join("target.txt");
         std::fs::write(&outside_file, "secret").unwrap();
 
-        let settings = make_settings("ws1", tempdir_a.path(), true);
+        let ws = make_workspace("ws1", tempdir_a.path());
         let absolute_outside_path = outside_file.to_string_lossy().to_string();
 
-        let result = delete_file_impl(&settings, "ws1", &absolute_outside_path);
+        let result = delete_file_impl(&ws, &absolute_outside_path);
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -1165,10 +1128,10 @@ mod tests {
         let subdir = tempdir.path().join("subdir");
         std::fs::create_dir(&subdir).unwrap();
 
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
         let absolute_path = subdir.to_string_lossy().to_string();
 
-        let result = delete_file_impl(&settings, "ws1", &absolute_path);
+        let result = delete_file_impl(&ws, &absolute_path);
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -1187,10 +1150,10 @@ mod tests {
         let file_path = tempdir.path().join("malware.exe");
         std::fs::write(&file_path, "MZ...").unwrap();
 
-        let settings = make_settings("ws1", tempdir.path(), true);
+        let ws = make_workspace("ws1", tempdir.path());
         let absolute_path = file_path.to_string_lossy().to_string();
 
-        let result = delete_file_impl(&settings, "ws1", &absolute_path);
+        let result = delete_file_impl(&ws, &absolute_path);
 
         assert!(result.is_err());
         let err = result.unwrap_err();

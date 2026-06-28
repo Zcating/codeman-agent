@@ -80,6 +80,11 @@ pub fn run() {
             commands::clear_all_history,
             // T22: dialog
             commands::pick_workspace_path,
+            // D8-W: workspace
+            commands::list_workspaces,
+            commands::add_workspace,
+            commands::rename_workspace,
+            commands::delete_workspace,
             // T6–T10: filesystem
             commands::filesystem::read_file,
             commands::filesystem::write_file,

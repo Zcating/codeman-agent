@@ -17,7 +17,7 @@
 //! 也不依赖 spec 03/04-llm-stream 的状态(独立 beforeAll)。
 //! 也不依赖 page.goto + LLM 立即返回 — 允许 90s LLM 冷启动。
 
-import { test, expect, assert, clearAllHistory, clickNewConversationAndWait, invoke, resetChatState, submitForm } from "./fixtures";
+import { test, expect, assert, clearAllHistory, clickNewConversationAndWait, invoke, resetChatState, setupWorkspaceAndCreateConvViaIpc, submitForm } from "./fixtures";
 import { loadEnvFile } from "./env-loader";
 import type { Settings } from "../src/shared/lib/types";
 
@@ -41,6 +41,9 @@ test.describe("06 — LLM round-trip", () => {
     // 那时 ChatLayout 已 unmount,footer 的 Settings 链接找不到,15s 超时。
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
+
+    // D8-W: provision workspace so clickNewConversationAndWait works
+    await setupWorkspaceAndCreateConvViaIpc(page);
 
     if (envKey && envKey.length > 0) {
       injectedKey = envKey;

@@ -7,9 +7,9 @@ import { render, cleanup } from "@solidjs/testing-library";
 import { ChatView } from "./chat-view";
 import type { Message } from "../../../shared/lib/types";
 
-// V2 ADR-0019: 不再 mock messages.store / agent.store，全部走 conversations.store
+// V2 ADR-0019: 不再 mock messages.store / agent.store，全部走 chat.store
 // 注意: vi.mock 会被 hoisting，所以 mock 数据必须内联在工厂函数内部
-vi.mock("../stores/conversations.store", () => ({
+vi.mock("../stores/chat.store", () => ({
   store: {
     activeId: null,
     byId: {
@@ -267,7 +267,7 @@ describe("ChatView", () => {
   // ─── handleSend 测试 ─────────────────────────────────────────────────
   it("handleSend with valid input 调 sendMessage", async () => {
     const user = (await import("@testing-library/user-event")).default;
-    const conversationsStoreMock = await import("../stores/conversations.store");
+    const conversationsStoreMock = await import("../stores/chat.store");
     const appStoreMock = await import("../../../shared/stores/app.store");
     // Reset sendMessage mock and appStore state
     (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
@@ -318,7 +318,7 @@ describe("ChatView", () => {
 
   it("handleSend empty input 不调 sendMessage", async () => {
     const user = (await import("@testing-library/user-event")).default;
-    const conversationsStoreMock = await import("../stores/conversations.store");
+    const conversationsStoreMock = await import("../stores/chat.store");
     // Reset sendMessage mock before test
     (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
     const { container } = render(() => <ChatView />);
@@ -330,7 +330,7 @@ describe("ChatView", () => {
   it("handleSend 输入后清空 input", async () => {
     const user = (await import("@testing-library/user-event")).default;
     const appStoreMock = await import("../../../shared/stores/app.store");
-    const conversationsStoreMock = await import("../stores/conversations.store");
+    const conversationsStoreMock = await import("../stores/chat.store");
     // Reset sendMessage mock and appStore state
     (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
     (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
@@ -373,7 +373,7 @@ describe("ChatView", () => {
   // ─── handleCancel 测试 ───────────────────────────────────────────────
   it("handleCancel 调 cancel(convId)", async () => {
     const user = (await import("@testing-library/user-event")).default;
-    const conversationsStoreMock = await import("../stores/conversations.store");
+    const conversationsStoreMock = await import("../stores/chat.store");
     // Reset cancel mock and set streaming state
     (conversationsStoreMock as unknown as { cancel: ReturnType<typeof vi.fn> }).cancel.mockClear();
     const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null }> } }).store;
@@ -388,7 +388,7 @@ describe("ChatView", () => {
 
   // ─── thinking indicator 测试 ────────────────────────────────────────
   it("thinking indicator 显示当 streaming + 最后消息 content=''", async () => {
-    const conversationsStoreMock = await import("../stores/conversations.store");
+    const conversationsStoreMock = await import("../stores/chat.store");
     const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null; messages: Message[] }> } }).store;
     // Reset streaming state first, then set fresh
     mockStore.byId["conv-1"].streamingMessageId = null;
@@ -404,7 +404,7 @@ describe("ChatView", () => {
   });
 
   it("thinking indicator 不显示 non-streaming", async () => {
-    const conversationsStoreMock = await import("../stores/conversations.store");
+    const conversationsStoreMock = await import("../stores/chat.store");
     // Ensure store state is clean
     const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null }> } }).store;
     mockStore.byId["conv-1"].streamingMessageId = null;
@@ -416,7 +416,7 @@ describe("ChatView", () => {
   // ─── form submit 测试 ────────────────────────────────────────────────
   it("form submit preventDefault + handleSend", async () => {
     const user = (await import("@testing-library/user-event")).default;
-    const conversationsStoreMock = await import("../stores/conversations.store");
+    const conversationsStoreMock = await import("../stores/chat.store");
     const appStoreMock = await import("../../../shared/stores/app.store");
     // Reset sendMessage mock and appStore state
     (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();

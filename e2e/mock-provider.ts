@@ -5,7 +5,7 @@
 //! LLM turn, simulating SSE streaming (text chunks + tool_use blocks).
 //!
 //! Usage:
-//!   await useMockProvider(page, { workspace: true });
+//!   await useMockProvider(page);
 //!   await enqueueMockResponse(page, { text: "Hello!" });
 //!   await enqueueMockResponse(page, { toolCalls: [{ name: "read_file", input: {...} }] });
 //!   await enqueueMockResponse(page, { text: "Done." });
@@ -59,14 +59,8 @@ export async function clearMockQueue(page: TauriPage): Promise<void> {
 /**
  * Switch settings to use the mock provider. Sets the mock provider as the
  * default LLM with baseUrl "mock://test" and a default model.
- *
- * Options:
- *   workspace: also inject a default workspace (id="main") so file tools work.
  */
-export async function useMockProvider(
-  page: TauriPage,
-  options: { workspace?: boolean } = {},
-): Promise<void> {
+export async function useMockProvider(page: TauriPage): Promise<void> {
   const current = await invoke<any>(page, "get_settings");
   const mockProvider = {
     id: MOCK_PROVIDER_ID,
@@ -97,20 +91,7 @@ export async function useMockProvider(
     providers: [...existing, mockProvider],
     default_llm_provider_id: MOCK_PROVIDER_ID,
   };
-  if (options.workspace) {
-    newSettings.workspaces = [
-      ...(current.workspaces ?? []),
-      {
-        id: "main",
-        label: "E2E Test Workspace",
-        root_path:
-          process.platform === "win32"
-            ? "C:UserszcatiAppDataLocalTempcodeman-mock-workspace"
-            : "/tmp/codeman-mock-workspace",
-        enabled: true,
-      },
-    ];
-  }
+
   await invoke(page, "update_settings", { newSettings });
   await clearMockQueue(page);
   // 关键: update_settings 是 raw IPC,只更新后端。chat-view 的 handleSend 读

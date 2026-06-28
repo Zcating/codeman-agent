@@ -16,19 +16,13 @@ import {
   SettingsService,
   SettingsServiceImpl,
   ProviderService,
-  WorkspaceService,
   FileService,
   SettingsServiceLive,
-  WorkspaceServiceLive,
   FileServiceLive,
   TauriError,
   getSettingsBridge,
   updateSettingsBridge,
   clearAllHistoryBridge,
-  getWorkspacesBridge,
-  addWorkspaceBridge,
-  updateWorkspaceBridge,
-  removeWorkspaceBridge,
 } from "./tauri";
 import type { Provider } from "./types";
 
@@ -198,34 +192,6 @@ describe("MessageService", () => {
   );
 });
 
-describe("WorkspaceService", () => {
-  it.effect("list returns workspaces from settings", () =>
-    Effect.gen(function* () {
-      const svc = yield* WorkspaceService;
-      const workspaces = yield* svc.list();
-      expect(Array.isArray(workspaces)).toBe(true);
-    }).pipe(
-      Effect.provide(WorkspaceServiceLive.pipe(Layer.provide(SettingsServiceLive))),
-    ),
-  );
-
-  it.effect("add + list round-trip", () =>
-    Effect.gen(function* () {
-      const svc = yield* WorkspaceService;
-      yield* svc.add({
-        id: "ws-1",
-        label: "Test",
-        root_path: "/tmp/test",
-        enabled: true,
-      });
-      const workspaces = yield* svc.list();
-      expect(workspaces.find((w) => w.id === "ws-1")).toBeDefined();
-    }).pipe(
-      Effect.provide(WorkspaceServiceLive.pipe(Layer.provide(SettingsServiceLive))),
-    ),
-  );
-});
-
 describe("FileService", () => {
   it.effect("readFile is wired to read_file IPC", () =>
     Effect.gen(function* () {
@@ -260,46 +226,6 @@ describe("Bridge Functions", () => {
 
   it("clearAllHistoryBridge completes", async () => {
     await expect(clearAllHistoryBridge()).resolves.toBeUndefined();
-  });
-
-  it("getWorkspacesBridge returns workspaces", async () => {
-    const workspaces = await getWorkspacesBridge();
-    expect(Array.isArray(workspaces)).toBe(true);
-  });
-
-  it("addWorkspaceBridge adds a workspace", async () => {
-    await addWorkspaceBridge({
-      id: "bridge-ws",
-      label: "Bridge Test",
-      root_path: "/tmp/bridge",
-      enabled: true,
-    });
-    const ws = await getWorkspacesBridge();
-    expect(ws.find((w) => w.id === "bridge-ws")).toBeDefined();
-  });
-
-  it("updateWorkspaceBridge updates a workspace", async () => {
-    await addWorkspaceBridge({
-      id: "update-ws",
-      label: "Before",
-      root_path: "/tmp/u",
-      enabled: false,
-    });
-    await updateWorkspaceBridge("update-ws", { label: "After" });
-    const ws = await getWorkspacesBridge();
-    expect(ws.find((w) => w.id === "update-ws")?.label).toBe("After");
-  });
-
-  it("removeWorkspaceBridge removes a workspace", async () => {
-    await addWorkspaceBridge({
-      id: "remove-ws",
-      label: "Remove",
-      root_path: "/tmp/r",
-      enabled: true,
-    });
-    await removeWorkspaceBridge("remove-ws");
-    const ws = await getWorkspacesBridge();
-    expect(ws.find((w) => w.id === "remove-ws")).toBeUndefined();
   });
 });
 

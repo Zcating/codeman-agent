@@ -7,7 +7,7 @@
 //! V2 简化:billing 工具已移除,本 spec 只验证纯文本响应。
 //! 工具调用的 mock 行为在 08-file-tools-mock.spec.ts 验证。
 
-import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
+import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, setupWorkspaceAndCreateConvViaIpc, submitForm } from "./fixtures";
 import { useMockProvider, enqueueMockResponse, clearMockQueue } from "./mock-provider";
 
 test.describe("07 — Mock LLM provider", () => {
@@ -15,8 +15,10 @@ test.describe("07 — Mock LLM provider", () => {
     const { page } = tauriEnv;
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
+    // D8-W: provision workspace so clickNewConversationAndWait works
+    await setupWorkspaceAndCreateConvViaIpc(page);
     // 切换到 mock provider — 不依赖 .env 里的真实 LLM key
-    await useMockProvider(page, { workspace: false });
+    await useMockProvider(page);
     // 验证 mock provider 已配置 (避免之前 test 残留的真实 LLM provider 被优先使用)
     const settings = await invoke<{ default_llm_provider_id?: string }>(page, "get_settings");
     if (settings.default_llm_provider_id !== "mock") {

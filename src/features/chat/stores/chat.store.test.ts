@@ -1,7 +1,7 @@
-//! conversations.store Solid createStore 测试 (Task 4)
+//! chat.store Solid createStore 测试 (Task 4)
 import { describe, it, expect, vi } from "vitest";
 import { createRoot } from "solid-js";
-import { Stream } from "effect";
+import { Effect, Exit, Stream } from "effect";
 import {
   store,
   setStore,
@@ -16,9 +16,17 @@ import {
   loadConversations,
   createConversation,
   createAndSendConversation,
+  workspaces$,
+  selectedWorkspaceId$,
+  setSelectedWorkspaceId,
+  addWorkspace,
+  removeWorkspace,
+  renameWorkspace,
+  pickWorkspacePath,
+  loadWorkspaces,
   type ConversationState,
-} from "./conversations.store";
-import type { Conversation, Message } from "../../../shared/lib/types";
+} from "./chat.store";
+import type { Conversation, Message, Workspace } from "../../../shared/lib/types";
 import type { RuntimeEvent, ProviderConfig } from "../lib/runtime";
 
 // ─── Mock tauri services ─────────────────────────────────────────────
@@ -85,6 +93,31 @@ vi.mock("../../../shared/lib/tauri", async () => {
   };
 });
 
+// ─── Mock workspace-service ──────────────────────────────────────────
+
+vi.mock("../lib/workspace-service", async () => {
+  const { Layer, Effect: E } = await import("effect");
+  const { WorkspaceService } = await vi.importActual<
+    typeof import("../lib/workspace-service")
+  >("../lib/workspace-service");
+  // Default mock behavior
+  return {
+    WorkspaceService,
+    WorkspaceServiceLive: Layer.succeed(WorkspaceService, {
+      list: () =>
+        E.succeed([
+          { id: "ws-1", label: "Workspace 1", root_path: "/path/ws1", created_at: 1, updated_at: 1 } as Workspace,
+          { id: "ws-2", label: "Workspace 2", root_path: "/path/ws2", created_at: 2, updated_at: 2 } as Workspace,
+        ]),
+      add: (label: string, _rootPath: string) =>
+        E.succeed({ id: "new-ws-id", label, root_path: "/new/path", created_at: 3, updated_at: 3 } as Workspace),
+      rename: (_id: string, _label: string) => E.void,
+      remove: (_id: string) => E.void,
+      pickPath: () => E.succeed("/picked/path"),
+    }),
+  };
+});
+
 // ─── Mock runtime (prevent real API calls) ─────────────────────────
 
 vi.mock("../lib/runtime", () => ({
@@ -131,7 +164,7 @@ const defaultProvider: ProviderConfig = {
 
 // ─── Existing tests ────────────────────────────────────────────────
 
-describe("conversations.store — ConversationState 类型", () => {
+describe("chat.store — ConversationState 类型", () => {
   it("setupConvState() 插入 byId, 包含空 messages 状态和 runtime", () =>
     createRoot((dispose) => {
       setupConvState(mockConv, mockHistory);
@@ -749,6 +782,103 @@ describe("createAndSendConversation — G24: early return when activeId is null"
       const cs = store.byId["c-ws-test"] as ConversationState | undefined;
       expect(cs).toBeDefined();
       expect(cs?.workspace_id).toBe("ws-specific-123");
+      dispose();
+    });
+  });
+});
+
+// ─── Workspace CRUD tests (T4) ───────────────────────────────────────
+
+describe("chat.store — workspace CRUD", () => {
+  // Test synchronous store state
+  it("workspaces$: returns current workspaces array", () => {
+    createRoot((dispose) => {
+      const ws = workspaces$();
+      expect(Array.isArray(ws)).toBe(true);
+      dispose();
+    });
+  });
+
+  it("selectedWorkspaceId$: initially null", () => {
+    createRoot((dispose) => {
+      expect(selectedWorkspaceId$()).toBeNull();
+      dispose();
+    });
+  });
+
+  it("setSelectedWorkspaceId(null): clears reactive signal", () => {
+    createRoot((dispose) => {
+      setSelectedWorkspaceId("ws-1");
+      expect(selectedWorkspaceId$()).toBe("ws-1");
+      setSelectedWorkspaceId(null);
+      expect(selectedWorkspaceId$()).toBeNull();
+      dispose();
+    });
+  });
+
+  it("setSelectedWorkspaceId(id): sets reactive signal", () => {
+    createRoot((dispose) => {
+      setSelectedWorkspaceId("ws-2");
+      expect(selectedWorkspaceId$()).toBe("ws-2");
+      dispose();
+    });
+  });
+
+  // pickWorkspacePath: uses module-level mock which returns "/picked/path"
+  it("pickWorkspacePath: returns Effect wrapping WorkspaceService.pickPath", async () => {
+    const result = await Effect.runPromiseExit(pickWorkspacePath());
+    expect(Exit.isSuccess(result)).toBe(true);
+    expect(result.value).toBe("/picked/path");
+  });
+
+  // loadWorkspaces: uses module-level mock (list returns 2 workspaces)
+  it("loadWorkspaces: writes workspaces to store via WorkspaceService.list", async () => {
+    await createRoot(async (dispose) => {
+      await Effect.runPromiseExit(loadWorkspaces());
+      const ws = workspaces$();
+      expect(ws.some((w) => w.id === "ws-1")).toBe(true);
+      expect(ws.some((w) => w.id === "ws-2")).toBe(true);
+      dispose();
+    });
+  });
+
+  // addWorkspace: uses module-level mock (pickPath="/picked/path", add returns new-ws-id)
+  it("addWorkspace: IPC succeeds → adds workspace to store + sets selectedWorkspaceId", async () => {
+    await createRoot(async (dispose) => {
+      const result = await Effect.runPromiseExit(addWorkspace());
+      expect(Exit.isSuccess(result)).toBe(true);
+      expect(result.value).not.toBeNull();
+      expect(result.value?.id).toBe("new-ws-id");
+      expect(workspaces$().some((w) => w.id === "new-ws-id")).toBe(true);
+      expect(selectedWorkspaceId$()).toBe("new-ws-id");
+      dispose();
+    });
+  });
+
+  // removeWorkspace: module-level mock has remove that succeeds
+  it("removeWorkspace: IPC succeeds → filters workspace from store", async () => {
+    await createRoot(async (dispose) => {
+      // Pre-populate
+      await Effect.runPromiseExit(loadWorkspaces());
+      expect(workspaces$().some((w) => w.id === "ws-1")).toBe(true);
+
+      const result = await Effect.runPromiseExit(removeWorkspace("ws-1"));
+      expect(Exit.isSuccess(result)).toBe(true);
+      expect(workspaces$().some((w) => w.id === "ws-1")).toBe(false);
+      dispose();
+    });
+  });
+
+  // renameWorkspace: module-level mock has rename that succeeds
+  it("renameWorkspace: IPC succeeds → patches workspace label in store", async () => {
+    await createRoot(async (dispose) => {
+      // Pre-populate
+      await Effect.runPromiseExit(loadWorkspaces());
+      expect(workspaces$().find((w) => w.id === "ws-1")?.label).toBe("Workspace 1");
+
+      const result = await Effect.runPromiseExit(renameWorkspace("ws-1", "Renamed WS"));
+      expect(Exit.isSuccess(result)).toBe(true);
+      expect(workspaces$().find((w) => w.id === "ws-1")?.label).toBe("Renamed WS");
       dispose();
     });
   });

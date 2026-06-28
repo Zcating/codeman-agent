@@ -1,12 +1,12 @@
 //! ChatView — 消息列表 + 输入框 + store 订阅 (V2 ADR-0019)。
 //!
-//! V2 后不再 import messages.store / agent.store,全部走 conversations.store
+//! V2 后不再 import messages.store / agent.store,全部走 chat.store
 //! 的 store / sendMessage / cancel。running 派生自 byId[activeId].streamingMessageId。
 
 import { createSignal, createEffect, createMemo, For, Show, onMount } from "solid-js";
 import { X, Send } from "lucide-solid";
 import { MessageBubble } from "./message-bubble";
-import { store, activeId$, sendMessage, cancel } from "../stores/conversations.store";
+import { store, activeId$, sendMessage, cancel } from "../stores/chat.store";
 import type { ProviderConfig } from "../lib/runtime";
 import { Button } from "../../../shared/components/ui/button";
 import { Textarea } from "../../../shared/components/ui/textarea";
