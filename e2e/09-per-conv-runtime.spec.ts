@@ -23,18 +23,7 @@
 //! 流式节奏: mock 每 chunk 500ms 延迟,17 字符分 5 chunks ≈ 2.5s 完成,
 //! 给切 conv + sidebar 检查充足 margin。
 
-import { test, expect } from "@playwright/test";
-import {
-  assert,
-  cancelRunningAgent,
-  clearAllHistory,
-  clickNewConversationAndWait,
-  disposeTauriPage,
-  getTauriPage,
-  invoke,
-  submitForm,
-  type TauriPage,
-} from "./helpers";
+import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm, type TauriPage } from "./fixtures";
 import { useMockProvider, enqueueMockResponse, clearMockQueue } from "./mock-provider";
 
 // 慢流式:每次 chunk 间隔 500ms,text ~17 字符 = 5 chunks × 500ms = 2.5s,
@@ -45,14 +34,14 @@ const TEXT_A = "Hello from conv A"; // 17 chars / 4 = 5 chunks × 300ms = 1.5s
 const TEXT_B = "Hello from conv B"; // 17 chars / 4 = 5 chunks × 300ms = 1.5s
 
 test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
-  test.beforeAll(async () => {
-    const page = await getTauriPage();
+  test.beforeAll(async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
     // 切到 mock provider — 后续测试全靠 mock 队列,不需要 .env 里的真实 key
     await useMockProvider(page, { workspace: false });
     // 验证 mock provider 已配置(避免前 spec 残留的真实 LLM provider 被优先使用)
-    const settings = await invoke<{ default_llm_provider_id?: string }>("get_settings");
+    const settings = await invoke<{ default_llm_provider_id?: string }>(page, "get_settings");
     if (settings.default_llm_provider_id !== "mock") {
       throw new Error(
         "default_llm_provider_id 应为 mock,实际: " + (settings.default_llm_provider_id ?? "null"),
@@ -60,17 +49,18 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     }
   });
 
-  test.afterAll(async () => {
-    await disposeTauriPage();
-  });
-
   /** 返回当前 sidebar 中的 conv 数量。 */
   async function convCount(page: TauriPage): Promise<number> {
-    return page.evaluate(() => document.querySelectorAll("aside li").length);
+    return page.evaluate(
+      () => document.querySelectorAll("aside button[data-conv-id]").length,
+    );
   }
 
-  test.beforeEach(async () => {
-    const page = await getTauriPage();
+  /** Conv id created in beforeEach (idx 0 for each test body). */
+  let beforeEachConvId = "";
+
+  test.beforeEach(async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
     page.on("console", (msg: { type: string; text: string }) => {
       if (msg.type === "error") {
         console.log(`[09 page error] ${msg.text}`);
@@ -80,31 +70,29 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
       console.log(`[09 page pageerror] ${err.message}`);
     });
     // 1) 取消 in-flight(防前 test 残留)
-    await cancelRunningAgent();
+    await cancelRunningAgent(page);
     // 2) 清 DB 历史
-    await clearAllHistory();
+    await clearAllHistory(page);
     // 3) 清 mock 队列
     await clearMockQueue(page);
-    // 4) 新建会话
-    await clickNewConversationAndWait(page);
+    // 4) 新建会话 — capture conv id for use in test bodies
+    const { convId } = await clickNewConversationAndWait(page);
+    beforeEachConvId = convId;
   });
 
   // ─── D1 + D3: 跨 conv 流式隔离(主 bug 修复) ─────────────────
 
-  test("D1+D3: A streaming 不 leak 到 B view; 切回 A 内容完整", async () => {
+  test("D1+D3: A streaming 不 leak 到 B view; 切回 A 内容完整", async ({ tauriEnv }) => {
     test.setTimeout(60_000);
-    const page = await getTauriPage();
+    const { page } = tauriEnv;
 
-    // convCount() 返回当前 conv 数量(含 beforeEach 创建的 1 个)。
-    // beforeEach conv 在 idx = count - 1, 即将创建的新 conv 在 idx = count。
-    const base = await convCount(page);
-    // 创建第二个 conv
-    await clickNewConversationAndWait(page);
+    // 创建第二个 conv — capture its id so we can address it by data-conv-id
+    // selector. beforeEachConvId (captured in beforeEach) is the first conv.
+    const { convId: newConvId } = await clickNewConversationAndWait(page);
 
-    // convIdx0 = beforeEach 创建的 conv (idx = base - 1)
-    // convIdx1 = 新创建的 conv (idx = base)
-    const convIdx0 = page.locator(`aside li[data-conv-idx="${base - 1}"]`);
-    const convIdx1 = page.locator(`aside li[data-conv-idx="${base}"]`);
+    // convIdx0 = beforeEach 创建的 conv; convIdx1 = test body 创建的 conv
+    const convIdx0 = page.locator(`[data-conv-id="${beforeEachConvId}"]`);
+    const convIdx1 = page.locator(`[data-conv-id="${newConvId}"]`);
 
     // 预置 2 个 mock 响应 — mock 队列是 webview 全局,按 send 顺序消费
     await enqueueMockResponse(page, { text: TEXT_A, delayMs: SLOW_DELAY_MS });
@@ -165,9 +153,9 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
 
   // ─── D5: sidebar streaming 指示 ──────────────────────────────
 
-  test("D5: sidebar streaming 指示 (⏳) 出现在 streaming conv 上,完成后消失", async () => {
+  test("D5: sidebar streaming 指示 (⏳) 出现在 streaming conv 上,完成后消失", async ({ tauriEnv }) => {
     test.setTimeout(30_000);
-    const page = await getTauriPage();
+    const { page } = tauriEnv;
 
     // beforeEach 已经建好一个 conv (idx 0),store 已清干净
     await enqueueMockResponse(page, { text: TEXT_A, delayMs: SLOW_DELAY_MS });
@@ -195,9 +183,9 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
 
   // ─── D2: AbortController cancel 行为 ───────────────────────
 
-  test("D2: Cancel 中断 in-flight; Send 按钮恢复; 新 send 正常工作", async () => {
+  test("D2: Cancel 中断 in-flight; Send 按钮恢复; 新 send 正常工作", async ({ tauriEnv }) => {
     test.setTimeout(30_000);
-    const page = await getTauriPage();
+    const { page } = tauriEnv;
 
     // 预置 2 个响应:第一个会被 cancel 掉(partial),第二个正常消费
     await enqueueMockResponse(page, { text: TEXT_A, delayMs: SLOW_DELAY_MS });
@@ -234,18 +222,15 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
 
   // ─── D1 + D3 + D5: 2 个 conv 同时 streaming ─────────────────
 
-  test("D1+D3+D5: 2 个 conv 同时 streaming,sidebar 各自显示 ⏳", async () => {
+  test("D1+D3+D5: 2 个 conv 同时 streaming,sidebar 各自显示 ⏳", async ({ tauriEnv }) => {
     test.setTimeout(60_000);
-    const page = await getTauriPage();
+    const { page } = tauriEnv;
 
-    // base = conv count 含 beforeEach 创建的 1 个。
-    // beforeEach conv 在 idx = base - 1; 新 conv 在 idx = base。
-    const base = await convCount(page);
-    // 创建第二个 conv
-    await clickNewConversationAndWait(page);
+    // 创建第二个 conv — capture its id for data-conv-id selector
+    const { convId: newConvId } = await clickNewConversationAndWait(page);
 
-    const convIdx0 = page.locator(`aside li[data-conv-idx="${base - 1}"]`);
-    const convIdx1 = page.locator(`aside li[data-conv-idx="${base}"]`);
+    const convIdx0 = page.locator(`[data-conv-id="${beforeEachConvId}"]`);
+    const convIdx1 = page.locator(`[data-conv-id="${newConvId}"]`);
 
     await enqueueMockResponse(page, { text: TEXT_A, delayMs: SLOW_DELAY_MS });
     await enqueueMockResponse(page, { text: TEXT_B, delayMs: SLOW_DELAY_MS });
@@ -269,7 +254,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
 
     // convIdx0 还在 streaming(切 conv 不 cancel),sidebar 仍显示 ⏳
     const idx0Badge = page.locator(
-      `aside li[data-conv-idx="${base - 1}"] [aria-label="streaming"]`,
+      `[data-conv-id="${beforeEachConvId}"] [aria-label="streaming"]`,
     );
     await assert.visible(idx0Badge, { timeout: 5_000 });
 
@@ -285,7 +270,9 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     });
 
     // 两个 conv 都应显示 ⏳(独立 runtime + per-conv streamingMessageId)
-    const idx1Badge = page.locator(`aside li[data-conv-idx="${base}"] [aria-label="streaming"]`);
+    const idx1Badge = page.locator(
+      `[data-conv-id="${newConvId}"] [aria-label="streaming"]`,
+    );
     await assert.visible(idx1Badge, { timeout: 5_000 });
 
     // 切到 idx 0,等流完

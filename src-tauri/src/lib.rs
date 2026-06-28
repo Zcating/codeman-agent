@@ -13,6 +13,17 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::Manager;
 use tauri_plugin_autostart::MacosLauncher;
 
+/// 测试隔离用的 per-worker 后缀。e2e 多 worker 模式下由 fixture 注入此 env var，
+/// 让 SQLite / settings.json / window-state.json 的文件名带 worker 索引后缀，
+/// 避免 4 个并行 worker 在同一 `app_data_dir` 里互相覆盖。
+///
+/// 生产路径：env var 不设 → `None` → 走原文件名（`codeman-agent.db` 等），零行为变化。
+pub fn test_worker_suffix() -> Option<String> {
+    std::env::var("CODEMAN_TEST_WORKER")
+        .ok()
+        .filter(|s| !s.is_empty())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -42,7 +53,14 @@ pub fn run() {
                 ))
                 .build(),
         )
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin({
+            // Window-state 文件名：e2e 多 worker 隔离用后缀。
+            let mut ws_builder = tauri_plugin_window_state::Builder::default();
+            if let Some(suffix) = test_worker_suffix() {
+                ws_builder = ws_builder.with_filename(format!("window-state.{suffix}.json"));
+            }
+            ws_builder.build()
+        })
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             // V0 removed per ADR-0012 T7

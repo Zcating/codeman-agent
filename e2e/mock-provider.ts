@@ -67,7 +67,7 @@ export async function useMockProvider(
   page: TauriPage,
   options: { workspace?: boolean } = {},
 ): Promise<void> {
-  const current = await invoke<any>("get_settings");
+  const current = await invoke<any>(page, "get_settings");
   const mockProvider = {
     id: MOCK_PROVIDER_ID,
     label: "Mock LLM (E2E test)",
@@ -111,7 +111,7 @@ export async function useMockProvider(
       },
     ];
   }
-  await invoke("update_settings", { newSettings });
+  await invoke(page, "update_settings", { newSettings });
   await clearMockQueue(page);
   // 关键: update_settings 是 raw IPC,只更新后端。chat-view 的 handleSend 读
   // appStore.state.value(内存 Solid signal),这 signal 不会因为 IPC 而变。

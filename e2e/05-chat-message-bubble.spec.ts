@@ -9,18 +9,7 @@
 //!   - 05 是"user-input → bubble → DB"往返契约测试。
 //!   - 两者失败原因不同;两个都跑将回归隔离到正确层(UI 渲染 vs. 运行时 plumbing)。
 
-import { test, expect } from "@playwright/test";
-import {
-  assert,
-  cancelRunningAgent,
-  clearAllHistory,
-  clickNewConversationAndWait,
-  disposeTauriPage,
-  getTauriPage,
-  invoke,
-  resetChatState,
-  submitForm,
-} from "./helpers";
+import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, resetChatState, submitForm } from "./fixtures";
 
 // 有意独特的字符串,以便我们永远不会将其与其他测试数据行
 // 或默认 Sidebar "New conversation" 占位符混淆。
@@ -40,22 +29,19 @@ interface MessageRow {
 }
 
 test.describe("05 — agent 页面输入 → 用户气泡", () => {
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
     // 彻底重置 chat 域 — cancelRunningAgent 单靠 click 取消 button 不一定
     // 能清掉 running$ signal(取消 button handler 是 best-effort),硬 reload
     // 才能保证下一个 spec 的 "新建会话" 之后 textarea 是 enabled 的。
-    await resetChatState();
+    await resetChatState(page);
     // 清除会话使这个 spec 是密封的。我们还在下一次 "new" 点击时
     //    重置 store 中的 active conversation 指针。
-    await clearAllHistory();
+    await clearAllHistory(page);
   });
 
-  test.afterAll(async () => {
-    await disposeTauriPage();
-  });
-
-  test("输入内容产生可见用户气泡并持久化到 DB", async () => {
-    const page = await getTauriPage();
+  test("输入内容产生可见用户气泡并持久化到 DB", async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
 
     // 诊断: 捕获所有 console + pageerror,这样 submit 时发生的 JS 错误
     // 不会淹没在 log 里。run_in_background 的 cdp-driver 转发到 node 端
@@ -184,8 +170,8 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
     ).toBeTruthy();
   });
 
-  test("多次发送产生多个气泡(无去重回归)", async () => {
-    const page = await getTauriPage();
+  test("多次发送产生多个气泡(无去重回归)", async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
     page.on("console", (msg) => {
       const t = msg.text;
       if (t.includes("[vite]") || t.includes("[HMR]")) {
@@ -197,7 +183,7 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
       console.log(`[page pageerror] ${err.message}`);
     });
     // 完整重置 — 前 spec LLM 完成/取消,DB 清空,页面 reload
-    await resetChatState();
+    await resetChatState(page);
 
     // 验证 resetChatState 后 chat-view 真的 mounted 且 signals 干净
     const postResetState = await page.evaluate(() => ({
@@ -222,7 +208,7 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
       // 前一次 submit 后 LLM 还在跑 → running=true → Send 被 取消 替换。
       // 先 取消 让 textarea 重新 enabled,Send 重新出现。
       if (i > 0) {
-        await cancelRunningAgent();
+        await cancelRunningAgent(page);
       }
       await textarea.fill(text);
       // 诊断: 检查当前 textarea 状态

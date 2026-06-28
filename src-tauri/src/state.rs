@@ -13,8 +13,16 @@ use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 use tokio::sync::Notify;
 
-const STORE_FILE: &str = "settings.json";
 const STORE_KEY: &str = "settings";
+
+/// e2e 多 worker 隔离：`CODEMAN_TEST_WORKER` 设了的话，文件名带后缀，
+/// 避免 4 个并行 worker 在同一 `app_data_dir` 里互相覆盖 settings。
+fn store_file_name() -> String {
+    match crate::test_worker_suffix() {
+        Some(suffix) => format!("settings.{suffix}.json"),
+        None => "settings.json".to_string(),
+    }
+}
 
 #[derive(Clone)]
 pub struct AppState {
@@ -54,7 +62,7 @@ impl AppState {
                 return;
             }
         };
-        match self.app_handle.store(STORE_FILE) {
+        match self.app_handle.store(store_file_name()) {
             Ok(store) => {
                 store.set(STORE_KEY, value);
                 if let Err(e) = store.save() {
@@ -67,7 +75,7 @@ impl AppState {
 }
 
 fn load_settings(app: &AppHandle) -> Option<Settings> {
-    let store = app.store(STORE_FILE).ok()?;
+    let store = app.store(store_file_name()).ok()?;
     let v = store.get(STORE_KEY)?;
     match serde_json::from_value::<Settings>(v) {
         Ok(s) => Some(s.sanitized()),

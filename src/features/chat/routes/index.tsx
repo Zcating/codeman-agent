@@ -11,7 +11,7 @@ import { ArrowLeft, Settings as SettingsIcon } from "lucide-solid";
 import { Link } from "@tanstack/solid-router";
 import { ChatView } from "../components/chat-view";
 import { HomeAgentForm } from "../components/home";
-import { CodemanSidebar, type CodemanSidebarWorkspace, type CodemanSidebarItem } from "../../../shared/components/internal/codeman-sidebar";
+import { CodemanSidebar, type WorkspaceNode } from "../../../shared/components/internal/codeman-sidebar";
 import {
   store,
   activeId$,
@@ -24,43 +24,38 @@ import { appStore } from "../../../shared/stores/app.store";
 
 // ─── Data mapping helpers ───────────────────────────────────────────────────
 
-function workspacesFromApp(): CodemanSidebarWorkspace[] {
-  const list = appStore.state.value.workspaces ?? [];
-  return list
-    .filter((w) => w.enabled)
-    .map((w) => ({
-      id: w.id,
-      label: w.label,
-      rootPath: w.root_path,
-    }));
+function buildSidebarNodes(): WorkspaceNode[] {
+  const workspaces = appStore.state.value.workspaces?.filter((w) => w.enabled) ?? [];
+  const allConvs = conversations$() ?? [];
+  return workspaces.map((ws) => {
+    const wsConvs = allConvs
+      .filter((c) => c.workspace_id === ws.id) // 自动过滤 workspace_id === ""
+      .sort((a, b) => b.updated_at - a.updated_at);
+    return {
+      kind: "workspace" as const,
+      id: ws.id,
+      label: ws.label,
+      rootPath: ws.root_path,
+      children: wsConvs.map((c) => ({
+        kind: "conv" as const,
+        id: c.id,
+        label: c.title,
+        subLabel: new Date(c.updated_at * 1000).toLocaleDateString("zh-CN"),
+        isStreaming: store.byId[c.id]?.streamingMessageId != null,
+        // 不再设 isDisabled/disableReason — V1.x 迁移 conv 不进 sidebar（D7-CS7）
+      })),
+    };
+  });
 }
 
-function itemsFromConversations(): CodemanSidebarItem[] {
-  const selectedWsId = appStore.selectedWorkspaceId();
-  if (!selectedWsId) return [];
-  return conversations$()
-    .filter((c) => c.workspace_id === selectedWsId)
-    .map((c) => ({
-      id: c.id,
-      label: c.title,
-      subLabel: new Date(c.updated_at * 1000).toLocaleDateString("zh-CN"),
-      isStreaming: store.byId[c.id]?.streamingMessageId != null,
-      isDisabled: c.workspace_id === "",
-      disabledReason: c.workspace_id === "" ? "Needs workspace" : undefined,
-    }));
+function workspacesExist(): boolean {
+  return (appStore.state.value.workspaces?.filter((w) => w.enabled).length ?? 0) > 0;
 }
 
 // ─── ChatLayout ─────────────────────────────────────────────────────────────
 
 export function ChatLayout(): JSX.Element {
-  const workspaces = (): CodemanSidebarWorkspace[] => workspacesFromApp();
-  const items = (): CodemanSidebarItem[] => itemsFromConversations();
-  const selectedWorkspaceId = (): string | null => appStore.selectedWorkspaceId();
   const selectedItemId = (): string | null => activeId$();
-
-  const handleSelectWorkspace = (id: string) => {
-    appStore.setLastUsedWorkspaceId(id);
-  };
 
   const handleSelectItem = (id: string) => selectConversation(id);
 
@@ -68,15 +63,17 @@ export function ChatLayout(): JSX.Element {
 
   const handleBackToHome = () => clearActiveConversation();
 
+  const handleEmptyWorkspaceClick = (wsId: string) => {
+    appStore.setLastUsedWorkspaceId(wsId);
+    clearActiveConversation();
+  };
+
   return (
     <main class="flex h-screen w-full bg-background text-foreground">
-      {/* CodemanSidebar — visible when workspaces exist or we're on home */}
-      <Show when={workspaces().length > 0 || activeId$() !== null}>
+      {/* CodemanSidebar — visible when workspaces exist or active conv exists */}
+      <Show when={workspacesExist() || activeId$() !== null}>
         <CodemanSidebar
-          workspaces={workspaces()}
-          selectedWorkspaceId={selectedWorkspaceId()}
-          onSelectWorkspace={handleSelectWorkspace}
-          items={items()}
+          nodes={buildSidebarNodes()}
           selectedItemId={selectedItemId()}
           onSelectItem={handleSelectItem}
           onDeleteItem={handleDeleteItem}
@@ -84,6 +81,7 @@ export function ChatLayout(): JSX.Element {
           onAddWorkspace={() => {
             window.location.href = "/settings";
           }}
+          onEmptyWorkspaceClick={handleEmptyWorkspaceClick}
         />
       </Show>
 

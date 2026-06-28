@@ -18,10 +18,17 @@ pub async fn init(pool: &SqlitePool) -> Result<(), sqlx::Error> {
 
 /// 在 `<app_data_dir>/codeman-agent.db` 打开 SQLite 连接池并
 /// 运行迁移。如果应用数据目录不存在则创建它。
+///
+/// e2e 多 worker 隔离：`CODEMAN_TEST_WORKER` 设了的话，文件名后缀
+/// `.<suffix>.db`，避免 4 个并行 worker 在同一 `app_data_dir` 里互相覆盖。
 pub async fn connect(app: &AppHandle) -> Result<SqlitePool, sqlx::Error> {
     let dir = app.path().app_data_dir().expect("应用数据目录");
     std::fs::create_dir_all(&dir).expect("创建应用数据目录");
-    let db_path = dir.join("codeman-agent.db");
+    let db_filename = match crate::test_worker_suffix() {
+        Some(suffix) => format!("codeman-agent.{suffix}.db"),
+        None => "codeman-agent.db".to_string(),
+    };
+    let db_path = dir.join(db_filename);
     let url = format!("sqlite://{}?mode=rwc", db_path.display());
     let pool = SqlitePoolOptions::new()
         .max_connections(5)

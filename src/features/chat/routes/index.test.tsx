@@ -65,7 +65,7 @@ vi.mock("../../../shared/components/internal/codeman-sidebar", () => ({
     <div data-testid="codeman-sidebar">
       <button
         data-testid="sidebar-ws-ws-1"
-        onClick={() => props.onSelectWorkspace?.("ws-1")}
+        onClick={() => props.onEmptyWorkspaceClick?.("ws-1")}
       >
         Workspace ws-1
       </button>
@@ -81,7 +81,6 @@ vi.mock("../../../shared/components/internal/codeman-sidebar", () => ({
       <button data-testid="sidebar-add-workspace" onClick={() => props.onAddWorkspace?.()}>
         Add workspace
       </button>
-      <span data-testid="sidebar-selected-ws">{props.selectedWorkspaceId ?? "none"}</span>
       <span data-testid="sidebar-selected-item">{props.selectedItemId ?? "none"}</span>
     </div>
   ),
@@ -150,7 +149,7 @@ describe("ChatLayout — state machine", () => {
     expect(getByTestId("codeman-sidebar")).toBeTruthy();
   });
 
-  it("T4.3.6: Click workspace in sidebar → setLastUsedWorkspaceId called", async () => {
+  it("T4.3.6: Click empty workspace in sidebar → setLastUsedWorkspaceId called (D7-CS)", async () => {
     const { appStore } = await import("../../../shared/stores/app.store") as any;
     appStore.state.value.workspaces = [
       { id: "ws-1", label: "My Project", root_path: "C:\\projects", enabled: true },
@@ -158,6 +157,7 @@ describe("ChatLayout — state machine", () => {
     appStore.selectedWorkspaceId.mockReturnValue("ws-1");
 
     const { getByTestId } = render(() => <ChatLayout />);
+    // D7-CS: workspace header click expands/collapses; empty ws click triggers handleEmptyWorkspaceClick
     fireEvent.click(getByTestId("sidebar-ws-ws-1"));
     expect(appStore.setLastUsedWorkspaceId).toHaveBeenCalledWith("ws-1");
   });

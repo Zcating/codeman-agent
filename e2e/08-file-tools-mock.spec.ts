@@ -11,17 +11,7 @@
 //!
 //! 这些测试是确定性的,跟 05-file-tools 不同,它们不依赖真实 LLM。
 
-import { test, expect } from "@playwright/test";
-import {
-  assert,
-  cancelRunningAgent,
-  clearAllHistory,
-  clickNewConversationAndWait,
-  disposeTauriPage,
-  getTauriPage,
-  invoke,
-  submitForm,
-} from "./helpers";
+import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
 import { useMockProvider, enqueueMockResponse, clearMockQueue } from "./mock-provider";
 import type { Settings } from "../src/shared/lib/types";
 import * as fs from "node:fs";
@@ -33,20 +23,20 @@ test.describe("08 — 文件工具 (mock LLM)", () => {
 
   let consoleErrors: string[] = [];
 
-  test.beforeAll(async () => {
-    const page = await getTauriPage();
+  test.beforeAll(async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
 
     // 确保 mock provider 已配置,并注入测试 workspace
-    const current = await invoke<Settings>("get_settings");
+    const current = await invoke<Settings>(page, "get_settings");
     const mainWorkspace = {
       id: "main",
       label: "Mock E2E Test Workspace",
       root_path: e2eRoot,
       enabled: true,
     };
-    await invoke("update_settings", {
+    await invoke(page, "update_settings", {
       newSettings: {
         ...current,
         workspaces: [mainWorkspace],
@@ -57,8 +47,8 @@ test.describe("08 — 文件工具 (mock LLM)", () => {
     await useMockProvider(page, { workspace: false });
 
     // 重新注入 workspace（useMockProvider 可能会被覆盖）
-    const current2 = await invoke<Settings>("get_settings");
-    await invoke("update_settings", {
+    const current2 = await invoke<Settings>(page, "get_settings");
+    await invoke(page, "update_settings", {
       newSettings: {
         ...current2,
         workspaces: [mainWorkspace],
@@ -68,9 +58,9 @@ test.describe("08 — 文件工具 (mock LLM)", () => {
     fs.mkdirSync(e2eRoot, { recursive: true });
   });
 
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ tauriEnv }) => {
     consoleErrors = [];
-    const page = await getTauriPage();
+    const { page } = tauriEnv;
     page.on("console", (msg: { type: string; text: string }) => {
       if (msg.type === "error") {
         consoleErrors.push(msg.text);
@@ -79,21 +69,20 @@ test.describe("08 — 文件工具 (mock LLM)", () => {
     page.on("pageerror", (err: Error) => {
       consoleErrors.push("pageerror: " + err.message);
     });
-    await cancelRunningAgent();
-    await clearAllHistory();
+    await cancelRunningAgent(page);
+    await clearAllHistory(page);
     await clearMockQueue(page);
     await clickNewConversationAndWait(page);
   });
 
   test.afterAll(async () => {
-    await disposeTauriPage();
     try {
       fs.rmSync(e2eRoot, { recursive: true, force: true });
     } catch {}
   });
 
-  test("write_file + read_file: 写文件后能读回内容", async () => {
-    const page = await getTauriPage();
+  test("write_file + read_file: 写文件后能读回内容", async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
     await page.goto("/");
     await clickNewConversationAndWait(page);
 
@@ -142,8 +131,8 @@ test.describe("08 — 文件工具 (mock LLM)", () => {
     expect(consoleErrors, "无 console.error").toHaveLength(0);
   });
 
-  test("沙箱越界: read_file 越界时返回 SandboxViolation", async () => {
-    const page = await getTauriPage();
+  test("沙箱越界: read_file 越界时返回 SandboxViolation", async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
     await page.goto("/");
     await clickNewConversationAndWait(page);
 

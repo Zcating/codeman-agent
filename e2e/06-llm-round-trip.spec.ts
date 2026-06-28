@@ -17,17 +17,7 @@
 //! 也不依赖 spec 03/04-llm-stream 的状态(独立 beforeAll)。
 //! 也不依赖 page.goto + LLM 立即返回 — 允许 90s LLM 冷启动。
 
-import { test, expect } from "@playwright/test";
-import {
-  assert,
-  clearAllHistory,
-  clickNewConversationAndWait,
-  disposeTauriPage,
-  getTauriPage,
-  invoke,
-  resetChatState,
-  submitForm,
-} from "./helpers";
+import { test, expect, assert, clearAllHistory, clickNewConversationAndWait, invoke, resetChatState, submitForm } from "./fixtures";
 import { loadEnvFile } from "./env-loader";
 import type { Settings } from "../src/shared/lib/types";
 
@@ -38,7 +28,7 @@ let injectedKey: string | undefined;
 let injectedBaseUrl: string | undefined;
 
 test.describe("06 — LLM round-trip", () => {
-  test.beforeAll(async () => {
+  test.beforeAll(async ({ tauriEnv }) => {
     const envFile = loadEnvFile();
     const envKey = envFile.MINIMAX_CN_API_KEY ?? process.env.MINIMAX_CN_API_KEY;
     const envBaseUrl = envFile.MINIMAX_CN_API_BASE_URL ?? process.env.MINIMAX_CN_API_BASE_URL;
@@ -46,9 +36,8 @@ test.describe("06 — LLM round-trip", () => {
     // RED 状态:没 .env 或没 key → skip 整个 spec,不在 e2e 报告里 fail
     test.skip(!envKey, ".env 缺 MINIMAX_CN_API_KEY — 没法验证 LLM round-trip,skip");
 
-    const page = await getTauriPage();
-    // 先把页面拉回 / — 前面的 spec 02 把 webview 留在 /settings,
-    // disposeTauriPage 只关 CDP,webview target 的 history 仍然停在 /settings,
+    const { page } = tauriEnv;
+    // 先把页面拉回 / — 前面的 spec 把 webview 留在 /settings,
     // 那时 ChatLayout 已 unmount,footer 的 Settings 链接找不到,15s 超时。
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
@@ -57,7 +46,7 @@ test.describe("06 — LLM round-trip", () => {
       injectedKey = envKey;
       injectedBaseUrl = envBaseUrl;
       // ADR-0015: unified providers[] schema. api_key + base_url live on Provider directly.
-      const current = await invoke<Settings>("get_settings");
+      const current = await invoke<Settings>(page, "get_settings");
       const providers = (current.providers ?? []).map((p) =>
         p.id === "minimax"
           ? {
@@ -67,25 +56,22 @@ test.describe("06 — LLM round-trip", () => {
             }
           : p,
       );
-      await invoke("update_settings", {
+      await invoke(page, "update_settings", {
         newSettings: { ...current, providers, default_llm_provider_id: "minimax" },
       });
     }
   });
 
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
     // 重置 chat 状态:cancel in-flight LLM → 清 DB → reload → 等 mount 完成
-    await resetChatState();
-    await clearAllHistory();
+    await resetChatState(page);
+    await clearAllHistory(page);
   });
 
-  test.afterAll(async () => {
-    await disposeTauriPage();
-  });
-
-  test("正常输入 + 配 API Key → 1 user + 1 assistant = 2 bubble", async () => {
+  test("正常输入 + 配 API Key → 1 user + 1 assistant = 2 bubble", async ({ tauriEnv }) => {
     test.setTimeout(180_000);
-    const page = await getTauriPage();
+    const { page } = tauriEnv;
 
     // 诊断: 听 console + pageerror — LLM 错误会从 chat-view catch 打到 console,
     // 这里转发到 Node 端方便诊断。

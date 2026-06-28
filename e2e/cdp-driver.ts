@@ -13,7 +13,6 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 const CDP_HOST = "127.0.0.1";
-const CDP_PORT = 9333;
 
 /** 注入到页面的工具对象。所有 Locator 操作最终调它。导出供 helpers 在 page reload 后 re-inject。 */
 export const CDP_INJECT_SCRIPT = `
@@ -176,11 +175,16 @@ export class TauriPage {
     readonly sessionId: string,
   ) {}
 
-  /** 重新注入 __cdp helper(page reload 后 window.__cdp 会丢失)。 */
+  /** 重新注入 __cdp helper(page reload 后 window.__cdp 会丢失)。
+   *
+   * 原来只调 `Runtime.evaluate` 一次性注入 — 但页面 reload 后新文档里
+   * `__cdp` 又没了,得再 reinject 一次。现在加 `Page.addScriptToEvaluateOnNewDocument`:
+   * 把脚本注册成"每个新文档创建时自动执行",reload 后 __cdp 立即可用,
+   * 后续 e2e helper 不需要每次手动 reinject。
+   */
   async reinjectCdp(): Promise<void> {
-    // 不能用 this.evaluate(fn) — new Function(CDP_INJECT_SCRIPT).toString()
-    // 序列化会破坏 IIFE 闭包。直接调 Runtime.evaluate 注入 script string 更可靠。
-    const result = await this.conn.send(
+    // 1. 当前页注入(立即生效)。
+    const currentResult = await this.conn.send(
       "Runtime.evaluate",
       {
         expression: CDP_INJECT_SCRIPT,
@@ -189,11 +193,29 @@ export class TauriPage {
       },
       this.sessionId,
     );
-    if (result.exceptionDetails) {
+    if (currentResult.exceptionDetails) {
       throw new Error(
-        result.exceptionDetails.exception?.description ??
-          result.exceptionDetails.text ??
-          "reinjectCdp failed",
+        currentResult.exceptionDetails.exception?.description ??
+          currentResult.exceptionDetails.text ??
+          "reinjectCdp current page failed",
+      );
+    }
+    // 2. 注册到 Page.addScriptToEvaluateOnNewDocument — 之后每次新文档
+    //    创建(reload / goto 触发 full nav)都会自动执行,window.__cdp 不会丢。
+    //    幂等:CDP 允许重复注册同名脚本,后注册的覆盖前注册的。
+    //    ⚠️ 参数名是 `source`(不是 `expression` — 那是 Runtime.evaluate 的)。
+    const futureResult = await this.conn.send(
+      "Page.addScriptToEvaluateOnNewDocument",
+      {
+        source: CDP_INJECT_SCRIPT,
+      },
+      this.sessionId,
+    );
+    if (futureResult.exceptionDetails) {
+      throw new Error(
+        futureResult.exceptionDetails.exception?.description ??
+          futureResult.exceptionDetails.text ??
+          "reinjectCdp future pages failed",
       );
     }
   }
@@ -220,11 +242,37 @@ export class TauriPage {
     return await this.evaluate(() => location.href);
   }
 
-  /** 导航到指定 URL — 走 history.pushState 让 TanStack Router 接住。 */
+  /** 导航到指定 URL — 走 history.pushState 让 TanStack Router 接住。
+   *
+   * Tauri webview 刚启动时 document 是 `about:blank` (origin=null,URL=空),
+   * `history.pushState` 会抛 `SecurityError: A history state object with URL ''
+   * cannot be created in a document with origin 'null' and URL 'about:blank'`
+   * — 必须先等 webview 把 `tauri://` 主页加载完,`window.__TAURI_INTERNALS__`
+   * 可用了,再 pushState。这里轮询直到 ready(最多 30s)再导航。
+   */
   async goto(path: string): Promise<void> {
     await this.evaluate((p: string) => {
-      history.pushState(null, "", p);
-      dispatchEvent(new PopStateEvent("popstate"));
+      return new Promise<void>((resolve, reject) => {
+        const deadline = Date.now() + 30_000;
+        const check = () => {
+          if (Date.now() > deadline) {
+            reject(
+              new Error(
+                `goto(${p}): page not loaded after 30s (URL=${document.URL})`,
+              ),
+            );
+            return;
+          }
+          if (document.URL !== "about:blank" && window.__TAURI_INTERNALS__) {
+            history.pushState(null, "", p);
+            dispatchEvent(new PopStateEvent("popstate"));
+            resolve();
+          } else {
+            setTimeout(check, 100);
+          }
+        };
+        check();
+      });
     }, path);
   }
 
@@ -415,10 +463,15 @@ class CDPConnection {
 }
 
 /** 顶层入口 — 连 WebView2,attach 页面,返回 TauriPage。 */
-export async function connectTauri(): Promise<TauriPage> {
-  const res = await fetch(`http://${CDP_HOST}:${CDP_PORT}/json/version`);
+export async function connectTauri(opts: {
+  cdpUrl?: string;
+  pageUrlPattern?: RegExp;
+} = {}): Promise<TauriPage> {
+  const cdpUrl = opts.cdpUrl ?? `http://${CDP_HOST}:9333`;
+  const pageUrlPattern = opts.pageUrlPattern ?? /.*/;
+  const res = await fetch(`${cdpUrl}/json/version`);
   if (!res.ok) {
-    throw new Error(`CDP /json/version returned ${res.status}`);
+    throw new Error(`CDP /json/version returned ${res.status} at ${cdpUrl}`);
   }
   const info = (await res.json()) as { webSocketDebuggerUrl: string };
   if (!info.webSocketDebuggerUrl) {
@@ -433,19 +486,22 @@ export async function connectTauri(): Promise<TauriPage> {
 
   const conn = new CDPConnection(ws);
 
-  // 找 Tauri 页面 target
+  // 找 Tauri 页面 target。默认接受任何 type="page" 的 target(per-worker
+  // fixture 可以传入更严格的 pageUrlPattern 来过滤)。
   const { targetInfos } = (await conn.send("Target.getTargets")) as {
     targetInfos: Array<{ targetId: string; type: string; url: string; title?: string }>;
   };
+  // Diagnostic: log all targets so we can debug multi-worker setup.
+  console.log(`[cdp] ${cdpUrl} targets:`, targetInfos.map((t) => `${t.type}@${t.url}`).join(", "));
   const tauri = targetInfos.find(
-    (t) =>
-      t.type === "page" && (t.url.includes("localhost:1420") || t.url.includes("127.0.0.1:1420")),
+    (t) => t.type === "page" && pageUrlPattern.test(t.url),
   );
   if (!tauri) {
     throw new Error(
-      `No Tauri page target found. Have ${targetInfos.length} targets: ${targetInfos
-        .map((t) => `${t.type}@${t.url}`)
-        .join(", ")}`,
+      `No Tauri page target found matching ${pageUrlPattern}. ` +
+        `Have ${targetInfos.length} targets: ${targetInfos
+          .map((t) => `${t.type}@${t.url}`)
+          .join(", ")}`,
     );
   }
 
@@ -458,8 +514,18 @@ export async function connectTauri(): Promise<TauriPage> {
 
   const page = new TauriPage(conn, sessionId);
 
-  // 注入 __cdp 工具
+  // 注入 __cdp 工具 — 同时设到当前页 + 注册成"每个新文档自动注入",
+  // 这样后续 page.reload() 后 __cdp 不会丢。
   await page.evaluate(new Function(CDP_INJECT_SCRIPT) as any);
+  await conn.send(
+    "Page.addScriptToEvaluateOnNewDocument",
+    {
+      source: CDP_INJECT_SCRIPT, // ⚠️ Page.addScriptToEvaluateOnNewDocument
+                                  //    用 `source` (不是 Runtime.evaluate 的
+                                  //    `expression`),否则 -32602 Invalid params。
+    },
+    sessionId,
+  );
 
   // 转发 console / pageerror
   conn.on("Runtime.consoleAPICalled", (params) => {

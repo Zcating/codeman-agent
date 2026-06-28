@@ -7,28 +7,18 @@
 //! V2 简化:billing 工具已移除,本 spec 只验证纯文本响应。
 //! 工具调用的 mock 行为在 08-file-tools-mock.spec.ts 验证。
 
-import { test, expect } from "@playwright/test";
-import {
-  assert,
-  cancelRunningAgent,
-  clearAllHistory,
-  clickNewConversationAndWait,
-  disposeTauriPage,
-  getTauriPage,
-  invoke,
-  submitForm,
-} from "./helpers";
+import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
 import { useMockProvider, enqueueMockResponse, clearMockQueue } from "./mock-provider";
 
 test.describe("07 — Mock LLM provider", () => {
-  test.beforeAll(async () => {
-    const page = await getTauriPage();
+  test.beforeAll(async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
     // 切换到 mock provider — 不依赖 .env 里的真实 LLM key
     await useMockProvider(page, { workspace: false });
     // 验证 mock provider 已配置 (避免之前 test 残留的真实 LLM provider 被优先使用)
-    const settings = await invoke<{ default_llm_provider_id?: string }>("get_settings");
+    const settings = await invoke<{ default_llm_provider_id?: string }>(page, "get_settings");
     if (settings.default_llm_provider_id !== "mock") {
       throw new Error(
         "default_llm_provider_id 应为 mock,实际: " + (settings.default_llm_provider_id ?? "null"),
@@ -36,12 +26,8 @@ test.describe("07 — Mock LLM provider", () => {
     }
   });
 
-  test.afterAll(async () => {
-    await disposeTauriPage();
-  });
-
-  test.beforeEach(async () => {
-    const page = await getTauriPage();
+  test.beforeEach(async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
     page.on("console", (msg: { type: string; text: string }) => {
       if (msg.type === "error") {
         console.log("[" + __filename + " page error]", msg.text);
@@ -50,14 +36,14 @@ test.describe("07 — Mock LLM provider", () => {
     page.on("pageerror", (err: Error) => {
       console.log("[" + __filename + " page pageerror]", err.message);
     });
-    await cancelRunningAgent();
-    await clearAllHistory();
+    await cancelRunningAgent(page);
+    await clearAllHistory(page);
     await clearMockQueue(page);
     await clickNewConversationAndWait(page);
   });
 
-  test("纯文本响应:assistant bubble 包含预置的固定文本", async () => {
-    const page = await getTauriPage();
+  test("纯文本响应:assistant bubble 包含预置的固定文本", async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
 
     // 预置一个固定文本响应
     const cannedText = "Hello from mock LLM!";
