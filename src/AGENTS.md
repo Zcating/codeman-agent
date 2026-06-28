@@ -24,7 +24,7 @@ V1 是 Tauri 2 + Solid chat agent，**不是 V0 280x100 浮窗**。视觉层走 
 - `stores/` — 跨域 Solid signal
 - `hooks/` — 跨域 composable（`use-` 前缀，V1 预留位）
 - `components/ui/` — 跨域设计系统原子
-- `components/internal/` — 跨域业务组件——codeman-* prefix（[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-N）；当前已落地 `codeman-sidebar`（首例，[ADR-0022](../docs/adr/0022-internal-components-and-design-tokens.md)）
+- `components/internal/` — 跨域业务组件——codeman-* prefix（[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-N）；当前已落地 `codeman-sidebar`（首例，[ADR-0022](../docs/adr/0022-internal-components-and-design-tokens.md)）+ `codeman-dialog`（命令式 alert/confirm/show，[ADR-0023 D8-W6](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md)）
 
 **`features/`**：业务域。允许子目录（白名单，按需创建）：
 
@@ -88,7 +88,9 @@ V1 是 Tauri 2 + Solid chat agent，**不是 V0 280x100 浮窗**。视觉层走 
 | 新增 sidebar 组件                 | 改 `shared/components/ui/sidebar.tsx`（primitive） + `shared/components/internal/codeman-sidebar.tsx`（业务组合），遵循 [ADR-0022](../docs/adr/0022-internal-components-and-design-tokens.md) + [ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md)（codeman-* namespace） |
 | 改 Home 布局 / Codex form         | 改 `src/features/chat/routes/index.tsx`（状态机）+ `src/features/chat/components/home.tsx`（Codex form）                            |
 | 改 `Conversation.workspace_id`    | 改 `src-tauri/src/db/conversations.rs`（Rust struct） + `src/shared/lib/types.ts`（TS 镜像）+ `src-tauri/src/db/migrations/<seq>_add_workspace_id.sql`（DB 迁移） |
-| 改 `last_used_workspace_id`       | 改 `src-tauri/src/settings.rs::Settings`（Rust）+ `src/shared/lib/types.ts`（TS）+ `src/shared/stores/app.store.ts`（default）       |
+| 改 `last_used_workspace_id`       | 改 `WorkspaceService`（Rust + TS Service） + `src/features/chat/stores/chat.store.ts`（chatStore reactive 状态）。**不再**是 Settings 字段，**不再**走 `appStore`（ADR-0023 D8-W）。|
+| 新增 Workspace CRUD               | `src-tauri/src/db/workspaces.rs`（Rust struct + SQLite）+ `src-tauri/src/db/migrations/<seq>_workspaces.sql` + `src-tauri/src/lib.rs`（Tauri 命令）+ `src/features/chat/lib/workspace-service.ts`（Effect Context.Tag + Live Layer）+ `src/features/chat/stores/chat.store.ts`（reactive bridge）。遵循 [ADR-0023 D8-W](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md)。|
+| 新增 Dialog 原子                  | `shared/components/ui/dialog.tsx`（@ark-ui/solid Dialog 包装，shadcn/ui 风格）+ `shared/components/internal/codeman-dialog.tsx`（命令式 alert / confirm / show）。遵循 [ADR-0023 D8-W6](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md)。|
 | 新增跨域设计系统原子              | `shared/components/ui/<Name>.tsx`（PascalCase）+ 同名 `<Name>.test.tsx`；Select primitive 走 @ark-ui/solid 包装（[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-S）            |
 | 新增跨域业务组件                  | `shared/components/internal/codeman-<Name>.tsx`（**ADR-0022** 首例 `codeman-sidebar`；[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-N codeman-* prefix 锁定；新组件须严格 prop-driven）      |
 | 新增跨域 Select wrapper          | `shared/components/ui/codeman-select.tsx`（flat options）或 `codeman-group-select.tsx`（groups）；内部用 @ark-ui/solid Select（[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-S） |

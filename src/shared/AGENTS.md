@@ -9,8 +9,8 @@
 | `lib/`                 | 纯函数 + 跨域类型：`cn.ts` / `logger.ts` / `tauri.ts` / `units.ts` / `types.ts` / `format-app-error.ts` / `design-tokens.ts` | 7 个文件（ADR-0010 前：3 文件；ADR-0018 加 `logger.ts`；ADR-0016 加 `format-app-error.ts`；**ADR-0022** 加 `design-tokens.ts`） |
 | `stores/`              | 跨域 Solid signal                                                                                       | `theme.ts`（从 `state/` 迁，ADR-0010）                                                                        |
 | `hooks/`               | 跨域 composable（`use-` 前缀）                                                                          | 空，V1 预留                                                                                                   |
-| `components/ui/`       | 跨域**设计系统原子**                                                                                    | 5 原子（Button / Card / Checkbox / Input / Textarea）+ `AGENTS.md`（从 `ui/` 迁）                             |
-| `components/internal/` | 跨域**业务组件**——跟本应用业务绑定但被多个 feature 复用  | `codeman-sidebar`（**ADR-0022** 首例，由 chat feature 消费；命名规则由 [ADR-0023 D4-N](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) 锁定；准入规则见 [ADR-0022 D1](../../docs/adr/0022-internal-components-and-design-tokens.md)） |
+| `components/ui/`       | 跨域**设计系统原子**                                                                                    | 6 原子（Button / Card / Checkbox / Input / Textarea / **Dialog**）+ `codeman-select.tsx` + `codeman-group-select.tsx`（Select 包装，ADR-0023 D4-S）+ `AGENTS.md` |
+| `components/internal/` | 跨域**业务组件**——跟本应用业务绑定但被多个 feature 复用  | `codeman-sidebar`（ADR-0022 首例）+ `codeman-dialog`（ADR-0023 D8-W6 引入，命令式 Modal：`alert` / `confirm` / `show`）；命名规则由 [ADR-0023 D4-N](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) 锁定 |
 
 **`shared/` 不允许**的子目录（旧命名已废弃，违反 ADR-0010 一律删除）：
 
@@ -24,8 +24,8 @@
 
 | 类别                   | 定义                                                     | 例子                                                                                 |
 | ---------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `components/ui/`       | **跨域设计系统原子**——不依赖具体业务，可在其它项目里复用 | Button / Input / Textarea / Checkbox / Card / **Select**（codeman-select + codeman-group-select wrappers，ADR-0023 D4-S） |
-| `components/internal/` | **跨域业务组件**——跟本应用业务绑定但被多个 feature 复用  | ErrorBoundary / LoadingSpinner / Toast / Provider wrappers / Layout atoms / AppShell / **codeman-sidebar**（chat feature 消费） |
+| `components/ui/`       | **跨域设计系统原子**——不依赖具体业务，可在其它项目里复用 | Button / Input / Textarea / Checkbox / Card / **Select**（codeman-select + codeman-group-select wrappers，ADR-0023 D4-S）/ **Dialog**（`dialog.tsx`，@ark-ui/solid 包装，ADR-0023 D8-W6） |
+| `components/internal/` | **跨域业务组件**——跟本应用业务绑定但被多个 feature 复用  | ErrorBoundary / LoadingSpinner / Toast / Provider wrappers / Layout atoms / AppShell / **codeman-sidebar** / **codeman-dialog**（命令式 confirm/alert/show，ADR-0023 D8-W6） |
 
 **为什么 `internal` 而不是 `app` 或 `feature-shared`**：与"设计系统（ui）"形成对照语义——"ui = 跨项目通用，internal = 跨 feature 通用但绑定本应用"。V1.5+ 开首例 `codeman-sidebar`（chat feature 消费；详见 [ADR-0022 D1](../docs/adr/0022-internal-components-and-design-tokens.md)）。后续新增 internal 组件须保持严格 prop-driven，不依赖任何 feature 的 store / 类型。
 

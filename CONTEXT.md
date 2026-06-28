@@ -29,19 +29,20 @@
 
 ### File IO
 
-- **Workspace (工作区)** — 用户在 Settings (`Settings.workspaces: Array<{ id, label, root_path, enabled }>`) 中配置的根目录。**每个 Conversation 绑定 1 个 workspace** (per-Conv, `Conversation.workspace_id` 必填，详见 `Workspace-Bound Conversation`)；agent 的 file tool 仅在该目录树下操作，越界 (canonical path 不在 workspace root 内) 由 Tauri command 拒绝 (返回 `SandboxViolation` 错误)。_避免_: sandbox、root directory、project root。
+- **Workspace (工作区)** — 用户在 file tool 中操作的根目录，由 chat feature 管理（`WorkspaceService` + SQLite 持久化，per ADR-0023 D8-W）。创建后 `root_path` 不可变。**每个 Conversation 绑定 1 个 workspace** (per-Conv, `Conversation.workspace_id` 必填，详见 `Workspace-Bound Conversation`)；agent 的 file tool 仅在该目录树下操作，越界 (canonical path 不在任何 workspace root 内) 由 Tauri command 拒绝 (返回 `SandboxViolation` 错误)。_避免_: sandbox、root directory、project root。
 - **Workspace-Bound Conversation (绑定 workspace 的会话)** — 每个 Conversation 在创建时 (`createConversation(workspaceId, ...)`) 必须绑定 1 个 workspace (`workspace_id: string` 字段)，创建后不可更改。`workspace_id = ""` 表示 "needs workspace" (V1.x 迁移的旧 conv 状态，UI 灰标)。该绑定决定 file tool 沙箱边界；Home 上的 workspace 选择器决定新 conv 的绑定。_避免_: global workspace、workspace 切换 (per-Conv 锁定后不存在切换)。
-- **Add Workspace (添加 Workspace)** — 用户在 Home 的 workspace picker dropdown 中通过 "+ Add new workspace…" Action slot 触发；调 `appStore.pickWorkspacePath()` 弹 OS 原生 folder picker；picker 关闭后若返回非 null 路径，调用 `appStore.addWorkspace(rootPath)` 自动派生 label + dedup（同 root_path 重复时静默忽略并自动选已有） + 写入 `Settings.workspaces[]` + 立即预选（`setDraftWorkspaceId` + `setLastUsedWorkspaceId`） + 关闭 dropdown + focus textarea。Home **不**再跳 /settings。_避免_: Navigate-to-Settings（V2.1 polish 早期设计，已废止）。
-- **Workspace Label Derivation (workspace label 派生)** — 通过 OS folder picker 添加 workspace 时（`Add Workspace` 流程），`label` 从 `root_path` 自动派生：调用 `deriveLabelFromPath(rootPath)` (位于 `src/shared/lib/derive-label-from-path.ts`) 取路径最后非空段作为 label；空结果（`C:\`、`/`）fallback `"Untitled workspace"`。后续用户可在 /settings 自由修改 label。_避免_: 强制用户在 picker 关闭后输入 label（增加 UI 阻塞；违反"calm/professional"原则）。
+- **Add Workspace (添加 Workspace)** — 用户在 Home 的 workspace picker dropdown 中通过 "+ Add new workspace…" Action slot 触发；调 `chatStore.pickWorkspacePath()` 弹 OS 原生 folder picker；picker 关闭后若返回非 null 路径，调用 `chatStore.addWorkspace(rootPath)` → `WorkspaceService.add`（SQLite 持久化）+ 自动派生 label（`deriveLabelFromPath`）+ dedup（同 root_path 重复时静默忽略并自动选已有）+ 关闭 dropdown + focus textarea。Home **不**再跳 /settings。_避免_: Navigate-to-Settings（V2.1 polish 早期设计，已废止）。
+- **Workspace Label Derivation (workspace label 派生)** — 通过 OS folder picker 添加 workspace 时（`Add Workspace` 流程），`label` 从 `root_path` 自动派生：调用 `deriveLabelFromPath(rootPath)` (位于 `src/shared/lib/derive-label-from-path.ts`) 取路径最后非空段作为 label；空结果（`C:\`、`/`）fallback `"Untitled workspace"`。后续用户可通过 sidebar hover → Rename 按钮修改 label。_避免_: 强制用户在 picker 关闭后输入 label（增加 UI 阻塞；违反"calm/professional"原则）。
 - **File Tool (文件工具)** — pi-agent 工具族，内置 5 个: `read_file` (读全文) / `write_file` (覆盖写) / `edit_file` (替换文本，支持 `replace_all`) / `search_files` (glob + content 搜索) / `delete_file` (移至回收站)。所有工具通过 Tauri command 调 Rust `std::fs`，沙箱由 workspace 边界约束。_避免_: fs tool、file operation (过载)。
-- **Sandbox Violation (越界错误)** — Tauri command 在 `canonicalize(path)` 后检测到 `path` 不在任何已启用 workspace 目录下时返回的错误。Agent 收到后必须重新规划 (改路径 / 让用户加 workspace) 而非重试原路径。
+- **Sandbox Violation (越界错误)** — Tauri command 在 `canonicalize(path)` 后检测到 `path` 不在任何 workspace 目录下时返回的错误。Agent 收到后必须重新规划 (改路径 / 让用户加 workspace) 而非重试原路径。
 
 ### 架构
 
 - **Runtime (运行时)** — 包装 pi-mono agent loop 的**纯工厂函数** `createAgentRuntime()`。无 `Context.Tag` service、无 Layer DI、无内部 Map（V2 起 per ADR-0019 supersede ADR-0014 D1）。每次调用 `createAgentRuntime()` 返回独立的 `AgentRuntime` 实体，存放在 `ConversationState.runtime`（per-conv 实例化）。`AgentRuntime.run({ context, provider })` 内部仍用 Queue-based Mailbox 架构（per ADR-0017）：`Queue.unbounded` 作为 event bus，`Effect.fork` 在子 fiber 里跑 `agent.subscribe + agent.prompt`，事件通过 `Queue.unsafeOffer` 推入；consumer 端 `Stream.fromQueue(queue)` 是 leaf operator。每次 `run()` 调用新建 pi-mono `Agent`，`initialState.messages = context`（store 来的浅拷贝，per ADR-0019 D2 "Agent 是 per-run transient"）；`AbortController` 注入 transport，`cancel()` 通过 `abortController.abort()` 触发 fetch abort。_避免_：agent core、agent loop、AgentRuntime service（旧 Context.Tag + Layer 设计）。
-- **Per-Conversation Runtime (会话级运行时)** — 每个 Conversation 对应一个 `createAgentRuntime()` 产物（即一个 `AgentRuntime` 实体），存放在 `ConversationState.runtime`（`src/features/chat/stores/conversations.store.ts` inline 定义）。生命周期跟随 Conversation：创建于 Conversation 首次 send 时（lazy），销毁于 Conversation 被 delete / archive。in-flight 流不被 cancel — 切换 Conversation 时 partial 进度保留在 `ConversationState.messages`（stream 订阅实时写）。同一 Conversation 至多 1 个 active 流；多 Conversation 可并行 streaming。_避免_：singleton Agent（旧 ADR-0014 D1 已被 supersede）、per-request Agent、Per-Conversation Agent（旧 term,已并入本词条）。
-- **Conversation State (会话视图)** — `Conversation`（DB-backed 持久字段）+ per-conv reactive state（`messages: Message[]` + `streamingMessageId: string | null`）+ per-conv runtime（`runtime: AgentRuntime`）的组合类型。定义在 `src/features/chat/stores/conversations.store.ts`（V2 起合并原 `messages.store` + `agent.store`，per ADR-0019 D3）。Solid `createStore<{ activeId: string | null; byId: Record<ConvId, ConversationState> }>` 管理反应式。UI 读 `store.byId[activeId()]` 拿到 reactive 视图；store 是 single source of truth，runtime 是 stateless LLM caller。_避免_：Per-Conv message signal（旧 `messages$` 全局 signal，已废止）、Agent Map（旧 `Ref<Map<ConvId, Agent>>`，已废止）。
-- **Bridge (桥接层)** — 将 Effect `Stream` / `Effect` 输出翻译为 Solid `createStore` 的层。V2 起归口到 `conversations.store.ts`：stream `runForEach` 订阅 → `setStore("byId", convId, ...)` 写 reactive state。UI 组件不 `import 'effect'`。_避免_：adapter（过载）。
+- **Per-Conversation Runtime (会话级运行时)** — 每个 Conversation 对应一个 `createAgentRuntime()` 产物（即一个 `AgentRuntime` 实体），存放在 `ConversationState.runtime`（`src/features/chat/stores/chat.store.ts` inline 定义）。生命周期跟随 Conversation：创建于 Conversation 首次 send 时（lazy），销毁于 Conversation 被 delete / archive。in-flight 流不被 cancel — 切换 Conversation 时 partial 进度保留在 `ConversationState.messages`（stream 订阅实时写）。同一 Conversation 至多 1 个 active 流；多 Conversation 可并行 streaming。_避免_：singleton Agent（旧 ADR-0014 D1 已被 supersede）、per-request Agent、Per-Conversation Agent（旧 term,已并入本词条）。
+- **Conversation State (会话视图)** — `Conversation`（DB-backed 持久字段）+ per-conv reactive state（`messages: Message[]` + `streamingMessageId: string | null`）+ per-conv runtime（`runtime: AgentRuntime`）的组合类型。定义在 `src/features/chat/stores/chat.store.ts`（V2 起合并原 `messages.store` + `agent.store`，per ADR-0019 D3）。Solid `createStore<{ activeId: string | null; byId: Record<ConvId, ConversationState> }>` 管理反应式。UI 读 `store.byId[activeId()]` 拿到 reactive 视图；store 是 single source of truth，runtime 是 stateless LLM caller。_避免_：Per-Conv message signal（旧 `messages$` 全局 signal，已废止）、Agent Map（旧 `Ref<Map<ConvId, Agent>>`，已废止）。
+- **Bridge (桥接层)** — 将 Effect `Stream` / `Effect` 输出翻译为 Solid `createStore` 的层。V2 起归口到 `chat.store.ts`：stream `runForEach` 订阅 → `setStore("byId", convId, ...)` 写 reactive state。UI 组件不 `import 'effect'`。_避免_：adapter（过载）。
+- **Chat Store (聊天域 Store)** — `src/features/chat/stores/chat.store.ts`（原 `conversations.store.ts`, 重命名 per ADR-0023 D8-W）。chat feature 唯一响应式源：拥有 conversations（ConversationState byId + CRUD + sendMessage）+ workspaces（WorkspaceService 桥接 + CRUD + selectedWorkspaceId 派生状态）。**公开 API 返回 `Effect<T, AppError, never>`**（per ADR-0016 D4 + "Bridge"），UI 通过 `Effect.runPromiseExit(...)` + `Exit.match(...)` 消费。公开 AS `chatStore` namespace（`features/chat/index.ts` barrel）。_避免_: agent store、messages store（旧拆分已合并 per ADR-0019 D3）。
 - **Effect Service (Effect 服务)** — 类型化异步模块，暴露 `Effect<A, E, R>` 或 `Stream<A, E, R>`。通过 Effect layer 组合；通过 mock layer 测试（`@effect/vitest`）。V2 起 chat 域不再用 Effect Service 模式承载 runtime（`createAgentRuntime` 是纯工厂函数而非 Context.Tag），但 DB 桥接仍用 Service 模式（`ConversationService` / `MessageService` in `shared/lib/tauri.ts`）。
 - **IPC** — Tauri 命令桥接。Rust 端命令注册在 `src-tauri/src/lib.rs::invoke_handler!`；TS 端包装在 `src/shared/lib/tauri.ts`（Service Tag + Live Layer）。`invoke` 在该文件之外不出现。
 
@@ -52,22 +53,20 @@
 
 ### Settings 与状态
 
-- **Settings (设置)** — 通过 `tauri-plugin-store` 持久化的 JSON 文档，位于 OS app-data 目录。包含统一 `providers[]` 数组（每条 `Provider` 含 `api_key` 明文字段，见 ADR-0015），以及 window / theme / system_prompt / conversations / workspaces / user_language / start_at_login 等字段。**API 密钥现在直接落在 Settings JSON 内**（V1.7+ 之前的"分 Tauri store 命名空间"模型已废止）。
-- **App Store (全局应用状态)** — `src/shared/stores/app.store.ts` 提供的 Settings reactive 桥接层（ADR-0015 + ADR-0016）。`createStore` 包装 settings。公开 API（5 个）：
+- **Settings (设置)** — 通过 `tauri-plugin-store` 持久化的 JSON 文档，位于 OS app-data 目录。包含统一 `providers[]` 数组（每条 `Provider` 含 `api_key` 明文字段，见 ADR-0015），以及 window / theme / system_prompt / conversations / user_language / start_at_login 等字段。`workspaces` 已从 Settings 移出，改由 `WorkspaceService`（SQLite 持久化，per ADR-0023 D8-W）。**API 密钥现在直接落在 Settings JSON 内**（V1.7+ 之前的"分 Tauri store 命名空间"模型已废止）。
+- **App Store (全局应用状态)** — `src/shared/stores/app.store.ts` 提供的 Settings reactive 桥接层（ADR-0015 + ADR-0016）。`createStore` 包装 settings。公开 API（7 个）：
   - `appStore.state.value` — reactive 读
   - `appStore.set(patch)` — 写 state，**不**触发 IPC（debounce 由 `features/settings/lib/settings-saver` 触发）
   - `appStore.forceFlush()` — 跳过 debounce 立即 IPC（footer Save 调用）
   - `appStore.refresh()` — 从后端重载
   - `appStore.refreshProviderModels(id)` — 调 `ProviderService.fetchModels` 拉新 models 列表并写 state（含 `default_model` 自动 fallback 不变量）
-  - `appStore.pickWorkspacePath()` — 调 OS folder picker，返回选中路径或 `null`
-  - `appStore.addWorkspace(rootPath)` — 派生 label + dedup + 写入 `Settings.workspaces[]` + 设置 `last_used_workspace_id`；返回新建（或已存在）的 `Workspace`，picker 添加专用（见 `Add Workspace` 词条）
   - `appStore.deleteProvider(id)` — 从 `providers[]` 移除指定记录
   - `appStore.clearAllHistory()` — 清 SQLite conversation 表（settings 路由 advanced tab 调用）
 
   **D4 硬规则（ADR-0016）**：**所有** service 操作（`Effect.gen(...yield* Service...)` / 裸 `invoke("...")` / 裸 `fetch`）只能在 Store 中出现。组件层 `.tsx` 文件**禁止**直接 import service 或调 IPC，全部走 `Effect.runPromiseExit(store.method(...))` + `Exit.match`。测试代码（`*.test.ts*`）不受 D4 约束。
 
 - **Stale (过期)** — `Snapshot` 时间戳超过 Billing Provider 的 `stale_after_seconds`；传统的"过期徽标"语义在 tool result 缓存场景保留。
-- **Last-Used Workspace (上次使用的 workspace)** — Settings 字段 `last_used_workspace_id?: string`。Home 落地时的预选 workspace；若该 workspace 已被删除/禁用，fallback 到 `workspaces` 数组中第一个 enabled 项；若 `workspaces` 全空，CTA 引导用户去 /settings 添加。用户在 Home 上选择 workspace 时即更新该字段；通过 `Add Workspace` 流程添加的新 workspace 也立即写入该字段（picker 关闭后 `setLastUsedWorkspaceId(newId)`）。_避免_: default workspace、active workspace (避免与 per-Conv 锁定混淆)。
+- **Last-Used Workspace (上次使用的 workspace)** — **已删除**（per ADR-0023 D8-W）。每个 app 启动总是进入 Home；用户每次手动选 workspace。无持久化。_避免_: 重新引入该字段（无业务价值）。
 
 ### 样式
 
@@ -78,11 +77,13 @@
 ### 组件
 
 - **Codeman Component (codeman-* namespace)** — `shared/components/internal/` 目录下所有组件文件以 `codeman-` 为前缀（如 `codeman-sidebar`）。命名空间规则由 [ADR-0023](./adr/0023-codeman-prefix-and-ark-ui-select.md) D4-N 锁定（从 ADR-0022 治理权迁移）。`internal/` 准入条件 + prop-driven 强约束保留（每个 codeman-* 组件必须纯 props 输入，不依赖任何 `features/*/stores/*`）。_避免_：feature-prefixed 命名（如 `agent-sidebar` / `settings-panel`），破坏跨域复用识别。
-- **UI Primitive (design system atoms)** — `shared/components/ui/` 目录下的纯展示组件（Button / Card / Checkbox / Input / Textarea / **Select** / ...）。Select 由 [ADR-0023](./adr/0023-codeman-prefix-and-ark-ui-select.md) D4-S 引入：基于 `@ark-ui/solid@^5.37.x` 的两个 wrapper：
+- **UI Primitive (design system atoms)** — `shared/components/ui/` 目录下的纯展示组件（Button / Card / Checkbox / Input / Textarea / **Select** / **Dialog** / ...）。Select 由 [ADR-0023](./adr/0023-codeman-prefix-and-ark-ui-select.md) D4-S 引入：基于 `@ark-ui/solid@^5.37.x` 的两个 wrapper：
   - `codeman-select.tsx` — single-list Select，props = `options: {label, value}[]` + `value: string | null` + `onChange: (value) => void` + 可选 `Action` slot（用于"+ Add new" 等非 option 元素，放 `<Select.List>` 之后、`Select.Content` 内部，下方加 `<hr role="separator">`）
   - `codeman-group-select.tsx` — grouped Select，props = `groups: Array<{label, options: {label, value}[]}>`,使用 `Select.ItemGroup` + `Select.ItemGroupLabel` 实现 provider 分组等场景
 
   Action slot 走 `useSelectContext().setOpen(false)` 关闭 dropdown；不是 listbox role，**不可通过 ↑/↓ 键到达**（折衷，V2.2 考虑 composite role）。_避免_：手写 Select 基础设施（Popover / portal / 键盘 / ARIA / Floating UI 定位），全部由 `@ark-ui/solid` 提供；不要引入 Radix / Kobalte / 其它 headless 库。
+- **Codeman Dialog (codeman-dialog 命令式 Modal)** — `shared/components/internal/codeman-dialog.tsx`（ADR-0023 D8-W6 引入，第 2 个 `internal/` 组件）。基于 `shared/components/ui/dialog.tsx`（`@ark-ui/solid` Dialog 原语包装的 shadcn/ui 风格通用 Dialog）。暴露 3 个命令式函数：`alert({ title, content, confirmText }) → Promise<void>`, `confirm({ title, content, confirmText, cancelText }) → Promise<boolean>`, `show<T>((resolve: (value: T) => void) => node) → Promise<T>`。纯 prop-driven，不依赖 feature stores。用于 workspace rename/delete dialog 等确认对话框。_避免_：手写 dialog（@ark-ui/solid 提供 ARIA + 键盘 + focus trap）。
+- **Cascade Sidebar Display (级联 sidebar 显示)** — `CodemanSidebar` 的视觉结构，由 [ADR-0023](./adr/0023-codeman-prefix-and-ark-ui-select.md) D7-CS 锁定。Workspaces 和 Conversations 渲染为**嵌套 tree**（每个 `WorkspaceNode` 含 `children: ConvNode[]`），**accordion 模式**——同一时刻至多 1 个 workspace 展开其 conversations，由 `@ark-ui/solid` 的 `Accordion.Root`（`multiple={false}` + `collapsible={true}`）承载（D7-CS8）。展开状态由 Ark UI 内部 zag-js state machine 管理（uncontrolled via `defaultValue={[]}`），`CodemanSidebar` **不持有展开 signal**，符合 ADR-0022 D3「codeman-* 组件严格 prop-driven」。Workspace **永远不 active**（无 `selectedWorkspaceId` prop）；只有 Conversation 可以 active（`selectedItemId`）。V1.x 迁移遗留 `workspace_id === ""` 的 convs 在 cascade 中不显示（与 V2.1 wave 1 行为一致）。空 workspace 展开后渲染可点击 `<button data-empty-workspace-id>` 文本「该 workspace 暂无会话」（CTA = `setLastUsedWorkspaceId(wsId)` + `clearActiveConversation()`，落到 HomeAgentForm 该 workspace 预选）。语义属性：`data-workspace-id` / `data-conv-id` / `aria-expanded` / `aria-current="page"`，e2e 选择器契约。视觉指示：lucide `ChevronRight` 通过 Tailwind `group-data-[state=open]/item:rotate-90` 旋转 90°表示展开（D7-CS7）。_避免_：V1.x flat `data-conv-idx` 索引（已在 spec 09 重写时废止）；always-expanded tree（多 workspace 滚动条地狱）；sidebar 写 `last_used_workspace_id`（与 HomeAgentForm draft 解耦后由 HomeAgentForm 独占）；手写 accordion state machine（用 Ark UI 避免）。
 
 ### Localization
 
@@ -118,7 +119,7 @@ Conversation          (src/shared/lib/types.ts, DB-backed)
         ├── model, input_tokens, output_tokens
         └── created_at
 
-Conversation State    (src/features/chat/stores/conversations.store.ts, V2 in-memory view)
+Conversation State    (src/features/chat/stores/chat.store.ts, V2 in-memory view)
   ├── (DB fields 镜像 Conversation)
   ├── messages[]               (Solid createStore reactive, per-conv 实时更新)
   ├── streamingMessageId       (当前 streaming 的 assistant msg id, 或 null)
@@ -185,13 +186,7 @@ interface Settings {
     max_history: number; // 默认 1000
   };
 
-  // G. File IO workspaces
-  workspaces: Array<{
-    id: string;
-    label: string;
-    root_path: string;
-    enabled: boolean;
-  }>;
+  // G. Deleted — workspaces 已移出 Settings，改由 WorkspaceService (SQLite) 管理 (ADR-0023 D8-W)
 }
 
 interface ModelMeta {
