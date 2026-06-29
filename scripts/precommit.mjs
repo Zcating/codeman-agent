@@ -19,7 +19,7 @@ const SOURCE_RE = /\.(ts|tsx)$/;
 const TEST_RE = /\.(test|spec)\.(ts|tsx)$/;
 const DT_RE = /\.d\.ts$/;
 const sourceFiles = staged.filter(
-    (f) => SOURCE_RE.test(f) && !TEST_RE.test(f) && !DT_RE.test(f),
+    (f) => SOURCE_RE.test(f) && !TEST_RE.test(f) && !DT_RE.test(f) && !f.includes("e2e/"),
 );
 
 if (sourceFiles.length > 0) {

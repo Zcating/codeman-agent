@@ -7,16 +7,22 @@
 //! V2 简化:billing 工具已移除,本 spec 只验证纯文本响应。
 //! 工具调用的 mock 行为在 08-file-tools-mock.spec.ts 验证。
 
-import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, setupWorkspaceAndCreateConvViaIpc, submitForm } from "./fixtures";
+import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
 import { useMockProvider, enqueueMockResponse, clearMockQueue } from "./mock-provider";
+import * as path from "node:path";
+import * as os from "node:os";
 
 test.describe("07 — Mock LLM provider", () => {
   test.beforeAll(async ({ tauriEnv }) => {
     const { page } = tauriEnv;
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
-    // D8-W: provision workspace so clickNewConversationAndWait works
-    await setupWorkspaceAndCreateConvViaIpc(page);
+    // D8-W: provision workspace via direct IPC (avoids setupWorkspaceAndCreateConvViaIpc's
+    // home form send flow which triggers LLM streaming with whatever provider is active).
+    await invoke(page, "add_workspace", {
+      label: "Mock E2E Test Workspace",
+      rootPath: path.join(os.tmpdir(), "codeman-e2e-mock-" + Date.now()),
+    });
     // 切换到 mock provider — 不依赖 .env 里的真实 LLM key
     await useMockProvider(page);
     // 验证 mock provider 已配置 (避免之前 test 残留的真实 LLM provider 被优先使用)

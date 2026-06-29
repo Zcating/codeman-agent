@@ -40,7 +40,7 @@ import {
   createWriteStream,
 } from "node:fs";
 import { resolve, join } from "node:path";
-import { tmpdir } from "node:os";
+import { tmpdir, homedir } from "node:os";
 
 import { connectTauri, type TauriPage } from "./cdp-driver";
 import { BASE_PORTS } from "../playwright.config";
@@ -109,6 +109,22 @@ export const test = base.extend<{}, { tauriEnv: TauriEnv }>({
       //    `<id>` directly).
       rmSync(userDataDir, { recursive: true, force: true });
       mkdirSync(webview2Dir, { recursive: true });
+
+      // 1b. Clean per-worker SQLite DB from Tauri app data dir.
+      //     `db::connect()` stores `codeman-agent.w{idx}.db` in Tauri's
+      //     `app_data_dir` (`%APPDATA%/<bundle_identifier>/` on Windows).
+      //     This is SEPARATE from `userDataDir` (WebView2 state only), so the
+      //     rmSync(userDataDir) above does NOT touch it. Without this cleanup,
+      //     `sqlx::migrate!` detects the migration file hash changed between
+      //     builds (binary rebuild changes the embedded migration hash) and
+      //     panics with "migration N was previously applied but has been modified".
+      const tauriAppData = join(
+        process.env["APPDATA"] ?? join(homedir(), "AppData", "Roaming"),
+        "com.zcati.codeman-agent",
+      );
+      for (const suffix of [`.w${idx}.db`, `.w${idx}.db-wal`, `.w${idx}.db-shm`]) {
+        try { rmSync(join(tauriAppData, `codeman-agent${suffix}`), { force: true }); } catch {}
+      }
 
       // 2. Spawn the compiled Tauri binary directly with per-worker env vars.
       //    CODEMAN_TEST_WORKER → Rust suffixes SQLite/settings/window-state files.

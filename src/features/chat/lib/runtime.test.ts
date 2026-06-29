@@ -455,7 +455,7 @@ describe("run() — agent_end 事件", () => {
     }
   });
 
-  it("agent_end 且 messages 为空数组时不发出 done 事件", async () => {
+  it("agent_end 的 messages 为空数组时仍发出 done 事件（空内容）", async () => {
     const { Agent } = await import("@mariozechner/pi-agent");
     const mockedAgent = vi.mocked(Agent);
     const originalImpl = mockedAgent.getMockImplementation();
@@ -483,17 +483,16 @@ describe("run() — agent_end 事件", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 
+      // ADR-0019: agent_end 无条件 emit done — 即使 messages 为空
       capturedCallback!({ type: "agent_end", messages: [] });
 
-      // 再次发送 agent_end 带内容以触发 emit.end() 清理
-      capturedCallback!({
-        type: "agent_end",
-        messages: [{ content: [{ type: "text", text: "cleanup" }] }],
-      });
-
       await new Promise((resolve) => setTimeout(resolve, 20));
-      const doneEvent = events.find((e) => e.type === "done");
-      expect(doneEvent).toBeUndefined();
+      const doneEvent = events.find((e) => e.type === "done") as
+        | { type: "done"; message: { content: string } }
+        | undefined;
+      // done event IS emitted with empty content
+      expect(doneEvent).toBeDefined();
+      expect(doneEvent!.message.content).toBe("");
     } finally {
       mockedAgent.mockImplementation(originalImpl as never);
     }

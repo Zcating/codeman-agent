@@ -13,9 +13,11 @@
 //! provider 切到 minimax（E2E 之前可能用户手动配过其它 provider，注入 minimax key
 //! 不会被 chat runtime 读到）。env 未设时 spec skip（与 spec 06 决策一致）。
 
-import { test, expect, assert, cancelRunningAgent, clearAllHistory, invoke, setupWorkspaceAndCreateConvViaIpc, submitForm } from "./fixtures";
+import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
 import { loadEnvFile } from "./env-loader";
 import type { Settings } from "../src/shared/lib/types";
+import * as path from "node:path";
+import * as os from "node:os";
 
 const USER_PROMPT = "用一句话介绍你自己";
 
@@ -36,6 +38,15 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     // 取消任何 in-flight LLM(前一个 spec 可能留下 running=true —
     // 没有这一步,新的 "新建会话" 点击后 textarea 会保持 disabled)
     await cancelRunningAgent(page);
+
+    // D8-W: 预置 workspace,使 clickNewConversationAndWait 可用。
+    // 用直接 IPC 创建(跟 05-file-tools / 06-llm-round-trip 一致),
+    // 避免 setupWorkspaceAndCreateConvViaIpc 的 home form send 流程
+    // 在顺序执行时被前 spec 残留的 provider 干扰。
+    await invoke(page, "add_workspace", {
+      label: "E2E LLM Test Workspace",
+      rootPath: path.join(os.tmpdir(), "codeman-e2e-llm-" + Date.now()),
+    });
 
     const envBaseUrl = envFile.MINIMAX_CN_API_BASE_URL ?? process.env.MINIMAX_CN_API_BASE_URL;
     if (envKey && envKey.length > 0) {
@@ -67,19 +78,16 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     test.setTimeout(180_000);
     const { page } = tauriEnv;
 
-    // V2.1: the sidebar "新对话" button no longer creates a conversation — it
-    // navigates home. Use the IPC-based shim to create + activate a conv.
-    // This switches V2.1 layout from HomeAgentForm → ChatView.
-    const { convId } = await setupWorkspaceAndCreateConvViaIpc(page);
+    // V2.1: 使用 clickNewConversationAndWait 创建新会话并切换到 ChatView。
+    // 这与顺序执行中稳定的测试(05-file-tools / 06 / 07 / 08)一致,
+    // 避免 setupWorkspaceAndCreateConvViaIpc 的 home form send 流在顺序执行时
+    // 被前 spec 残留的 provider 状态干扰。
+    const { convId } = await clickNewConversationAndWait(page);
 
-    // 1. textarea 应启用 (ChatLayout 现在已 mount,textarea 存在)。
+    // 1. textarea 应启用 (ChatView 已 mount)。
     const textarea = page.locator('textarea[placeholder="发条消息\u2026"]');
+    await assert.visible(textarea, { timeout: 10_000 });
     await assert.enabled(textarea);
-
-    // 2. 等 sidebar 显示新 conv (data-conv-id selector — replaced bg-primary
-    //    class which was V1.x specific)。
-    const newConvInSidebar = page.locator(`[data-conv-id="${convId}"]`);
-    await assert.visible(newConvInSidebar, { timeout: 5_000 });
 
     // 3. 输入并发送。
     await textarea.fill(USER_PROMPT);

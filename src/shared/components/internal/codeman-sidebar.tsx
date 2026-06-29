@@ -123,7 +123,8 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
               <Accordion.Root
                 multiple={false}
                 collapsible={true}
-                defaultValue={[]}
+                // Expand the first workspace by default so convs are immediately visible
+                defaultValue={props.nodes.length > 0 ? [props.nodes[0]!.id] : []}
                 data-testid="sidebar-accordion"
               >
                 <For each={props.nodes}>

@@ -17,9 +17,11 @@
 //! 也不依赖 spec 03/04-llm-stream 的状态(独立 beforeAll)。
 //! 也不依赖 page.goto + LLM 立即返回 — 允许 90s LLM 冷启动。
 
-import { test, expect, assert, clearAllHistory, clickNewConversationAndWait, invoke, resetChatState, setupWorkspaceAndCreateConvViaIpc, submitForm } from "./fixtures";
+import { test, expect, assert, clearAllHistory, clickNewConversationAndWait, invoke, resetChatState, submitForm } from "./fixtures";
 import { loadEnvFile } from "./env-loader";
 import type { Settings } from "../src/shared/lib/types";
+import * as path from "node:path";
+import * as os from "node:os";
 
 const USER_PROMPT = "用一句话介绍你自己";
 
@@ -42,8 +44,14 @@ test.describe("06 — LLM round-trip", () => {
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
 
-    // D8-W: provision workspace so clickNewConversationAndWait works
-    await setupWorkspaceAndCreateConvViaIpc(page);
+    // D8-W: provision workspace so clickNewConversationAndWait works.
+    // Use direct IPC (like 05-file-tools.spec.ts) instead of
+    // setupWorkspaceAndCreateConvViaIpc to avoid home form send flow
+    // which triggers LLM streaming with whatever provider is active.
+    await invoke(page, "add_workspace", {
+      label: "E2E LLM Test Workspace",
+      rootPath: path.join(os.tmpdir(), "codeman-e2e-llm-" + Date.now()),
+    });
 
     if (envKey && envKey.length > 0) {
       injectedKey = envKey;

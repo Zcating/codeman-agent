@@ -184,6 +184,8 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
         };
         setStore("byId", convId, "messages", (msgs) => [...msgs, stub]);
         setStore("byId", convId, "streamingMessageId", stubId);
+        // Notify sidebar re: streaming state change (triggers conversations$ update)
+        setConversationsSignal(Object.values(store.byId));
       }
       setStore("byId", convId, "messages", (msgs) =>
         msgs.map((m) => (m.id === stubId ? { ...m, content: evt.content } : m)),
@@ -226,6 +228,8 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
         setStore("byId", convId, "messages", (msgs) => [...msgs, evt.message]);
       }
       setStore("byId", convId, "streamingMessageId", null);
+      // Notify sidebar re: streaming ended (triggers conversations$ update → badge removal)
+      setConversationsSignal(Object.values(store.byId));
       void persistAssistantMessage({ ...evt.message, conversation_id: convId });
       break;
     }
@@ -235,6 +239,7 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       // (Cancel 按钮不消失,Send 按钮不恢复 — e2e spec 09 D2 失败的原因)。
       console.error("[chat.store] runtime error:", evt.error);
       setStore("byId", convId, "streamingMessageId", null);
+      setConversationsSignal(Object.values(store.byId));
       break;
   }
 }

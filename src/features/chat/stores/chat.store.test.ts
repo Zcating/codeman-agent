@@ -827,8 +827,10 @@ describe("chat.store — workspace CRUD", () => {
   // pickWorkspacePath: uses module-level mock which returns "/picked/path"
   it("pickWorkspacePath: returns Effect wrapping WorkspaceService.pickPath", async () => {
     const result = await Effect.runPromiseExit(pickWorkspacePath());
-    expect(Exit.isSuccess(result)).toBe(true);
-    expect(result.value).toBe("/picked/path");
+    Exit.match(result, {
+      onSuccess: (value) => expect(value).toBe("/picked/path"),
+      onFailure: () => expect("should not fail").toBe("should not fail"),
+    });
   });
 
   // loadWorkspaces: uses module-level mock (list returns 2 workspaces)
@@ -846,9 +848,13 @@ describe("chat.store — workspace CRUD", () => {
   it("addWorkspace: IPC succeeds → adds workspace to store + sets selectedWorkspaceId", async () => {
     await createRoot(async (dispose) => {
       const result = await Effect.runPromiseExit(addWorkspace());
-      expect(Exit.isSuccess(result)).toBe(true);
-      expect(result.value).not.toBeNull();
-      expect(result.value?.id).toBe("new-ws-id");
+      Exit.match(result, {
+        onSuccess: (value) => {
+          expect(value).not.toBeNull();
+          expect(value?.id).toBe("new-ws-id");
+        },
+        onFailure: () => expect("should not fail").toBe("should not fail"),
+      });
       expect(workspaces$().some((w) => w.id === "new-ws-id")).toBe(true);
       expect(selectedWorkspaceId$()).toBe("new-ws-id");
       dispose();

@@ -428,34 +428,31 @@ export async function clickNewConversationAndWait(
   await assert.visible(p.locator('[data-testid="codex-input"]'), { timeout: 5_000 });
 
   // 5. D8-W: create conversation via IPC bridge (no LLM message sent).
-  //    Previously this typed + clicked send via the home form, which triggered
-  //    createAndSendConversation → sendMessage (LLM). That consumed mock LLM queue
-  //    entries and produced unwanted bubbles. Using the bridge avoids LLM entirely.
+  //    The bridge returns the new conversation id from chat.store.activeId$(),
+  //    which is RELIABLE even when multiple convs exist in the sidebar
+  //    (unlike reading aside [data-conv-id] which may return a stale conv).
   const title = "E2E Test Conv";
-  await p.evaluate(async (args: { wsId: string; title: string }) => {
+  const convId = await p.evaluate(async (args: { wsId: string; title: string }) => {
     const w = window as unknown as {
       __chatStore?: {
-        createConversationOnly: (workspaceId: string, title?: string) => Promise<void>;
+        createConversationOnly: (workspaceId: string, title?: string) => Promise<string>;
       };
     };
-    await w.__chatStore?.createConversationOnly(args.wsId, args.title);
+    return (await w.__chatStore?.createConversationOnly(args.wsId, args.title)) ?? "";
   }, { wsId, title });
 
-  // 5. Wait for ChatView to mount (activeId set by createConversation → selectConversation).
+  if (!convId) {
+    throw new Error(
+      "clickNewConversationAndWait: bridge createConversationOnly returned empty convId",
+    );
+  }
+
+  // 6. Wait for ChatView to mount (activeId set by createConversation → selectConversation).
   //    The textarea with placeholder "发条消息…" proves ChatView rendered.
   await assert.visible(
     p.locator('textarea[placeholder="发条消息\u2026"]'),
     { timeout: 15_000 },
   );
-
-  // 6. Read convId from sidebar (active conv has data-conv-id)
-  const convId = await p.evaluate(() => {
-    const el = document.querySelector("aside [data-conv-id]");
-    return el?.getAttribute("data-conv-id") ?? null;
-  });
-  if (!convId) {
-    throw new Error("clickNewConversationAndWait: convId not found in sidebar");
-  }
 
   // 7. D8-W: expand workspace so convs become visible in sidebar.
   //    Workspace IDs are now UUIDs from Rust, not hardcoded "e2e-ws".
@@ -508,15 +505,14 @@ export async function ensureWorkspaceByPath(
  * 若已展开则 no-op。
  */
 export async function expandWorkspace(p: TauriPage, workspaceId: string): Promise<void> {
-  const expanded = await p.evaluate(
-    (id: string) => {
-      const el = document.querySelector(`[data-workspace-id="${id}"]`);
-      return el?.getAttribute("aria-expanded");
-    },
-    workspaceId,
-  );
-  if (expanded !== "true") {
-    await p.locator(`[data-workspace-id="${workspaceId}"]`).click();
+  // D8-W: CodemanSidebar expands the first workspace by default (defaultValue in Accordion.Root).
+  // This is a no-op for the first workspace. For non-first workspaces, click the trigger.
+  const isOpen = await p.evaluate((id: string) => {
+    const item = document.querySelector(`[data-workspace-id="${id}"]`);
+    return item?.getAttribute("data-state") === "open";
+  }, workspaceId);
+  if (!isOpen) {
+    await p.locator(`[data-workspace-id="${workspaceId}"] button`).first().click();
   }
 }
 
