@@ -97,7 +97,7 @@ export default defineConfig(async () => ({
       ],
       reporter: ["text", "html", "json-summary"],
       thresholds: {
-        statements: 50,
+        statements: 90,
         perFile: true,
       },
     },
