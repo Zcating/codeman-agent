@@ -15,7 +15,8 @@
 
 import { createMemo, createSignal, Show, type JSX } from "solid-js";
 import { FolderPlus, Send } from "lucide-solid";
-import { Effect } from "effect";
+import { Effect, Exit } from "effect";
+import { useNavigate } from "@tanstack/solid-router";
 import { appStore } from "../../../shared/stores/app.store";
 import { Button } from "../../../shared/components/ui/button";
 import { CodemanSelect } from "../../../shared/components/ui/codeman-select";
@@ -25,7 +26,8 @@ import {
   selectedWorkspaceId$,
   setSelectedWorkspaceId,
   addWorkspace,
-  createAndSendConversation,
+  createConversation,
+  sendMessage,
 } from "../stores/chat.store";
 import type { ProviderConfig } from "../lib/runtime";
 import { buildEnabledProviders } from "../lib/build-enabled-providers";
@@ -110,6 +112,7 @@ export function HomeAgentForm(): JSX.Element {
 
   const [input, setInput] = createSignal("");
   let textareaRef: HTMLTextAreaElement | undefined;
+  const navigate = useNavigate();
 
   const handleSend = async (e: Event) => {
     e.preventDefault();
@@ -128,8 +131,19 @@ export function HomeAgentForm(): JSX.Element {
       tools: [],
     };
 
-    await createAndSendConversation(wsId, text.slice(0, 30), text, provider);
+    // Step 1: Create conversation
+    const exit = await Effect.runPromiseExit(
+      createConversation(wsId, text.slice(0, 30)),
+    );
+    if (Exit.isFailure(exit)) return;
+    const convId = exit.value;
+
+    // Step 2: Clear input + navigate
     setInput("");
+    navigate({ to: "/" });
+
+    // Step 3: Start streaming (fire-and-forget)
+    Effect.runPromiseExit(sendMessage(convId, text, provider));
   };
 
   return (

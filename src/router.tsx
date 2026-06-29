@@ -1,24 +1,36 @@
-//! Router — TanStack Router 配置。
+//! Router — TanStack Router configuration (V2.2).
 //!
-//! 代码路由（无 Vite 插件）。两个路由：
-//! - /          → ChatLayout（Sidebar + ChatView + 底部 Settings 链接）
-//! - /settings  → SettingsPage（全页面设置，替换主内容）
-//!
-//! 历史记录：`createBrowserHistory()` — Tauri 2 单窗口 + Vite
-//! SPA fallback 原生处理深度链接。
+ //! Code-based routing (no Vite plugin). Route structure:
+ //! - /              → ChatLayout → HomeRoute (HomeAgentForm)
+ //! - /conversation/$convId → ChatLayout → ConversationRoute (ChatView + back)
+ //! - /settings      → SettingsPage
+ //!
+ //! History: createBrowserHistory() — Tauri 2 single window + Vite SPA fallback.
 
 import { createRouter, createRoute, createRootRoute, Outlet } from "@tanstack/solid-router";
-import { ChatLayout } from "./features/chat/routes/index";
+import { ChatLayout, HomeRoute, ConversationRoute } from "./features/chat/routes/index";
 import { SettingsPage } from "./features/settings/routes/settings";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
 });
 
-const indexRoute = createRoute({
+const chatLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/",
+  id: "chat",
   component: ChatLayout,
+});
+
+const homeRoute = createRoute({
+  getParentRoute: () => chatLayoutRoute,
+  path: "/",
+  component: HomeRoute,
+});
+
+const conversationRoute = createRoute({
+  getParentRoute: () => chatLayoutRoute,
+  path: "/conversation/$convId",
+  component: ConversationRoute,
 });
 
 const settingsRoute = createRoute({
@@ -27,7 +39,10 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 });
 
-export const routeTree = rootRoute.addChildren([indexRoute, settingsRoute]);
+export const routeTree = rootRoute.addChildren([
+  chatLayoutRoute.addChildren([homeRoute, conversationRoute]),
+  settingsRoute,
+]);
 
 export const router = createRouter({
   routeTree,

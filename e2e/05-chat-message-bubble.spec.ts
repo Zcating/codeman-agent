@@ -9,7 +9,8 @@
 //!   - 05 是"user-input → bubble → DB"往返契约测试。
 //!   - 两者失败原因不同;两个都跑将回归隔离到正确层(UI 渲染 vs. 运行时 plumbing)。
 
-import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, resetChatState, submitForm } from "./fixtures";
+import { test, expect, assert, cancelRunningAgent, clickNewConversationAndWait, invoke, resetChatState, submitForm } from "./fixtures";
+import { useMockProvider, enqueueMockResponse } from "./mock-provider";
 
 // 有意独特的字符串,以便我们永远不会将其与其他测试数据行
 // 或默认 Sidebar "New conversation" 占位符混淆。
@@ -31,10 +32,11 @@ interface MessageRow {
 test.describe("05 — agent 页面输入 → 用户气泡", () => {
   test.beforeEach(async ({ tauriEnv }) => {
     const { page } = tauriEnv;
-    // 彻底重置 chat 域: cancel in-flight → 清 DB → reload → create workspace + conv
-    // resetChatState 内部已调 clear_all_history,不再额外调 clearAllHistory
-    // (避免 double-clear 导致 Solid store 与 DB 不同步)。
+    // 彻底重置 chat 域: cancel in-flight → 清 DB → navigate to /
+    // Note: resetChatState no longer creates conv via IPC (UI-driven now).
+    // The test body calls clickNewConversationAndWait which handles conv creation.
     await resetChatState(page);
+    await useMockProvider(page);
   });
 
   test("输入内容产生可见用户气泡并持久化到 DB", async ({ tauriEnv }) => {
@@ -55,6 +57,10 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
       console.log(`[page pageerror] ${err.message}`);
     });
 
+    // Enqueue mocks: one for clickNewConversationAndWait (title send), one for USER_INPUT
+    await enqueueMockResponse(page, { text: "Mock for setup", delayMs: 50 });
+    await enqueueMockResponse(page, { text: "Mock response for USER_INPUT", delayMs: 50 });
+
     // 1. 到达聊天页面。Tauri dev URL 是 /;我们不需要
     //    导航,但这样做使 spec 对未来默认路由变更更健壮。
     await page.goto("/");
@@ -62,8 +68,8 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
       timeout: 15_000,
     });
 
-    // 2. 创建全新会话 via IPC bridge (V2.1 D8-W flow, no LLM consumption)。
-    //    clickNewConversationAndWait 返回 convId 即 active conv 的 id。
+    // 2. 创建全新会话 via UI-driven flow.
+    //    clickNewConversationAndWait 返回 convId 即 active conv 的 id.
     const { convId } = await clickNewConversationAndWait(page);
 
     // 3. Verify the conv element exists in the DOM (may be inside accordion).
@@ -173,13 +179,11 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
     // 完整重置 — 前 spec LLM 完成/取消,DB 清空,页面 reload
     await resetChatState(page);
 
-    // 验证 resetChatState 后 chat-view 真的 mounted 且 signals 干净
-    const postResetState = await page.evaluate(() => ({
-      taExists: !!document.querySelector('textarea[placeholder="发条消息\u2026"]'),
-      sidebarItems: document.querySelectorAll("aside li").length,
-      bubbles: document.querySelectorAll("div.justify-end").length,
-    }));
-    console.log(`[postReset] ${JSON.stringify(postResetState)}`);
+    // Enqueue mocks: 1 for clickNewConversationAndWait + 3 for messages
+    await enqueueMockResponse(page, { text: "Mock for setup", delayMs: 50 });
+    await enqueueMockResponse(page, { text: "Mock 1", delayMs: 50 });
+    await enqueueMockResponse(page, { text: "Mock 2", delayMs: 50 });
+    await enqueueMockResponse(page, { text: "Mock 3", delayMs: 50 });
 
     await clickNewConversationAndWait(page);
 

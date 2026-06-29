@@ -66,6 +66,7 @@ export const CodemanSelect: Component<CodemanSelectProps> = (props) => {
       value={props.value ? [props.value] : []}
       onValueChange={handleValueChange}
       disabled={props.disabled}
+      positioning={{ sameWidth: true }}
     >
       <Select.Control class="w-full">
         <Select.Trigger
@@ -101,12 +102,6 @@ export const CodemanSelect: Component<CodemanSelectProps> = (props) => {
 
         <Select.Positioner
           class="z-50 overflow-hidden rounded-md border border-input bg-background shadow-md"
-          style={{
-            "--reference-width": "var(--available-width)",
-            "--available-width": "100%",
-            "--x": "0",
-            "--y": "4px",
-          }}
         >
           <Select.Content data-testid={contentTestId} class="max-h-60 overflow-y-auto bg-background">
             <Select.List class="p-1">

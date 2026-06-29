@@ -41,23 +41,13 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
 
-    // D8-W: provision a workspace so clickNewConversationAndWait has one to
-    // reference. Without this, list_workspaces returns empty and the helper
-    // can't create conversations (missing workspaceId).
-    const ws = await invoke<{ id: string }>(page, "add_workspace", {
+    // D8-W: provision workspace directly via IPC. ChatLayout mount auto-loads workspaces.
+    await invoke<{ id: string }>(page, "add_workspace", {
       label: "09 Test Workspace",
       rootPath: path.join(os.tmpdir(), "codeman-09-" + Date.now()),
     });
-    // Load into chat.store so subsequent clickNewConversationAndWait picks it up
-    await page.evaluate(async (id: string) => {
-      const w = window as unknown as {
-        __chatStore?: { loadWorkspaces: () => Promise<void>; setSelectedWorkspaceId: (id: string) => void };
-      };
-      if (w.__chatStore) {
-        await w.__chatStore.loadWorkspaces();
-        w.__chatStore.setSelectedWorkspaceId(id);
-      }
-    }, ws.id);
+    // Navigate to / so ChatLayout mounts and loads workspaces
+    await page.goto("/");
 
     // 切到 mock provider — 后续测试全靠 mock 队列,不需要 .env 里的真实 key
     await useMockProvider(page);
@@ -96,7 +86,9 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     await clearAllHistory(page);
     // 3) 清 mock 队列
     await clearMockQueue(page);
-    // 4) 新建会话 — capture conv id for use in test bodies
+    // 4) Enqueue mock response for clickNewConversationAndWait's send
+    await enqueueMockResponse(page, { text: "Mock setup", delayMs: 50 });
+    // 5) 新建会话 — capture conv id for use in test bodies
     const { convId } = await clickNewConversationAndWait(page);
     beforeEachConvId = convId;
   });

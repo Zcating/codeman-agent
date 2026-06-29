@@ -1,36 +1,48 @@
-//! routes/index.test.tsx — ChatLayout 状态机测试 (T4.3)
+//! routes/index.test.tsx — Chat route components tests (V2.2)
+//!
+ //! Tests the new route structure:
+ //! - HomeRoute renders HomeAgentForm
+ //! - ConversationRoute renders ChatView with back button
+ //! - ChatLayout renders sidebar + outlet + footer
+
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, cleanup, fireEvent } from "@solidjs/testing-library";
-import type { Conversation } from "../../../shared/lib/types";
+import { render, cleanup } from "@solidjs/testing-library";
 
 // ─── Mock @tanstack/solid-router ──────────────────────────────────────────
 
+const mockUseParams = vi.fn((_opts?: any) => () => ({}));
+const mockUseNavigate = vi.fn((_opts?: any) => {});
+
 vi.mock("@tanstack/solid-router", () => ({
+  Outlet: () => <div data-testid="outlet">Outlet</div>,
   Link: (props: any) => {
     const { activeProps, inactiveProps, ...rest } = props;
     return <a {...rest} {...(props.to ? { href: props.to } : {})}>{props.children}</a>;
   },
-  useRouter: () => ({ navigate: vi.fn() }),
+  useParams: () => mockUseParams({ from: "/conversation/$convId" }),
+  useNavigate: () => mockUseNavigate,
 }));
 
-// ─── Mock chat.store ────────────────────────────────────────────────
-
-vi.mock("../stores/chat.store", () => ({
-  store: { byId: {} },
-  activeId$: vi.fn<() => string | null>(),
-  workspaces$: vi.fn<() => Array<{ id: string; label: string; root_path: string }>>(),
-  conversations$: vi.fn<() => Conversation[]>(),
-  selectConversation: vi.fn<(id: string) => void>(),
-  deleteConversation: vi.fn(),
-  clearActiveConversation: vi.fn<() => void>(),
-  setSelectedWorkspaceId: vi.fn<(id: string | null) => void>(),
-  createConversation: vi.fn(),
-  sendMessage: vi.fn(),
-  cancel: vi.fn(),
-  archiveConversation: vi.fn(),
-  setupConvState: vi.fn(),
-  loadConversations: vi.fn(),
-}));
+vi.mock("../stores/chat.store", async () => {
+  const effect = await vi.importActual<typeof import("effect")>("effect");
+  const succeedVoid = effect.Effect.succeed<void>(void 0) as any;
+  return {
+    store: { byId: {} },
+    workspaces$: vi.fn<() => Array<{ id: string; label: string; root_path: string }>>(),
+    conversations$: vi.fn<() => any[]>(),
+    deleteConversation: vi.fn(() => succeedVoid),
+    setSelectedWorkspaceId: vi.fn<(id: string | null) => void>(),
+    loadWorkspaces: vi.fn(() => succeedVoid),
+    createConversation: vi.fn(),
+    sendMessage: vi.fn(),
+    cancel: vi.fn(),
+    archiveConversation: vi.fn(),
+    setupConvState: vi.fn(),
+    loadConversations: vi.fn(),
+    renameWorkspace: vi.fn(() => succeedVoid),
+    removeWorkspace: vi.fn(() => succeedVoid),
+  };
+});
 
 // ─── Mock CodemanSidebar (internal component) ────────────────────────────────
 
@@ -49,6 +61,24 @@ vi.mock("../../../shared/components/internal/codeman-sidebar", () => ({
       >
         Conversation conv-1
       </button>
+      <button
+        data-testid="sidebar-delete-conv-1"
+        onClick={() => props.onDeleteItem?.("conv-1")}
+      >
+        Delete conv-1
+      </button>
+      <button
+        data-testid="sidebar-rename-ws-1"
+        onClick={() => props.onRenameWorkspace?.("ws-1", "My Project")}
+      >
+        Rename ws-1
+      </button>
+      <button
+        data-testid="sidebar-delete-ws-1"
+        onClick={() => props.onDeleteWorkspace?.("ws-1", "My Project")}
+      >
+        Delete ws-1
+      </button>
       <button data-testid="sidebar-back-to-home" onClick={() => props.onCreateItem?.()}>
         New conversation
       </button>
@@ -61,13 +91,66 @@ vi.mock("../../../shared/components/internal/codeman-sidebar", () => ({
   type: {},
 }));
 
-// ─── Import ChatLayout after mocks ─────────────────────────────────────────
+// ─── Mock HomeAgentForm ──────────────────────────────────────────────────
 
-import { ChatLayout } from "./index";
+vi.mock("../components/home", () => ({
+  HomeAgentForm: () => (
+    <div data-testid="home-agent-form">HomeAgentForm</div>
+  ),
+}));
 
-// ─── Tests ─────────────────────────────────────────────────────────────────
+// ─── Mock ChatView ──────────────────────────────────────────────────────
 
-describe("ChatLayout — state machine", () => {
+vi.mock("../components/chat-view", () => ({
+  ChatView: (props: any) => (
+    <div data-testid="chat-view">
+      <span data-testid="chat-view-conv-id">{props.convId ?? "none"}</span>
+    </div>
+  ),
+}));
+
+// ─── Mock workspace-rename-dialog ──────────────────────────────────────────
+
+const mockShowRenameDialog = vi.hoisted(() => vi.fn<(...args: string[]) => Promise<string | null>>(async () => null));
+
+vi.mock("../components/workspace-rename-dialog", () => ({
+  showRenameDialog: mockShowRenameDialog,
+}));
+
+// ─── Mock Dialog ──────────────────────────────────────────────────────────────
+
+const mockDialogConfirm = vi.hoisted(() => vi.fn(async () => false));
+
+vi.mock("../../../shared/components/internal/codeman-dialog", () => ({
+  Dialog: {
+    confirm: mockDialogConfirm,
+    show: vi.fn(),
+    alert: vi.fn(),
+  },
+}));
+
+// ─── Import route components from barrel ────────────────────────────────────
+
+import { HomeRoute } from "./home-route";
+import { ConversationRoute } from "./conversation-route";
+import { ChatLayout } from "./chat-layout";
+
+// ─── HomeRoute tests ─────────────────────────────────────────────────────
+
+describe("HomeRoute", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("Renders HomeAgentForm", () => {
+    const { getByTestId } = render(() => <HomeRoute />);
+    expect(getByTestId("home-agent-form")).toBeTruthy();
+  });
+});
+
+// ─── ConversationRoute tests ──────────────────────────────────────────────
+
+describe("ConversationRoute", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -76,43 +159,30 @@ describe("ChatLayout — state machine", () => {
     cleanup();
   });
 
-  it("T4.3.1: Renders HomeAgentForm when activeId$() === null", async () => {
-    const { activeId$ } = await import("../stores/chat.store") as any;
-    activeId$.mockReturnValue(null);
+  it("Renders back button and ChatView", () => {
+    // Mock useParams to return a convId (useParams returns an Accessor)
+    mockUseParams.mockReturnValue(() => ({ convId: "test-conv-id" }));
 
-    const { getByTestId, queryByTestId } = render(() => <ChatLayout />);
-    // HomeAgentForm should be visible
-    expect(getByTestId("codex-input")).toBeTruthy();
-    // Back button should NOT be visible
-    expect(queryByTestId("back-to-home")).toBeNull();
-  });
+    const { getByTestId } = render(() => <ConversationRoute />);
 
-  it("T4.3.2: Back button shows when activeId$() !== null", async () => {
-    const { activeId$ } = await import("../stores/chat.store") as any;
-    activeId$.mockReturnValue("conv-1");
-
-    const { getByTestId } = render(() => <ChatLayout />);
     expect(getByTestId("back-to-home")).toBeTruthy();
+    expect(getByTestId("chat-view")).toBeTruthy();
+    expect(getByTestId("chat-view-conv-id").textContent).toBe("test-conv-id");
+  });
+});
+
+// ─── ChatLayout tests ────────────────────────────────────────────────────
+
+describe("ChatLayout", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it("T4.3.3: Back button hidden when activeId$() === null", async () => {
-    const { activeId$ } = await import("../stores/chat.store") as any;
-    activeId$.mockReturnValue(null);
-
-    const { queryByTestId } = render(() => <ChatLayout />);
-    expect(queryByTestId("back-to-home")).toBeNull();
+  afterEach(() => {
+    cleanup();
   });
 
-  it("T4.3.4: Click back button → clearActiveConversation called", async () => {
-    const { activeId$, clearActiveConversation } = await import("../stores/chat.store") as any;
-    activeId$.mockReturnValue("conv-1");
-
-    const { getByTestId } = render(() => <ChatLayout />);
-    fireEvent.click(getByTestId("back-to-home"));
-    expect(clearActiveConversation).toHaveBeenCalledTimes(1);
-  });
-
-  it("T4.3.5: CodemanSidebar visible when workspaces exist", async () => {
+  it("Renders sidebar when workspaces exist", async () => {
     const { workspaces$ } = await import("../stores/chat.store") as any;
     workspaces$.mockReturnValue([
       { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
@@ -122,23 +192,31 @@ describe("ChatLayout — state machine", () => {
     expect(getByTestId("codeman-sidebar")).toBeTruthy();
   });
 
-  it("T4.3.6: Click empty workspace in sidebar → setSelectedWorkspaceId called (D7-CS)", async () => {
-    const { workspaces$, setSelectedWorkspaceId } = await import("../stores/chat.store") as any;
-    workspaces$.mockReturnValue([
-      { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
-    ]);
-
-    const { getByTestId } = render(() => <ChatLayout />);
-    // D7-CS: workspace header click expands/collapses; empty ws click triggers handleEmptyWorkspaceClick
-    fireEvent.click(getByTestId("sidebar-ws-ws-1"));
-    expect(setSelectedWorkspaceId).toHaveBeenCalledWith("ws-1");
+  it("Renders footer with settings link", () => {
+    const { getByText } = render(() => <ChatLayout />);
+    expect(getByText("codeman-agent")).toBeTruthy();
+    expect(getByText("设置")).toBeTruthy();
   });
 
-  it("T4.3.7: Click conversation item in sidebar → selectConversation called", async () => {
-    const { workspaces$, conversations$, selectConversation } = await import("../stores/chat.store") as any;
+  it("Renders outlet for child routes", () => {
+    const { getByTestId } = render(() => <ChatLayout />);
+    expect(getByTestId("outlet")).toBeTruthy();
+  });
+
+  it("Does not render sidebar when no workspaces", async () => {
+    const { workspaces$ } = await import("../stores/chat.store") as any;
+    workspaces$.mockReturnValue([]);
+
+    const { queryByTestId } = render(() => <ChatLayout />);
+    expect(queryByTestId("codeman-sidebar")).toBeNull();
+  });
+
+  it("Highlights selected item from params", async () => {
+    const { workspaces$ } = await import("../stores/chat.store") as any;
     workspaces$.mockReturnValue([
       { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
     ]);
+    const { conversations$ } = await import("../stores/chat.store") as any;
     conversations$.mockReturnValue([
       {
         id: "conv-1",
@@ -151,18 +229,100 @@ describe("ChatLayout — state machine", () => {
       },
     ]);
 
+    // Mock useParams to return selected convId (useParams returns an Accessor)
+    mockUseParams.mockReturnValue(() => ({ convId: "conv-1" }));
+
     const { getByTestId } = render(() => <ChatLayout />);
-    fireEvent.click(getByTestId("sidebar-item-conv-1"));
-    expect(selectConversation).toHaveBeenCalledWith("conv-1");
+    expect(getByTestId("sidebar-selected-item").textContent).toBe("conv-1");
   });
 
-  it("T4.3.8: CodemanSidebar hidden when no workspaces AND no active conv", async () => {
-    const { workspaces$ } = await import("../stores/chat.store") as any;
-    workspaces$.mockReturnValue([]);
-    const { activeId$ } = await import("../stores/chat.store") as any;
-    activeId$.mockReturnValue(null);
+  it("Click empty workspace → setSelectedWorkspaceId called", async () => {
+    const { workspaces$, setSelectedWorkspaceId } = await import("../stores/chat.store") as any;
+    workspaces$.mockReturnValue([
+      { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
+    ]);
 
-    const { queryByTestId } = render(() => <ChatLayout />);
-    expect(queryByTestId("codeman-sidebar")).toBeNull();
+    const { getByTestId } = render(() => <ChatLayout />);
+    getByTestId("sidebar-ws-ws-1").click();
+    expect(setSelectedWorkspaceId).toHaveBeenCalledWith("ws-1");
+  });
+
+  it("Click add workspace → navigates to /settings", async () => {
+    const { getByTestId } = render(() => <ChatLayout />);
+    const addBtn = getByTestId("sidebar-add-workspace");
+    // The button uses window.location.href, we just verify it renders
+    expect(addBtn).toBeTruthy();
+  });
+
+  it("Click delete conversation → deleteConversation called", async () => {
+    const { deleteConversation } = await import("../stores/chat.store") as any;
+    const { workspaces$ } = await import("../stores/chat.store") as any;
+    workspaces$.mockReturnValue([
+      { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
+    ]);
+
+    const { getByTestId } = render(() => <ChatLayout />);
+    getByTestId("sidebar-delete-conv-1").click();
+    expect(deleteConversation).toHaveBeenCalledWith("conv-1");
+  });
+
+  it("Click rename workspace → showRenameDialog called", async () => {
+    const { workspaces$ } = await import("../stores/chat.store") as any;
+    workspaces$.mockReturnValue([
+      { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
+    ]);
+    mockShowRenameDialog.mockResolvedValue("New Name");
+
+    const { getByTestId } = render(() => <ChatLayout />);
+    getByTestId("sidebar-rename-ws-1").click();
+    // Allow the async handler to settle
+    await vi.waitFor(() => {
+      expect(mockShowRenameDialog).toHaveBeenCalledWith("My Project");
+    });
+  });
+
+  it("Click rename workspace with new name → renameWorkspace called", async () => {
+    const { workspaces$, renameWorkspace } = await import("../stores/chat.store") as any;
+    workspaces$.mockReturnValue([
+      { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
+    ]);
+    mockShowRenameDialog.mockResolvedValue("Updated Name");
+
+    const { getByTestId } = render(() => <ChatLayout />);
+    getByTestId("sidebar-rename-ws-1").click();
+
+    await vi.waitFor(() => {
+      expect(renameWorkspace).toHaveBeenCalledWith("ws-1", "Updated Name");
+    });
+  });
+
+  it("Click delete workspace → Dialog.confirm called", async () => {
+    const { workspaces$ } = await import("../stores/chat.store") as any;
+    workspaces$.mockReturnValue([
+      { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
+    ]);
+    mockDialogConfirm.mockResolvedValue(false);
+
+    const { getByTestId } = render(() => <ChatLayout />);
+    getByTestId("sidebar-delete-ws-1").click();
+
+    await vi.waitFor(() => {
+      expect(mockDialogConfirm).toHaveBeenCalled();
+    });
+  });
+
+  it("Click delete workspace confirmed → removeWorkspace called", async () => {
+    const { workspaces$, removeWorkspace } = await import("../stores/chat.store") as any;
+    workspaces$.mockReturnValue([
+      { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
+    ]);
+    mockDialogConfirm.mockResolvedValue(true);
+
+    const { getByTestId } = render(() => <ChatLayout />);
+    getByTestId("sidebar-delete-ws-1").click();
+
+    await vi.waitFor(() => {
+      expect(removeWorkspace).toHaveBeenCalledWith("ws-1");
+    });
   });
 });

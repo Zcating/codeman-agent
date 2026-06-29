@@ -7,9 +7,10 @@
 //! Task 4 范围: ConversationState 类型 + createStore + setupConvState + accessors。
 //! 后续 Task 5/6/7 加 sendMessage / cancel / archive / delete / loadConversations / createConversation。
 
-import { createStore } from "solid-js/store";
 import { createSignal, type Accessor } from "solid-js";
-import { Effect, Stream, Exit } from "effect";
+import { createStore } from "solid-js/store";
+
+import { Effect, Stream } from "effect";
 import type { AppError, Conversation, Message, Workspace } from "../../../shared/lib/types";
 import {
   createAgentRuntime,
@@ -50,11 +51,9 @@ export interface ConversationState {
 // ─── 单一响应式源: Solid createStore ──────────────────────────
 
 const [store, setStore] = createStore<{
-  activeId: string | null;
   byId: Record<string, ConversationState>;
   workspaces: Workspace[];
 }>({
-  activeId: null,
   byId: {},
   workspaces: [],
 });
@@ -62,9 +61,6 @@ const [store, setStore] = createStore<{
 export { store, setStore };
 
 // ─── Accessors (for UI components) ─────────────────────────────
-
-const [activeId, setActiveIdSignal] = createSignal<string | null>(null);
-export const activeId$: Accessor<string | null> = activeId;
 
 const [conversations, setConversationsSignal] = createSignal<ConversationState[]>([]);
 export const conversations$: Accessor<ConversationState[]> = conversations;
@@ -103,58 +99,50 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
   return cs;
 }
 
-// ─── selectConversation: 切换 active ──────────────────────────
-
-export function selectConversation(id: string): void {
-  setActiveIdSignal(id);
-  setStore("activeId", id);
-}
-
-// ─── clearActiveConversation: 清除 active ─────────────────────
-
-export function clearActiveConversation(): void {
-  setActiveIdSignal(null);
-  setStore("activeId", null);
-}
-
 // ─── sendMessage: append user msg + run + subscribe ───────────
 
-export async function sendMessage(
+export function sendMessage(
   convId: string,
   content: string,
   provider: ProviderConfig,
-): Promise<void> {
-  const cs = store.byId[convId];
-  if (!cs) {
-    return;
-  }
+): Effect.Effect<void, never, never> {
+  return Effect.gen(function* () {
+    const cs = store.byId[convId];
+    if (!cs) {
+      return;
+    }
 
-  // 1. Append user message to local + DB
-  const userMsg: Message = {
-    id: crypto.randomUUID(),
-    conversation_id: convId,
-    role: "user",
-    content,
-    tool_calls: null,
-    tool_results: null,
-    model: null,
-    input_tokens: null,
-    output_tokens: null,
-    created_at: Date.now(),
-  };
-  setStore("byId", convId, "messages", (msgs) => [...msgs, userMsg]);
-  await persistUserMessage(userMsg);
+    // 1. Append user message to local + DB
+    const userMsg: Message = {
+      id: crypto.randomUUID(),
+      conversation_id: convId,
+      role: "user",
+      content,
+      tool_calls: null,
+      tool_results: null,
+      model: null,
+      input_tokens: null,
+      output_tokens: null,
+      created_at: Date.now(),
+    };
+    setStore("byId", convId, "messages", (msgs) => [...msgs, userMsg]);
+    yield* persistUserMessageEffect(userMsg);
 
-  // 2. Build context (浅拷贝,含最新 user msg)
-  const context = [...store.byId[convId]!.messages];
+    // 2. Build context (浅拷贝,含最新 user msg)
+    const context = [...store.byId[convId]!.messages];
 
-  // 3. Run runtime + subscribe
-  const stream = cs.runtime.run({ context, provider });
-  const program = Stream.runForEach(stream, (evt) => Effect.sync(() => handleEvent(convId, evt)));
-  const result = await Effect.runPromiseExit(program.pipe(Effect.scoped));
-  if (Exit.isFailure(result)) {
-    console.error("[chat.store] sendMessage stream failure:", result.cause);
-  }
+    // 3. Run runtime + subscribe
+    const stream = cs.runtime.run({ context, provider });
+    yield* Stream.runForEach(stream, (evt) =>
+      Effect.sync(() => handleEvent(convId, evt)),
+    ).pipe(Effect.scoped);
+  }).pipe(
+    Effect.catchAll((err) =>
+      Effect.sync(() => {
+        console.error("[chat.store] sendMessage stream failure:", err);
+      }),
+    ),
+  );
 }
 
 // ─── handleEvent: RuntimeEvent → setStore ─────────────────────
@@ -230,7 +218,9 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       setStore("byId", convId, "streamingMessageId", null);
       // Notify sidebar re: streaming ended (triggers conversations$ update → badge removal)
       setConversationsSignal(Object.values(store.byId));
-      void persistAssistantMessage({ ...evt.message, conversation_id: convId });
+      Effect.runPromise(persistAssistantMessageEffect({ ...evt.message, conversation_id: convId })).catch((err) =>
+        console.error("[chat.store] persistAssistantMessage failed:", err),
+      );
       break;
     }
     case "error":
@@ -246,22 +236,21 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
 
 // ─── DB 持久化辅助 ────────────────────────────────────────────
 
-async function persistUserMessage(msg: Message): Promise<void> {
-  const program = Effect.gen(function* () {
+function persistUserMessageEffect(msg: Message): Effect.Effect<void, AppError, never> {
+  return Effect.gen(function* () {
     const svc = yield* MessageService;
-    return yield* svc.append({
+    yield* svc.append({
       conversationId: msg.conversation_id,
       role: msg.role,
       content: msg.content,
     });
   }).pipe(Effect.provide(MessageServiceLive));
-  await Effect.runPromiseExit(program);
 }
 
-async function persistAssistantMessage(msg: Message): Promise<void> {
-  const program = Effect.gen(function* () {
+function persistAssistantMessageEffect(msg: Message): Effect.Effect<void, AppError, never> {
+  return Effect.gen(function* () {
     const svc = yield* MessageService;
-    return yield* svc.append({
+    yield* svc.append({
       conversationId: msg.conversation_id,
       role: msg.role,
       content: msg.content,
@@ -270,7 +259,6 @@ async function persistAssistantMessage(msg: Message): Promise<void> {
       model: msg.model ?? undefined,
     });
   }).pipe(Effect.provide(MessageServiceLive));
-  await Effect.runPromiseExit(program);
 }
 
 // ─── cancel: 调 runtime.cancel() 中断 in-flight stream ───────
@@ -281,58 +269,45 @@ export function cancel(convId: string): void {
 
 // ─── archiveConversation: cancel + 从 store 移除 + DB archive ──
 
-export async function archiveConversation(convId: string): Promise<void> {
-  cancel(convId);
-  const program = Effect.gen(function* () {
+export function archiveConversation(convId: string): Effect.Effect<void, AppError, never> {
+  return Effect.gen(function* () {
+    cancel(convId);
     const svc = yield* ConversationService;
-    return yield* svc.archive(convId);
+    yield* svc.archive(convId);
+    // @ts-expect-error — setStore delete
+    setStore("byId", convId, undefined);
+    setConversationsSignal(Object.values(store.byId));
   }).pipe(Effect.provide(ConversationServiceLive));
-  await Effect.runPromiseExit(program);
-  setStore("byId", convId, undefined as unknown as ConversationState);
-  if (activeId() === convId) {
-    setActiveIdSignal(null);
-  }
-  setConversationsSignal(Object.values(store.byId));
 }
 
 // ─── deleteConversation: cancel + 从 store 移除 + DB delete ───
 
-export async function deleteConversation(convId: string): Promise<void> {
-  cancel(convId);
-  const program = Effect.gen(function* () {
+export function deleteConversation(convId: string): Effect.Effect<void, AppError, never> {
+  return Effect.gen(function* () {
+    cancel(convId);
     const svc = yield* ConversationService;
-    return yield* svc.delete(convId);
+    yield* svc.delete(convId);
+    // @ts-expect-error — setStore delete
+    setStore("byId", convId, undefined);
+    setConversationsSignal(Object.values(store.byId));
   }).pipe(Effect.provide(ConversationServiceLive));
-  await Effect.runPromiseExit(program);
-  setStore("byId", convId, undefined as unknown as ConversationState);
-  if (activeId() === convId) {
-    setActiveIdSignal(null);
-  }
-  setConversationsSignal(Object.values(store.byId));
 }
 
 // ─── loadConversations: DB → byId ─────────────────────────────
 
-export async function loadConversations(includeArchived = false): Promise<void> {
-  const listProgram = Effect.gen(function* () {
+export function loadConversations(includeArchived = false): Effect.Effect<void, AppError, never> {
+  return Effect.gen(function* () {
     const svc = yield* ConversationService;
-    return yield* svc.list(includeArchived);
-  }).pipe(Effect.provide(ConversationServiceLive));
-  const listResult = await Effect.runPromiseExit(listProgram);
-  if (Exit.isFailure(listResult)) {
-    return;
-  }
-  const convs = listResult.value;
-
-  for (const conv of convs) {
-    const historyProgram = Effect.gen(function* () {
-      const svc = yield* MessageService;
-      return yield* svc.list(conv.id);
-    }).pipe(Effect.provide(MessageServiceLive));
-    const historyResult = await Effect.runPromiseExit(historyProgram);
-    const history = Exit.isSuccess(historyResult) ? historyResult.value : [];
-    setupConvState(conv, history);
-  }
+    const convs = yield* svc.list(includeArchived);
+    for (const conv of convs) {
+      const msgSvc = yield* MessageService;
+      const history = yield* msgSvc.list(conv.id);
+      setupConvState(conv, history);
+    }
+  }).pipe(
+    Effect.provide(ConversationServiceLive),
+    Effect.provide(MessageServiceLive),
+  );
 }
 
 // ─── createConversation: DB 新建 + setupConvState ─────────────
@@ -345,48 +320,41 @@ export async function loadConversations(includeArchived = false): Promise<void> 
  * @param title - 会话标题
  * @param systemPrompt - 可选，覆盖 settings.system_prompt.default
  */
-export async function createConversation(
+export function createConversation(
   workspaceId: string,
   title: string,
   systemPrompt?: string,
-): Promise<void> {
-  const program = Effect.gen(function* () {
+): Effect.Effect<string, AppError, never> {
+  return Effect.gen(function* () {
     const svc = yield* ConversationService;
-    return yield* svc.create(title, systemPrompt ?? null, workspaceId);
+    const conv = yield* svc.create(title, systemPrompt ?? null, workspaceId);
+    setupConvState(conv, []);
+    return conv.id;
   }).pipe(Effect.provide(ConversationServiceLive));
-  const result = await Effect.runPromiseExit(program);
-  if (Exit.isSuccess(result)) {
-    setupConvState(result.value, []);
-    selectConversation(result.value.id);
-  }
 }
 
 // ─── createAndSendConversation: Home send flow ─────────────────
 
 /**
  * Home send flow:
- * 1. createConversation(workspaceId, title) → DB persist + selectConversation
- * 2. activeId is set by createConversation (via selectConversation)
- * 3. sendMessage(id, firstMessage, provider) → LLM streaming
+ * 1. createConversation(workspaceId, title) → DB persist
+ * 2. sendMessage(convId, firstMessage, provider) → LLM streaming
  *
  * @param workspaceId - 用户选定的 workspace id
  * @param title - 会话标题（from firstMessage.slice(0, 30)）
  * @param firstMessage - 用户输入的第一条消息
  * @param provider - ProviderConfig (与 sendMessage 同样的构造)
  */
-export async function createAndSendConversation(
+export function createAndSendConversation(
   workspaceId: string,
   title: string,
   firstMessage: string,
   provider: ProviderConfig,
-): Promise<void> {
-  await createConversation(workspaceId, title);
-  const id = activeId$();
-  if (!id) {
-    console.error("[chat.store] createAndSendConversation: activeId is null after createConversation");
-    return;
-  }
-  await sendMessage(id, firstMessage, provider);
+): Effect.Effect<void, AppError, never> {
+  return Effect.gen(function* () {
+    const convId = yield* createConversation(workspaceId, title);
+    yield* sendMessage(convId, firstMessage, provider);
+  });
 }
 
 // ─── Workspace CRUD (D8-W) ──────────────────────────────────────────

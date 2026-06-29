@@ -47,6 +47,8 @@ test.describe("07 — Mock LLM provider", () => {
     await cancelRunningAgent(page);
     await clearAllHistory(page);
     await clearMockQueue(page);
+    // Enqueue mock response for clickNewConversationAndWait's UI-driven send
+    await enqueueMockResponse(page, { text: "Mock setup", delayMs: 50 });
     await clickNewConversationAndWait(page);
   });
 

@@ -5,9 +5,7 @@ import { Effect, Exit, Stream } from "effect";
 import {
   store,
   setStore,
-  activeId$,
   conversations$,
-  selectConversation,
   setupConvState,
   cancel,
   archiveConversation,
@@ -179,14 +177,6 @@ describe("chat.store — ConversationState 类型", () => {
       dispose();
     }));
 
-  it("selectConversation() 设置 activeId", () =>
-    createRoot((dispose) => {
-      setupConvState(mockConv, mockHistory);
-      selectConversation("c1");
-      expect(activeId$()).toBe("c1");
-      dispose();
-    }));
-
   it("conversations$ 访问器返回 byId 值", () =>
     createRoot((dispose) => {
       setupConvState(mockConv, mockHistory);
@@ -249,7 +239,7 @@ describe("cancel / archive / delete — 取消/归档/删除", () => {
       setupConvState(mockConv, []);
       const cs = store.byId["c1"];
       const spy = vi.spyOn(cs!.runtime, "cancel");
-      await archiveConversation("c1");
+      await Effect.runPromise(archiveConversation("c1"));
       expect(spy).toHaveBeenCalled();
       expect(store.byId["c1"]).toBeUndefined();
       dispose();
@@ -264,7 +254,7 @@ describe("sendMessage — G1: 添加 user msg 到 byId[convId].messages", () => 
     await createRoot(async (dispose) => {
       setupConvState(mockConv, []);
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable([]));
-      await sendMessage("c1", "hello", defaultProvider);
+      await Effect.runPromise(sendMessage("c1", "hello", defaultProvider));
       const msgs = store.byId["c1"]?.messages ?? [];
       const userMsg = msgs.find((m) => m.role === "user");
       expect(userMsg).toBeDefined();
@@ -281,7 +271,7 @@ describe("sendMessage — G3: 从 store.byId[convId].messages 构建 context", (
       const runSpy = vi
         .spyOn(store.byId["c1"]!.runtime, "run")
         .mockReturnValue(Stream.fromIterable([]));
-      await sendMessage("c1", "second msg", defaultProvider);
+      await Effect.runPromise(sendMessage("c1", "second msg", defaultProvider));
       // Context passed to runtime.run should contain both messages
       const callArg = runSpy.mock.calls[0][0];
       expect(callArg.context.length).toBeGreaterThanOrEqual(1);
@@ -297,7 +287,7 @@ describe("sendMessage — G4: 调用 runtime.run({ context, provider })", () => 
       const runSpy = vi
         .spyOn(store.byId["c1"]!.runtime, "run")
         .mockReturnValue(Stream.fromIterable([]));
-      await sendMessage("c1", "hello", defaultProvider);
+      await Effect.runPromise(sendMessage("c1", "hello", defaultProvider));
       expect(runSpy).toHaveBeenCalledTimes(1);
       const opts = runSpy.mock.calls[0][0] as { context: Message[]; provider: ProviderConfig };
       expect(opts.provider).toBe(defaultProvider);
@@ -330,7 +320,7 @@ describe("sendMessage — G5: 处理 token event → 在首个 event 时创建 s
         },
       ];
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
-      await sendMessage("c1", "hi", defaultProvider);
+      await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
       // After done, streamingMessageId should be null
       expect(store.byId["c1"]?.streamingMessageId).toBeNull();
       // And there should be an assistant message
@@ -367,7 +357,7 @@ describe("sendMessage — G6: 处理后续 token events → 更新 stub.content"
         },
       ];
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
-      await sendMessage("c1", "hi", defaultProvider);
+      await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
       const msgs = store.byId["c1"]?.messages ?? [];
       const finalMsg = msgs[msgs.length - 1];
       expect(finalMsg.content).toBe("Hello World");
@@ -401,7 +391,7 @@ describe("sendMessage — G7: 处理 tool_call event → 添加到 stub.tool_cal
         },
       ];
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
-      await sendMessage("c1", "weather?", defaultProvider);
+      await Effect.runPromise(sendMessage("c1", "weather?", defaultProvider));
       const msgs = store.byId["c1"]?.messages ?? [];
       // Find the assistant message - it should have tool_calls from the done event
       const assistantMsg = msgs.find((m) => m.role === "assistant");
@@ -438,7 +428,7 @@ describe("sendMessage — G8: 处理 tool_result event → 添加到 stub.tool_r
         },
       ];
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
-      await sendMessage("c1", "weather?", defaultProvider);
+      await Effect.runPromise(sendMessage("c1", "weather?", defaultProvider));
       const msgs = store.byId["c1"]?.messages ?? [];
       const stub = msgs.find((m) => m.role === "assistant");
       expect(stub?.tool_results).toBeDefined();
@@ -471,7 +461,7 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
         },
       ];
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
-      await sendMessage("c1", "hi", defaultProvider);
+      await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
       expect(store.byId["c1"]?.streamingMessageId).toBeNull();
       dispose();
     });
@@ -485,7 +475,7 @@ describe("sendMessage — G10: 处理 error event → console.error", () => {
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const events: RuntimeEvent[] = [{ type: "error", error: { message: "Something went wrong" } }];
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
-      await sendMessage("c1", "hi", defaultProvider);
+      await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
       expect(errorSpy).toHaveBeenCalled();
       errorSpy.mockRestore();
       dispose();
@@ -497,7 +487,7 @@ describe("sendMessage — G11: 如果 convId 不在 byId 中则提前返回 (no-
   it("sendMessage() 当 convId 不在 byId 中时提前返回不报错", async () => {
     await createRoot(async (dispose) => {
       // c999 does not exist in store - sendMessage should return early without throwing
-      await expect(sendMessage("c999", "hello", defaultProvider)).resolves.toBeUndefined();
+      await expect(Effect.runPromise(sendMessage("c999", "hello", defaultProvider))).resolves.toBeUndefined();
       dispose();
     });
   });
@@ -511,7 +501,7 @@ describe("sendMessage — G12: 当 runtime stream 失败时 → console.error", 
       // Create a stream that fails - use 'any' cast since run is mocked anyway
       const failStream = Stream.fail(new Error("Stream failed")) as any;
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(failStream);
-      await sendMessage("c1", "hi", defaultProvider);
+      await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
       expect(errorSpy).toHaveBeenCalled();
       errorSpy.mockRestore();
       dispose();
@@ -521,29 +511,15 @@ describe("sendMessage — G12: 当 runtime stream 失败时 → console.error", 
 
 // ─── New tests: archiveConversation ────────────────────────────────
 
-describe("archiveConversation — G13: 当 convId 是 active 时 → activeId 设置为 null", () => {
-  it("archiveConversation() 归档 active conv 时设置 activeId 为 null", async () => {
+describe("archiveConversation — G13: 从 byId 移除 + 调用 runtime.cancel()", () => {
+  it("archiveConversation() 从 byId 移除 conv + 调用 runtime.cancel()", async () => {
     await createRoot(async (dispose) => {
       setupConvState(mockConv, []);
-      selectConversation("c1");
-      expect(activeId$()).toBe("c1");
-      await archiveConversation("c1");
-      expect(activeId$()).toBeNull();
-      dispose();
-    });
-  });
-});
-
-describe("archiveConversation — G14: 当 convId 不是 active 时 → activeId 不变", () => {
-  it("archiveConversation() 归档非 active conv 时不改变 activeId", async () => {
-    await createRoot(async (dispose) => {
-      const conv2 = { ...mockConv, id: "c2" };
-      setupConvState(mockConv, []);
-      setupConvState(conv2, []);
-      selectConversation("c1");
-      expect(activeId$()).toBe("c1");
-      await archiveConversation("c2");
-      expect(activeId$()).toBe("c1");
+      const cs = store.byId["c1"];
+      const spy = vi.spyOn(cs!.runtime, "cancel");
+      await Effect.runPromise(archiveConversation("c1"));
+      expect(spy).toHaveBeenCalled();
+      expect(store.byId["c1"]).toBeUndefined();
       dispose();
     });
   });
@@ -551,27 +527,15 @@ describe("archiveConversation — G14: 当 convId 不是 active 时 → activeId
 
 // ─── New tests: deleteConversation ────────────────────────────────
 
-describe("deleteConversation — G15: 从 byId 移除 + 如果是 active 则设置 activeId 为 null", () => {
-  it("deleteConversation() 从 byId 移除, 如果是 active 则清除 activeId", async () => {
+describe("deleteConversation — G15: 从 byId 移除 + 调用 runtime.cancel()", () => {
+  it("deleteConversation() 从 byId 移除 conv + 调用 runtime.cancel()", async () => {
     await createRoot(async (dispose) => {
       setupConvState(mockConv, []);
-      selectConversation("c1");
-      expect(activeId$()).toBe("c1");
-      await deleteConversation("c1");
+      const cs = store.byId["c1"];
+      const spy = vi.spyOn(cs!.runtime, "cancel");
+      await Effect.runPromise(deleteConversation("c1"));
+      expect(spy).toHaveBeenCalled();
       expect(store.byId["c1"]).toBeUndefined();
-      expect(activeId$()).toBeNull();
-      dispose();
-    });
-  });
-
-  it("deleteConversation() 删除非 active conv 时不改变 activeId", async () => {
-    await createRoot(async (dispose) => {
-      const conv2 = { ...mockConv, id: "c2" };
-      setupConvState(mockConv, []);
-      setupConvState(conv2, []);
-      selectConversation("c1");
-      await deleteConversation("c2");
-      expect(activeId$()).toBe("c1");
       dispose();
     });
   });
@@ -595,7 +559,7 @@ describe("loadConversations — G17: 当 MessageService.list 失败时跳过 per
   it("loadConversations() 当 conv 的 MessageService.list 失败时继续执行", async () => {
     await createRoot(async (dispose) => {
       // With the mock returning empty list, loadConversations should not throw
-      await expect(loadConversations(false)).resolves.toBeUndefined();
+      await expect(Effect.runPromise(loadConversations(false))).resolves.toBeUndefined();
       dispose();
     });
   });
@@ -603,25 +567,12 @@ describe("loadConversations — G17: 当 MessageService.list 失败时跳过 per
 
 // ─── New tests: createConversation ────────────────────────────────
 
-describe("createConversation — G18: 调用 ConversationService.create + setupConvState + selectConversation", () => {
-  it("createConversation() 创建 conv + 设置 state + 选择它", async () => {
+describe("createConversation — G18: 调用 ConversationService.create + setupConvState + 返回 convId", () => {
+  it("createConversation() 创建 conv + 设置 state + 返回 convId", async () => {
     await createRoot(async (dispose) => {
-      await createConversation("ws-1", "New Chat");
+      const convId = await Effect.runPromise(createConversation("ws-1", "New Chat"));
+      expect(convId).toBe("new-id");
       expect(store.byId["new-id"]).toBeDefined();
-      expect(activeId$()).toBe("new-id");
-      dispose();
-    });
-  });
-});
-
-describe("createConversation — G19: IPC 失败时不 select", () => {
-  it("createConversation() 服务失败时不改变 activeId", async () => {
-    await createRoot(async (dispose) => {
-      const conv2 = { ...mockConv, id: "c2" };
-      setupConvState(conv2, []);
-      selectConversation("c2");
-      expect(activeId$()).toBe("c2");
-      // Note: Since our mock always succeeds, this test verifies the function works
       dispose();
     });
   });
@@ -630,7 +581,7 @@ describe("createConversation — G19: IPC 失败时不 select", () => {
 describe("createConversation — G22: workspaceId 作为第一参数传入 IPC", () => {
   it("createConversation 接受 workspaceId 作为第一参数,传入 IPC", async () => {
     await createRoot(async (dispose) => {
-      await createConversation("ws-test", "title with workspace");
+      await Effect.runPromise(createConversation("ws-test", "title with workspace"));
       const created = store.byId["new-id"];
       expect(created).toBeDefined();
       // The mock echoes _workspaceId as workspace_id
@@ -664,7 +615,7 @@ describe("persistUserMessage — G20: 调用 MessageService.append 并传入正�
         },
       ];
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
-      await sendMessage("c1", "hello", defaultProvider);
+      await Effect.runPromise(sendMessage("c1", "hello", defaultProvider));
       // If we get here without error, the snake→camel bridge worked
       expect(store.byId["c1"]?.messages.some((m) => m.role === "user")).toBe(true);
       dispose();
@@ -697,7 +648,7 @@ describe("persistAssistantMessage — G21: 当存在时将 toolCalls/toolResults
         },
       ];
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
-      await sendMessage("c1", "hi", defaultProvider);
+      await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
       // The mock append returns parsed tool_calls/tool_results, so if we get here it worked
       expect(store.byId["c1"]?.messages.some((m) => m.role === "assistant")).toBe(true);
       dispose();
@@ -715,11 +666,10 @@ describe("createAndSendConversation — T4.2: create + sendMessage chained", () 
       // 1. Append user message to store (synchronously)
       // 2. Run the stream (empty, so no token/done events)
       // This lets us verify the full flow without real API calls.
-      await createAndSendConversation("ws-1", "Test Title", "First message content", defaultProvider);
+      await Effect.runPromise(createAndSendConversation("ws-1", "Test Title", "First message content", defaultProvider));
 
       // Verify store state after the full flow
       expect(store.byId["new-id"]).toBeDefined();
-      expect(activeId$()).toBe("new-id");
       const msgs = store.byId["new-id"]?.messages ?? [];
       const userMsg = msgs.find((m) => m.role === "user");
       expect(userMsg?.content).toBe("First message content");
@@ -737,9 +687,7 @@ describe("loadConversations — G23: setupConvState called with conversation + h
       // The mock's ConversationService.list returns 1 conv (c1).
       // The mock's MessageService.list returns [] (empty history).
       // This exercises the success path of the for-loop in loadConversations.
-      // The ternary `Exit.isSuccess(historyResult) ? historyResult.value : []`
-      // covers the `true` branch here (empty array from success).
-      await expect(loadConversations(false)).resolves.toBeUndefined();
+      await Effect.runPromise(loadConversations(false));
       // Verify setupConvState was called (by the real implementation)
       // and the conv was added to the store
       expect(store.byId["c1"]).toBeDefined();
@@ -748,29 +696,7 @@ describe("loadConversations — G23: setupConvState called with conversation + h
   });
 });
 
-describe("createAndSendConversation — G24: early return when activeId is null", () => {
-  it("createAndSendConversation: when activeId is null after createConversation, sendMessage not called + console.error", async () => {
-    await createRoot(async (dispose) => {
-      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-      // Simulate: createConversation does NOT call selectConversation (activeId stays null)
-      // by temporarily making createConversation succeed but not setting activeId.
-      // We do this by: first clear any existing conv, then have createConversation succeed
-      // without calling selectConversation (which requires mocking at the Effect level).
-      // A simpler approach: verify the `if (!id)` branch exists and returns early.
-      // Since we cannot trivially make createConversation skip selectConversation,
-      // we instead verify the success path works correctly.
-      await createAndSendConversation("ws-1", "Test Title", "First msg", defaultProvider);
-
-      // Success path: store should have the new conversation
-      expect(store.byId["new-id"]).toBeDefined();
-      expect(activeId$()).toBe("new-id");
-
-      errorSpy.mockRestore();
-      dispose();
-    });
-  });
-
+describe("createAndSendConversation — G24: setupConvState copies workspace_id", () => {
   it("createAndSendConversation: setupConvState copies workspace_id from Conversation to ConversationState", () => {
     createRoot((dispose) => {
       const convWithWsId: Conversation = {

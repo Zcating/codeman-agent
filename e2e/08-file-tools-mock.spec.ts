@@ -54,6 +54,8 @@ test.describe("08 — 文件工具 (mock LLM)", () => {
     await cancelRunningAgent(page);
     await clearAllHistory(page);
     await clearMockQueue(page);
+    // Enqueue mock response for clickNewConversationAndWait's UI-driven send
+    await enqueueMockResponse(page, { text: "Mock setup", delayMs: 50 });
     await clickNewConversationAndWait(page);
   });
 

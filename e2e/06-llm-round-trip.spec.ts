@@ -17,7 +17,7 @@
 //! 也不依赖 spec 03/04-llm-stream 的状态(独立 beforeAll)。
 //! 也不依赖 page.goto + LLM 立即返回 — 允许 90s LLM 冷启动。
 
-import { test, expect, assert, clearAllHistory, clickNewConversationAndWait, invoke, resetChatState, submitForm } from "./fixtures";
+import { test, expect, assert, clickNewConversationAndWait, invoke, resetChatState, submitForm } from "./fixtures";
 import { loadEnvFile } from "./env-loader";
 import type { Settings } from "../src/shared/lib/types";
 import * as path from "node:path";
@@ -75,9 +75,12 @@ test.describe("06 — LLM round-trip", () => {
 
   test.beforeEach(async ({ tauriEnv }) => {
     const { page } = tauriEnv;
-    // 重置 chat 状态:cancel in-flight LLM → 清 DB → reload → 等 mount 完成
+    // 重置 chat 状态:cancel in-flight → 清 DB → navigate to /
+    // Note: resetChatState now just navigates to / (no conv creation).
+    // The test body creates a conv via clickNewConversationAndWait.
     await resetChatState(page);
-    await clearAllHistory(page);
+    // Do NOT call clearAllHistory here - it would wipe the conversation
+    // created by clickNewConversationAndWait in the test body.
   });
 
   test("正常输入 + 配 API Key → 1 user + 1 assistant = 2 bubble", async ({ tauriEnv }) => {
@@ -94,8 +97,7 @@ test.describe("06 — LLM round-trip", () => {
       console.log(`[page pageerror] ${err.message}`);
     });
 
-    // 1. 到达聊天页面。
-    await page.goto("/");
+    // 1. 到达聊天页面 (resetChatState already navigated to /).
     await assert.visible(page.locator('textarea[placeholder="发条消息\u2026"]'), {
       timeout: 15_000,
     });

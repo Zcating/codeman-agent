@@ -129,113 +129,27 @@ export async function cancelRunningAgent(page: TauriPage): Promise<void> {
  * 然后等用户进入聊天页面。
  *
  * 比 cancelRunningAgent 更激进 — 适用 spec 间需要彻底重置的场景。
- * 实现:先 cancel in-flight LLM → 清空 DB → reload 页面让 Solid 重 mount
- * chat-view（runtime singleton 仍然存在,但 agentRef 通过 abort 释放）。
+ * 实现:先 cancel in-flight LLM → 清空 DB → navigate to /
  *
- * 关键:reload 后等 ~1s 让 Solid signal 初始化 + Effect build,避免 race。
- *
- * 还提供 waitForNewConversationReady(): click new conv 后等 loadMessages
- * 完成,避免 race（loadMessages 完成后才让 appendUserMessage 加用户消息）。
+ * Note: Does NOT create a conversation (which would consume a mock response).
+ * The caller should call setupWorkspaceAndCreateConvViaIpc if needed.
  */
 export async function resetChatState(page: TauriPage): Promise<void> {
   try {
-    // 先 cancel in-flight
     await cancelRunningAgent(page);
-    // 再清空 DB,避免跨 spec 数据残留
     await invoke(page, "clear_all_history");
-  } catch {
-    // best-effort
-  }
-  // 硬 reload 页面让 Solid 重 mount chat-view。goto 同一 URL 不一定触发 reload,
-  // 所以用 evaluate 强制调 window.location.reload。
-  try {
-    await page.evaluate(() => {
-      window.location.reload();
-    });
-  } catch {
-    // goto 作为兜底
-    await page.goto("/");
-  }
-  // 重新注入 __cdp helper（reload 会清掉 cdp-driver 注入的 __cdp）。
-  // 等 page reload 完成,然后 inject。
-  await new Promise((r) => setTimeout(r, 800));
-  try {
-    await page.reinjectCdp();
-  } catch {
-    // inject 失败可能 page 还没 ready
-    await new Promise((r) => setTimeout(r, 500));
-    await page.reinjectCdp();
-  }
-  // V2.1 backward-compat: after clear_all_history + reload, no active conv
-  // exists, so V2.1 shows HomeAgentForm instead of ChatView. We need to
-  // create + activate a new conv so the chat layout is back. Reuse the
-  // IPC shim — it creates workspace (idempotent) + conv + activates via
-  // __chatStore.activateConv.
-  try {
-    await setupWorkspaceAndCreateConvViaIpc(page);
-  } catch {
-    // best-effort: if workspace + conv setup fails, downstream asserts
-    // will surface the real error. Don't double-fail here.
-  }
-  await assert.visible(page.locator('textarea[placeholder="发条消息\u2026"]'), {
-    timeout: 15_000,
-  });
-  // 等 Solid signal 完全初始化 + Effect build 完成,避免 race。
-  // 1s 经验值:足够让 Module 层初始化 + conversations$ 从 DB 加载完成。
-  await new Promise((r) => setTimeout(r, 1_000));
-}
+  } catch { /* best-effort */ }
 
-/**
- * Wait for `window.__appStore` to be set by `src/index.tsx::bootstrap()`.
- * The app bootstrap is async (after DOM ready), so right after a page
- * reload `__appStore` is briefly undefined. Poll up to 15s.
- */
-async function waitForAppStore(p: TauriPage, timeoutMs = 15_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const has = await p.evaluate(() => {
-      return !!(window as unknown as { __appStore?: unknown }).__appStore;
-    });
-    if (has) return;
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error(`__appStore not available after ${timeoutMs}ms`);
+  await page.goto("/");
+  await assert.visible(page.locator('[data-testid="codex-input"]'), { timeout: 15_000 });
 }
 
 /**
  * V2.1 backward-compat shim: ensure workspace exists + create conv via
  * the production HomeAgentForm UI flow.
  *
- * ## Why this exists (V2.1 polish backward compat)
- * After V2.1 polish, the new HomeAgentForm UI (rendered when activeId===null)
- * is the canonical way to create a conversation — typing in the codex-input
- * and clicking 发送 triggers `home.tsx::handleSend` →
- * `conversations.store.createAndSendConversation()`, which atomically:
- *   1. `createConversation(wsId, title)` — DB insert + `setupConvState`
- *      (populates `store.byId`) + `selectConversation` (sets `activeId`)
- *   2. `sendMessage(convId, text, provider)` — starts LLM streaming
- *
- * Layout switches to ChatView after step 1. The store is populated by
- * the production code path — no test bridge on `window` is needed (we
- * drive the actual UI handlers, matching the conversation.store API).
- *
- * ## Why workspace is still via IPC
- * Workspace CRUD uses WorkspaceService (SQLite-backed) via IPC commands
- * (`add_workspace`, `list_workspaces`, `delete_workspace`). Using
- * `add_workspace` IPC is the canonical way to provision a workspace in
- * tests; the chat conv itself goes through the UI.
- *
- * ## Which specs use it
- * - 05-chat-message-bubble, 05-file-tools, 06-llm-round-trip, 07-mock-provider,
- *   08-file-tools-mock, 09-per-conv-runtime — call clickNewConversationAndWait()
- *   which wraps this shim internally.
- * - 01-app-launch is a launch canary (no conversation needed).
- * - 02-settings-api-key and 04-theme-toggle drive state via IPC directly.
- * - 10-home-agent.spec.ts is the new spec (does NOT use this shim).
- *
- * ## Expected pass condition
- * All 9 pre-existing specs (05–09) pass WITHOUT modification after V2.1 polish.
- * If they fail, the home form flow or the IPC bridge is broken — not the individual spec.
+ * Workspaces auto-load on ChatLayout mount (via onMount(() => Effect.runPromiseExit(loadWorkspaces()))).
+ * No __chatStore bridge needed — everything driven through the UI.
  *
  * @param p - TauriPage
  * @param opts - { workspaceLabel?: string, workspaceRoot?: string, title?: string }
@@ -248,113 +162,26 @@ export async function setupWorkspaceAndCreateConvViaIpc(
   const root = opts.workspaceRoot ?? path.join(os.tmpdir(), "codeman-e2e-" + Date.now());
   const title = opts.title ?? "E2E Test Conv";
 
-  // 0. Ensure the Tauri webview is fully loaded before any IPC call.
-  //    `goto` (in cdp-driver) now polls until `__TAURI_INTERNALS__` is
-  //    available, so this also guarantees `document.URL !== "about:blank"`
-  //    and the `tauri://` host page has mounted.
   await p.goto("/");
+  await assert.visible(p.locator('[data-testid="codex-input"]'), { timeout: 15_000 });
 
-  // 0b. Wait for the Solid app to bootstrap (`__appStore` is set in
-  //     `src/index.tsx::bootstrap()` after DOM ready). This is async
-  //     after page load.
-  await waitForAppStore(p);
-
-  // 0c. D8-W: Clean old workspaces first so the home form sees exactly 1
-  //     workspace (avoids "Select a workspace…" when wsCount > 1).
+  // Clean old workspaces
   try {
     const oldWorkspaces = await invoke<{ id: string }[]>(p, "list_workspaces");
     for (const ws of oldWorkspaces) {
       await invoke(p, "delete_workspace", { id: ws.id });
     }
-  } catch {
-    // best-effort
-  }
+  } catch { /* best-effort */ }
 
-  // 1. Create a fresh workspace via WorkspaceService IPC.
+  // Create workspace via IPC
   const actualWsId = (await invoke<Workspace>(p, "add_workspace", { label, rootPath: root })).id;
 
-  // 2. D8-W: Load workspaces into chat.store so the home form sees the new
-  //    workspace. Workspaces are now managed by chat.store (not appStore).
-  //    The home form uses `workspaces$()` to determine input enabled state.
-  //    Also set selectedWorkspaceId so the input unlocks (home.tsx checks
-  //    selectedWorkspaceId() !== null, it does NOT auto-select).
-  await p.evaluate(async (id: string) => {
-    const w = window as unknown as {
-      __chatStore?: {
-        loadWorkspaces: () => Promise<void>;
-        setSelectedWorkspaceId: (id: string | null) => void;
-      };
-    };
-    if (w.__chatStore) {
-      await w.__chatStore.loadWorkspaces();
-      w.__chatStore.setSelectedWorkspaceId(id);
-    }
-  }, actualWsId);
-
-  // 3. Navigate to / — re-mounts home form. With exactly 1 workspace,
-  //    draftWorkspaceId auto-selects and the input unlocks.
+  // Navigate to / — chat-layout mount triggers loadWorkspaces
   await p.goto("/");
+  await assert.visible(p.locator('[data-testid="codex-input"]'), { timeout: 15_000 });
 
-  // 4. Wait for the input to be enabled (wsCount=1, draftWorkspaceId=wsId).
-  await assert.enabled(p.locator('[data-testid="codex-input"]'), {
-    timeout: 10_000,
-  });
-
-  // 5. Type message in home form + click send. This triggers
-  //    `home.tsx::handleSend` → `conversations.store.createAndSendConversation()`:
-  //      a) `createConversation(wsId, title)` → DB insert +
-  //         `setupConvState(conv, [])` (populates `store.byId`) +
-  //         `selectConversation(conv.id)` (sets `activeId`).
-  //         Layout switches to ChatView (Show: activeId$() !== null).
-  //      b) `sendMessage(convId, text, provider)` → starts LLM streaming.
-  //    The store is populated by the PRODUCTION code path — no test bridge
-  //    on window. The new conv appears in the sidebar with `data-conv-id`.
-  const text = title;
-  await p.locator('[data-testid="codex-input"]').fill(text);
-  await p.locator('[data-testid="codex-send"]').click();
-
-  // 6. Wait for ChatView to mount (textarea "发条消息…" visible).
-  await assert.visible(
-    p.locator('textarea[placeholder="发条消息\u2026"]'),
-    { timeout: 15_000 },
-  );
-
-  // 6b. Wait for the new conv to appear in the sidebar.
-  //     The home form send creates the conv via `createAndSendConversation`
-  //     which is async — the sidebar re-render happens on the next Solid
-  //     reactive tick. Without this wait, reading the sidebar immediately
-  //     returns null (sidebar hasn't updated yet).
-  await p.evaluate(() => {
-    return new Promise<void>((resolve, reject) => {
-      const deadline = Date.now() + 10_000;
-      const check = () => {
-        if (Date.now() > deadline) {
-          reject(
-            new Error("setupWorkspaceAndCreateConvViaIpc: sidebar did not show any conv after 10s"),
-          );
-          return;
-        }
-        const el = document.querySelector("aside [data-conv-id]");
-        if (el) {
-          resolve();
-          return;
-        }
-        setTimeout(check, 100);
-      };
-      check();
-    });
-  });
-
-  // 7. Read convId from sidebar (data-conv-id on the active item).
-  const convId = await p.evaluate(() => {
-    const el = document.querySelector("aside [data-conv-id]");
-    return el?.getAttribute("data-conv-id") ?? null;
-  });
-  if (!convId) {
-    throw new Error(
-      "setupWorkspaceAndCreateConvViaIpc: convId not found in sidebar after home form send",
-    );
-  }
+  // Use clickNewConversationAndWait (now UI-driven)
+  const { convId } = await clickNewConversationAndWait(p, { workspaceLabel: label, title });
 
   return { workspaceId: actualWsId, convId };
 }
@@ -368,107 +195,69 @@ export async function submitHomeAgentForm(p: TauriPage, text: string): Promise<v
 }
 
 /**
- * Create a new conversation and wait for the chat layout to be ready.
+ * UI-driven conversation creation flow (V2.1 post-refactor):
+ * 1. Navigate to /
+ * 2. Wait for home form input to appear
+ * 3. Select workspace from picker (or use auto-select for 1 ws)
+ * 4. Type in HomeAgentForm input
+ * 5. Click send
+ * 6. Wait for ChatView mount (textarea visible)
+ * 7. Read convId from URL
  *
- * V2.1: "新对话" button no longer creates a conv directly. Instead:
- *   1. Click "back to home" (clears activeId → HomeAgentForm renders)
- *   2. Type message in codex-input + click 发送
- *   3. HomeAgentForm.handleSend → createAndSendConversation in the store
- *      (DB + setupConvState + selectConversation + sendMessage)
- *   4. Layout switches to ChatView
- *   5. Read convId from sidebar (data-conv-id)
+ * Caller MUST have:
+ * - Workspace provisioned via invoke(page, "add_workspace", ...)
+ * - Mock provider active (useMockProvider) + enqueueMockResponse
  *
- * For the FIRST call in a test, use `setupWorkspaceAndCreateConvViaIpc`
- * (which sets up the workspace too). This helper assumes the workspace
- * is already configured.
- *
- * @returns the new conv's id (for tests that need to address the conv by
- *          its data-conv-id selector).
+ * @returns the new conv's id (read from URL after navigation to /conversation/{convId})
  */
 export async function clickNewConversationAndWait(
   p: TauriPage,
-  opts: { workspaceId?: string } = {},
+  opts: { workspaceLabel?: string; title?: string } = {},
 ): Promise<{ convId: string }> {
-  // 1. Click "back to home" to clear activeId (if on ChatView).
-  //    HomeAgentForm renders when activeId$() === null.
-  try {
-    await p.locator('[data-testid="back-to-home"]').click({ timeout: 2_000 });
-  } catch {
-    // Already on home (no back button) — proceed
+  // 1. Navigate to /
+  await p.goto("/");
+
+  // 2. Wait for home form input to appear
+  await assert.visible(p.locator('[data-testid="codex-input"]'), { timeout: 15_000 });
+
+  // 3. Select workspace from picker (trigger click → select option by label)
+  const wsLabel = opts.workspaceLabel;
+  if (wsLabel) {
+    await p.evaluate((label: string) => {
+      const trigger = document.querySelector('[data-testid="workspace-select-trigger"]') as HTMLElement;
+      trigger?.click();
+      setTimeout(() => {
+        const items = document.querySelectorAll('[role="option"]');
+        for (const item of Array.from(items)) {
+          if ((item.textContent ?? "").trim() === label) {
+            (item as HTMLElement).click();
+            break;
+          }
+        }
+      }, 100);
+    }, wsLabel);
+    await new Promise((r) => setTimeout(r, 300));
   }
 
-  // 2. D8-W: load workspaces into chat.store so the sidebar renders.
-  //    Without this, workspaces$() is empty and the sidebar won't show convs.
-  await p.evaluate(async () => {
-    const w = window as unknown as {
-      __chatStore?: { loadWorkspaces: () => Promise<void> };
-    };
-    await w.__chatStore?.loadWorkspaces();
-  });
+  // 4. Type + submit
+  const text = opts.title ?? "E2E Test Conv";
+  await p.locator('[data-testid="codex-input"]').fill(text);
+  await p.locator('[data-testid="codex-send"]').click();
 
-  // 3. D8-W: set selectedWorkspaceId so the input unlocks.
-  //    home.tsx checks selectedWorkspaceId() !== null to enable input.
-  //    If caller provided workspaceId, use it; otherwise use list_workspaces.
-  let wsId = opts.workspaceId;
-  if (!wsId) {
-    const wsList = await invoke<{ id: string }[]>(p, "list_workspaces");
-    wsId = wsList[0]?.id;
-  }
-  if (wsId) {
-    await p.evaluate((id: string) => {
-      const w = window as unknown as {
-        __chatStore?: { setSelectedWorkspaceId: (id: string | null) => void };
-      };
-      w.__chatStore?.setSelectedWorkspaceId(id);
-    }, wsId);
-  }
-
-  // 4. Wait for home form input to be enabled (workspace now selected).
-  //    If input can't be enabled, the home form UI path is broken — let the test fail fast.
-  await assert.visible(p.locator('[data-testid="codex-input"]'), { timeout: 5_000 });
-
-  // 5. D8-W: create conversation via IPC bridge (no LLM message sent).
-  //    The bridge returns the new conversation id from chat.store.activeId$(),
-  //    which is RELIABLE even when multiple convs exist in the sidebar
-  //    (unlike reading aside [data-conv-id] which may return a stale conv).
-  const title = "E2E Test Conv";
-  const convId = await p.evaluate(async (args: { wsId: string; title: string }) => {
-    const w = window as unknown as {
-      __chatStore?: {
-        createConversationOnly: (workspaceId: string, title?: string) => Promise<string>;
-      };
-    };
-    return (await w.__chatStore?.createConversationOnly(args.wsId, args.title)) ?? "";
-  }, { wsId, title });
-
-  if (!convId) {
-    throw new Error(
-      "clickNewConversationAndWait: bridge createConversationOnly returned empty convId",
-    );
-  }
-
-  // 6. Wait for ChatView to mount (activeId set by createConversation → selectConversation).
-  //    The textarea with placeholder "发条消息…" proves ChatView rendered.
+  // 5. Wait for ChatView mount
   await assert.visible(
     p.locator('textarea[placeholder="发条消息\u2026"]'),
     { timeout: 15_000 },
   );
 
-  // 7. D8-W: expand workspace so convs become visible in sidebar.
-  //    Workspace IDs are now UUIDs from Rust, not hardcoded "e2e-ws".
-  //    If caller didn't pass workspaceId, look up first existing workspace.
-  let workspaceId = opts.workspaceId;
-  if (!workspaceId) {
-    const workspaces = await invoke<{ id: string }[]>(p, "list_workspaces");
-    if (workspaces.length === 0) {
-      throw new Error(
-        "clickNewConversationAndWait: no workspace exists. " +
-          "Call setupWorkspaceAndCreateConvViaIpc first or pass opts.workspaceId.",
-      );
-    }
-    workspaceId = workspaces[0]!.id;
+  // 6. Read convId from URL
+  const convId = await p.evaluate(() => {
+    const match = window.location.pathname.match(/\/conversation\/(.+)/);
+    return match?.[1] ?? null;
+  });
+  if (!convId) {
+    throw new Error("clickNewConversationAndWait: no convId in URL after navigation");
   }
-  await expandWorkspace(p, workspaceId);
 
   return { convId };
 }
@@ -537,7 +326,6 @@ export async function nthConv(
 ): Promise<{ convId: string; workspaceId: string }> {
   const result = await p.evaluate(
     (args: { n: number; workspaceId?: string }) => {
-      let sel: string;
       if (args.workspaceId) {
         const ws = document.querySelector(`[data-workspace-id="${args.workspaceId}"]`);
         if (!ws) return null;

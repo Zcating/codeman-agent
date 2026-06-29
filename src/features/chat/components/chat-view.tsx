@@ -4,9 +4,10 @@
 //! 的 store / sendMessage / cancel。running 派生自 byId[activeId].streamingMessageId。
 
 import { createSignal, createEffect, createMemo, For, Show, onMount } from "solid-js";
+import { Effect } from "effect";
 import { X, Send } from "lucide-solid";
 import { MessageBubble } from "./message-bubble";
-import { store, activeId$, sendMessage, cancel } from "../stores/chat.store";
+import { store, sendMessage, cancel } from "../stores/chat.store";
 import type { ProviderConfig } from "../lib/runtime";
 import { Button } from "../../../shared/components/ui/button";
 import { Textarea } from "../../../shared/components/ui/textarea";
@@ -79,18 +80,13 @@ function ProviderSelect() {
   );
 }
 
-export function ChatView() {
+export function ChatView(props: { convId?: string }) {
   const [input, setInput] = createSignal("");
-  const [convId, setConvId] = createSignal<string | null>(null);
+  const convId = (): string | undefined => props.convId;
   let messagesEndRef: HTMLDivElement | undefined;
 
   onMount(() => {
     startThemeSync();
-  });
-
-  // 跟踪 active conv id (从 activeId$ signal)
-  createEffect(() => {
-    setConvId(activeId$());
   });
 
   // 派生 running 状态(per-conv streaming)
@@ -122,7 +118,7 @@ export function ChatView() {
     }
   });
 
-  const handleCancel = async () => {
+  const handleCancel = () => {
     const id = convId();
     if (!id) {
       return;
@@ -148,7 +144,7 @@ export function ChatView() {
       tools: [],
     };
 
-    await sendMessage(id, text, provider);
+    Effect.runPromiseExit(sendMessage(id, text, provider));
   };
 
   return (

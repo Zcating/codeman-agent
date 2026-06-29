@@ -80,34 +80,6 @@ function bootstrap() {
       ),
   };
 
-  // D8-W: e2e bridge for chatStore workspace methods
-  type WindowWithChatStore = {
-    __chatStore?: {
-      loadWorkspaces: () => Promise<void>;
-      setSelectedWorkspaceId: (id: string | null) => void;
-      /** Create a conversation without sending a message (avoids LLM consumption). Returns the new conv id. */
-      createConversationOnly: (workspaceId: string, title?: string) => Promise<string>;
-      /** Check if a conversation is currently streaming. Used by e2e D5 test. */
-      getStreamingMessageId: (convId: string) => string | null;
-    };
-  };
-  (window as unknown as WindowWithChatStore).__chatStore = {
-    loadWorkspaces: () =>
-      Effect.runPromiseExit(chatStore.loadWorkspaces()).then((exit) => {
-        if (Exit.isFailure(exit)) {
-          throw new Error("loadWorkspaces failed");
-        }
-      }),
-    setSelectedWorkspaceId: (id: string | null) => {
-      chatStore.setSelectedWorkspaceId(id);
-    },
-    createConversationOnly: async (workspaceId: string, title?: string): Promise<string> => {
-      await chatStore.createConversation(workspaceId, title ?? "E2E Test Conv");
-      // Return the active conversation id after creation
-      return chatStore.activeId$() ?? "";
-    },
-    getStreamingMessageId: (convId: string) => chatStore.store.byId[convId]?.streamingMessageId ?? null,
-  };
 }
 
 bootstrap();

@@ -1,0 +1,147 @@
+//! ChatLayout — Layout shell with Sidebar + Footer + Outlet (Task 5 refactor complete).
+//!
+//! Provides the shared layout structure for all chat routes.
+
+import { Show, onMount, type JSX } from "solid-js";
+import { Outlet, useParams, Link } from "@tanstack/solid-router";
+import { Settings as SettingsIcon } from "lucide-solid";
+import { Effect, Exit } from "effect";
+import { CodemanSidebar, type WorkspaceNode } from "../../../shared/components/internal/codeman-sidebar";
+import { Dialog } from "../../../shared/components/internal/codeman-dialog";
+import {
+  store,
+  workspaces$,
+  conversations$,
+  deleteConversation,
+  setSelectedWorkspaceId,
+  loadWorkspaces,
+  renameWorkspace,
+  removeWorkspace,
+} from "../stores/chat.store";
+import { showRenameDialog } from "../components/workspace-rename-dialog";
+
+// ─── Data mapping helpers ───────────────────────────────────────────────────
+
+function buildSidebarNodes(): WorkspaceNode[] {
+  const allConvs = conversations$() ?? [];
+  const wsList = workspaces$() ?? [];
+  return wsList.map((ws) => {
+    const wsConvs = allConvs
+      .filter((c) => c.workspace_id === ws.id)
+      .sort((a, b) => b.updated_at - a.updated_at);
+    return {
+      kind: "workspace" as const,
+      id: ws.id,
+      label: ws.label,
+      rootPath: ws.root_path,
+      children: wsConvs.map((c) => ({
+        kind: "conv" as const,
+        id: c.id,
+        label: c.title,
+        subLabel: new Date(c.updated_at * 1000).toLocaleDateString("zh-CN"),
+        isStreaming: store.byId[c.id]?.streamingMessageId != null,
+      })),
+    };
+  });
+}
+
+function workspacesExist(): boolean {
+  return (workspaces$()?.length ?? 0) > 0;
+}
+
+// ─── ChatLayout ─────────────────────────────────────────────────────────────
+
+export function ChatLayout(): JSX.Element {
+  // Load workspaces on mount
+  onMount(() => {
+    Effect.runPromiseExit(loadWorkspaces());
+  });
+
+  const params = useParams({ from: "/chat/conversation/$convId" });
+  // selectedItemId comes from URL — /conversation/{id} has convId, / has null
+  const selectedItemId = (): string | null => params().convId ?? null;
+
+  const handleSelectItem = (_id: string) => {
+    // Navigation is handled by CodemanSidebar's internal link behavior
+  };
+
+  const handleDeleteItem = (id: string) => {
+    Effect.runPromiseExit(deleteConversation(id));
+  };
+
+  const handleBackToHome = () => {
+    // Navigate to home — no activeId signal anymore, URL is SSOT
+  };
+
+  const handleEmptyWorkspaceClick = (wsId: string) => {
+    setSelectedWorkspaceId(wsId);
+  };
+
+  const handleRenameWorkspace = async (workspaceId: string, currentLabel: string) => {
+    const newLabel = await showRenameDialog(currentLabel);
+
+    if (newLabel && newLabel !== currentLabel) {
+      const exit = await Effect.runPromiseExit(renameWorkspace(workspaceId, newLabel));
+      if (Exit.isFailure(exit)) {
+        console.error("[chat-layout] rename failed:", exit.cause);
+      }
+    }
+  };
+
+  const handleDeleteWorkspace = async (workspaceId: string, label: string) => {
+    const confirmed = await Dialog.confirm({
+      title: "Delete workspace",
+      content: `Are you sure you want to delete "${label}"? All conversations in this workspace will be permanently deleted.`,
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      destructive: true,
+    });
+
+    if (!confirmed) return;
+
+    const exit = await Effect.runPromiseExit(removeWorkspace(workspaceId));
+    if (Exit.isFailure(exit)) {
+      console.error("[chat-layout] delete failed:", exit.cause);
+    }
+  };
+
+  return (
+    <main class="flex h-screen w-full bg-background text-foreground">
+      <Show when={workspacesExist()}>
+        <CodemanSidebar
+          nodes={buildSidebarNodes()}
+          selectedItemId={selectedItemId()}
+          onSelectItem={handleSelectItem}
+          onDeleteItem={handleDeleteItem}
+          onCreateItem={handleBackToHome}
+          onAddWorkspace={() => {
+            window.location.href = "/settings";
+          }}
+          onEmptyWorkspaceClick={handleEmptyWorkspaceClick}
+          onRenameWorkspace={handleRenameWorkspace}
+          onDeleteWorkspace={handleDeleteWorkspace}
+        />
+      </Show>
+
+      <section class="flex-1 flex flex-col overflow-hidden">
+        <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
+          <Outlet />
+        </div>
+        <footer class="flex items-center justify-between px-4 py-2 border-t border-border bg-card text-xs text-muted-foreground">
+          <span>codeman-agent</span>
+          <Link
+            to="/settings"
+            activeProps={{ class: "text-primary font-medium" }}
+            inactiveProps={{
+              class:
+                "hover:text-foreground transition-colors flex items-center gap-1 px-2 py-1 -mx-2 -my-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+            }}
+          >
+            <SettingsIcon class="h-3.5 w-3.5" aria-hidden="true" />
+            <span>设置</span>
+          </Link>
+        </footer>
+      </section>
+    </main>
+  );
+}

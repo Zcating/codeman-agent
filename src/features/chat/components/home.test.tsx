@@ -4,7 +4,7 @@ import { render, cleanup, fireEvent, waitFor } from "@solidjs/testing-library";
 import { Effect } from "effect";
 import { HomeAgentForm } from "./home";
 import type { ProviderConfig } from "../lib/runtime";
-import { createAndSendConversation, addWorkspace as addWorkspaceFromStore } from "../stores/chat.store";
+import { createConversation, sendMessage, addWorkspace as addWorkspaceFromStore } from "../stores/chat.store";
 
 // Mock @ark-ui/solid Select for jsdom — same pattern as codeman-select.test.tsx
 let mockIsOpen = false;
@@ -81,6 +81,12 @@ vi.mock("@ark-ui/solid", async () => {
   };
 });
 
+// ─── Mock @tanstack/solid-router ──────────────────────────────────────────────
+
+vi.mock("@tanstack/solid-router", () => ({
+  useNavigate: vi.fn(() => (_opts: { to: string }) => undefined),
+}));
+
 // ─── Mock settings-saver ────────────────────────────────────────────────────────
 
 vi.mock("../../settings/lib/settings-saver", () => ({
@@ -93,12 +99,14 @@ vi.mock("../../settings/lib/settings-saver", () => ({
 
 // ─── Mock appStore ─────────────────────────────────────────────────────────
 
+const mockDefaultLlmProvider = vi.hoisted(() => ({ id: "minimax" }));
+
 vi.mock("../../../shared/stores/app.store", () => ({
   appStore: {
     state: {
       value: {
         workspaces: [] as Array<{ id: string; label: string; root_path: string; enabled: boolean }>,
-        default_llm_provider_id: "minimax",
+        get default_llm_provider_id() { return mockDefaultLlmProvider.id; },
         providers: [
           {
             id: "minimax",
@@ -140,15 +148,14 @@ vi.mock("../stores/chat.store", () => ({
   activeId$: vi.fn<() => string | null>(),
   conversations$: vi.fn<() => never[]>(),
   selectConversation: vi.fn<(id: string) => void>(),
-  sendMessage: vi.fn<(id: string, content: string, provider: ProviderConfig) => Promise<void>>(),
-  createConversation: vi.fn<(id: string, title: string, prompt?: string) => Promise<void>>(),
+  sendMessage: vi.fn<(id: string, content: string, provider: ProviderConfig) => Effect.Effect<void, never, never>>(() => Effect.succeed(undefined)),
+  createConversation: vi.fn<(workspaceId: string, title: string, systemPrompt?: string) => Effect.Effect<string, { _tag: "SomeError" }, never>>(() => Effect.succeed("new-conv-id")),
   deleteConversation: vi.fn(),
   archiveConversation: vi.fn(),
   setupConvState: vi.fn(),
   cancel: vi.fn(),
   loadConversations: vi.fn(),
   clearActiveConversation: vi.fn(),
-  createAndSendConversation: vi.fn<(wsId: string, title: string, msg: string, provider: ProviderConfig) => Promise<void>>(),
 }));
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
@@ -250,11 +257,11 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
     expect(sendButton.disabled).toBe(false);
   });
 
-  it("T4.1.6: send button click triggers createAndSendConversation with workspaceId + firstMessage", async () => {
+  it("T4.1.6: send button click triggers createConversation then sendMessage", async () => {
     const { appStore } = await import("../../../shared/stores/app.store");
     mockWorkspaces.push({ id: "ws-1", label: "Frontend", root_path: "/p" });
     mockSelectedWsId = "ws-1";
-    appStore.state.value.default_llm_provider_id = "minimax";
+    mockDefaultLlmProvider.id = "minimax";
     appStore.state.value.providers = [
       {
         id: "minimax",
@@ -282,16 +289,20 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
     fireEvent.click(sendBtn);
 
     await waitFor(() => {
-      expect(createAndSendConversation).toHaveBeenCalledWith(
-        "ws-1",
-        "Hello world", // title is firstMessage.slice(0, 30)
+      // createConversation is called with workspaceId and title (firstMessage.slice(0, 30))
+      expect(createConversation).toHaveBeenCalledWith("ws-1", "Hello world");
+    });
+    // sendMessage is called with the new convId, message, and provider
+    await waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledWith(
+        "new-conv-id",
         "Hello world",
         expect.objectContaining({ apiKey: "test-key" }),
       );
     });
   });
 
-  it("T4.1.7: send with empty input does not call createAndSendConversation", async () => {
+  it("T4.1.7: send with empty input does not call createConversation or sendMessage", async () => {
     mockWorkspaces.push({ id: "ws-1", label: "Frontend", root_path: "/p" });
     mockSelectedWsId = "ws-1";
 
@@ -301,10 +312,11 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
     // Send button is disabled when input is empty
     expect(sendBtn).toBeDisabled();
     fireEvent.click(sendBtn); // click on disabled button doesn't fire
-    expect(createAndSendConversation).not.toHaveBeenCalled();
+    expect(createConversation).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 
-  it("T4.1.8: send with no workspace selected (2+ workspaces) does not call createAndSendConversation", async () => {
+  it("T4.1.8: send with no workspace selected (2+ workspaces) does not call createConversation or sendMessage", async () => {
     // 2 workspaces, user hasn't picked yet
     mockWorkspaces.push(
       { id: "ws-1", label: "A", root_path: "/a" },
@@ -317,7 +329,8 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
     const sendBtn = container.querySelector("[data-testid='codex-send']") as HTMLButtonElement;
     expect(sendBtn).toBeDisabled(); // disabled because no workspace picked
     fireEvent.click(sendBtn);
-    expect(createAndSendConversation).not.toHaveBeenCalled();
+    expect(createConversation).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 
   it("T4.1.9: workspace Select renders all workspaces as options", async () => {
@@ -548,7 +561,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
         },
       },
     ];
-    appStore.state.value.default_llm_provider_id = "provider-1";
+    mockDefaultLlmProvider.id = "provider-1";
 
     const { getByTestId } = render(() => <HomeAgentForm />);
 
@@ -600,7 +613,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
         },
       },
     ];
-    appStore.state.value.default_llm_provider_id = "provider-1";
+    mockDefaultLlmProvider.id = "provider-1";
 
     const { getByTestId } = render(() => <HomeAgentForm />);
 
@@ -616,5 +629,22 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
     // Should set default_llm_provider_id to provider-2 (which has model-2)
     expect(appStore.set).toHaveBeenCalledWith({ default_llm_provider_id: "provider-2" });
     expect(settingsSaver.scheduleSave).toHaveBeenCalledTimes(1);
+  });
+
+  it("currentModelId() fallback when no provider ID matches", () => {
+    // Set to a non-existent provider ID so currentModelId() falls back
+    mockDefaultLlmProvider.id = "non-existent";
+
+    const { getByTestId } = render(() => <HomeAgentForm />);
+
+    // The LLM picker still renders, falling back to first provider's first model
+    const trigger = getByTestId("llm-picker-trigger");
+    expect(trigger).toBeTruthy();
+
+    // Open the picker and verify the model option is present
+    fireEvent.click(trigger);
+    // First provider minimax → model "MiniMax-M2.5-highspeed"
+    const modelOption = document.querySelector('li[data-value="MiniMax-M2.5-highspeed"]');
+    expect(modelOption).toBeTruthy();
   });
 });

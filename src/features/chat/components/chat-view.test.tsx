@@ -4,6 +4,7 @@
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
+import { Effect } from "effect";
 import { ChatView } from "./chat-view";
 import type { Message } from "../../../shared/lib/types";
 
@@ -69,7 +70,6 @@ vi.mock("../stores/chat.store", () => ({
       },
     },
   },
-  activeId$: vi.fn(() => "conv-1"),
   conversations$: vi.fn(() => [
     {
       id: "conv-1",
@@ -80,7 +80,7 @@ vi.mock("../stores/chat.store", () => ({
       archived_at: null,
     },
   ]),
-  sendMessage: vi.fn().mockResolvedValue(undefined),
+  sendMessage: vi.fn(() => Effect.succeed(undefined)),
   cancel: vi.fn(),
   selectConversation: vi.fn(),
   setupConvState: vi.fn(),
@@ -162,7 +162,7 @@ describe("ChatView", () => {
   afterEach(() => cleanup());
 
   it("从 store.byId[convId].messages 渲染消息列表", () => {
-    const { container } = render(() => <ChatView />);
+    const { container } = render(() => <ChatView convId="conv-1" />);
     // MessageBubble 外层包装有 class `mb-3 flex w-full`（Tailwind utilities）
     // mock 数据含 3 条消息(user / assistant / tool),全 role 都走同一 wrapper,
     // 所以 querySelectorAll("div.mb-3") 应得 3。
@@ -171,7 +171,7 @@ describe("ChatView", () => {
   });
 
   it("输入为空时 Send 按钮禁用", () => {
-    const { container } = render(() => <ChatView />);
+    const { container } = render(() => <ChatView convId="conv-1" />);
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
     expect(textarea.value).toBe("");
     const submitBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
@@ -179,7 +179,7 @@ describe("ChatView", () => {
   });
 
   it("运行中状态显示 Cancel 按钮", async () => {
-    const { container } = render(() => <ChatView />);
+    const { container } = render(() => <ChatView convId="conv-1" />);
     // 运行状态在组件内部 - 我们测试当 isRunning() 为 true 时，
     // Cancel 按钮替代 Send 按钮出现。我们可以验证初始状态显示 "发送"。
     const submitBtn = container.querySelector('button[type="submit"]');
@@ -190,7 +190,7 @@ describe("ChatView", () => {
   });
 
   it("tool 角色的消息渲染工具结果", () => {
-    const { container } = render(() => <ChatView />);
+    const { container } = render(() => <ChatView convId="conv-1" />);
     // 验证工具结果details存在
     const details = container.querySelectorAll("details");
     expect(details.length).toBeGreaterThan(0);
@@ -200,7 +200,7 @@ describe("ChatView", () => {
   });
 
   it("tool 消息显示工具调用 ID 和结果", () => {
-    const { container } = render(() => <ChatView />);
+    const { container } = render(() => <ChatView convId="conv-1" />);
     const codeElements = container.querySelectorAll("code");
     const hasToolCallId = Array.from(codeElements).some((code) => code.textContent === "tc-read-1");
     expect(hasToolCallId).toBe(true);
@@ -208,7 +208,7 @@ describe("ChatView", () => {
 
   // ─── V2.x provider 选择器测试 (CodemanGroupSelect) ─────────────────
   it("渲染 provider 选择器并列出 enabled 的 provider", () => {
-    const { container } = render(() => <ChatView />);
+    const { container } = render(() => <ChatView convId="conv-1" />);
     const trigger = container.querySelector('button[data-testid="provider-select-trigger"]') as HTMLButtonElement;
     expect(trigger).toBeTruthy();
     // 点击 trigger 打开下拉菜单
@@ -220,7 +220,7 @@ describe("ChatView", () => {
   });
 
   it("默认值匹配 appStore.state.value.default_llm_provider_id", () => {
-    const { container } = render(() => <ChatView />);
+    const { container } = render(() => <ChatView convId="conv-1" />);
     const trigger = container.querySelector('button[data-testid="provider-select-trigger"]') as HTMLButtonElement;
     expect(trigger).toBeTruthy();
     // Trigger 显示当前选中的值文本，验证存在即可
@@ -256,7 +256,7 @@ describe("ChatView", () => {
       ],
       default_llm_provider_id: "deepseek",
     });
-    const { container } = render(() => <ChatView />);
+    const { container } = render(() => <ChatView convId="conv-1" />);
     const trigger = container.querySelector('button[data-testid="provider-select-trigger"]');
     expect(trigger).toBeNull();
     const link = container.querySelector('a[href="/settings"]');
@@ -296,7 +296,7 @@ describe("ChatView", () => {
       ],
       default_llm_provider_id: "minimax",
     });
-    const { container } = render(() => <ChatView />);
+    const { container } = render(() => <ChatView convId="conv-1" />);
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
     await user.type(textarea, "hi");
     expect(textarea.value).toBe("hi");
@@ -321,7 +321,7 @@ describe("ChatView", () => {
     const conversationsStoreMock = await import("../stores/chat.store");
     // Reset sendMessage mock before test
     (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
-    const { container } = render(() => <ChatView />);
+    const { container } = render(() => <ChatView convId="conv-1" />);
     const submitBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
     await user.click(submitBtn);
     expect((conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage).not.toHaveBeenCalled();
@@ -358,7 +358,7 @@ describe("ChatView", () => {
       ],
       default_llm_provider_id: "minimax",
     });
-    const { container } = render(() => <ChatView />);
+    const { container } = render(() => <ChatView convId="conv-1" />);
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
     await user.type(textarea, "hello world");
     expect(textarea.value).toBe("hello world");
@@ -378,7 +378,7 @@ describe("ChatView", () => {
     (conversationsStoreMock as unknown as { cancel: ReturnType<typeof vi.fn> }).cancel.mockClear();
     const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null }> } }).store;
     mockStore.byId["conv-1"].streamingMessageId = "msg-streaming";
-    const { container } = render(() => <ChatView />);
+    const { container } = render(() => <ChatView convId="conv-1" />);
     // Cancel button appears when streaming; use aria-label selector to avoid provider-select-trigger
     const cancelBtn = container.querySelector('button[aria-label="取消运行"]') as HTMLButtonElement;
     expect(cancelBtn).toBeTruthy();
@@ -395,7 +395,7 @@ describe("ChatView", () => {
     mockStore.byId["conv-1"].streamingMessageId = "msg-streaming";
     // Set last message content to empty string for thinking indicator condition
     mockStore.byId["conv-1"].messages[mockStore.byId["conv-1"].messages.length - 1].content = "";
-    const { container } = render(() => <ChatView />);
+    const { container } = render(() => <ChatView convId="conv-1" />);
     const indicator = container.querySelector('[data-testid="thinking-indicator"]');
     expect(indicator).toBeTruthy();
     expect(indicator?.getAttribute("role")).toBe("status");
@@ -408,7 +408,7 @@ describe("ChatView", () => {
     // Ensure store state is clean
     const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null }> } }).store;
     mockStore.byId["conv-1"].streamingMessageId = null;
-    const { container } = render(() => <ChatView />);
+    const { container } = render(() => <ChatView convId="conv-1" />);
     const indicator = container.querySelector('[data-testid="thinking-indicator"]');
     expect(indicator).toBeNull();
   });
@@ -445,7 +445,7 @@ describe("ChatView", () => {
       ],
       default_llm_provider_id: "minimax",
     });
-    const { container } = render(() => <ChatView />);
+    const { container } = render(() => <ChatView convId="conv-1" />);
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
     await user.type(textarea, "submit test");
     const form = container.querySelector("form") as HTMLFormElement;
@@ -456,5 +456,11 @@ describe("ChatView", () => {
     });
     // Also verify textarea cleared
     expect(textarea.value).toBe("");
+  });
+
+  it("renders empty state when no convId (guards against undefined convId)", () => {
+    const { container } = render(() => <ChatView convId={undefined as unknown as string} />);
+    // Should not crash — renders empty/missing-indicator
+    expect(container.textContent).toBeTruthy();
   });
 });
