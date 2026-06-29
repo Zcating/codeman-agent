@@ -94,6 +94,8 @@ export default defineConfig(async () => ({
         "src/index.tsx",
         "src/router.tsx",
         "src/features/**/routes/index.tsx",
+        "e2e/**",
+        "*.config.ts",
       ],
       reporter: ["text", "html", "json-summary"],
       thresholds: {

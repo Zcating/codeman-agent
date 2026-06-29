@@ -27,7 +27,7 @@ export default defineConfig({
   // Workers run in parallel; each owns its own Tauri instance (see
   // e2e/fixtures.ts). Tune up/down via the `e2e` script if the machine
   // can't handle N concurrent Tauri processes.
-  workers: process.env.E2E_WORKERS ? Number(process.env.E2E_WORKERS) : 4,
+  workers: 4,
   fullyParallel: true,
   timeout: 60_000,
   expect: { timeout: 10_000 },
