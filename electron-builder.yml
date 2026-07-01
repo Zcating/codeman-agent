@@ -22,8 +22,4 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   deleteAppDataOnUninstall: false
-msi:
-  oneClick: false
-  perMachine: false
-  allowToChangeInstallationDirectory: true
 publish: null
