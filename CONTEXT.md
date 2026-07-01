@@ -1,6 +1,6 @@
 ﻿# codeman-agent — 项目语境
 
-独立 Windows 桌面 AI 智能体，基于 Tauri 2 (Rust) + Solid.js + TypeScript + Effect-TS，运行时采用 pi-mono (`@mariozechner/pi-ai` + `@mariozechner/pi-agent`)。主窗口是 LLM 对话 (`/`)，设置走 `/settings` 路由（TanStack Router），内置 2 个计费工具（`get_balance`、`get_plan_quota`，覆盖 DeepSeek 与 MiniMax）和 5 个文件工具（`read_file` / `write_file` / `edit_file` / `search_files` / `delete_file`）。本文档固定词汇表，确保 plan、code 与 commit message 保持一致。
+独立 Windows 桌面 AI 智能体，基于 Electron (Node main + Chromium renderer) + Solid.js + TypeScript + Effect-TS，运行时采用 pi-mono (`@mariozechner/pi-ai` + `@mariozechner/pi-agent`)。主窗口是 LLM 对话 (`/`)，设置走 `/settings` 路由（TanStack Router），内置 2 个计费工具（`get_balance`、`get_plan_quota`，覆盖 DeepSeek 与 MiniMax）和 5 个文件工具（`read_file` / `write_file` / `edit_file` / `search_files` / `delete_file`）。本文档固定词汇表，确保 plan、code 与 commit message 保持一致。V3 起壳由 Tauri 2 迁至 Electron（ADR-0024），UI / 逻辑层 / Agent runtime / 持久化 schema 全保留。
 
 ## 词汇表
 
@@ -29,12 +29,12 @@
 
 ### File IO
 
-- **Workspace (工作区)** — 用户在 file tool 中操作的根目录，由 chat feature 管理（`WorkspaceService` + SQLite 持久化，per ADR-0023 D8-W）。创建后 `root_path` 不可变。**每个 Conversation 绑定 1 个 workspace** (per-Conv, `Conversation.workspace_id` 必填，详见 `Workspace-Bound Conversation`)；agent 的 file tool 仅在该目录树下操作，越界 (canonical path 不在任何 workspace root 内) 由 Tauri command 拒绝 (返回 `SandboxViolation` 错误)。_避免_: sandbox、root directory、project root。
+- **Workspace (工作区)** — 用户在 file tool 中操作的根目录，由 chat feature 管理（`WorkspaceService` + SQLite 持久化，per ADR-0023 D8-W）。创建后 `root_path` 不可变。**每个 Conversation 绑定 1 个 workspace** (per-Conv, `Conversation.workspace_id` 必填，详见 `Workspace-Bound Conversation`)；agent 的 file tool 仅在该目录树下操作，越界 (canonical path 不在任何 workspace root 内) 由 Electron Main process handler 拒绝 (返回 `SandboxViolation` 错误)。_避免_: sandbox、root directory、project root。
 - **Workspace-Bound Conversation (绑定 workspace 的会话)** — 每个 Conversation 在创建时 (`createConversation(workspaceId, ...)`) 必须绑定 1 个 workspace (`workspace_id: string` 字段)，创建后不可更改。`workspace_id = ""` 表示 "needs workspace" (V1.x 迁移的旧 conv 状态，UI 灰标)。该绑定决定 file tool 沙箱边界；Home 上的 workspace 选择器决定新 conv 的绑定。_避免_: global workspace、workspace 切换 (per-Conv 锁定后不存在切换)。
 - **Add Workspace (添加 Workspace)** — 用户在 Home 的 workspace picker dropdown 中通过 "+ Add new workspace…" Action slot 触发；调 `chatStore.pickWorkspacePath()` 弹 OS 原生 folder picker；picker 关闭后若返回非 null 路径，调用 `chatStore.addWorkspace(rootPath)` → `WorkspaceService.add`（SQLite 持久化）+ 自动派生 label（`deriveLabelFromPath`）+ dedup（同 root_path 重复时静默忽略并自动选已有）+ 关闭 dropdown + focus textarea。Home **不**再跳 /settings。_避免_: Navigate-to-Settings（V2.1 polish 早期设计，已废止）。
 - **Workspace Label Derivation (workspace label 派生)** — 通过 OS folder picker 添加 workspace 时（`Add Workspace` 流程），`label` 从 `root_path` 自动派生：调用 `deriveLabelFromPath(rootPath)` (位于 `src/shared/lib/derive-label-from-path.ts`) 取路径最后非空段作为 label；空结果（`C:\`、`/`）fallback `"Untitled workspace"`。后续用户可通过 sidebar hover → Rename 按钮修改 label。_避免_: 强制用户在 picker 关闭后输入 label（增加 UI 阻塞；违反"calm/professional"原则）。
-- **File Tool (文件工具)** — pi-agent 工具族，内置 5 个: `read_file` (读全文) / `write_file` (覆盖写) / `edit_file` (替换文本，支持 `replace_all`) / `search_files` (glob + content 搜索) / `delete_file` (移至回收站)。所有工具通过 Tauri command 调 Rust `std::fs`，沙箱由 workspace 边界约束。_避免_: fs tool、file operation (过载)。
-- **Sandbox Violation (越界错误)** — Tauri command 在 `canonicalize(path)` 后检测到 `path` 不在任何 workspace 目录下时返回的错误。Agent 收到后必须重新规划 (改路径 / 让用户加 workspace) 而非重试原路径。
+- **File Tool (文件工具)** — pi-agent 工具族，内置 5 个: `read_file` (读全文) / `write_file` (覆盖写) / `edit_file` (替换文本，支持 `replace_all`) / `search_files` (glob + content 搜索) / `delete_file` (移至回收站)。所有工具通过 IPC 调 Electron Main process 的 `node:fs`，沙箱由 workspace 边界约束。_避免_: fs tool、file operation (过载)。
+- **Sandbox Violation (越界错误)** — Electron Main process 在 `fs.realpath(path)` 后检测到 `path` 不在任何 workspace 目录下时返回的错误。Agent 收到后必须重新规划 (改路径 / 让用户加 workspace) 而非重试原路径。V3 起语义不变；实现从 Rust `std::fs::canonicalize` 改为 Node `fs.realpath.native` (per ADR-0024)。
 
 ### 架构
 
@@ -43,17 +43,17 @@
 - **Conversation State (会话视图)** — `Conversation`（DB-backed 持久字段）+ per-conv reactive state（`messages: Message[]` + `streamingMessageId: string | null`）+ per-conv runtime（`runtime: AgentRuntime`）的组合类型。定义在 `src/features/chat/stores/chat.store.ts`（V2 起合并原 `messages.store` + `agent.store`，per ADR-0019 D3）。Solid `createStore<{ activeId: string | null; byId: Record<ConvId, ConversationState> }>` 管理反应式。UI 读 `store.byId[activeId()]` 拿到 reactive 视图；store 是 single source of truth，runtime 是 stateless LLM caller。_避免_：Per-Conv message signal（旧 `messages$` 全局 signal，已废止）、Agent Map（旧 `Ref<Map<ConvId, Agent>>`，已废止）。
 - **Bridge (桥接层)** — 将 Effect `Stream` / `Effect` 输出翻译为 Solid `createStore` 的层。V2 起归口到 `chat.store.ts`：stream `runForEach` 订阅 → `setStore("byId", convId, ...)` 写 reactive state。UI 组件不 `import 'effect'`。_避免_：adapter（过载）。
 - **Chat Store (聊天域 Store)** — `src/features/chat/stores/chat.store.ts`（原 `conversations.store.ts`, 重命名 per ADR-0023 D8-W）。chat feature 唯一响应式源：拥有 conversations（ConversationState byId + CRUD + sendMessage）+ workspaces（WorkspaceService 桥接 + CRUD + selectedWorkspaceId 派生状态）。**公开 API 返回 `Effect<T, AppError, never>`**（per ADR-0016 D4 + "Bridge"），UI 通过 `Effect.runPromiseExit(...)` + `Exit.match(...)` 消费。公开 AS `chatStore` namespace（`features/chat/index.ts` barrel）。_避免_: agent store、messages store（旧拆分已合并 per ADR-0019 D3）。
-- **Effect Service (Effect 服务)** — 类型化异步模块，暴露 `Effect<A, E, R>` 或 `Stream<A, E, R>`。通过 Effect layer 组合；通过 mock layer 测试（`@effect/vitest`）。V2 起 chat 域不再用 Effect Service 模式承载 runtime（`createAgentRuntime` 是纯工厂函数而非 Context.Tag），但 DB 桥接仍用 Service 模式（`ConversationService` / `MessageService` in `shared/lib/tauri.ts`）。
-- **IPC** — Tauri 命令桥接。Rust 端命令注册在 `src-tauri/src/lib.rs::invoke_handler!`；TS 端包装在 `src/shared/lib/tauri.ts`（Service Tag + Live Layer）。`invoke` 在该文件之外不出现。
+- **Effect Service (Effect 服务)** — 类型化异步模块，暴露 `Effect<A, E, R>` 或 `Stream<A, E, R>`。通过 Effect layer 组合；通过 mock layer 测试（`@effect/vitest`）。V2 起 chat 域不再用 Effect Service 模式承载 runtime（`createAgentRuntime` 是纯工厂函数而非 Context.Tag），但 DB 桥接仍用 Service 模式（`ConversationService` / `MessageService` in `shared/lib/ipc.ts`）。
+- **IPC** — Electron 跨进程命令桥接。Main 端 handler 注册在 `electron/main/ipc.ts` 的 `ipcMain.handle(...)`；preload 通过 `contextBridge.exposeInMainWorld('codeman', api)` 暴露类型化 API；renderer 端包装在 `src/shared/lib/ipc.ts`（Service Tag + Live Layer）。Renderer 直接 import `window.codeman` 不出现；所有调用走 Service Tag。V3 起替代 V2 的 Tauri `invoke_handler` 桥接 (per ADR-0024)。
 
 ### 密钥
 
-- **API Key (API 密钥)** — Provider 的对外调用凭据，shape 为 `Provider.api_key: string`。**明文存于 Settings JSON**（`%LocalAppData%\codeman-agent\settings.json`），与 Settings 其它字段同档；不再分 LLM / Billing 二分（ADR-0015）。LLM 调用和计费工具调端点都复用同一 key。V1 单机单用户威胁模型下接受明文；如未来需 OS 级密钥管理（keyring / Windows Credential Manager）需重做 ADR-0015。_避免_：把 key 单独存 Tauri store 再走 IPC（V1.7+ 前的设计，已废止）。
+- **API Key (API 密钥)** — Provider 的对外调用凭据，shape 为 `Provider.api_key: string`。**明文存于 Settings JSON**（`%LocalAppData%\codeman-agent\settings.json`，由 `app.setPath('userData', '%LocalAppData%\\codeman-agent')` 锁定，per ADR-0024），与 Settings 其它字段同档；不再分 LLM / Billing 二分（ADR-0015）。LLM 调用和计费工具调端点都复用同一 key。V1 单机单用户威胁模型下接受明文；如未来需 OS 级密钥管理（keytar / Windows Credential Manager / Electron `safeStorage`）需重做 ADR-0015。_避免_：把 key 单独走 OS keychain 再走 IPC（V1.7+ 前的设计，已废止）。
 - **Secret** — Rust 端 `Secret<String>` newtype，`Debug` / `Display` 打印 `Secret(***)` / `***`。V1.7+ 后 Settings JSON 明文存 key，`Secret` 主要用于 pi-agent 运行时构造 header 时临时包裹。**调用方**：`logger.*` / `log::*!` 不得打印完整 secret 值（任一语言）；`Secret` 类型自动重载 `Debug` / `Display`，裸字符串变量需手动 redact 为 `***`。V1.10+ 起本规则从"强制 redact"降级为 developer 自觉——理由是 simple logger API 与自动 redaction 实现冲突，详见 ADR-0018 D6。_避免_：对任何凭据使用裸 `String`。
 
 ### Settings 与状态
 
-- **Settings (设置)** — 通过 `tauri-plugin-store` 持久化的 JSON 文档，位于 OS app-data 目录。包含统一 `providers[]` 数组（每条 `Provider` 含 `api_key` 明文字段，见 ADR-0015），以及 window / theme / system_prompt / conversations / user_language / start_at_login 等字段。`workspaces` 已从 Settings 移出，改由 `WorkspaceService`（SQLite 持久化，per ADR-0023 D8-W）。**API 密钥现在直接落在 Settings JSON 内**（V1.7+ 之前的"分 Tauri store 命名空间"模型已废止）。
+- **Settings (设置)** — 通过 `electron-store` 持久化的 JSON 文档，位于 `%LocalAppData%\codeman-agent\`（由 `app.setPath('userData', ...)` 显式锁定，与 V2 Tauri 路径对齐，per ADR-0024）。包含统一 `providers[]` 数组（每条 `Provider` 含 `api_key` 明文字段，见 ADR-0015），以及 window / theme / system_prompt / conversations / user_language / start_at_login 等字段。`workspaces` 已从 Settings 移出，改由 `WorkspaceService`（SQLite 持久化，per ADR-0023 D8-W）。**API 密钥现在直接落在 Settings JSON 内**（V1.7+ 之前的"分 store 命名空间"模型已废止）。
 - **App Store (全局应用状态)** — `src/shared/stores/app.store.ts` 提供的 Settings reactive 桥接层（ADR-0015 + ADR-0016）。`createStore` 包装 settings。公开 API（7 个）：
   - `appStore.state.value` — reactive 读
   - `appStore.set(patch)` — 写 state，**不**触发 IPC（debounce 由 `features/settings/lib/settings-saver` 触发）
@@ -83,11 +83,22 @@
 
   Action slot 走 `useSelectContext().setOpen(false)` 关闭 dropdown；不是 listbox role，**不可通过 ↑/↓ 键到达**（折衷，V2.2 考虑 composite role）。_避免_：手写 Select 基础设施（Popover / portal / 键盘 / ARIA / Floating UI 定位），全部由 `@ark-ui/solid` 提供；不要引入 Radix / Kobalte / 其它 headless 库。
 - **Codeman Dialog (codeman-dialog 命令式 Modal)** — `shared/components/internal/codeman-dialog.tsx`（ADR-0023 D8-W6 引入，第 2 个 `internal/` 组件）。基于 `shared/components/ui/dialog.tsx`（`@ark-ui/solid` Dialog 原语包装的 shadcn/ui 风格通用 Dialog）。暴露 3 个命令式函数：`alert({ title, content, confirmText }) → Promise<void>`, `confirm({ title, content, confirmText, cancelText }) → Promise<boolean>`, `show<T>((resolve: (value: T) => void) => node) → Promise<T>`。纯 prop-driven，不依赖 feature stores。用于 workspace rename/delete dialog 等确认对话框。_避免_：手写 dialog（@ark-ui/solid 提供 ARIA + 键盘 + focus trap）。
-- **Cascade Sidebar Display (级联 sidebar 显示)** — `CodemanSidebar` 的视觉结构，由 [ADR-0023](./adr/0023-codeman-prefix-and-ark-ui-select.md) D7-CS 锁定。Workspaces 和 Conversations 渲染为**嵌套 tree**（每个 `WorkspaceNode` 含 `children: ConvNode[]`），**accordion 模式**——同一时刻至多 1 个 workspace 展开其 conversations，由 `@ark-ui/solid` 的 `Accordion.Root`（`multiple={false}` + `collapsible={true}`）承载（D7-CS8）。展开状态由 Ark UI 内部 zag-js state machine 管理（uncontrolled via `defaultValue={[]}`），`CodemanSidebar` **不持有展开 signal**，符合 ADR-0022 D3「codeman-* 组件严格 prop-driven」。Workspace **永远不 active**（无 `selectedWorkspaceId` prop）；只有 Conversation 可以 active（`selectedItemId`）。V1.x 迁移遗留 `workspace_id === ""` 的 convs 在 cascade 中不显示（与 V2.1 wave 1 行为一致）。空 workspace 展开后渲染可点击 `<button data-empty-workspace-id>` 文本「该 workspace 暂无会话」（CTA = `setLastUsedWorkspaceId(wsId)` + `clearActiveConversation()`，落到 HomeAgentForm 该 workspace 预选）。语义属性：`data-workspace-id` / `data-conv-id` / `aria-expanded` / `aria-current="page"`，e2e 选择器契约。视觉指示：lucide `ChevronRight` 通过 Tailwind `group-data-[state=open]/item:rotate-90` 旋转 90°表示展开（D7-CS7）。_避免_：V1.x flat `data-conv-idx` 索引（已在 spec 09 重写时废止）；always-expanded tree（多 workspace 滚动条地狱）；sidebar 写 `last_used_workspace_id`（与 HomeAgentForm draft 解耦后由 HomeAgentForm 独占）；手写 accordion state machine（用 Ark UI 避免）。
+- **Cascade Sidebar Display (级联 sidebar 显示)** — `CodemanSidebar` 的视觉结构，由 [ADR-0023](./adr/0023-codeman-prefix-and-ark-ui-select.md) D7-CS 锁定。Workspaces 和 Conversations 渲染为**嵌套 tree**（每个 `WorkspaceNode` 含 `children: ConvNode[]`），**accordion 模式**——同一时刻至多 1 个 workspace 展开其 conversations，由 `@ark-ui/solid` 的 `Accordion.Root`（`multiple={false}` + `collapsible={true}`）承载（D7-CS8）。展开状态由 Ark UI 内部 zag-js state machine 管理（uncontrolled via `defaultValue={[]}`），`CodemanSidebar` **不持有展开 signal**，符合 ADR-0022 D3「codeman-* 组件严格 prop-driven」。Workspace **永远不 active**（无 `selectedWorkspaceId` prop）；只有 Conversation 可以 active（`selectedItemId`）。V1.x 迁移遗留 `workspace_id === ""` 的 convs 在 cascade 中不显示（与 V2.1 wave 1 行为一致）。空 workspace 展开后渲染可点击 `<button data-empty-workspace-id>` 文本「该 workspace 暂无会话」（CTA = `setLastUsedWorkspaceId(wsId)` + `clearActiveConversation()`，落到 HomeAgentForm 该 workspace 预选）。  语义属性：`data-workspace-id` / `data-conv-id` / `aria-expanded` / `aria-current="page"`，e2e 选择器契约。视觉指示：lucide `ChevronRight` 通过 Tailwind `group-data-[state=open]/item:rotate-90` 旋转 90°表示展开（D7-CS7）。_避免_：V1.x flat `data-conv-idx` 索引（已在 spec 09 重写时废止）；always-expanded tree（多 workspace 滚动条地狱）；sidebar 写 `last_used_workspace_id`（与 HomeAgentForm draft 解耦后由 HomeAgentForm 独占）；手写 accordion state machine（用 Ark UI 避免）。
+
+### 测试
+
+- **Fake LLM Provider (假 LLM Provider)** — e2e 测试专用的 Provider 记录，`base_url` 以 `mock://` 开头（典型值 `mock://test`）。shape 与真实 Provider (`minimax` / `deepseek`) 完全一致（同 `id` / `label` / `api_key` / `llm.{base_url, default_model, models, ...}` 字段），由 `AnthropicTransport` 通过 `baseUrl.startsWith("mock://")` 识别后跳过 HTTP，改读 Q→A Table 出 SSE 字符串。生产构建中检测点存在但 Q→A Table 未加载（`CODEMAN_TEST_QA_TABLE` 环境变量未设），等价 no-op。e2e 设置走 `update_settings` IPC 或 Settings UI，路径与真实 Provider 注册一致（无 bypass 代码路径）。V3 起 IPC 实现从 Tauri command 变为 Electron `ipcMain.handle('update_settings', ...)`；fake-provider 识别点与 bypass 路径不变 (per ADR-0024)。_避免_：进程内 JS shim（V1 `mockStreamTurn` 用 `__MOCK_LLM_QUEUE__` window global 模式，已废止）；为测试单写 Electron IPC handler；wiremock / 独立 HTTP server；任何「把 mock 藏在 transport 之外」的进程间方案。
+- **Mock Marker URL (mock://)** — 触发 Fake LLM Provider 分支的 base_url 前缀。继承 V1 约定，`anthropic-transport.ts` 中 `baseUrl.startsWith("mock://")` 是 codebase 唯一识别点；非测试不另起 prefix（避免识别点分裂）。_避免_：新增 `test://` / `qa://` / `fake://` 任何 parallel marker。
+- **Q→A Table (Q→A 表)** — e2e 测试 fixture，`CODEMAN_TEST_QA_TABLE` 环境变量指向 per-worker 路径，典型 `e2e/fixtures/qa-w{N}.json`（N = `workerInfo.parallelIndex`）。Electron Main process 启动时一次性加载到内存 hash map，**不在运行时重读**（reload 不在 scope，避免文件 mtime race + 简化语义）。V3 起加载位置从 Rust `src-tauri/src/lib.rs` 启动钩子变为 Node `electron/main/index.ts` 启动钩子 (per ADR-0024)。Shape：顶层 `QaEntry[]` JSON 数组。
+- **Q→A Entry (Q→A 条目)** — Q→A Table 单条记录，shape: `{ question: string, answer: string, default?: true }`。
+  - `question` — 跟 user message content 做 **substring 匹配**（case-sensitive），first-wins 命中。
+  - `answer` — 预格式化 Anthropic API SSE 字符串（典型 `"data: {...}\n\ndata: {...}\n\n..."`），transport 原样 emit byte-for-byte（不经 `parseSseLine`，不经 `JSON.parse`）。可包含 `message_start` / `content_block_start` / `content_block_delta` / `content_block_stop` / `message_delta` / `message_stop` / `ping` 任一事件 —— 因此 text 流式 chunk + tool_use 块都天然支持（与 V1 `mockStreamTurn` 同覆盖度）。
+  - `default?: true` — fallback 标记。`substring` miss 且无 default 命中时，transport 主动 throw `QaTableMissError`（避免静默漏测）。同一文件可含多个 `default: true` entry（按数组顺序 first-wins）。
+- **Per-Worker Q→A Isolation (per-worker Q→A 隔离)** — Playwright 4 worker 并行跑，每个 worker 拥有独立 SQLite（`.w{N}.db`）+ WebView2 state + Settings JSON（per `e2e/fixtures.ts` 的 `CODEMAN_TEST_WORKER` 隔离模式）；Q→A Table 同样 per-worker 隔离。**约束**（因一次性加载）：同一 worker 内多个 spec 共用同一 Q→A Table；各 spec 须确保 `question` 字符串在 worker 内 unique，否则 first-wins 会让一个 spec 意外命中另一个 spec 的 entry（漏测的另一面）。_避免_：跨 worker 共享 Q→A Table（破坏 per-worker 隔离语义）；Q→A 文件运行时重写（首次加载后表视为 immutable）。
 
 ### Localization
 
-- **Developer Language (开发者语言)** — 标识符、注释、治理文档的语言。分层：identifier 保持英文（与 Tauri / Solid / Effect-TS / pi-mono / Tailwind / Vite / Vitest / Playwright 生态对齐），prose 与注释走中文。Canonical 词汇表是 `CONTEXT.md`。_避免_：bilingual inline annotations、翻译 identifier。
+- **Developer Language (开发者语言)** — 标识符、注释、治理文档的语言。分层：identifier 保持英文（与 Electron / Solid / Effect-TS / pi-mono / Tailwind / Vite / Vitest / Playwright 生态对齐），prose 与注释走中文。Canonical 词汇表是 `CONTEXT.md`。_避免_：bilingual inline annotations、翻译 identifier。
 - **User Language (用户语言)** — UI 字符串（按钮 / 错误 / 提示）的语言。通过 `Settings.user_language: "zh" | "en" | "auto"` 配置。没有 i18n runtime；UI 字符串硬编码英文，与该设置解耦。_避免_：作为代码注释翻译的副作用改动 UI 字符串。
 - **Test Description (测试描述)** — `it("xxx")` / `test("xxx")` 中描述测试目标的可读字符串。出现在测试报告中。约定：**中文**（例如 `it("可以保存 LLM API key")`）。_避免_：新测试使用英文 test description。
 - **Assertion (断言)** — 测试体内的 runtime 检查，例如 `expect(x).toBe(y)`。**锚定 UI 字符串时英文**（必须与 UI 完全一致），**fixture 数据时中文**（例如 `toHaveBeenCalledWith({ content: '你好' })`）。_避免_：当底层值是 UI 字符串时使用中文断言字符串（运行时会失败）。
@@ -134,7 +145,7 @@ Provider              (Settings.providers[].api_key + llm 必选 + .billing 可�
 
 ## Settings
 
-通过 `tauri-plugin-store` 持久化（JSON 文件位于 app-data 目录）。完整 schema 位于 `src-tauri/src/settings.rs`；canonical TS 镜像位于 `src/shared/lib/types.ts`。`Settings::sanitized()` 钳制不变量（`auto_archive_after_days >= 1`、`max_history >= 10` 等）。
+通过 `electron-store` 持久化（JSON 文件位于 `%LocalAppData%\codeman-agent\settings.json`，per ADR-0024）。完整 schema 位于 `electron/main/settings-schema.ts`（V3 起从 Rust `src-tauri/src/settings.rs` 迁移）；canonical TS 镜像位于 `src/shared/lib/types.ts`。`SettingsSchema.sanitize()` 钳制不变量（`auto_archive_after_days >= 1`、`max_history >= 10` 等）。
 
 ```ts
 interface Settings {
@@ -198,7 +209,7 @@ interface ModelMeta {
 }
 ```
 
-**API 密钥现在直接进 Settings JSON**（`Provider.api_key` 字段，明文存盘，见 ADR-0015）。**没有**单独的 Tauri store 命名空间或 keyring 隔离。V1.7+ 之前的 `llm_providers/<id>/api_key` 与 `billing/<id>/api_key` 两个 Tauri store 路径已删除。同一家公司 LLM 和 billing 调用复用**同一** key。
+**API 密钥现在直接进 Settings JSON**（`Provider.api_key` 字段，明文存盘，见 ADR-0015）。**没有**单独的 store 命名空间或 OS keyring 隔离。V1.7+ 之前的 `llm_providers/<id>/api_key` 与 `billing/<id>/api_key` 两个 store 路径已删除。同一家公司 LLM 和 billing 调用复用**同一** key。
 
 **默认预填**：`Settings::Default` 编译时预置一条 LLM provider 记录（`id: "minimax"` / `default_model: "MiniMax-M2.5-highspeed"` / `base_url: "https://api.minimaxi.com/anthropic"` / `api_type: "anthropic-messages"`），并预填对应 billing 子对象（`kind: PlanQuota`）。首次启动即可用，用户只需在 Settings UI 填 MiniMax API key。
 
@@ -219,6 +230,6 @@ MiniMax `plan_quota` 端点（`https://api.minimaxi.com/anthropic/v1/quota/plan`
 - 跨会话用户事实的自动记忆 / 跨 session 持久化
 - 计费与文件工具之外的通用工具（无 shell、无 IDE 集成）
 - 无鼠标操作（无热键、无键盘快捷键）
-- 跨平台打包（Tauri 保持可移植；仅 Windows）
+- 跨平台打包（Electron 保持可移植；仅 Windows，per ADR-0024）
 - 自动更新、代码签名
 - 点击穿透透明区域
