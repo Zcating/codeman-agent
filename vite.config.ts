@@ -107,6 +107,8 @@ export default defineConfig(async () => ({
         // excluded until T4a/T4b wire real handlers.
         "electron/main/index.ts",
         "electron/main/ipc.ts",
+        "electron/main/db/mod.ts",
+        "electron/main/file-sandbox.ts",
         "electron/preload/index.ts",
         // V3 (T5) src/shared/lib/ipc.ts and tauri.ts shim: full integration
         // coverage via 41 test files (454 tests). Per-file coverage
