@@ -52,23 +52,35 @@ export default defineConfig(async () => ({
     ],
   },
   test: {
-    environment: "jsdom",
+    // V3 (T8): split into two projects so the main-process node-only tests
+    // (electron/main/* using better-sqlite3 / node:fs) don't pay the jsdom
+    // overhead, and renderer tests keep their jsdom DOM. The two projects
+    // share coverage, exclude list, and setup file.
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
     passWithNoTests: true,
-    // E2E specs in /e2e are run by Playwright, not vitest. The patterns
-    // below keep vitest focused on the unit-test surface under /src.
-    // V3 (T2/T3) also includes electron/main/ for main-process tests.
-    include: [
-      "src/**/*.{test,spec}.{ts,tsx}",
-      "electron/main/**/*.{test,spec}.{ts,tsx}",
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "web",
+          environment: "jsdom",
+          include: ["src/**/*.{test,spec}.{ts,tsx}"],
+          server: {
+            deps: { inline: [/solid-js/, /solidjs/] },
+          },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "main",
+          environment: "node",
+          include: ["electron/main/**/*.{test,spec}.{ts,tsx}"],
+        },
+      },
     ],
     exclude: ["node_modules", "dist", "e2e", "playwright-report"],
-    server: {
-      deps: {
-        inline: [/solid-js/, /solidjs/],
-      },
-    },
     // Coverage (test:coverage). The exclude list keeps mocks, test files,
     // and mount-point entry points out of the report. The statements
     // threshold is per-file (per the 11-target goal that all core modules
