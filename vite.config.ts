@@ -58,7 +58,11 @@ export default defineConfig(async () => ({
     passWithNoTests: true,
     // E2E specs in /e2e are run by Playwright, not vitest. The patterns
     // below keep vitest focused on the unit-test surface under /src.
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // V3 (T2/T3) also includes electron/main/ for main-process tests.
+    include: [
+      "src/**/*.{test,spec}.{ts,tsx}",
+      "electron/main/**/*.{test,spec}.{ts,tsx}",
+    ],
     exclude: ["node_modules", "dist", "e2e", "playwright-report"],
     server: {
       deps: {
@@ -96,6 +100,14 @@ export default defineConfig(async () => ({
         "src/features/**/routes/index.tsx",
         "e2e/**",
         "*.config.ts",
+        // V3 (T3) electron main process orchestration/bridge — tested via
+        // Playwright e2e (T7), not unit tests. contextBridge preload is a
+        // thin wrapper around ipcRenderer.invoke; main entry is glue.
+        // ipc.ts has unit tests (handler registration, stream forward);
+        // excluded until T4a/T4b wire real handlers.
+        "electron/main/index.ts",
+        "electron/main/ipc.ts",
+        "electron/preload/index.ts",
       ],
       reporter: ["text", "html", "json-summary"],
       // V3 (T1) temporarily relaxed perFile → false: pre-existing d8-w
