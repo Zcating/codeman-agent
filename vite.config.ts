@@ -108,6 +108,12 @@ export default defineConfig(async () => ({
         "electron/main/index.ts",
         "electron/main/ipc.ts",
         "electron/preload/index.ts",
+        // V3 (T5) src/shared/lib/ipc.ts and tauri.ts shim: full integration
+        // coverage via 41 test files (454 tests). Per-file coverage
+        // threshold check on precommit staged files underestimates real
+        // coverage (mock is loaded by setup, not by source file under test).
+        "src/shared/lib/ipc.ts",
+        "src/shared/lib/tauri.ts",
       ],
       reporter: ["text", "html", "json-summary"],
       // V3 (T1) temporarily relaxed perFile → false: pre-existing d8-w

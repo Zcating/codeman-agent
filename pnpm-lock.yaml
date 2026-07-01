@@ -44,9 +44,15 @@ importers:
       effect:
         specifier: ^3.21.3
         version: 3.21.3
+      electron-log:
+        specifier: ^5.4.4
+        version: 5.4.4
       electron-store:
         specifier: ^11.0.2
         version: 11.0.2
+      electron-window-state:
+        specifier: ^5.0.3
+        version: 5.0.3
       es-toolkit:
         specifier: ^1.47.1
         version: 1.47.1
@@ -105,15 +111,9 @@ importers:
       electron-builder:
         specifier: ^26.15.3
         version: 26.15.3(electron-builder-squirrel-windows@26.15.3)
-      electron-log:
-        specifier: ^5.4.4
-        version: 5.4.4
       electron-vite:
         specifier: 6.0.0-beta.1
         version: 6.0.0-beta.1(vite@8.0.16(@types/node@22.19.21)(jiti@2.7.0))
-      electron-window-state:
-        specifier: ^5.0.3
-        version: 5.0.3
       jsdom:
         specifier: ^25.0.0
         version: 25.0.1

@@ -35,3 +35,12 @@ if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
  * `src/__mocks__/@tauri-apps/api/core.ts` 的导出。
  */
 vi.mock("@tauri-apps/api/core", () => import("./src/__mocks__/@tauri-apps/api/core"));
+
+/**
+ * V3 (T5/T6): statically import the mock module to trigger its side
+ * effects (window.codeman initialization). Without this import, the mock
+ * module never loads in V3 because ipc.ts no longer imports from
+ * `@tauri-apps/api/core` — the vi.mock factory is a virtual mapping only
+ * that only loads on actual import of the mocked module.
+ */
+import "./src/__mocks__/@tauri-apps/api/core";

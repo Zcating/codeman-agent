@@ -427,3 +427,70 @@ export const invoke = vi.fn().mockImplementation((name: string, args?: IPCArgs) 
 
 export { invoke as TauriInvoke };
 export default { invoke };
+
+// ─── V3: window.codeman Mock (T5/T6) ────────────────────────────
+//
+// Per V3 consensus 1.3 shim: ipc.ts no longer imports `@tauri-apps/api/core`.
+// It dispatches via `window.codeman.<method>` (set by electron/preload).
+// This mock mirrors every command in `commandHandlers` as a method on
+// `window.codeman`, so V3 ipc.ts finds the mock at runtime in jsdom tests.
+
+function buildCodemanMock(): Record<string, unknown> {
+  // The renderer (ipc.ts) dispatches each IPC command via a different
+  // window.codeman method (NOT a generic invoke). Each method has a
+  // specific positional signature. The mock reconstructs an args object
+  // matching the V2 invoke(cmd, args) shape so that mockState.callArgs /
+  // invokeCalls / commandHandlers continue to work unchanged.
+  //
+  // Method → (cmd, arg-builder from positional args):
+  const methodToCmd: Record<string, { cmd: string; build: (...a: unknown[]) => Record<string, unknown> }> = {
+    getSettings: { cmd: "get_settings", build: () => ({}) },
+    updateSettings: { cmd: "update_settings", build: (ns) => ({ newSettings: ns }) },
+    clearAllHistory: { cmd: "clear_all_history", build: () => ({}) },
+    listConversations: { cmd: "list_conversations", build: (ia) => ({ includeArchived: ia }) },
+    getConversation: { cmd: "get_conversation", build: (id) => ({ id }) },
+    createConversation: { cmd: "create_conversation", build: (a) => a as Record<string, unknown> },
+    archiveConversation: { cmd: "archive_conversation", build: (id) => ({ id }) },
+    deleteConversation: { cmd: "delete_conversation", build: (id) => ({ id }) },
+    listMessages: { cmd: "list_messages", build: (cid) => ({ conversationId: cid }) },
+    appendMessage: { cmd: "append_message", build: (a) => a as Record<string, unknown> },
+    searchMessages: { cmd: "search_messages", build: (q, l) => ({ query: q, limit: l }) },
+    listWorkspaces: { cmd: "list_workspaces", build: () => ({}) },
+    addWorkspace: { cmd: "add_workspace", build: (l, rp) => ({ label: l, root_path: rp }) },
+    renameWorkspace: { cmd: "rename_workspace", build: (id, l) => ({ id, label: l }) },
+    deleteWorkspace: { cmd: "delete_workspace", build: (id) => ({ id }) },
+    pickWorkspacePath: { cmd: "pick_workspace_path", build: () => ({}) },
+    readFile: { cmd: "read_file", build: (wid, p) => ({ workspaceId: wid, path: p }) },
+    writeFile: { cmd: "write_file", build: (wid, p, c) => ({ workspaceId: wid, path: p, content: c }) },
+    editFile: { cmd: "edit_file", build: (wid, p, ot, nt, ra) => ({ workspaceId: wid, path: p, oldText: ot, newText: nt, replaceAll: ra }) },
+    searchFiles: { cmd: "search_files", build: (wid, g, cp) => ({ workspaceId: wid, glob: g, contentPattern: cp }) },
+    deleteFile: { cmd: "delete_file", build: (wid, p) => ({ workspaceId: wid, path: p }) },
+  };
+
+  const codeman: Record<string, unknown> = {};
+  for (const [method, mapping] of Object.entries(methodToCmd)) {
+    codeman[method] = (...args: unknown[]) => {
+      const builtArgs = mapping.build(...args);
+      return invoke(mapping.cmd, builtArgs);
+    };
+  }
+  // Native shims (no IPC handler — return resolved Promise for tests).
+  codeman.notify = () => Promise.resolve();
+  codeman.openExternal = () => Promise.resolve();
+  codeman.setLoginItem = () => Promise.resolve();
+  codeman.getLogPath = () => Promise.resolve("/tmp/codeman.log");
+  // Streaming — return unsubscribe fn.
+  codeman.onStreamChunk = () => () => {};
+  return codeman;
+}
+
+// Install window.codeman on the global (jsdom). Skip if window absent
+// (e.g. running in pure Node). Use Object.defineProperty to make it
+// writable so tests can swap the codeman object via `window.codeman = ...`.
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "codeman", {
+    value: buildCodemanMock(),
+    writable: true,
+    configurable: true,
+  });
+}
