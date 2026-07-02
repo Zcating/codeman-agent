@@ -27,7 +27,26 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     // (与 spec 06 决策一致 — 真实 LLM round-trip 走 mock 或 .env 提供商)。
     const envFile = loadEnvFile();
     const envKey = envFile.MINIMAX_CN_API_KEY ?? process.env.MINIMAX_CN_API_KEY;
+    const envBase = envFile.MINIMAX_CN_API_BASE_URL ?? process.env.MINIMAX_CN_API_BASE_URL;
     test.skip(!envKey, ".env 缺 MINIMAX_CN_API_KEY,跳过真实 LLM 流式测试");
+
+    // 快速检查 API key 可用性(限流 429 也 skip)
+    if (envKey) {
+      try {
+        const resp = await fetch(`${envBase ?? "https://api.minimaxi.com/anthropic"}/v1/messages`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${envKey}`,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({ model: "MiniMax-M2.5-highspeed", max_tokens: 1, messages: [{ role: "user", content: "hi" }] }),
+        });
+        if (resp.status === 429) {
+          test.skip(true, "MiniMax API key 已限流(429),跳过 LLM 测试");
+        }
+      } catch { /* 网络错误不计入 skip 判定 */ }
+    }
 
     const { page } = tauriEnv;
     // 先把页面拉回 / — 前面的 spec 把 webview 留在 /settings,

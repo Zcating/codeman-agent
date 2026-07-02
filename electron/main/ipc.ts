@@ -143,7 +143,7 @@ async function getWorkspaceById(id: string): Promise<RawWorkspace> {
   dbInit();
   const row = getDatabase().prepare("SELECT * FROM workspaces WHERE id = ?").get(id) as RawWorkspace | undefined;
   if (!row) {
-    throw { kind: "NotFound", path: id };
+    throw new Error(`Workspace not found: ${id}`);
   }
   return row;
 }
@@ -242,7 +242,7 @@ export function registerIpcHandlers(_deps: {
   ipcMain.handle("get_conversation", (_e, args: { id: string }) => {
     dbInit();
     const row = getDatabase().prepare("SELECT * FROM conversations WHERE id = ?").get(args.id) as RawConvRow | undefined;
-    if (!row) throw { kind: "NotFound", path: args.id };
+    if (!row) throw new Error(`Conversation not found: ${args.id}`);
     return toConversation(row);
   });
   ipcMain.handle("create_conversation", (_e, args: { title?: string; workspaceId?: string; workspace_id?: string; systemPrompt?: string | null; system_prompt?: string | null }) => {
@@ -359,7 +359,7 @@ export function registerIpcHandlers(_deps: {
         .run(id, label, rootPath, now);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      throw { kind: "Unknown", message: `add_workspace failed: ${msg}` };
+      throw new Error(`add_workspace failed: ${msg}`);
     }
     return toWorkspace({ id, label, root_path: rootPath, created_at: now });
   });
@@ -398,13 +398,12 @@ export function registerIpcHandlers(_deps: {
     const content = await readFile(abs, "utf-8");
     const occurrences = content.split(args.oldText).length - 1;
     if (occurrences === 0) {
-      throw { kind: "NotFound", path: args.path };
+      throw new Error(`Pattern not found in ${args.path}`);
     }
     if (occurrences > 1 && !args.replaceAll) {
-      throw {
-        kind: "Unknown",
-        message: `Pattern matches ${occurrences} times — use replaceAll or be more specific (must match exactly once)`,
-      };
+      throw new Error(
+        `Pattern matches ${occurrences} times — use replaceAll or be more specific (must match exactly once)`,
+      );
     }
     const newContent = args.replaceAll
       ? content.split(args.oldText).join(args.newText)

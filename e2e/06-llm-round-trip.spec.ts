@@ -38,6 +38,24 @@ test.describe("06 — LLM round-trip", () => {
     // RED 状态:没 .env 或没 key → skip 整个 spec,不在 e2e 报告里 fail
     test.skip(!envKey, ".env 缺 MINIMAX_CN_API_KEY — 没法验证 LLM round-trip,skip");
 
+    // 快速检查 API key 可用性(限流 429 也 skip)
+    if (envKey) {
+      try {
+        const resp = await fetch(`${envBaseUrl ?? "https://api.minimaxi.com/anthropic"}/v1/messages`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${envKey}`,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({ model: "MiniMax-M2.5-highspeed", max_tokens: 1, messages: [{ role: "user", content: "hi" }] }),
+        });
+        if (resp.status === 429) {
+          test.skip(true, "MiniMax API key 已限流(429),跳过 LLM round-trip 测试");
+        }
+      } catch { /* 网络错误不计入 skip 判定 */ }
+    }
+
     const { page } = tauriEnv;
     // 先把页面拉回 / — 前面的 spec 把 webview 留在 /settings,
     // 那时 ChatLayout 已 unmount,footer 的 Settings 链接找不到,15s 超时。
@@ -97,12 +115,9 @@ test.describe("06 — LLM round-trip", () => {
       console.log(`[page pageerror] ${err.message}`);
     });
 
-    // 1. 到达聊天页面 (resetChatState already navigated to /).
-    await assert.visible(page.locator('textarea[placeholder="发条消息\u2026"]'), {
-      timeout: 15_000,
-    });
-
-    // 2. 创建新会话 + 等 active item + loadMessages 完成(避免 race)。
+    // 1. 创建新会话 + 等 active item + loadMessages 完成(避免 race)。
+    //    resetChatState 已将页面导航到 / (home page),clickNewConversationAndWait
+    //    会走完整的 workspace picker + title send 流程进入 ChatView。
     await clickNewConversationAndWait(page);
 
     // 3. textarea 启用 + 正常输入 + 提交。

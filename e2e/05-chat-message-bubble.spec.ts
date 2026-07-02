@@ -247,7 +247,7 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
       }
     }
 
-    // 最后所有 3 个必须共存于列表中。
-    await assert.count(page.locator("div.justify-end > div.bg-primary.text-primary-foreground"), 3);
+    // 最后所有 4 个必须共存于列表中(1 个标题气泡 + 3 个发送气泡,无去重)。
+    await assert.count(page.locator("div.justify-end > div.bg-primary.text-primary-foreground"), 4);
   });
 });
