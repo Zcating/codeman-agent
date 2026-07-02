@@ -1,60 +1,59 @@
 ﻿//! e2e/helpers.ts — 共享 utility。Spec 们从这里导入 invoke / clearAllHistory /
-//! cancelRunningAgent / assert / TauriLocator / TauriPage 等。
+//! cancelRunningAgent / assert / ElectronLocator / ElectronPage 等。
 //!
 //! Multi-worker 改造 (2026-06): 删除了原来的 module-singleton `page` +
-//! `getTauriPage()` / `disposeTauriPage()`。每个 worker 在自己的 Tauri 实例
-//! 上跑（见 e2e/fixtures.ts），spec 通过 `{ tauriEnv }` fixture 拿到 page，
+//! `getTauriPage()` / `disposeTauriPage()`。每个 worker 在自己的 V3 Electron 实例
+//! 上跑（见 e2e/fixtures.ts），spec 通过 `{ electronEnv }` fixture 拿到 page，
 //! 然后把 page 作为第一个参数传给本文件里的 helper。
 //!
-//! 跟 Playwright `connectOverCDP` 不同（WebView2 不支持
-//! `Browser.setDownloadBehavior` —— 见 cdp-driver.ts 注释），我们直接连 CDP。
-//! 因此 helpers 的 API 是我们自己实现的 Page/Locator 包装，但调用语法
-//! 跟 Playwright 一致，spec 文件改动最小（只换 `expect` 为 `assert.*`）。
+//! 跟 Playwright `connectOverCDP` 不同(Chromium 的 remote-debugging 限制),
+//! 我们直接连 CDP。因此 helpers 的 API 是我们自己实现的 Page/Locator 包装,
+//! 但调用语法 跟 Playwright 一致,spec 文件改动最小。
 
-import { assert, TauriLocator, TauriPage } from "./cdp-driver";
+import { assert, ElectronLocator, ElectronPage } from "./cdp-driver";
 import type { Workspace } from "../src/shared/lib/types";
 import * as path from "node:path";
 import * as os from "node:os";
 
-
-export { TauriLocator, TauriPage, assert };
+// Re-export V3 names + V2 deprecated aliases.
+export { ElectronLocator, ElectronPage, assert };
+/** @deprecated Use ElectronLocator (V3). */
+export type TauriLocator = ElectronLocator;
+/** @deprecated Use ElectronPage (V3). */
+export type TauriPage = ElectronPage;
 
 /**
- * 调 Tauri IPC 命令。Spec 用它做端到端断言（不依赖 UI 反馈）。
- * 实际是在 webview 里跑 `window.__TAURI_INTERNALS__.invoke(cmd, args)`。
+ * 调 V3 Electron IPC 命令。Spec 用它做端到端断言（不依赖 UI 反馈）。
+ * 实际是在 webview 里跑 `window.codeman.invoke(channel, args)` — 由
+ * electron/preload/index.ts 通过 contextBridge 暴露的通用 escape hatch。
  *
  * 实现注意：内层函数必须是 `async`,以便在调用方视角把 invoke promise 的
- * rejection 包装成同步的 throw。如果直接 `return w.__TAURI_INTERNALS__.invoke(...)`,
- * Tauri webview 内部对 IPC 失败的 catch 会在我们看见之前消费它,
- * 把 rejection 暴露为未捕获的 "Uncaught (in promise)" 事件 — 而不是
- * 干净的 Rust 错误消息。`await` + `try/catch` + `throw new Error`
+ * rejection 包装成同步的 throw。`await` + `try/catch` + `throw new Error`
  * 显式重抛确保 CDP `Runtime.evaluate` 收到的 `exceptionDetails.text`
- * 是真实的 Rust 错误。
+ * 是真实的 main 端错误（不被吞为 "Uncaught (in promise)"）。
  *
- * @param page  - Per-worker TauriPage（来自 `tauriEnv.page` fixture）
+ * @param page  - Per-worker ElectronPage（来自 `electronEnv.page` fixture）
  */
 export async function invoke<T = unknown>(
-  page: TauriPage,
+  page: ElectronPage,
   cmd: string,
   args?: Record<string, unknown>,
 ): Promise<T> {
   const result = await page.evaluate(
     async ([c, a]) => {
       const w = window as unknown as {
-        __TAURI_INTERNALS__?: { invoke: (cmd: string, args: unknown) => Promise<unknown> };
+        codeman?: { invoke: (cmd: string, args: unknown) => Promise<unknown> };
       };
-      if (!w.__TAURI_INTERNALS__) {
+      if (!w.codeman) {
         throw new Error(
-          "window.__TAURI_INTERNALS__ is missing — is the Tauri webview actually loaded?",
+          "window.codeman is missing — is the V3 Electron preload actually loaded?",
         );
       }
       try {
-        return await w.__TAURI_INTERNALS__.invoke(c, a ?? {});
+        return await w.codeman.invoke(c, a ?? {});
       } catch (e) {
-        // 重抛为 Error 实例,让 cdp-driver 的 exceptionDetails 拿到干净的
-        // 消息字符串（原生的 Tauri rejection 会变成 "Uncaught (in promise)"）。
         const msg = e instanceof Error ? e.message : typeof e === "object" && e !== null ? JSON.stringify(e) : String(e);
-        throw new Error(`Tauri invoke(${c}) failed: ${msg}`);
+        throw new Error(`V3 invoke(${c}) failed: ${msg}`);
       }
     },
     [cmd, args ?? {}] as const,
@@ -65,19 +64,16 @@ export async function invoke<T = unknown>(
 /**
  * 触发 chat 输入框的提交。
  *
- * 实现:直接调用 ChatView 给 Send button 装的 onClick handler —
- * 不依赖 form onSubmit + button click 隐式链。原因:
- *  WebView2 + Solid 组合下,form 的 submit event 派发链
- * (click → 默认 submit → submit event → Solid listener)不可靠 — 三层
- * capture/bubble/document listener 都 fire,但 Solid 的 onSubmit 没反应。
- *  显式 button.onClick 是直接的 click → handler 路径,跟 form 解耦。
+ * 实现:直接点击 Send button。不依赖 form onSubmit 隐式链,因为
+ * V3 Chromium + Solid 组合下 form submit event 派发链不可靠
+ * (per V2 经验 — V3 同样 Electron 内 Chromium 内核)。
  */
-export async function submitForm(p: TauriPage): Promise<void> {
+export async function submitForm(p: ElectronPage): Promise<void> {
   await p.locator('button[type="submit"]').click();
 }
 
 /** 重置对话 + 消息历史。Spec 间清理用，失败不抛。 */
-export async function clearAllHistory(page: TauriPage): Promise<void> {
+export async function clearAllHistory(page: ElectronPage): Promise<void> {
   try {
     await invoke(page, "clear_all_history");
   } catch {
@@ -88,20 +84,8 @@ export async function clearAllHistory(page: TauriPage): Promise<void> {
 /**
  * 取消任何 in-flight LLM 调用。Spec beforeEach 调用，防止前 spec 的
  * 慢 LLM 响应让 Send 按钮卡在 Cancel 状态。
- *
- * 实现:
- *   1. 等 Cancel 按钮出现（如有）— 点击它 abort in-flight run
- *   2. 等 Send 按钮（`button[type="submit"]`）重新出现,running=false
- *   3. textarea 重新 enabled
- * 这保证下一个 spec 提交时,Submit button 可点。
- *
- * 可靠性: 旧版本 click 超时只 2s,如果 cancel 按钮晚了出现就直接返回
- * 导致下次 submit 被 isRunning() 阻塞。新版本:
- *   - click 超时升到 10s（给慢 LLM 时间进入 streaming 状态）
- *   - 等 Send 按钮 超时升到 10s（等运行时真的 abort 完成）
- *   - 兜底: 直接调 runtime.cancel(convId) 强制 abort,再 wait
  */
-export async function cancelRunningAgent(page: TauriPage): Promise<void> {
+export async function cancelRunningAgent(page: ElectronPage): Promise<void> {
   // 1. 等 Cancel 按钮出现
   let clicked = false;
   try {

@@ -44,13 +44,16 @@ import { tmpdir, homedir } from "node:os";
 import { connectElectron, type ElectronPage } from "./cdp-driver";
 import { BASE_PORTS } from "../playwright.config";
 
-/** Per-worker environment passed to specs via the `electronEnv` fixture. */
+/** Per-worker environment passed to specs via the `tauriEnv` fixture.
+ *  Renamed to `electronEnv` in V3 — both names exported as the same type. */
 export type ElectronEnv = {
   page: ElectronPage;
   workerIndex: number;
   cdpUrl: string;
   workerDataDir: string;
 };
+/** V2 name preserved — same shape as ElectronEnv (per-worker V3 Electron instance). */
+export type TauriEnv = ElectronEnv;
 
 /**
  * V3 Electron binary path. Built by `pnpm run build:dir` (electron-vite
@@ -90,8 +93,8 @@ async function waitForUrl(url: string, timeoutMs: number): Promise<void> {
   );
 }
 
-export const test = base.extend<{}, { electronEnv: ElectronEnv }>({
-  electronEnv: [
+export const test = base.extend<{}, { tauriEnv: ElectronEnv; electronEnv: ElectronEnv }>({
+  tauriEnv: [
     async ({}, use, workerInfo: WorkerInfo) => {
       const idx = workerInfo.parallelIndex;
       const cdpPort = BASE_PORTS.BASE_ELECTRON_CDP_PORT + idx;
@@ -101,19 +104,13 @@ export const test = base.extend<{}, { electronEnv: ElectronEnv }>({
 
       // 1. Clean stale Electron user data from previous run.
       //    V3 main process (electron/main/index.ts) sets app.getPath('userData')
-      //    from CODEMAN_TEST_WORKER env var via lib.rs::test_worker_suffix.
-      //    For V3 Electron, the userData path is %LocalAppData%/codeman-agent
-      //    (overridden in main entry). Worker suffix is added by the Rust main
-      //    via CODEMAN_TEST_WORKER=w{N}; we clean it here.
+      //    via app.setPath to LOCALAPPDATA/codeman-agent.
       rmSync(userDataDir, { recursive: true, force: true });
       mkdirSync(userDataDir, { recursive: true });
 
       // 1b. Clean per-worker SQLite DB from Electron app data dir.
       //     V3 main process (electron/main/db/mod.ts) opens
       //     <userData>/codeman-agent.db via better-sqlite3.
-      //     Per-worker suffix added in main: <userData>/codeman-agent.w{N}.db
-      //     (per ADR-0023 D8-W6 pattern; implemented in T4a/T4b when handler
-      //     bodies are wired). For now, clean any w{N}.db file before spawn.
       const electronAppData = join(
         process.env["LOCALAPPDATA"] ?? join(homedir(), "AppData", "Local"),
         "codeman-agent",
@@ -125,11 +122,15 @@ export const test = base.extend<{}, { electronEnv: ElectronEnv }>({
           // ignore
         }
       }
+      // Also clean settings.{wN}.json so each worker has fresh settings.
+      try {
+        rmSync(join(electronAppData, `settings.w${idx}.json`), { force: true });
+        rmSync(join(electronAppData, `settings.json`), { force: true });
+      } catch {
+        // ignore
+      }
 
       // 2. Spawn the V3 Electron binary directly with per-worker env vars.
-      //    CODEMAN_TEST_WORKER → V3 main process suffixes SQLite/settings files.
-      //    WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS → Chromium exposes CDP endpoint.
-      //    V3 uses Chromium 134 (Electron 43); CDP via remote-debugging-port.
       const child: ChildProcess = spawn(
         ELECTRON_BIN,
         [`--remote-debugging-port=${cdpPort}`],
@@ -137,7 +138,6 @@ export const test = base.extend<{}, { electronEnv: ElectronEnv }>({
           env: {
             ...process.env,
             CODEMAN_TEST_WORKER: `w${idx}`,
-            WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${cdpPort}`,
             ELECTRON_DISABLE_GPU: "1",
             ELECTRON_NO_ATTACH_CONSOLE: "1",
           },
@@ -160,14 +160,13 @@ export const test = base.extend<{}, { electronEnv: ElectronEnv }>({
         // 3. Wait for CDP endpoint.
         await waitForUrl(`${cdpUrl}/json/version`, 60_000);
 
-        // 4. Connect via CDP. V3 loads bundled renderer via file://, so
-        //    page URL is file:///path/to/dist/index.html.
+        // 4. Connect via CDP. V3 loads bundled renderer via file://.
         const page = await connectElectron({
           cdpUrl,
           pageUrlPattern: /file:\/\/.*index\.html|.*index\.html$/,
         });
 
-        // Diagnostic probe.
+        // Diagnostic probe — log so we can debug multi-worker setup.
         try {
           const probe = await page.evaluate(() => ({
             url: location.href,
@@ -175,17 +174,17 @@ export const test = base.extend<{}, { electronEnv: ElectronEnv }>({
             bodyChars: document.body?.innerText?.length ?? 0,
             bodySample: document.body?.innerText?.slice(0, 200) ?? "",
             asideExists: !!document.querySelector("aside"),
-            codemanExists: !!window.codeman,
-            codemanKeys: window.codeman
-              ? Object.keys(window.codeman).length
+            codemanExists: !!(window as unknown as { codeman?: unknown }).codeman,
+            codemanKeys: (window as unknown as { codeman?: { [k: string]: unknown } }).codeman
+              ? Object.keys((window as unknown as { codeman: { [k: string]: unknown } }).codeman).length
               : 0,
           }));
           console.log(
-            `[electronEnv w${idx}] page probe: ${JSON.stringify(probe)}`,
+            `[tauriEnv w${idx}] page probe: ${JSON.stringify(probe)}`,
           );
         } catch (probeErr) {
           console.log(
-            `[electronEnv w${idx}] page probe failed: ${String(probeErr)}`,
+            `[tauriEnv w${idx}] page probe failed: ${String(probeErr)}`,
           );
         }
 
@@ -206,7 +205,6 @@ export const test = base.extend<{}, { electronEnv: ElectronEnv }>({
         }
         throw e;
       } finally {
-        // Teardown (always runs).
         try {
           child.kill("SIGKILL");
         } catch {
@@ -218,10 +216,17 @@ export const test = base.extend<{}, { electronEnv: ElectronEnv }>({
         } catch {
           // ignore
         }
-        console.log(`[electronEnv w${idx}] log preserved at ${logPath}`);
+        console.log(`[tauriEnv w${idx}] log preserved at ${logPath}`);
       }
     },
     { scope: "worker", auto: true },
+  ],
+  // V3 alias for `tauriEnv` — same data, V3 spec files may prefer this name.
+  electronEnv: [
+    async ({ tauriEnv }, use) => {
+      await use(tauriEnv);
+    },
+    { scope: "worker", auto: false },
   ],
 });
 
@@ -234,10 +239,6 @@ export { expect };
 export {
   invoke,
   assert,
-  // TauriLocator → ElectronLocator (TBD; per-spec migration in follow-up)
-  TauriLocator,
-  // TauriPage → ElectronPage (TBD; cdp-driver.ts handles both via connectElectron)
-  TauriPage,
   cancelRunningAgent,
   clearAllHistory,
   clickNewConversationAndWait,
@@ -251,3 +252,5 @@ export {
   submitForm,
   submitHomeAgentForm,
 } from "./helpers";
+// Type-only re-exports (V2 deprecated aliases for ElectronLocator / ElectronPage).
+export type { TauriLocator, TauriPage } from "./helpers";

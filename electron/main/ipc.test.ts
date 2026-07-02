@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const fakeIpcMain = { handle: vi.fn() };
-const fakeApp = { setLoginItemSettings: vi.fn() };
+const fakeApp = {
+  setLoginItemSettings: vi.fn(),
+  getPath: vi.fn().mockReturnValue("/tmp/codeman-agent-test"),
+};
 const fakeDialog = { showOpenDialog: vi.fn() };
 const fakeNotification = vi.fn();
 const fakeShell = { openExternal: vi.fn() };
@@ -17,6 +20,13 @@ vi.mock("electron", () => ({
   dialog: fakeDialog,
   Notification: fakeNotification,
   shell: fakeShell,
+}));
+
+// better-sqlite3 is built for Electron's ABI; node test env can't load it.
+// Mock db/mod so registerIpcHandlers can call dbInit() without touching native binding.
+vi.mock("./db/mod", () => ({
+  initDatabase: () => ({ prepare: () => ({ all: () => [], get: () => undefined, run: () => undefined }), exec: () => undefined, pragma: () => undefined }),
+  getDatabase: () => ({ prepare: () => ({ all: () => [], get: () => undefined, run: () => undefined }), exec: () => undefined, pragma: () => undefined }),
 }));
 
 const EXPECTED_CHANNELS = [

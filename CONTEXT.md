@@ -218,10 +218,6 @@ interface ModelMeta {
 - **LLM providers** 通过 pi-mono 标准机制认证（因 provider 而异：OpenAI Bearer、Anthropic `x-api-key`、OpenAI 兼容自定义 header）。`pi-ai` 负责构造 header；密钥值来自 `Provider.api_key`（Settings JSON 字段，ADR-0015）。
 - **Billing providers** 使用 `Authorization: Bearer <Provider.api_key>`。header 在 TS adapter 内部构造；密钥值来自同一字段。密钥存 webview 进程内的 Settings JSON；前端可直接读取字符串值（V1.7+ 前的 `has_key: boolean` 探测已废止，因字段恒存在）。
 
-## MiniMax 端点
-
-MiniMax `plan_quota` 端点（`https://api.minimaxi.com/anthropic/v1/quota/plan`）当前有效。`balance` 端点尚未公开验证，调用时 adapter 返回 `Upstream` 错误。DeepSeek balance 端点 `https://api.deepseek.com/user/balance` 当前有效；DeepSeek 不支持 `plan_quota`，调用时 adapter 返回 `Upstream` 错误。
-
 ## Non-goals
 
 - 单 provider 多账号

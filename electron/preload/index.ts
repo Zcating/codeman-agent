@@ -107,6 +107,16 @@ const codeman = {
       ipcRenderer.off("stream-chunk", listener);
     };
   },
+
+  /**
+   * Generic IPC bridge — channels specs pass V2-style camelCase args to
+   * V3 main handlers. Mirrors V2 Tauri `__TAURI_INTERNALS__.invoke`.
+   * Used by e2e helpers (cdp-driver `invoke(page, channel, args)`).
+   * Renderer code should prefer the typed methods above for compile-time
+   * safety; this is the generic escape hatch for arbitrary channels.
+   */
+  invoke: (channel: string, args?: Record<string, unknown>) =>
+    ipcRenderer.invoke(channel, args ?? {}),
 };
 
 contextBridge.exposeInMainWorld("codeman", codeman);

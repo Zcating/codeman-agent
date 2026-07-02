@@ -1,66 +1,447 @@
-// T3 — electron/main/ipc.ts: register 24 ipcMain.handle channels + emitStreamChunk.
-// Handler bodies are minimal stubs — T4a/T4b will wire real logic (settings/db/file-sandbox).
+// T4 — electron/main/ipc.ts: 24 ipcMain.handle channels wired to settings/db/files.
+//
+// T3 was stubs; T4 wires real handlers backed by:
+//   - settings-schema.ts (sanitize + V0→V1.5 migration)
+//   - db/mod.ts (better-sqlite3 + 3 SQL migrations already applied)
+//   - file-sandbox.ts (validatePathInWorkspace / validatePathForWrite / read/write)
 
-import { ipcMain, app, BrowserWindow, dialog, Notification, shell } from "electron";
+import { app, BrowserWindow, dialog, Notification, shell, ipcMain } from "electron";
+import { randomUUID } from "node:crypto";
+import { readFile, unlink, readdir, stat } from "node:fs/promises";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 
-const HANDLER_STUB = (): never => {
-  throw { kind: "NotImplemented" as const, message: "wired in T4a/T4b" };
-};
+import { initDatabase, getDatabase } from "./db/mod";
+import { sanitize, migrationsV0ToV15, type SettingsV15 } from "./settings-schema";
+import {
+  validatePathInWorkspace,
+  readFileInWorkspace,
+  writeFileInWorkspace,
+} from "./file-sandbox";
 
-export function registerIpcHandlers(deps: {
+// ─── Settings store (JSON file under app.getPath("userData")) ─────────
+
+let settingsCache: SettingsV15 | null = null;
+
+function settingsPath(): string {
+  // app.setPath('userData') is called BEFORE registerIpcHandlers in main/index.ts.
+  return join(app.getPath("userData"), "settings.json");
+}
+
+function loadSettings(): SettingsV15 {
+  if (settingsCache) return settingsCache;
+  const path = settingsPath();
+  let raw: unknown = {};
+  if (existsSync(path)) {
+    try {
+      raw = JSON.parse(readFileSync(path, "utf-8"));
+    } catch {
+      raw = {};
+    }
+  }
+  const migrated = migrationsV0ToV15(raw as Parameters<typeof migrationsV0ToV15>[0]);
+  settingsCache = sanitize(migrated);
+  saveSettings();
+  return settingsCache;
+}
+
+function saveSettings(): void {
+  if (!settingsCache) return;
+  writeFileSync(settingsPath(), JSON.stringify(settingsCache, null, 2), "utf-8");
+}
+
+function updateSettings(patch: Partial<SettingsV15>): SettingsV15 {
+  loadSettings();
+  settingsCache = sanitize({ ...settingsCache!, ...patch });
+  saveSettings();
+  return settingsCache!;
+}
+
+// ─── DB init flag ─────────────────────────────────────────────────────
+
+let dbReady = false;
+function dbInit(): void {
+  if (!dbReady) {
+    initDatabase();
+    dbReady = true;
+  }
+}
+
+// ─── Row types + mappers ────────────────────────────────────────────
+
+interface RawConvRow {
+  id: string;
+  title: string;
+  system_prompt: string | null;
+  created_at: number;
+  updated_at: number;
+  archived_at: number | null;
+  workspace_id: string;
+}
+interface RawMsgRow {
+  id: string;
+  conversation_id: string;
+  role: string;
+  content: string;
+  tool_calls: string | null;
+  tool_results: string | null;
+  model: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  created_at: number;
+}
+interface RawWorkspace {
+  id: string;
+  label: string;
+  root_path: string;
+  created_at: number;
+}
+
+function toConversation(row: RawConvRow) {
+  return {
+    id: row.id,
+    title: row.title,
+    system_prompt: row.system_prompt ?? null,
+    workspace_id: row.workspace_id ?? "",
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    archived_at: row.archived_at ?? null,
+  };
+}
+function toMessage(row: RawMsgRow) {
+  return {
+    id: row.id,
+    conversation_id: row.conversation_id,
+    role: row.role,
+    content: row.content,
+    tool_calls: row.tool_calls ? JSON.parse(row.tool_calls) : null,
+    tool_results: row.tool_results ? JSON.parse(row.tool_results) : null,
+    model: row.model,
+    input_tokens: row.input_tokens,
+    output_tokens: row.output_tokens,
+    created_at: row.created_at,
+  };
+}
+function toWorkspace(row: RawWorkspace) {
+  return {
+    id: row.id,
+    label: row.label,
+    root_path: row.root_path,
+    created_at: row.created_at,
+  };
+}
+
+function getConv(includeArchived: boolean) {
+  dbInit();
+  const sql = includeArchived
+    ? "SELECT * FROM conversations"
+    : "SELECT * FROM conversations WHERE archived_at IS NULL";
+  return (getDatabase().prepare(sql).all() as RawConvRow[]).map(toConversation);
+}
+
+async function getWorkspaceById(id: string): Promise<RawWorkspace> {
+  dbInit();
+  const row = getDatabase().prepare("SELECT * FROM workspaces WHERE id = ?").get(id) as RawWorkspace | undefined;
+  if (!row) {
+    throw { kind: "NotFound", path: id };
+  }
+  return row;
+}
+
+// ─── File search ────────────────────────────────────────────────────
+
+async function searchFilesInWorkspace(
+  root: string,
+  glob: string,
+  contentPattern: string | null,
+): Promise<Array<{ path: string; line: number; text: string }>> {
+  const results: Array<{ path: string; line: number; text: string }> = [];
+  await walkDir(root, async (relPath) => {
+    const norm = relPath.replace(/\\/g, "/");
+    if (!matchGlob(norm, glob)) return;
+    if (contentPattern === null) {
+      results.push({ path: norm, line: 0, text: "" });
+      return;
+    }
+    const content = await readFile(join(root, relPath), "utf-8").catch(() => null);
+    if (!content) return;
+    const lines = content.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes(contentPattern)) {
+        results.push({ path: norm, line: i + 1, text: lines[i].trim() });
+        return;
+      }
+    }
+  });
+  return results;
+}
+
+async function walkDir(root: string, visit: (relPath: string) => Promise<void>): Promise<void> {
+  // Skip dotfiles + node_modules + dist for sanity.
+  const skip = new Set([".git", "node_modules", "dist", "dist-electron", ".electron-builder-cache"]);
+  const stack: Array<{ abs: string; rel: string }> = [{ abs: root, rel: "" }];
+  while (stack.length > 0) {
+    const item = stack.pop()!;
+    let entries: string[];
+    try {
+      entries = await readdir(item.abs);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (skip.has(entry)) continue;
+      const childRel = item.rel ? `${item.rel}/${entry}` : entry;
+      const childAbs = join(root, childRel);
+      const st = await stat(childAbs).catch(() => null);
+      if (!st) continue;
+      if (st.isDirectory()) {
+        stack.push({ abs: childAbs, rel: childRel });
+      } else if (st.isFile()) {
+        await visit(childRel);
+      }
+    }
+  }
+}
+
+function matchGlob(relPath: string, glob: string): boolean {
+  const escaped = glob
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*/g, "::DOUBLESTAR::")
+    .replace(/\*/g, "[^/]*")
+    .replace(/\?/g, "[^/]")
+    .replace(/::DOUBLESTAR::/g, ".*");
+  return new RegExp(`^${escaped}$`).test(relPath);
+}
+
+// ─── Handler registration ──────────────────────────────────────────
+
+export function registerIpcHandlers(_deps: {
   getMainWindow: () => BrowserWindow | null;
 }): void {
+  dbInit();
+  loadSettings();
+
   // Settings
-  ipcMain.handle("get_settings", () => HANDLER_STUB());
-  ipcMain.handle("update_settings", () => HANDLER_STUB());
-  ipcMain.handle("clear_all_history", () => HANDLER_STUB());
+  ipcMain.handle("get_settings", () => loadSettings());
+  ipcMain.handle("update_settings", (_e, args) => {
+    // V2 spec convention: args may be { newSettings } OR just the patch object.
+    const patch =
+      (args && typeof args === "object" && ("newSettings" in args ? (args as { newSettings: unknown }).newSettings : args)) ?? {};
+    return updateSettings(patch as Partial<SettingsV15>);
+  });
+  ipcMain.handle("clear_all_history", () => {
+    dbInit();
+    getDatabase().exec("DELETE FROM conversations");
+  });
 
   // Conversations
-  ipcMain.handle("list_conversations", () => HANDLER_STUB());
-  ipcMain.handle("get_conversation", () => HANDLER_STUB());
-  ipcMain.handle("create_conversation", () => HANDLER_STUB());
-  ipcMain.handle("archive_conversation", () => HANDLER_STUB());
-  ipcMain.handle("delete_conversation", () => HANDLER_STUB());
+  ipcMain.handle("list_conversations", (_e, args) => {
+    const include = !!(args && typeof args === "object" && (args as { includeArchived?: boolean }).includeArchived);
+    return getConv(include);
+  });
+  ipcMain.handle("get_conversation", (_e, args: { id: string }) => {
+    dbInit();
+    const row = getDatabase().prepare("SELECT * FROM conversations WHERE id = ?").get(args.id) as RawConvRow | undefined;
+    if (!row) throw { kind: "NotFound", path: args.id };
+    return toConversation(row);
+  });
+  ipcMain.handle("create_conversation", (_e, args: { title?: string; workspaceId?: string; workspace_id?: string; systemPrompt?: string | null; system_prompt?: string | null }) => {
+    dbInit();
+    const id = randomUUID();
+    const now = Math.floor(Date.now() / 1000);
+    const title = args.title ?? "";
+    const workspaceId = args.workspaceId ?? args.workspace_id ?? "";
+    const systemPrompt = args.systemPrompt ?? args.system_prompt ?? null;
+    getDatabase()
+      .prepare(
+        "INSERT INTO conversations (id, title, system_prompt, created_at, updated_at, archived_at, workspace_id) VALUES (?, ?, ?, ?, ?, NULL, ?)",
+      )
+      .run(id, title, systemPrompt, now, now, workspaceId);
+    return toConversation({
+      id,
+      title,
+      system_prompt: systemPrompt,
+      created_at: now,
+      updated_at: now,
+      archived_at: null,
+      workspace_id: workspaceId,
+    });
+  });
+  ipcMain.handle("archive_conversation", (_e, args: { id: string }) => {
+    dbInit();
+    getDatabase().prepare("UPDATE conversations SET archived_at = ? WHERE id = ?").run(
+      Math.floor(Date.now() / 1000),
+      args.id,
+    );
+  });
+  ipcMain.handle("delete_conversation", (_e, args: { id: string }) => {
+    dbInit();
+    getDatabase().prepare("DELETE FROM conversations WHERE id = ?").run(args.id);
+  });
 
   // Messages
-  ipcMain.handle("list_messages", () => HANDLER_STUB());
-  ipcMain.handle("append_message", () => HANDLER_STUB());
-  ipcMain.handle("search_messages", () => HANDLER_STUB());
+  ipcMain.handle("list_messages", (_e, args: { conversationId?: string; conversation_id?: string }) => {
+    dbInit();
+    const convId = args.conversationId ?? args.conversation_id;
+    if (!convId) return [];
+    const rows = getDatabase()
+      .prepare("SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC")
+      .all(convId) as RawMsgRow[];
+    return rows.map(toMessage);
+  });
+  ipcMain.handle("append_message", (_e, args: {
+    conversationId?: string;
+    conversation_id?: string;
+    role: string;
+    content: string;
+    toolCalls?: string;
+    tool_calls?: string;
+    toolResults?: string;
+    tool_results?: string;
+    model?: string | null;
+  }) => {
+    dbInit();
+    const id = randomUUID();
+    const now = Math.floor(Date.now() / 1000);
+    const convId = args.conversationId ?? args.conversation_id ?? "";
+    const toolCalls = args.toolCalls ?? args.tool_calls ?? null;
+    const toolResults = args.toolResults ?? args.tool_results ?? null;
+    getDatabase()
+      .prepare(
+        "INSERT INTO messages (id, conversation_id, role, content, tool_calls, tool_results, model, input_tokens, output_tokens, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)",
+      )
+      .run(id, convId, args.role, args.content, toolCalls, toolResults, args.model ?? null, now);
+    return toMessage({
+      id,
+      conversation_id: convId,
+      role: args.role,
+      content: args.content,
+      tool_calls: toolCalls,
+      tool_results: toolResults,
+      model: args.model ?? null,
+      input_tokens: null,
+      output_tokens: null,
+      created_at: now,
+    });
+  });
+  ipcMain.handle("search_messages", (_e, args: { query: string; limit?: number }) => {
+    dbInit();
+    const limit = args.limit ?? 20;
+    try {
+      const rows = getDatabase()
+        .prepare(
+          "SELECT m.* FROM messages m JOIN messages_fts f ON m.rowid = f.rowid WHERE messages_fts MATCH ? ORDER BY rank LIMIT ?",
+        )
+        .all(args.query, limit) as RawMsgRow[];
+      return rows.map(toMessage);
+    } catch {
+      return [];
+    }
+  });
 
   // Workspaces
-  ipcMain.handle("list_workspaces", () => HANDLER_STUB());
-  ipcMain.handle("add_workspace", () => HANDLER_STUB());
-  ipcMain.handle("rename_workspace", () => HANDLER_STUB());
-  ipcMain.handle("delete_workspace", () => HANDLER_STUB());
+  ipcMain.handle("list_workspaces", () => {
+    dbInit();
+    const rows = getDatabase()
+      .prepare("SELECT * FROM workspaces ORDER BY created_at DESC")
+      .all() as RawWorkspace[];
+    return rows.map(toWorkspace);
+  });
+  ipcMain.handle("add_workspace", (_e, args: { label?: string; rootPath?: string; root_path?: string }) => {
+    dbInit();
+    const id = randomUUID();
+    const now = Math.floor(Date.now() / 1000);
+    const label = args.label ?? "Workspace";
+    const rootPath = args.rootPath ?? args.root_path ?? "";
+    try {
+      getDatabase()
+        .prepare("INSERT INTO workspaces (id, label, root_path, created_at) VALUES (?, ?, ?, ?)")
+        .run(id, label, rootPath, now);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw { kind: "Unknown", message: `add_workspace failed: ${msg}` };
+    }
+    return toWorkspace({ id, label, root_path: rootPath, created_at: now });
+  });
+  ipcMain.handle("rename_workspace", (_e, args: { id: string; label: string }) => {
+    dbInit();
+    getDatabase().prepare("UPDATE workspaces SET label = ? WHERE id = ?").run(args.label, args.id);
+  });
+  ipcMain.handle("delete_workspace", (_e, args: { id: string }) => {
+    dbInit();
+    // CASCADE: conversations in this workspace are deleted.
+    getDatabase().prepare("DELETE FROM workspaces WHERE id = ?").run(args.id);
+  });
   ipcMain.handle("pick_workspace_path", async () => {
     const r = await dialog.showOpenDialog({ properties: ["openDirectory"] });
-    return r.canceled ? null : r.filePaths[0];
+    return r.canceled ? null : r.filePaths[0] ?? null;
   });
 
   // Filesystem
-  ipcMain.handle("read_file", () => HANDLER_STUB());
-  ipcMain.handle("write_file", () => HANDLER_STUB());
-  ipcMain.handle("edit_file", () => HANDLER_STUB());
-  ipcMain.handle("search_files", () => HANDLER_STUB());
-  ipcMain.handle("delete_file", () => HANDLER_STUB());
+  ipcMain.handle("read_file", async (_e, args: { workspaceId?: string; workspace_id?: string; path: string }) => {
+    dbInit();
+    const wsId = args.workspaceId ?? args.workspace_id ?? "";
+    const ws = await getWorkspaceById(wsId);
+    return await readFileInWorkspace(ws.root_path, args.path);
+  });
+  ipcMain.handle("write_file", async (_e, args: { workspaceId?: string; workspace_id?: string; path: string; content: string }) => {
+    dbInit();
+    const wsId = args.workspaceId ?? args.workspace_id ?? "";
+    const ws = await getWorkspaceById(wsId);
+    await writeFileInWorkspace(ws.root_path, args.path, args.content);
+  });
+  ipcMain.handle("edit_file", async (_e, args: { workspaceId?: string; workspace_id?: string; path: string; oldText: string; newText: string; replaceAll?: boolean }) => {
+    dbInit();
+    const wsId = args.workspaceId ?? args.workspace_id ?? "";
+    const ws = await getWorkspaceById(wsId);
+    const abs = await validatePathInWorkspace(args.path, ws.root_path);
+    const content = await readFile(abs, "utf-8");
+    const occurrences = content.split(args.oldText).length - 1;
+    if (occurrences === 0) {
+      throw { kind: "NotFound", path: args.path };
+    }
+    if (occurrences > 1 && !args.replaceAll) {
+      throw {
+        kind: "Unknown",
+        message: `Pattern matches ${occurrences} times — use replaceAll or be more specific (must match exactly once)`,
+      };
+    }
+    const newContent = args.replaceAll
+      ? content.split(args.oldText).join(args.newText)
+      : content.replace(args.oldText, args.newText);
+    await writeFileInWorkspace(ws.root_path, args.path, newContent);
+  });
+  ipcMain.handle("search_files", async (_e, args: { workspaceId?: string; workspace_id?: string; glob: string; contentPattern?: string | null }) => {
+    dbInit();
+    const wsId = args.workspaceId ?? args.workspace_id ?? "";
+    const ws = await getWorkspaceById(wsId);
+    return await searchFilesInWorkspace(ws.root_path, args.glob, args.contentPattern ?? null);
+  });
+  ipcMain.handle("delete_file", async (_e, args: { workspaceId?: string; workspace_id?: string; path: string }) => {
+    dbInit();
+    const wsId = args.workspaceId ?? args.workspace_id ?? "";
+    const ws = await getWorkspaceById(wsId);
+    const abs = await validatePathInWorkspace(args.path, ws.root_path);
+    await unlink(abs);
+  });
 
   // Native shims
   ipcMain.handle("set_login_item", (_e, args) => {
-    app.setLoginItemSettings({ openAtLogin: !!args?.enabled });
+    app.setLoginItemSettings({ openAtLogin: !!(args && (args as { enabled?: boolean }).enabled) });
   });
   ipcMain.handle("notify", (_e, args) => {
-    new Notification({ title: args?.title, body: args?.body }).show();
+    const title = (args && (args as { title?: string }).title) ?? "";
+    const body = (args && (args as { body?: string }).body) ?? "";
+    new Notification({ title, body }).show();
   });
-  ipcMain.handle("open_external", (_e, args) => shell.openExternal(args?.url));
+  ipcMain.handle("open_external", (_e, args) => {
+    const url = (args && (args as { url?: string }).url) ?? "";
+    return shell.openExternal(url);
+  });
   ipcMain.handle("get_log_path", async () => {
-    // Lazy-import to avoid eager electron-log init in non-Electron test env.
     const { default: log } = await import("electron-log");
-    return log.transports.file.getFile()?.path;
+    return log.transports.file.getFile()?.path ?? null;
   });
-
-  // Suppress unused-parameter warning for deps (used by future T4+ code that
-  // needs the main window reference for streaming).
-  void deps;
 }
 
 /**
