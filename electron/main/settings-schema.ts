@@ -112,7 +112,17 @@ export const DEFAULT_SETTINGS: SettingsV15 = {
         default_model: MINIMAX_DEFAULT_MODEL,
         base_url: MINIMAX_BASE_URL,
         api_type: "anthropic-messages",
-        models: [],
+        // Pre-populate with the default model so the LLM picker has at least
+        // one option out of the box (matches app.store.ts default).
+        models: [
+          {
+            id: MINIMAX_DEFAULT_MODEL,
+            label: MINIMAX_DEFAULT_MODEL,
+            context_window: 200_000,
+            deprecated: false,
+            thinking: false,
+          },
+        ],
         models_endpoint: MINIMAX_MODELS_ENDPOINT,
       },
       billing: { kind: "plan_quota" },
