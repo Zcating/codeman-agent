@@ -9,8 +9,11 @@
 //!   - 05 是"user-input → bubble → DB"往返契约测试。
 //!   - 两者失败原因不同;两个都跑将回归隔离到正确层(UI 渲染 vs. 运行时 plumbing)。
 
-import { test, expect, assert, cancelRunningAgent, clickNewConversationAndWait, invoke, resetChatState, submitForm } from "./fixtures";
-import { useMockProvider, enqueueMockResponse } from "./mock-provider";
+import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, resetChatState, submitForm } from "./fixtures";
+import { useMockProvider, enqueueMockResponse, clearMockQueue } from "./mock-provider";
+import * as path from "node:path";
+import * as os from "node:os";
+import * as fs from "node:fs";
 
 // 有意独特的字符串,以便我们永远不会将其与其他测试数据行
 // 或默认 Sidebar "New conversation" 占位符混淆。
@@ -30,23 +33,39 @@ interface MessageRow {
 }
 
 test.describe("05 — agent 页面输入 → 用户气泡", () => {
+  const e2eRoot = path.join(os.tmpdir(), "codeman-e2e-bubble-" + Date.now());
+
+  test.beforeAll(async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
+    fs.mkdirSync(e2eRoot, { recursive: true });
+
+    await page.goto("/");
+    await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
+
+    // D8-W: provision workspace so clickNewConversationAndWait works
+    await invoke(page, "add_workspace", {
+      label: "Bubble E2E Test Workspace",
+      rootPath: e2eRoot,
+    });
+
+    await useMockProvider(page);
+  });
+
   test.beforeEach(async ({ tauriEnv }) => {
     const { page } = tauriEnv;
     // 彻底重置 chat 域: cancel in-flight → 清 DB → navigate to /
-    // Note: resetChatState no longer creates conv via IPC (UI-driven now).
-    // The test body calls clickNewConversationAndWait which handles conv creation.
-    await resetChatState(page);
-    await useMockProvider(page);
+    await cancelRunningAgent(page);
+    await clearAllHistory(page);
+    await clearMockQueue(page);
+    await page.goto("/");
+    await assert.visible(page.locator('[data-testid="codex-input"]'), { timeout: 15_000 });
   });
 
   test("输入内容产生可见用户气泡并持久化到 DB", async ({ tauriEnv }) => {
     const { page } = tauriEnv;
 
-    // 诊断: 捕获所有 console + pageerror,这样 submit 时发生的 JS 错误
-    // 不会淹没在 log 里。run_in_background 的 cdp-driver 转发到 node 端
-    // 但没人听 — 我们用 console.log 显式输出。
+    // 诊断: 捕获所有 console + pageerror
     page.on("console", (msg) => {
-      // 过滤掉 vite hmr 噪声
       const t = msg.text;
       if (t.includes("[vite]") || t.includes("[HMR]") || t.includes("hmr update")) {
         return;
@@ -61,15 +80,7 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
     await enqueueMockResponse(page, { text: "Mock for setup", delayMs: 50 });
     await enqueueMockResponse(page, { text: "Mock response for USER_INPUT", delayMs: 50 });
 
-    // 1. 到达聊天页面。Tauri dev URL 是 /;我们不需要
-    //    导航,但这样做使 spec 对未来默认路由变更更健壮。
-    await page.goto("/");
-    await assert.visible(page.locator('textarea[placeholder="发条消息\u2026"]'), {
-      timeout: 15_000,
-    });
-
-    // 2. 创建全新会话 via UI-driven flow.
-    //    clickNewConversationAndWait 返回 convId 即 active conv 的 id.
+    // 1. 创建全新会话 via UI-driven flow.
     const { convId } = await clickNewConversationAndWait(page);
 
     // 3. Verify the conv element exists in the DOM (may be inside accordion).
@@ -162,6 +173,12 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
       userRow,
       `content 为 "${USER_INPUT}" 的 user message 必须持久化在会话 ${convId} 中`,
     ).toBeTruthy();
+  });
+
+  test.afterAll(async () => {
+    try {
+      fs.rmSync(e2eRoot, { recursive: true, force: true });
+    } catch {}
   });
 
   test("多次发送产生多个气泡(无去重回归)", async ({ tauriEnv }) => {
