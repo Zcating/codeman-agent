@@ -5,10 +5,14 @@
 // that might transitively call app.getPath('userData') — e.g. electron-store,
 // electron-log, electron-window-state lazy init).
 //
-// TDD-exempt: orchestration glue, tested via e2e in T7.
+// V3 e2e fix: register `app://` custom protocol handler so the renderer loads
+// from a clean `app://./index.html` URL instead of `file:///C:/.../index.html`.
+// TanStack Router's createBrowserHistory reads window.location.pathname which
+// on file:// is the absolute Windows path and never matches the `/` route.
 
-import { app, BrowserWindow, Menu } from "electron";
-import { join } from "node:path";
+import { app, BrowserWindow, Menu, protocol, net } from "electron";
+import { join, sep, normalize } from "node:path";
+import { pathToFileURL } from "node:url";
 import { registerIpcHandlers } from "./ipc";
 
 const USER_DATA = join(
@@ -17,10 +21,56 @@ const USER_DATA = join(
 );
 app.setPath("userData", USER_DATA);
 
+// Register `app://` scheme as privileged (secure, standard, fetch API) BEFORE
+// app is ready. Without this, `fetch()` and `History.pushState` are blocked
+// on the custom scheme.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "app",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+]);
+
 let mainWindow: BrowserWindow | null = null;
 
+/** Resolve `app://./foo` to a file path under dist/ (the renderer output). */
+function appUrlToDistPath(urlString: string): string | null {
+  let pathname: string;
+  try {
+    const u = new URL(urlString);
+    pathname = u.pathname;
+  } catch {
+    return null;
+  }
+  // Map "/" → "index.html"; anything else → relative file under dist/
+  const rel = pathname === "/" || pathname === "" ? "index.html" : pathname.replace(/^\/+/, "");
+  const distDir = join(__dirname, "../../dist");
+  const candidate = normalize(join(distDir, rel));
+  // Path traversal guard: must stay inside distDir
+  if (!candidate.startsWith(normalize(distDir) + sep) && candidate !== normalize(distDir)) {
+    return null;
+  }
+  return candidate;
+}
+
+function registerAppProtocol(): void {
+  protocol.handle("app", (request) => {
+    const filePath = appUrlToDistPath(request.url);
+    if (!filePath) {
+      return new Response("Not found", { status: 404 });
+    }
+    // Use net.fetch for proper streaming + range support + MIME inference.
+    return net.fetch(pathToFileURL(filePath).toString());
+  });
+}
+
 function createMainWindow(): BrowserWindow {
-  // T4b will swap this for electron-window-state (remember position/size).
   const win = new BrowserWindow({
     width: 800,
     height: 600,
@@ -29,8 +79,6 @@ function createMainWindow(): BrowserWindow {
     title: "codeman-agent",
     show: false,
     webPreferences: {
-      // electron-vite 6 outputs preload as .mjs (ESM). Resolve by glob to
-      // match either .js or .mjs in the same dir, since older builds use .js.
       preload: (() => {
         const base = join(__dirname, "../preload/index");
         for (const ext of [".mjs", ".js"]) {
@@ -45,31 +93,33 @@ function createMainWindow(): BrowserWindow {
       })(),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false, // preload needs Node 'electron' module
+      sandbox: false,
     },
   });
 
   win.once("ready-to-show", () => win.show());
 
-  // Close → minimize to taskbar (V2 parity per ADR-0007).
   win.on("close", (e) => {
     if (process.platform === "darwin") return;
     e.preventDefault();
     win.minimize();
   });
 
-  // Load renderer — dev server URL or built dist/index.html.
+  // Load renderer via custom `app://` protocol — clean URL for TanStack Router.
+  // Load `app://./` (path "/") so the router's createBrowserHistory sees
+  // pathname "/" and matches the home route. The app:// protocol handler maps
+  // "/" → dist/index.html.
+  // Dev server override: use the dev URL if ELECTRON_RENDERER_URL is set.
   if (process.env.ELECTRON_RENDERER_URL) {
     void win.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
-    void win.loadFile(join(__dirname, "../../dist/index.html"));
+    void win.loadURL("app://./");
   }
 
   return win;
 }
 
 function buildAppMenu(): void {
-  // File → Quit (CmdOrCtrl+Q). Mirrors V2 Tauri menu.
   const menu = Menu.buildFromTemplate([
     {
       label: "File",
@@ -86,6 +136,7 @@ function buildAppMenu(): void {
 }
 
 app.whenReady().then(() => {
+  registerAppProtocol();
   buildAppMenu();
   registerIpcHandlers({ getMainWindow: () => mainWindow });
   mainWindow = createMainWindow();

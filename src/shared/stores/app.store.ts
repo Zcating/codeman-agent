@@ -25,7 +25,10 @@
 import { createStore } from "solid-js/store";
 import { Effect } from "effect";
 import type { Settings, Provider, ModelMeta, AppError, Workspace } from "../lib/types";
-import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+// V3: route IPC through the V3 canonical (window.codeman dispatch) instead of
+// the V2 @tauri-apps/api/core which reads window.__TAURI_INTERNALS__ (missing
+// in V3 Electron).
+import { invoke as ipcInvoke } from "../lib/ipc";
 import {
   ProviderService,
   ProviderServiceLive,
@@ -101,20 +104,16 @@ function toAppError(e: unknown): AppError {
   return { kind: "Unknown", message: e instanceof Error ? e.message : String(e) };
 }
 
-const flushEffect: Effect.Effect<void, AppError> = Effect.tryPromise({
-  try: async () => {
-    await tauriInvoke("update_settings", { newSettings: settings.value });
-  },
-  catch: toAppError,
+// V3: ipcInvoke returns Effect.Effect<T, AppError> (not Promise) — use
+// Effect.gen with yield* instead of tryPromise + await.
+const flushEffect: Effect.Effect<void, AppError> = Effect.gen(function* () {
+  yield* ipcInvoke("update_settings", { newSettings: settings.value });
 });
 
-const refreshEffect: Effect.Effect<Settings, AppError> = Effect.tryPromise({
-  try: async () => {
-    const fresh = await tauriInvoke<Settings>("get_settings");
-    setSettings("value", fresh);
-    return fresh;
-  },
-  catch: toAppError,
+const refreshEffect: Effect.Effect<Settings, AppError> = Effect.gen(function* () {
+  const fresh = yield* ipcInvoke<Settings>("get_settings");
+  setSettings("value", fresh);
+  return fresh;
 });
 
 /**

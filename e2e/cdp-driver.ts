@@ -266,10 +266,16 @@ export class ElectronPage {
             return;
           }
           // V3 readiness check: window.codeman (set by preload) + URL not about:blank.
-          const w = window as unknown as { codeman?: unknown };
+          const w = window as unknown as { codeman?: unknown; __router?: { navigate: (args: { to: string }) => void } };
           if (document.URL !== "about:blank" && w.codeman) {
-            history.pushState(null, "", p);
-            dispatchEvent(new PopStateEvent("popstate"));
+            // V3: file:// URL pathname is absolute Windows path; history.pushState
+            // can't update it cleanly. Use the router's navigate() instead.
+            if (w.__router) {
+              w.__router.navigate({ to: p });
+            } else {
+              history.pushState(null, "", p);
+              dispatchEvent(new PopStateEvent("popstate"));
+            }
             resolve();
           } else {
             setTimeout(check, 100);
@@ -472,7 +478,9 @@ export async function connectElectron(opts: {
   pageUrlPattern?: RegExp;
 } = {}): Promise<ElectronPage> {
   const cdpUrl = opts.cdpUrl ?? `http://${CDP_HOST}:9222`;
-  const pageUrlPattern = opts.pageUrlPattern ?? /file:\/\/.*index\.html$|.*index\.html$/;
+    // V3 Electron: page URL is `app://./` (custom protocol). Match any page
+    // target to be robust against URL scheme changes.
+    const pageUrlPattern = opts.pageUrlPattern ?? /.*/;
   const res = await fetch(`${cdpUrl}/json/version`);
   if (!res.ok) {
     throw new Error(`CDP /json/version returned ${res.status} at ${cdpUrl}`);
@@ -490,22 +498,25 @@ export async function connectElectron(opts: {
 
   const conn = new CDPConnection(ws);
 
-  // 找 V3 Electron 页面 target。V3 用 file:// 加载 dist/index.html 或 dev 1420。
+  // 找 V3 Electron 页面 target。V3 用 app:// (custom protocol) 或 file:// 加载。
+  // 取第一个 type="page" target — 单一 BrowserWindow 下只有一个 page target。
   const { targetInfos } = (await conn.send("Target.getTargets")) as {
     targetInfos: Array<{ targetId: string; type: string; url: string; title?: string }>;
   };
   console.log(`[cdp] ${cdpUrl} targets:`, targetInfos.map((t) => `${t.type}@${t.url}`).join(", "));
-  const target = targetInfos.find(
-    (t) => t.type === "page" && pageUrlPattern.test(t.url),
-  );
-  if (!target) {
+  const pageTargets = targetInfos.filter((t) => t.type === "page");
+  if (pageTargets.length === 0) {
     throw new Error(
-      `No V3 Electron page target found matching ${pageUrlPattern}. ` +
-        `Have ${targetInfos.length} targets: ${targetInfos
-          .map((t) => `${t.type}@${t.url}`)
-          .join(", ")}`,
+      `No page target found. Have ${targetInfos.length} targets: ${targetInfos
+        .map((t) => `${t.type}@${t.url}`)
+        .join(", ")}`,
     );
   }
+  // If a pattern is given, use it; otherwise take the first page.
+  const target =
+    pageUrlPattern.source === ".*"
+      ? pageTargets[0]!
+      : pageTargets.find((t) => pageUrlPattern.test(t.url)) ?? pageTargets[0]!;
 
   const { sessionId } = (await conn.send("Target.attachToTarget", {
     targetId: target.targetId,

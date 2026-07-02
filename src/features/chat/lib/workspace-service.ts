@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from "effect";
-import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { invoke as ipcInvoke } from "../../../shared/lib/ipc";
 import { logger } from "../../../shared/lib/logger";
 import type { AppError, Workspace } from "../../../shared/lib/types";
 
@@ -11,16 +11,16 @@ export class WorkspaceService extends Context.Tag("WorkspaceService")<WorkspaceS
   readonly pickPath: () => Effect.Effect<string | null, AppError>;
 }>() {}
 
-// Internal invoke wrapper (NOT exported)
+// V3 IPC: dispatch through shared/lib/ipc.ts (window.codeman) instead of V2
+// @tauri-apps/api/core (which reads window.__TAURI_INTERNALS__.invoke, missing
+// in V3 Electron).
 const invoke = <T>(name: string, args?: Record<string, unknown>): Effect.Effect<T, AppError> =>
-  Effect.tryPromise({
-    try: () => tauriInvoke<T>(name, args),
-    catch: (e) => {
-      if (e && typeof e === "object" && "kind" in e) return e as AppError;
-      logger.error("Workspace IPC 失败", name, e);
-      return { kind: "Unknown" as const, message: String(e) } as AppError;
-    },
-  });
+  ipcInvoke<T>(name, args).pipe(
+    Effect.catchAll((err) => {
+      logger.error("Workspace IPC 失败", name, err);
+      return Effect.fail(err);
+    }),
+  ) as Effect.Effect<T, AppError>;
 
 export const WorkspaceServiceLive = Layer.succeed(WorkspaceService, {
   list: () => invoke<Workspace[]>("list_workspaces"),

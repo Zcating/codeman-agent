@@ -57,9 +57,9 @@ export function ChatLayout(): JSX.Element {
     Effect.runPromiseExit(loadWorkspaces());
   });
 
-  const params = useParams({ from: "/chat/conversation/$convId" });
+  const params = useParams({ strict: false });
   // selectedItemId comes from URL — /conversation/{id} has convId, / has null
-  const selectedItemId = (): string | null => params().convId ?? null;
+  const selectedItemId = (): string | null => (params() as { convId?: string }).convId ?? null;
 
   const handleSelectItem = (_id: string) => {
     // Navigation is handled by CodemanSidebar's internal link behavior
