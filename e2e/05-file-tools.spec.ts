@@ -49,6 +49,13 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
     // Enqueue mock response for clickNewConversationAndWait's UI-driven send
     await enqueueMockResponse(page, { text: "Mock setup", delayMs: 50 });
     await clickNewConversationAndWait(page);
+    // Wait for streaming from clickNewConversationAndWait to complete
+    // (Send button reappears when streamingMessageId is cleared)
+    try {
+      await page.locator('button[type="submit"]').waitFor({ state: "visible", timeout: 10_000 });
+    } catch {
+      await cancelRunningAgent(page);
+    }
   });
 
   test.afterAll(async () => {
