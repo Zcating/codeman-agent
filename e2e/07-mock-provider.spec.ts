@@ -59,24 +59,41 @@ test.describe("07 — Mock LLM provider", () => {
     const cannedText = "Hello from mock LLM!";
     await enqueueMockResponse(page, { text: cannedText });
 
+    // 等待 Send 按钮重新出现(clickNewConversationAndWait 触发的 mock 还在跑时
+    // 按钮是 Cancel;等它完成才发第二条)
+    try {
+      await page.locator('button[type="submit"]').waitFor({ state: "visible", timeout: 10_000 });
+    } catch {
+      // If Cancel still visible, cancel it
+      await cancelRunningAgent(page);
+    }
+
     // 发送消息
     const textarea = page.locator('textarea[placeholder="发条消息…"]');
     await textarea.fill("Hi");
     await submitForm(page);
 
     // 等 assistant bubble 出现并包含预置文本
-    const bubble = page.locator("div.justify-start > div[class*='bg-card']");
-    await assert.visible(bubble.first(), { timeout: 10_000 });
-    // 绛?text 杈惧埌瀹屽叡 text(mock 浠?4-char chunks 娴?+ 5ms delay,20 瀛楃闇€ 25ms+)
-    const textDeadline = Date.now() + 5_000;
-    let polledText = "";
+    // Use evaluate to check ANY assistant bubble (not just .first()) because
+    // beforeEach's clickNewConversationAndWait already consumed one mock
+    // response — there's already an assistant bubble "Mock setup" from the
+    // conv-title send, so .first() would match the wrong one.
+    const textDeadline = Date.now() + 10_000;
+    let foundText = "";
     while (Date.now() < textDeadline) {
-      polledText = (await bubble.first().textContent()) ?? "";
-      if (polledText.includes(cannedText)) {
-        break;
-      }
+      foundText = await page.evaluate((target: string) => {
+        const bubbles = document.querySelectorAll("div.justify-start > div[class*='bg-card']");
+        for (const b of Array.from(bubbles)) {
+          const t = (b.textContent ?? "").trim();
+          if (t.includes(target)) return t;
+        }
+        // Return the last bubble text for diagnostics
+        const last = bubbles[bubbles.length - 1];
+        return last ? (last.textContent ?? "").trim() : "(no assistant bubbles)";
+      }, cannedText);
+      if (foundText.includes(cannedText)) break;
       await new Promise((r) => setTimeout(r, 100));
     }
-    expect(polledText, "assistant bubble 应包含 mock 预置文本").toContain(cannedText);
+    expect(foundText, "某个 assistant bubble 应包含 mock 预置文本").toContain(cannedText);
   });
 });

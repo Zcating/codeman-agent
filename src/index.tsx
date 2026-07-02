@@ -66,6 +66,9 @@ function bootstrap() {
       refresh: () => Effect.Effect<unknown, unknown>;
       refreshAsync: () => Promise<unknown>;
     };
+    __chatStore?: {
+      loadWorkspacesAsync: () => Promise<void>;
+    };
   };
   (window as unknown as WindowWithAppStore).__appStore = {
     refresh: () => appStore.refresh(),
@@ -76,6 +79,21 @@ function bootstrap() {
             throw new Error("appStore.refresh failed");
           }
           return exit.value;
+        },
+      ),
+  };
+
+  // Expose chatStore on window for e2e tests — tests create workspaces via raw
+  // IPC (invoke("add_workspace", ...)) which bypasses the in-memory store.
+  // After creating workspaces, the test must refresh chatStore so the
+  // HomeAgentForm's workspace picker and sidebar see the new workspaces.
+  (window as unknown as WindowWithAppStore).__chatStore = {
+    loadWorkspacesAsync: () =>
+      Effect.runPromiseExit(chatStore.loadWorkspaces() as Effect.Effect<void>).then(
+        (exit) => {
+          if (Exit.isFailure(exit)) {
+            throw new Error("chatStore.loadWorkspaces failed");
+          }
         },
       ),
   };

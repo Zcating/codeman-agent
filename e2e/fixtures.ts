@@ -123,24 +123,17 @@ export const test = base.extend<{}, { tauriEnv: ElectronEnv; electronEnv: Electr
       rmSync(userDataDir, { recursive: true, force: true });
       mkdirSync(userDataDir, { recursive: true });
 
-      // 1b. Clean per-worker SQLite DB from Electron app data dir.
-      //     V3 main process (electron/main/db/mod.ts) opens
-      //     <userData>/codeman-agent.db via better-sqlite3.
+      // 1b. Clean per-worker Electron app data dir.  The main process now
+      //     uses CODEMAN_TEST_WORKER to suffix its userData path (see
+      //     electron/main/index.ts), so data lives under
+      //     codeman-agent.w{idx}/.  Clean the entire per-worker dir so
+      //     SQLite, settings, and window-state are pristine.
       const electronAppData = join(
         process.env["LOCALAPPDATA"] ?? join(homedir(), "AppData", "Local"),
-        "codeman-agent",
+        `codeman-agent.w${idx}`,
       );
-      for (const suffix of [`codeman-agent.w${idx}.db`, `-wal`, `-shm`]) {
-        try {
-          rmSync(join(electronAppData, suffix), { force: true });
-        } catch {
-          // ignore
-        }
-      }
-      // Also clean settings.{wN}.json so each worker has fresh settings.
       try {
-        rmSync(join(electronAppData, `settings.w${idx}.json`), { force: true });
-        rmSync(join(electronAppData, `settings.json`), { force: true });
+        rmSync(electronAppData, { recursive: true, force: true });
       } catch {
         // ignore
       }

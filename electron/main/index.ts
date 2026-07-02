@@ -15,9 +15,14 @@ import { join, sep, normalize } from "node:path";
 import { pathToFileURL } from "node:url";
 import { registerIpcHandlers } from "./ipc";
 
+// Worker suffix for e2e parallel workers (CODEMAN_TEST_WORKER = w0, w1, …).
+// When set, paths are suffixed (codeman-agent.w0, codeman-agent.w1) so
+// parallel Electron instances don't share SQLite / settings / window-state.
+const WORKER = process.env.CODEMAN_TEST_WORKER ?? "";
+
 const USER_DATA = join(
   process.env.LOCALAPPDATA ?? process.env.HOME ?? process.cwd(),
-  "codeman-agent",
+  WORKER ? `codeman-agent.${WORKER}` : "codeman-agent",
 );
 app.setPath("userData", USER_DATA);
 
@@ -76,7 +81,7 @@ function createMainWindow(): BrowserWindow {
     height: 600,
     minWidth: 600,
     minHeight: 400,
-    title: "codeman-agent",
+    title: "Codeman",
     show: false,
     webPreferences: {
       preload: (() => {

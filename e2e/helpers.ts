@@ -201,42 +201,65 @@ export async function clickNewConversationAndWait(
   // 1. Navigate to /
   await p.goto("/");
 
-  // 2. Wait for home form input to appear
+  // 2. Refresh workspaces from DB (workspaces may have been created via raw
+  //    IPC in beforeAll, bypassing the in-memory store).  Without this the
+  //    HomeAgentForm shows "No workspaces" and the send button is disabled.
+  await p.evaluate(() => {
+    const w = window as unknown as { __chatStore?: { loadWorkspacesAsync: () => Promise<void> } };
+    return w.__chatStore?.loadWorkspacesAsync() ?? Promise.resolve();
+  });
+
+  // 3. Wait for home form input to appear
   await assert.visible(p.locator('[data-testid="codex-input"]'), { timeout: 15_000 });
 
-  // 3. Select workspace from picker (trigger click → select option by label).
+  // 4. Select workspace from picker (trigger click → select option by label).
   //    V3 e2e: if no label given but 2+ workspaces exist, select the first
   //    one — otherwise the codex-input stays disabled and send is a no-op.
   //    Previous specs' workspaces persist in the DB (state pollution), so
   //    auto-select-via-label is not enough.
+  //
+  //    ⚠️  Scope option search to [data-testid="workspace-select-content"]
+  //    only — document.querySelectorAll('[role="option"]') also matches
+  //    options from the LLM picker (CodemanGroupSelect), and without a
+  //    label the first match would be the wrong picker, leaving
+  //    selectedWorkspaceId null and the send button disabled.
+  //    ⚠️  Ark UI renders its dropdown content asynchronously (portal);
+  //    100ms setTimeout is not enough — poll for the content element.
   const wsLabel = opts.workspaceLabel;
-  await p.evaluate((label: string | null) => {
+  await p.evaluate(async (label: string | null) => {
     const trigger = document.querySelector('[data-testid="workspace-select-trigger"]') as HTMLElement;
     if (!trigger) return;
     const triggerText = (trigger.textContent ?? "").trim();
-    // If a label is specified OR the trigger is empty (no auto-select),
-    // open the picker and click the matching option.
     const needsSelect = label !== null || triggerText === "" || triggerText === "Select a workspace…";
     if (!needsSelect) return;
     trigger.click();
-    setTimeout(() => {
-      const items = document.querySelectorAll('[role="option"]');
-      for (const item of Array.from(items)) {
-        const text = (item.textContent ?? "").trim();
-        if (label !== null) {
-          if (text === label) { (item as HTMLElement).click(); break; }
-        } else {
-          // No label — pick the first workspace option.
-          (item as HTMLElement).click(); break;
+    // Poll for the workspace select content (Ark UI portal) up to 2s
+    const deadline = Date.now() + 2_000;
+    while (Date.now() < deadline) {
+      const content = document.querySelector('[data-testid="workspace-select-content"]');
+      if (content) {
+        const items = content.querySelectorAll<HTMLElement>('[role="option"]');
+        if (items.length > 0) {
+          if (label !== null) {
+            for (const item of Array.from(items)) {
+              const text = (item.textContent ?? "").trim();
+              if (text === label) { item.click(); break; }
+            }
+          } else {
+            items[0]!.click();
+          }
+          return;
         }
       }
-    }, 100);
+      await new Promise((r) => setTimeout(r, 100));
+    }
   }, wsLabel ?? null);
   await new Promise((r) => setTimeout(r, 300));
 
   // 4. Type + submit
   const text = opts.title ?? "E2E Test Conv";
   await p.locator('[data-testid="codex-input"]').fill(text);
+
   await p.locator('[data-testid="codex-send"]').click();
 
   // 5. Wait for ChatView mount
