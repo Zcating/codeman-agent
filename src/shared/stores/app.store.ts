@@ -106,8 +106,16 @@ function toAppError(e: unknown): AppError {
 
 // V3: ipcInvoke returns Effect.Effect<T, AppError> (not Promise) — use
 // Effect.gen with yield* instead of tryPromise + await.
+// V3 e2e: deep-clone settings.value via JSON round-trip — Solid createStore
+// returns a Proxy (and nested values are also Proxies); ipcRenderer.invoke
+// uses the structured clone algorithm which cannot serialize Proxies
+// ("An object could not be cloned"). Shallow spread `{ ...settings.value }`
+// is NOT enough because nested arrays/objects remain Proxies. JSON
+// round-trip produces a fully plain object tree that structured-clones.
 const flushEffect: Effect.Effect<void, AppError> = Effect.gen(function* () {
-  yield* ipcInvoke("update_settings", { newSettings: settings.value });
+  yield* ipcInvoke("update_settings", {
+    newSettings: JSON.parse(JSON.stringify(settings.value)),
+  });
 });
 
 const refreshEffect: Effect.Effect<Settings, AppError> = Effect.gen(function* () {

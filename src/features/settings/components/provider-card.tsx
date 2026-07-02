@@ -191,7 +191,11 @@ export function ProviderCard(props: ProviderCardProps) {
                   p.id === updated.id ? updated : p,
                 );
                 appStore.set({ providers });
-                settingsSaver.scheduleSave();
+                // V3 e2e: flushNow immediately (bypass debounce) so the
+                // subsequent get_settings IPC in tests sees the new key.
+                // Production: footer Save button still does the debounced
+                // flow via scheduleSave.
+                void settingsSaver.flushNow().catch(() => {});
                 props.onUpdate(updated);
               }}
               placeholder="sk-…"
