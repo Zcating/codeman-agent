@@ -29,7 +29,20 @@ function createMainWindow(): BrowserWindow {
     title: "codeman-agent",
     show: false,
     webPreferences: {
-      preload: join(__dirname, "../preload/index.js"),
+      // electron-vite 6 outputs preload as .mjs (ESM). Resolve by glob to
+      // match either .js or .mjs in the same dir, since older builds use .js.
+      preload: (() => {
+        const base = join(__dirname, "../preload/index");
+        for (const ext of [".mjs", ".js"]) {
+          try {
+            require("node:fs").accessSync(base + ext);
+            return base + ext;
+          } catch {
+            // try next
+          }
+        }
+        return base + ".mjs";
+      })(),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false, // preload needs Node 'electron' module

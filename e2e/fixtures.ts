@@ -37,7 +37,7 @@
 import { test as base, expect, type WorkerInfo } from "@playwright/test";
 import { spawn, type ChildProcess } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
-import { mkdirSync, rmSync, createWriteStream } from "node:fs";
+import { mkdirSync, rmSync, createWriteStream, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir, homedir } from "node:os";
 
@@ -56,17 +56,32 @@ export type ElectronEnv = {
 export type TauriEnv = ElectronEnv;
 
 /**
- * V3 Electron binary path. Built by `pnpm run build:dir` (electron-vite
- * build && electron-builder --dir) → release/win-unpacked/codeman-agent.exe.
- * globalSetup (e2e/global-setup-warm.ts) ensures this exists before workers
- * start.
+ * V3 Electron binary path. Two resolution modes:
+ *   1. If `release/win-unpacked/codeman-agent.exe` exists (from `pnpm run build:dir`),
+ *      use that (full asar-packaged release).
+ *   2. Otherwise, fall back to the local `node_modules/electron/dist/electron.exe`
+ *      pointing to `dist-electron/main/index.js`. This is the dev-mode shortcut
+ *      when `electron-builder --dir` is blocked (e.g., icon download offline).
  */
-const ELECTRON_BIN = resolve(
+const PACKAGED_BIN = resolve(
   process.cwd(),
   "release",
   "win-unpacked",
   process.platform === "win32" ? "codeman-agent.exe" : "codeman-agent",
 );
+const LOCAL_BIN = resolve(
+  process.cwd(),
+  "node_modules",
+  "electron",
+  "dist",
+  process.platform === "win32" ? "electron.exe" : "electron",
+);
+const ELECTRON_BIN = existsSync(PACKAGED_BIN) ? PACKAGED_BIN : LOCAL_BIN;
+
+/** Optional app entry point for LOCAL_BIN mode. The packaged binary embeds its own entry. */
+const APP_ENTRY = existsSync(PACKAGED_BIN)
+  ? null
+  : resolve(process.cwd(), "dist-electron", "main", "index.js");
 
 /**
  * Port the shared Vite dev server (1420) is NOT used in V3 — Electron loads
@@ -131,9 +146,14 @@ export const test = base.extend<{}, { tauriEnv: ElectronEnv; electronEnv: Electr
       }
 
       // 2. Spawn the V3 Electron binary directly with per-worker env vars.
+      //    When using the local (non-packaged) Electron binary, pass the app entry
+      //    point as the first non-flag argument.
+      const args = [`--remote-debugging-port=${cdpPort}`];
+      if (APP_ENTRY) args.push(APP_ENTRY);
+
       const child: ChildProcess = spawn(
         ELECTRON_BIN,
-        [`--remote-debugging-port=${cdpPort}`],
+        args,
         {
           env: {
             ...process.env,

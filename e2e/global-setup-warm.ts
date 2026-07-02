@@ -60,12 +60,26 @@ export default async function globalSetup(): Promise<void> {
   // 1. Build V3 Electron: electron-vite build (dist-electron/*) + electron-builder
   //    --dir (release/win-unpacked/codeman-agent.exe). The npm script
   //    `build:dir` chains both.
-  runStep("pnpm run build:dir", () => {
-    execSync("pnpm run build:dir", {
-      stdio: "ignore",
-      env: { ...process.env, ELECTRON_BUILDER_CACHE: resolve(process.cwd(), ".electron-builder-cache") },
+  //    Skip if local Electron binary + dist-electron/ already exist (dev shortcut
+  //    when `electron-builder --dir` is blocked by offline icon download).
+  const electronBin = resolve(
+    process.cwd(),
+    "node_modules",
+    "electron",
+    "dist",
+    process.platform === "win32" ? "electron.exe" : "electron",
+  );
+  const mainEntry = resolve(process.cwd(), "dist-electron", "main", "index.js");
+  if (existsSync(electronBin) && existsSync(mainEntry)) {
+    console.log(`[e2e warm] skip pnpm run build:dir — local Electron binary + dist-electron/ ready`);
+  } else {
+    runStep("pnpm run build:dir", () => {
+      execSync("pnpm run build:dir", {
+        stdio: "ignore",
+        env: { ...process.env, ELECTRON_BUILDER_CACHE: resolve(process.cwd(), ".electron-builder-cache") },
+      });
     });
-  });
+  }
 
   // 2. Free stale CDP ports.
   console.log(`[e2e warm] killing stale CDP ports ${CDP_PORTS_TO_KILL.join(", ")}`);
@@ -73,15 +87,30 @@ export default async function globalSetup(): Promise<void> {
     stdio: "inherit",
   });
 
-  // 3. Sanity: confirm the binary actually got built.
-  if (!existsSync(ELECTRON_BIN_REL)) {
+  // 3. Sanity: confirm at least one binary path is available.
+  //    We accept either the packaged release binary OR the local Electron binary
+  //    + dist-electron/main entry (dev shortcut when electron-builder --dir is
+  //    blocked by offline icon download).
+  const packagedExists = existsSync(ELECTRON_BIN_REL);
+  const localBin = resolve(
+    process.cwd(),
+    "node_modules",
+    "electron",
+    "dist",
+    process.platform === "win32" ? "electron.exe" : "electron",
+  );
+  const localEntry = resolve(process.cwd(), "dist-electron", "main", "index.js");
+  const localExists = existsSync(localBin) && existsSync(localEntry);
+  if (!packagedExists && !localExists) {
     throw new Error(
-      `[e2e warm] V3 Electron binary not found at ${ELECTRON_BIN_REL} — ` +
-        `pnpm run build:dir did not produce output. Check that electron-builder --dir ` +
-        `finished successfully (look for "building target=nsis ... target=msi" lines).`,
+      `[e2e warm] No V3 Electron binary available. ` +
+        `Expected either ${ELECTRON_BIN_REL} (from pnpm run build:dir) ` +
+        `or ${localBin} + ${localEntry} (local dev mode).`,
     );
   }
-  console.log(`[e2e warm] V3 Electron binary ready: ${ELECTRON_BIN_REL}`);
+  console.log(
+    `[e2e warm] V3 Electron binary ready: ${packagedExists ? ELECTRON_BIN_REL : localBin}`,
+  );
 
   // 4. Brief settle (electron-vite + electron-builder can leave file handles
   //    open briefly after exit).
