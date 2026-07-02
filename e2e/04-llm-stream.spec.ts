@@ -21,6 +21,9 @@ import * as os from "node:os";
 
 const USER_PROMPT = "用一句话介绍你自己";
 
+// 全局标志:API key 是否可用(在 beforeAll 中异步检查后设置)
+let llmKeyUsable = true;
+
 test.describe("04 — 流式 LLM 非空文本", () => {
   test.beforeAll(async ({ tauriEnv }) => {
     // RED 状态:没 .env 或没 key → skip,允许 e2e 在无 key 环境通过
@@ -43,7 +46,7 @@ test.describe("04 — 流式 LLM 非空文本", () => {
           body: JSON.stringify({ model: "MiniMax-M2.5-highspeed", max_tokens: 1, messages: [{ role: "user", content: "hi" }] }),
         });
         if (resp.status === 429) {
-          test.skip(true, "MiniMax API key 已限流(429),跳过 LLM 测试");
+          llmKeyUsable = false;
         }
       } catch { /* 网络错误不计入 skip 判定 */ }
     }
@@ -95,6 +98,7 @@ test.describe("04 — 流式 LLM 非空文本", () => {
 
   test("发送消息并在 30s 内观察到非空 assistant 文本或 Cancel 按钮", async ({ tauriEnv }) => {
     test.setTimeout(180_000);
+    test.skip(!llmKeyUsable, "MiniMax API key 已限流(429),跳过 LLM 测试");
     const { page } = tauriEnv;
 
     // V2.1: 使用 clickNewConversationAndWait 创建新会话并切换到 ChatView。

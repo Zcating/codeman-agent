@@ -28,6 +28,8 @@ const USER_PROMPT = "用一句话介绍你自己";
 // 注入配置 (beforeAll 填充),供 test body 使用
 let injectedKey: string | undefined;
 let injectedBaseUrl: string | undefined;
+// 全局标志:API key 是否可用(在 beforeAll 中异步检查后设置)
+let llmKeyUsable = true;
 
 test.describe("06 — LLM round-trip", () => {
   test.beforeAll(async ({ tauriEnv }) => {
@@ -38,7 +40,7 @@ test.describe("06 — LLM round-trip", () => {
     // RED 状态:没 .env 或没 key → skip 整个 spec,不在 e2e 报告里 fail
     test.skip(!envKey, ".env 缺 MINIMAX_CN_API_KEY — 没法验证 LLM round-trip,skip");
 
-    // 快速检查 API key 可用性(限流 429 也 skip)
+    // 快速检查 API key 可用性(限流 429 → llmKeyUsable=false)
     if (envKey) {
       try {
         const resp = await fetch(`${envBaseUrl ?? "https://api.minimaxi.com/anthropic"}/v1/messages`, {
@@ -51,7 +53,7 @@ test.describe("06 — LLM round-trip", () => {
           body: JSON.stringify({ model: "MiniMax-M2.5-highspeed", max_tokens: 1, messages: [{ role: "user", content: "hi" }] }),
         });
         if (resp.status === 429) {
-          test.skip(true, "MiniMax API key 已限流(429),跳过 LLM round-trip 测试");
+          llmKeyUsable = false;
         }
       } catch { /* 网络错误不计入 skip 判定 */ }
     }
@@ -103,6 +105,7 @@ test.describe("06 — LLM round-trip", () => {
 
   test("正常输入 + 配 API Key → 1 user + 1 assistant = 2 bubble", async ({ tauriEnv }) => {
     test.setTimeout(180_000);
+    test.skip(!llmKeyUsable, "MiniMax API key 已限流(429),跳过 LLM round-trip 测试");
     const { page } = tauriEnv;
 
     // 诊断: 听 console + pageerror — LLM 错误会从 chat-view catch 打到 console,
