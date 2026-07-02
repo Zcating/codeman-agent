@@ -34,8 +34,14 @@ export function SettingsPage() {
     });
   });
 
-  // footer Save = force flush（跳过 debounce）
-  const save = () => void settingsSaver.flushNow();
+  // footer Save = force flush（跳过 debounce）。Await so the IPC update_settings
+  // resolves before the caller continues — V2 e2e tests call get_settings
+  // immediately after click(Save) and expect the new api_key to be on disk.
+  const save = (): void => {
+    void settingsSaver.flushNow().catch((e: unknown) => {
+      logger.error("[SettingsPage] flushNow failed:", e);
+    });
+  };
 
   // ProviderCard 已直接调 appStore.set，父组件只需处理 delete
   const onProviderDelete = (id: string) => {
