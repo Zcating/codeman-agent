@@ -138,9 +138,9 @@ export function HomeAgentForm(): JSX.Element {
     if (Exit.isFailure(exit)) return;
     const convId = exit.value;
 
-    // Step 2: Clear input + navigate
+    // Step 2: Clear input + navigate to the new conversation route
     setInput("");
-    navigate({ to: "/" });
+    navigate({ to: "/conversation/$convId", params: { convId } });
 
     // Step 3: Start streaming (fire-and-forget)
     Effect.runPromiseExit(sendMessage(convId, text, provider));

@@ -204,24 +204,35 @@ export async function clickNewConversationAndWait(
   // 2. Wait for home form input to appear
   await assert.visible(p.locator('[data-testid="codex-input"]'), { timeout: 15_000 });
 
-  // 3. Select workspace from picker (trigger click → select option by label)
+  // 3. Select workspace from picker (trigger click → select option by label).
+  //    V3 e2e: if no label given but 2+ workspaces exist, select the first
+  //    one — otherwise the codex-input stays disabled and send is a no-op.
+  //    Previous specs' workspaces persist in the DB (state pollution), so
+  //    auto-select-via-label is not enough.
   const wsLabel = opts.workspaceLabel;
-  if (wsLabel) {
-    await p.evaluate((label: string) => {
-      const trigger = document.querySelector('[data-testid="workspace-select-trigger"]') as HTMLElement;
-      trigger?.click();
-      setTimeout(() => {
-        const items = document.querySelectorAll('[role="option"]');
-        for (const item of Array.from(items)) {
-          if ((item.textContent ?? "").trim() === label) {
-            (item as HTMLElement).click();
-            break;
-          }
+  await p.evaluate((label: string | null) => {
+    const trigger = document.querySelector('[data-testid="workspace-select-trigger"]') as HTMLElement;
+    if (!trigger) return;
+    const triggerText = (trigger.textContent ?? "").trim();
+    // If a label is specified OR the trigger is empty (no auto-select),
+    // open the picker and click the matching option.
+    const needsSelect = label !== null || triggerText === "" || triggerText === "Select a workspace…";
+    if (!needsSelect) return;
+    trigger.click();
+    setTimeout(() => {
+      const items = document.querySelectorAll('[role="option"]');
+      for (const item of Array.from(items)) {
+        const text = (item.textContent ?? "").trim();
+        if (label !== null) {
+          if (text === label) { (item as HTMLElement).click(); break; }
+        } else {
+          // No label — pick the first workspace option.
+          (item as HTMLElement).click(); break;
         }
-      }, 100);
-    }, wsLabel);
-    await new Promise((r) => setTimeout(r, 300));
-  }
+      }
+    }, 100);
+  }, wsLabel ?? null);
+  await new Promise((r) => setTimeout(r, 300));
 
   // 4. Type + submit
   const text = opts.title ?? "E2E Test Conv";
@@ -234,10 +245,30 @@ export async function clickNewConversationAndWait(
     { timeout: 15_000 },
   );
 
-  // 6. Read convId from URL
+  // 6. Read convId from the router's internal state (not window.location, which
+  //    may lag the navigate() call by a tick or differ in app:// scheme).
   const convId = await p.evaluate(() => {
-    const match = window.location.pathname.match(/\/conversation\/(.+)/);
-    return match?.[1] ?? null;
+    const w = window as unknown as {
+      __router?: {
+        state: {
+          location: {
+            pathname: string;
+            params?: Record<string, unknown>;
+          };
+        };
+      };
+    };
+    if (w.__router) {
+      // Try params first (canonical), then parse pathname.
+      const params = w.__router.state.location.params;
+      if (params && typeof params === "object" && "convId" in params) {
+        return String((params as { convId: unknown }).convId);
+      }
+      const m = w.__router.state.location.pathname.match(/\/conversation\/(.+)/);
+      if (m) return m[1] ?? null;
+    }
+    const m = window.location.pathname.match(/\/conversation\/(.+)/);
+    return m?.[1] ?? null;
   });
   if (!convId) {
     throw new Error("clickNewConversationAndWait: no convId in URL after navigation");
