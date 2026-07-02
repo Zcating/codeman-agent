@@ -11,7 +11,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 
 test.describe("05 — 文件工具 (mock LLM)", () => {
-  const e2eRoot = path.join(os.tmpdir(), "codeman-e2e-mock-" + Date.now());
+  const e2eRoot = path.join(os.tmpdir(), "codeman-e2e-mock-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8));
   let workspaceId = "";
 
   let consoleErrors: string[] = [];
