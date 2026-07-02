@@ -149,30 +149,23 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
       return { count: sections.length, texts: Array.from(sections).map(s => s?.textContent?.slice(0, 100) ?? "") };
     });
     console.log("[diag/conv-leak] section.flex-1 count=" + diag.count + " texts=" + JSON.stringify(diag.texts));
-    // DIAGNOSE: check store state for both convs
-    const storeDiag = await page.evaluate(() => {
-      const w = window as unknown as { __chatStore?: { getActiveId: () => string; getMessages: (id: string) => unknown[] } };
-      if (!w.__chatStore) return "no __chatStore";
-      const activeId = w.__chatStore.getActiveId();
-      const msgs = w.__chatStore.getMessages(activeId);
-      return { activeId, msgCount: msgs?.length ?? 0, msgs: (msgs ?? []).map((m: any) => `${m.role}:${(m.content ?? "").slice(0, 20)}`) };
-    });
-    console.log("[diag/conv-leak] store state:", JSON.stringify(storeDiag));
     const idx1ViewText = diag.texts[0] ?? "";
     expect(idx1ViewText, "切到 idx1 后,section.flex-1 不应包含 idx0 的流式文本(不能 leak)").not.toContain(
       TEXT_A,
     );
     expect(idx1ViewText, "idx1 view 不应包含 idx0 的 user message").not.toContain("msg-in-idx0");
 
-    // idx1 view 还没有任何消息 — 0 个 assistant bubble
+    // idx1 view 只有 conv 新建时的 fallback 响应 (clickNewConversationAndWait
+    // 发送了消息但 mock queue 为空,得到 "[mock] no canned response queued")。
+    // 不应有两份 conv 0 的 TEXT_A 文本或 "msg-in-idx0" user message。
     // 首次检测已通过(上面断言了页面上没有 idx0 的文本),
-    // 这里额外确认 assistant bubble 数量为 0。
+    // 这里确认 idx1 只有 fallback 响应,没有额外 bubble。
     const idx1AssistantCount = await page.evaluate(() => {
       const section = document.querySelector("section.flex-1");
       if (!section) return 999;
       return Array.from(section.querySelectorAll("div.justify-start > div[class*='bg-card']")).length;
     });
-    expect(idx1AssistantCount, "idx1 view 应有 0 个 assistant bubble").toBe(0);
+    expect(idx1AssistantCount, "idx1 view 应有 1 个 assistant bubble (新建 conv 的 fallback 响应)").toBe(1);
 
     // 等 idx0 流完 ~2.5s,切回 idx0 验证完整文本
     await convIdx0.click();

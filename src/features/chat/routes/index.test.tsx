@@ -254,6 +254,100 @@ describe("ChatLayout", () => {
     expect(addBtn).toBeTruthy();
   });
 
+  it("Click sidebar conversation → navigate to /conversation/${id}", async () => {
+    const { workspaces$ } = await import("../stores/chat.store") as any;
+    workspaces$.mockReturnValue([
+      { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
+    ]);
+
+    const { getByTestId } = render(() => <ChatLayout />);
+    getByTestId("sidebar-item-conv-1").click();
+    expect(mockUseNavigate).toHaveBeenCalledWith({ to: "/conversation/conv-1" });
+  });
+
+  it("Click rename workspace with same name → no renameWorkspace call", async () => {
+    const { workspaces$, renameWorkspace } = await import("../stores/chat.store") as any;
+    workspaces$.mockReturnValue([
+      { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
+    ]);
+    mockShowRenameDialog.mockResolvedValue("My Project"); // same name
+
+    const { getByTestId } = render(() => <ChatLayout />);
+    getByTestId("sidebar-rename-ws-1").click();
+    // Wait for the async rename operation to potentially settle
+    await new Promise((r) => setTimeout(r, 50));
+    // renameWorkspace should NOT be called (label didn't change)
+    expect(renameWorkspace).not.toHaveBeenCalled();
+  });
+
+  it("Click rename workspace failed → console.error called", async () => {
+    const { workspaces$, renameWorkspace } = await import("../stores/chat.store") as any;
+    const effect = await vi.importActual<typeof import("effect")>("effect");
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    workspaces$.mockReturnValue([
+      { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
+    ]);
+    renameWorkspace.mockReturnValue(effect.Effect.fail("rename failed"));
+    mockShowRenameDialog.mockResolvedValue("New Name");
+
+    const { getByTestId } = render(() => <ChatLayout />);
+    getByTestId("sidebar-rename-ws-1").click();
+
+    // Wait for console.error to be called (async rename)
+    await vi.waitFor(() => {
+      // Exit.fail produces a Cause (Fail) object — just verify the prefix
+      const calls = consoleSpy.mock.calls.filter(c => c[0] === "[chat-layout] rename failed:");
+      expect(calls.length).toBeGreaterThanOrEqual(1);
+    }, { timeout: 2_000 });
+    consoleSpy.mockRestore();
+  });
+
+  it("Click delete workspace confirmed with error → console.error", async () => {
+    const { workspaces$, removeWorkspace } = await import("../stores/chat.store") as any;
+    const effect = await vi.importActual<typeof import("effect")>("effect");
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    workspaces$.mockReturnValue([
+      { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
+    ]);
+    removeWorkspace.mockReturnValue(effect.Effect.fail("delete failed"));
+    mockDialogConfirm.mockResolvedValue(true);
+
+    const { getByTestId } = render(() => <ChatLayout />);
+    getByTestId("sidebar-delete-ws-1").click();
+
+    // Wait for console.error to be called (async delete)
+    await vi.waitFor(() => {
+      const calls = consoleSpy.mock.calls.filter(c => c[0] === "[chat-layout] delete failed:");
+      expect(calls.length).toBeGreaterThanOrEqual(1);
+    }, { timeout: 2_000 });
+    consoleSpy.mockRestore();
+  });
+
+  it("Click add workspace → sets window.location.href to /settings", async () => {
+    // jsdom doesn't support window.location.href assignment for non-hash URLs
+    // (throws "Not implemented: navigation"). We mock the Location to capture
+    // the assignment without triggering navigation.
+    const origLocation = window.location;
+    const mockLocation = { href: "http://localhost:3000/" } as Location;
+    Object.defineProperty(window, "location", {
+      value: mockLocation,
+      configurable: true,
+      writable: true,
+    });
+
+    const { getByTestId } = render(() => <ChatLayout />);
+    getByTestId("sidebar-add-workspace").click();
+
+    expect(mockLocation.href).toBe("/settings");
+
+    // Restore original location
+    Object.defineProperty(window, "location", {
+      value: origLocation,
+      configurable: true,
+      writable: true,
+    });
+  });
+
   it("Click delete conversation → deleteConversation called", async () => {
     const { deleteConversation } = await import("../stores/chat.store") as any;
     const { workspaces$ } = await import("../stores/chat.store") as any;
