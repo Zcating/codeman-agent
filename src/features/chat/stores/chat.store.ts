@@ -208,6 +208,7 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       break;
     case "done": {
       const stubId = store.byId[convId]?.streamingMessageId;
+      console.log("[chat.store/diag] done event: stubId=" + stubId + " content.length=" + (evt.message.content ?? "").length + " content_preview=" + String(evt.message.content ?? "").slice(0, 100) + " tool_calls=" + JSON.stringify(evt.message.tool_calls));
       if (stubId) {
         setStore("byId", convId, "messages", (msgs) =>
           msgs.map((m) => (m.id === stubId ? { ...evt.message, id: stubId } : m)),

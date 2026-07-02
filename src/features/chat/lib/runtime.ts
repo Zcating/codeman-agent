@@ -166,21 +166,24 @@ export function createAgentRuntime(): AgentRuntime {
                         b.type === "toolCall" && b.id !== undefined,
                     )
                   : [];
+                const doneContent = text;
+                const doneToolCalls =
+                  toolBlocks.length > 0
+                    ? toolBlocks.map((b: { id?: string; name?: string; arguments?: Record<string, unknown> }) => ({
+                        id: b.id!,
+                        name: b.name ?? "",
+                        args: b.arguments ?? {},
+                      }))
+                    : null;
+                console.log("[runtime/diag] agent_end: msgs.length=" + msgs.length + " text.length=" + doneContent.length + " text_preview=" + doneContent.slice(0, 100) + " toolBlocks=" + toolBlocks.length + " lastMsg.content=" + JSON.stringify(lastMsg?.content));
                 emit.single({
                   type: "done",
                   message: {
                     id: crypto.randomUUID(),
                     conversation_id: "",
                     role: "assistant",
-                    content: text,
-                    tool_calls:
-                      toolBlocks.length > 0
-                        ? toolBlocks.map((b: { id?: string; name?: string; arguments?: Record<string, unknown> }) => ({
-                            id: b.id!,
-                            name: b.name ?? "",
-                            args: b.arguments ?? {},
-                          }))
-                        : null,
+                    content: doneContent,
+                    tool_calls: doneToolCalls,
                     tool_results: null,
                     model: provider.defaultModel || null,
                     input_tokens: null,

@@ -169,6 +169,32 @@ export const invoke = <T>(
   Effect.tryPromise({
     try: () => dispatchInvoke<T>(name, args),
     catch: (e) => {
+      // AppError from main process is encoded as JSON in Error.message
+      // (electron/main/ipc.ts sandboxHandler wraps AppError plain objects).
+      // However, Electron's ipcMain.handle re-wraps the Error, so the renderer
+      // sees: `Error: Error invoking remote method 'X': Error: {"kind":"...","message":"..."}`.
+      // We need to extract the JSON from the doubly-wrapped message.
+      if (e instanceof Error) {
+        const msg = e.message;
+        // Look for the last `{...}` in the message chain (the inner JSON payload).
+        const braceStart = msg.lastIndexOf("{");
+        if (braceStart !== -1) {
+          try {
+            const candidate = msg.slice(braceStart);
+            const parsed = JSON.parse(candidate) as Record<string, unknown>;
+            if (parsed && typeof parsed === "object" && "kind" in parsed) {
+              return parsed as AppError;
+            }
+          } catch { /* not our JSON — fall through */ }
+        }
+        // Also try parsing the whole message as JSON (pre-wrap case).
+        try {
+          const parsed = JSON.parse(msg) as Record<string, unknown>;
+          if (parsed && typeof parsed === "object" && "kind" in parsed) {
+            return parsed as AppError;
+          }
+        } catch { /* nope */ }
+      }
       if (e && typeof e === "object" && "kind" in e) {
         return e as AppError;
       }

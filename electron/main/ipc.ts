@@ -377,20 +377,42 @@ export function registerIpcHandlers(_deps: {
     return r.canceled ? null : r.filePaths[0] ?? null;
   });
 
+  /**
+   * Wrap a sandbox-calling handler so AppError plain objects (thrown by
+   * file-sandbox.ts) become proper Error instances BEFORE they reach Electron
+   * IPC serialization. Without this, Electron serializes them as "[object Object]",
+   * the renderer can't parse the error kind, and tool_execution etc. lose error context.
+   *
+   * Encodes the AppError as JSON in the Error message. The renderer's `invoke()`
+   * (src/shared/lib/ipc.ts) reconstructs the AppError from this JSON.
+   */
+  const sandboxHandler = <A extends unknown[], R>(fn: (...args: A) => Promise<R>) =>
+    async (...args: A): Promise<R> => {
+      try {
+        return await fn(...args);
+      } catch (e) {
+        if (e && typeof e === "object" && "kind" in e) {
+          const ae = e as { kind: string; message?: string };
+          throw new Error(JSON.stringify({ kind: ae.kind, message: ae.message ?? String(e) }));
+        }
+        throw e;
+      }
+    };
+
   // Filesystem
-  ipcMain.handle("read_file", async (_e, args: { workspaceId?: string; workspace_id?: string; path: string }) => {
+  ipcMain.handle("read_file", sandboxHandler(async (_e, args: { workspaceId?: string; workspace_id?: string; path: string }) => {
     dbInit();
     const wsId = args.workspaceId ?? args.workspace_id ?? "";
     const ws = await getWorkspaceById(wsId);
     return await readFileInWorkspace(ws.root_path, args.path);
-  });
-  ipcMain.handle("write_file", async (_e, args: { workspaceId?: string; workspace_id?: string; path: string; content: string }) => {
+  }));
+  ipcMain.handle("write_file", sandboxHandler(async (_e, args: { workspaceId?: string; workspace_id?: string; path: string; content: string }) => {
     dbInit();
     const wsId = args.workspaceId ?? args.workspace_id ?? "";
     const ws = await getWorkspaceById(wsId);
     await writeFileInWorkspace(ws.root_path, args.path, args.content);
-  });
-  ipcMain.handle("edit_file", async (_e, args: { workspaceId?: string; workspace_id?: string; path: string; oldText: string; newText: string; replaceAll?: boolean }) => {
+  }));
+  ipcMain.handle("edit_file", sandboxHandler(async (_e, args: { workspaceId?: string; workspace_id?: string; path: string; oldText: string; newText: string; replaceAll?: boolean }) => {
     dbInit();
     const wsId = args.workspaceId ?? args.workspace_id ?? "";
     const ws = await getWorkspaceById(wsId);
@@ -409,20 +431,20 @@ export function registerIpcHandlers(_deps: {
       ? content.split(args.oldText).join(args.newText)
       : content.replace(args.oldText, args.newText);
     await writeFileInWorkspace(ws.root_path, args.path, newContent);
-  });
+  }));
   ipcMain.handle("search_files", async (_e, args: { workspaceId?: string; workspace_id?: string; glob: string; contentPattern?: string | null }) => {
     dbInit();
     const wsId = args.workspaceId ?? args.workspace_id ?? "";
     const ws = await getWorkspaceById(wsId);
     return await searchFilesInWorkspace(ws.root_path, args.glob, args.contentPattern ?? null);
   });
-  ipcMain.handle("delete_file", async (_e, args: { workspaceId?: string; workspace_id?: string; path: string }) => {
+  ipcMain.handle("delete_file", sandboxHandler(async (_e, args: { workspaceId?: string; workspace_id?: string; path: string }) => {
     dbInit();
     const wsId = args.workspaceId ?? args.workspace_id ?? "";
     const ws = await getWorkspaceById(wsId);
     const abs = await validatePathInWorkspace(args.path, ws.root_path);
     await unlink(abs);
-  });
+  }));
 
   // Native shims
   ipcMain.handle("set_login_item", (_e, args) => {

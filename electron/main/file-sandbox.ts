@@ -46,10 +46,15 @@ export async function validatePathForWrite(
     }
   }
 
-  // 2. Resolve parent dir (which must exist) via realpath, then check that
-  //    appending the basename stays inside.
-  const { dirname, basename } = await import("node:path");
-  const parent = dirname(inputPath);
+  // 2. Resolve relative paths against workspaceRoot, not process CWD.
+  //    Without this, `dirname("relative.txt")` = `"."` → `realpath(".")`
+  //    resolves to Electron's CWD, which is outside the workspace and
+  //    always triggers a SandboxViolation.
+  const { dirname, basename, isAbsolute, resolve } = await import("node:path");
+  const absolutePath = isAbsolute(inputPath)
+    ? inputPath
+    : resolve(workspaceRoot, inputPath);
+  const parent = dirname(absolutePath);
   let realParent: string;
   try {
     realParent = await realpath(parent);
@@ -73,7 +78,7 @@ export async function validatePathForWrite(
     };
   }
 
-  const candidate = join(realParent, basename(inputPath));
+  const candidate = join(realParent, basename(absolutePath));
   const inside =
     candidate === realRoot || candidate.startsWith(realRoot + sep);
   if (!inside) {
@@ -110,13 +115,21 @@ export async function validatePathInWorkspace(
     }
   }
 
-  // 2. realpath.native — resolves symlinks + absolute path.
+  // 2. Resolve relative paths against workspaceRoot (not process CWD).
+  //    Without this, realpath("relative.txt") resolves against Electron's CWD,
+  //    which is outside the workspace, and always triggers SandboxViolation.
+  const { isAbsolute, resolve } = await import("node:path");
+  const absolutePath = isAbsolute(inputPath)
+    ? inputPath
+    : resolve(workspaceRoot, inputPath);
+
+  // 3. realpath.native — resolves symlinks + absolute path.
   //    Throws ENOENT if path doesn't exist (Rust canonicalize also errors here,
   //    but V3 explicitly distinguishes NotFound from SandboxViolation per
   //    ADR-0024 amendment D2).
   let real: string;
   try {
-    real = await realpath(inputPath);
+    real = await realpath(absolutePath);
   } catch (e: unknown) {
     const code = (e as NodeJS.ErrnoException)?.code;
     if (code === "ENOENT") {
@@ -130,7 +143,7 @@ export async function validatePathInWorkspace(
     throw err;
   }
 
-  // 3. realpath the workspace root, then prefix check.
+  // 4. realpath the workspace root, then prefix check.
   let realRoot: string;
   try {
     realRoot = await realpath(workspaceRoot);

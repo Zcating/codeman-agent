@@ -121,9 +121,19 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     await submitForm(page);
 
     // 等第一个 chunk(4 chars)到达 — 触发 streamingMessageId 设置
-    const assistantBubble = page.locator("div.justify-start > div[class*='bg-card']");
-    await assert.visible(assistantBubble.first(), { timeout: 10_000 });
-    await waitForText(assistantBubble.first(), "Hell", 5_000);
+    // 注意:最新的 assistant 消息在后面(streaming stub 追加到 messages 末尾),
+    // 前面是 beforeEach 产生的 "Mock setup" 消息。用 nth(-1) 取最后一个。
+    const assistantBubbles = page.locator("div.justify-start > div[class*='bg-card']");
+    // Wait for at least one visible assistant bubble
+    await assert.visible(assistantBubbles.first(), { timeout: 10_000 });
+    // Count bubbles, then check the last one for our streaming text
+    const count = await page.evaluate(() =>
+      document.querySelectorAll("div.justify-start > div[class*='bg-card']").length
+    );
+    const lastBubble = count > 1
+      ? assistantBubbles.nth(count - 1)
+      : assistantBubbles.first();
+    await waitForText(lastBubble, "Hell", 5_000);
 
     // 切到第二个 conv(切 conv 不取消 in-flight,per ADR-0019 D1)
     await convIdx1.click();
@@ -134,11 +144,21 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     // 关键断言:idx1 的 view 不应包含 idx0 的流式内容(跨 conv leak 修复)
     // 使用 section.flex-1 内的文本(排除 sidebar),避免 sidebar 列出的
     // 所有 conv 干扰 body 文本检查。section.flex-1 是 ChatView 容器。
-    const idx1ViewText =
-      (await page.evaluate(() => {
-        const section = document.querySelector("section.flex-1");
-        return section?.textContent ?? "";
-      })) ?? "";
+    const diag = await page.evaluate(() => {
+      const sections = document.querySelectorAll("section.flex-1");
+      return { count: sections.length, texts: Array.from(sections).map(s => s?.textContent?.slice(0, 100) ?? "") };
+    });
+    console.log("[diag/conv-leak] section.flex-1 count=" + diag.count + " texts=" + JSON.stringify(diag.texts));
+    // DIAGNOSE: check store state for both convs
+    const storeDiag = await page.evaluate(() => {
+      const w = window as unknown as { __chatStore?: { getActiveId: () => string; getMessages: (id: string) => unknown[] } };
+      if (!w.__chatStore) return "no __chatStore";
+      const activeId = w.__chatStore.getActiveId();
+      const msgs = w.__chatStore.getMessages(activeId);
+      return { activeId, msgCount: msgs?.length ?? 0, msgs: (msgs ?? []).map((m: any) => `${m.role}:${(m.content ?? "").slice(0, 20)}`) };
+    });
+    console.log("[diag/conv-leak] store state:", JSON.stringify(storeDiag));
+    const idx1ViewText = diag.texts[0] ?? "";
     expect(idx1ViewText, "切到 idx1 后,section.flex-1 不应包含 idx0 的流式文本(不能 leak)").not.toContain(
       TEXT_A,
     );

@@ -114,6 +114,33 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
     expect(consoleErrors, "console.error 不应出现:\n" + consoleErrors.join("\n")).toHaveLength(0);
   });
 
+  test("mock plain text response appears (diagnostic)", async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
+    // Send a simple plain-text message (no toolCalls) to verify streaming pipeline
+    await enqueueMockResponse(page, {
+      text: "Hello from search_files diagnostic test!",
+      delayMs: 10,
+    });
+
+    const textarea = page.locator('textarea[placeholder="发条消息…"]');
+    await textarea.fill("Test plain text response");
+    await submitForm(page);
+
+    // Wait for assistant bubble (up to 15s)
+    const deadline = Date.now() + 15_000;
+    let bodyText = "";
+    while (Date.now() < deadline) {
+      bodyText = (await page.evaluate(() => document.body.textContent)) ?? "";
+      if (bodyText.includes("Hello from search_files diagnostic test!")) {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    console.log("[diag/plain-text] final body text preview:", (bodyText ?? "").slice(0, 500));
+    expect(bodyText, "should contain mock text").toContain("Hello from search_files diagnostic test!");
+    expect(consoleErrors, "no console.errors").toHaveLength(0);
+  });
+
   test("search_files 返回匹配文件 + 行号,不包含无关文件", async ({ tauriEnv }) => {
     const { page } = tauriEnv;
     const dirA = path.join(e2eRoot, "src");
@@ -138,27 +165,46 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
     await textarea.fill("Find all .ts files containing 'TODO'");
     await submitForm(page);
 
+    // Wait for user message to appear (confirms sendMessage was called)
+    try {
+      await page.locator('textarea[placeholder="发条消息…"]').waitFor({ state: "visible", timeout: 5_000 });
+    } catch { /* ok */ }
+    await new Promise((r) => setTimeout(r, 1000));
+
+    // DIAGNOSE: check if mock queue was consumed
+    const afterConsumed = await page.evaluate(() => {
+      const w = window as unknown as { __MOCK_LLM_QUEUE__?: unknown[] };
+      return { len: w.__MOCK_LLM_QUEUE__?.length ?? 0, items: JSON.stringify(w.__MOCK_LLM_QUEUE__ ?? []) };
+    });
+    console.log("[diag/search_files] queue AFTER 1s:", afterConsumed);
+
+    // DIAGNOSE: check if assistant stub exists
+    const hasAssistant = await page.evaluate(() => {
+      const msgs = document.querySelectorAll("[data-testid='thinking-indicator'], div.justify-start > div");
+      const body = document.body.textContent ?? "";
+      return { bodyPreview: body.slice(0, 500), thinkingEl: document.querySelector("[data-testid='thinking-indicator']") !== null };
+    });
+    console.log("[diag/search_files] state after 1s:", JSON.stringify(hasAssistant));
+
+    // Wait for the mock to be consumed (up to 30s)
     const deadline = Date.now() + 30_000;
-    let sawResult = false;
+    let finalText = "";
     while (Date.now() < deadline) {
-      const assistantBubbles = await page
-        .locator("div.justify-start > div[class*='bg-card']")
-        .count();
-      if (assistantBubbles > 0) {
-        sawResult = true;
+      finalText = (await page.evaluate(() => document.body.textContent)) ?? "";
+      if (finalText.includes("a.ts") || finalText.includes("no canned response") || finalText.includes("Error")) {
         break;
       }
       await new Promise((r) => setTimeout(r, 500));
     }
-    expect(sawResult, "30s 内未观察到 assistant bubble(search_files)").toBe(true);
+    console.log("[diag/search_files] final body text preview:", (finalText ?? "").slice(0, 500));
 
-    const bodyText = await page.evaluate(() => document.body.textContent);
-    expect(bodyText?.includes("a.ts"), "结果应包含 a.ts,实际: " + bodyText?.slice(0, 300)).toBe(
+    const bodyText = finalText;
+    expect(bodyText?.includes("a.ts"), "结果应包含 a.ts,实际: " + bodyText?.slice(0, 500)).toBe(
       true,
     );
     expect(
       bodyText?.toLowerCase().includes("line") || bodyText?.includes("1"),
-      "结果应包含行号信息,实际: " + bodyText?.slice(0, 300),
+      "结果应包含行号信息,实际: " + bodyText?.slice(0, 500),
     ).toBe(true);
 
     expect(consoleErrors, "console.error 不应出现:\n" + consoleErrors.join("\n")).toHaveLength(0);
