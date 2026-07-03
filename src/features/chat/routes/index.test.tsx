@@ -25,22 +25,23 @@ vi.mock("@tanstack/solid-router", () => ({
 
 vi.mock("../stores/chat.store", async () => {
   const effect = await vi.importActual<typeof import("effect")>("effect");
-  const succeedVoid = effect.Effect.succeed<void>(void 0) as any;
+  // 每个 mock 返回独立的 Effect，避免 runPromiseExit 重复消费同一实例导致 _op 丢失
+  const freshSuccess = () => effect.Effect.succeed(undefined);
   return {
     store: { byId: {} },
     workspaces$: vi.fn<() => Array<{ id: string; label: string; root_path: string }>>(),
     conversations$: vi.fn<() => any[]>(),
-    deleteConversation: vi.fn(() => succeedVoid),
+    deleteConversation: vi.fn(() => freshSuccess()),
     setSelectedWorkspaceId: vi.fn<(id: string | null) => void>(),
-    loadWorkspaces: vi.fn(() => succeedVoid),
+    loadWorkspaces: vi.fn(() => freshSuccess()),
+    loadConversations: vi.fn(() => freshSuccess()),
     createConversation: vi.fn(),
     sendMessage: vi.fn(),
     cancel: vi.fn(),
     archiveConversation: vi.fn(),
     setupConvState: vi.fn(),
-    loadConversations: vi.fn(),
-    renameWorkspace: vi.fn(() => succeedVoid),
-    removeWorkspace: vi.fn(() => succeedVoid),
+    renameWorkspace: vi.fn(() => freshSuccess()),
+    removeWorkspace: vi.fn(() => freshSuccess()),
   };
 });
 
@@ -159,13 +160,13 @@ describe("ConversationRoute", () => {
     cleanup();
   });
 
-  it("Renders back button and ChatView", () => {
+  it("Does NOT render the back-to-home button (Q1: removed)", () => {
     // Mock useParams to return a convId (useParams returns an Accessor)
     mockUseParams.mockReturnValue(() => ({ convId: "test-conv-id" }));
 
-    const { getByTestId } = render(() => <ConversationRoute />);
+    const { queryByTestId, getByTestId } = render(() => <ConversationRoute />);
 
-    expect(getByTestId("back-to-home")).toBeTruthy();
+    expect(queryByTestId("back-to-home")).toBeNull();
     expect(getByTestId("chat-view")).toBeTruthy();
     expect(getByTestId("chat-view-conv-id").textContent).toBe("test-conv-id");
   });
@@ -180,6 +181,19 @@ describe("ChatLayout", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  it("Calls loadConversations on mount (regression: H1 bug)", async () => {
+    const { loadConversations, workspaces$ } = await import("../stores/chat.store") as any;
+    workspaces$.mockReturnValue([
+      { id: "ws-1", label: "My Project", root_path: "C:\\projects" },
+    ]);
+
+    render(() => <ChatLayout />);
+
+    await vi.waitFor(() => {
+      expect(loadConversations).toHaveBeenCalled();
+    });
   });
 
   it("Renders sidebar when workspaces exist", async () => {

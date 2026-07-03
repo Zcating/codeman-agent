@@ -509,6 +509,39 @@ describe("sendMessage — G12: 当 runtime stream 失败时 → console.error", 
   });
 });
 
+// ─── Bug B: handleEvent "error" should set lastError so chat-view can render banner ──
+
+describe("sendMessage — Bug B: RuntimeEvent 'error' sets store.byId[convId].lastError", () => {
+  it("G25: 收到 {type:'error', error:{message:'X'}} 时 lastError = 'X'，且 streamingMessageId 清空", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, []);
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      // Runtime emits a single error event then ends — via Stream.make
+      const errorStream = Stream.make({
+        type: "error" as const,
+        error: { message: "AnthropicTransport: 缺 apiKey" },
+      });
+      vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(errorStream);
+
+      await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
+
+      // 1. lastError 设进去了（typed narrow，绕开编译期无该字段）
+      const cs = store.byId["c1"] as ConversationState & { lastError?: string | null };
+      expect(cs?.lastError).toBe("AnthropicTransport: 缺 apiKey");
+
+      // 2. 仍然 console.error (向后兼容 dev 调试可见性)
+      expect(errorSpy).toHaveBeenCalled();
+
+      // 3. streamingMessageId 清空（避免"正在思考"卡住）
+      expect(cs?.streamingMessageId).toBeNull();
+
+      errorSpy.mockRestore();
+      dispose();
+    });
+  });
+});
+
 // ─── New tests: archiveConversation ────────────────────────────────
 
 describe("archiveConversation — G13: 从 byId 移除 + 调用 runtime.cancel()", () => {

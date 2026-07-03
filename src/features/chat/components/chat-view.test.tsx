@@ -68,6 +68,18 @@ vi.mock("../stores/chat.store", () => ({
         streamingMessageId: null,
         runtime: { run: vi.fn(), cancel: vi.fn() },
       },
+      "conv-err": {
+        id: "conv-err",
+        title: "Err",
+        system_prompt: null,
+        created_at: 1710000000,
+        updated_at: 1710000000,
+        archived_at: null,
+        messages: [],
+        streamingMessageId: null,
+        lastError: "AnthropicTransport: 缺 apiKey",
+        runtime: { run: vi.fn(), cancel: vi.fn() },
+      },
     },
   },
   conversations$: vi.fn(() => [
@@ -462,5 +474,20 @@ describe("ChatView", () => {
     const { container } = render(() => <ChatView convId={undefined as unknown as string} />);
     // Should not crash — renders empty/missing-indicator
     expect(container.textContent).toBeTruthy();
+  });
+
+  // ─── Bug B: lastError UX ─────────────────────────────────────────────────
+
+  it("Bug B: lastError ≠ null 时在消息列表上方渲染红色错误 banner（含错误文案）", () => {
+    const { container } = render(() => <ChatView convId="conv-err" />);
+    const banner = container.querySelector('[data-testid="chat-error-banner"]');
+    expect(banner).toBeTruthy();
+    expect(banner?.textContent).toContain("AnthropicTransport");
+  });
+
+  it("Bug B: lastError = null / undefined 时不渲染错误 banner", () => {
+    const { container } = render(() => <ChatView convId="conv-1" />);
+    const banner = container.querySelector('[data-testid="chat-error-banner"]');
+    expect(banner).toBeNull();
   });
 });

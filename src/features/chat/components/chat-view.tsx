@@ -110,6 +110,15 @@ export function ChatView(props: { convId?: string }) {
     return store.byId[id]?.messages ?? [];
   };
 
+  // Bug B: 当前 conv 的 lastError，没就 null
+  const currentLastError = (): string | null => {
+    const id = convId();
+    if (!id) {
+      return null;
+    }
+    return store.byId[id]?.lastError ?? null;
+  };
+
   // 自动滚动到底部
   createEffect(() => {
     currentMessages();
@@ -150,6 +159,20 @@ export function ChatView(props: { convId?: string }) {
   return (
     <>
       <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+        <Show when={currentLastError()}>
+          <div
+            role="alert"
+            aria-label="运行时错误"
+            data-testid="chat-error-banner"
+            class="p-3 rounded-md border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-900 dark:text-red-200 text-sm flex items-start gap-2"
+          >
+            <X class="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
+            <div class="flex-1 min-w-0">
+              <div class="font-medium mb-1">运行时错误</div>
+              <div class="break-words">{currentLastError()}</div>
+            </div>
+          </div>
+        </Show>
         <For each={currentMessages()}>{(m) => <MessageBubble message={m} />}</For>
         <Show
           when={

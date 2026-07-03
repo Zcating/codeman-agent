@@ -44,6 +44,9 @@ export interface ConversationState {
   // Per-conv reactive state
   messages: Message[];
   streamingMessageId: string | null;
+  // Bug B: 上次 runtime error 的人读消息，null 表示无错误。
+  // 任何 send 成功（type:'done'）后清空。
+  lastError: string | null;
   // Per-conv runtime (createAgentRuntime 工厂产物)
   runtime: AgentRuntime;
 }
@@ -91,6 +94,7 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
     archived_at: conv.archived_at,
     messages: history,
     streamingMessageId: null,
+    lastError: null,
     runtime,
   };
   setStore("byId", conv.id, cs);
@@ -228,8 +232,10 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       // 不论 cancel 还是真实 LLM 错误,都从 error path 进来。
       // 这里必须清 streamingMessageId,否则 UI 永远 stuck in "running" 状态
       // (Cancel 按钮不消失,Send 按钮不恢复 — e2e spec 09 D2 失败的原因)。
+      // Bug B: 同步写 lastError，UI 渲染红色 banner 提示用户 (而非静默)。
       console.error("[chat.store] runtime error:", evt.error);
       setStore("byId", convId, "streamingMessageId", null);
+      setStore("byId", convId, "lastError", evt.error.message);
       setConversationsSignal(Object.values(store.byId));
       break;
   }

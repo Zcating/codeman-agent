@@ -102,6 +102,8 @@ function createMainWindow(): BrowserWindow {
     },
   });
 
+  win.webContents.openDevTools({ mode: "detach" });
+
   win.once("ready-to-show", () => win.show());
 
   win.on("close", (e) => {
@@ -125,6 +127,7 @@ function createMainWindow(): BrowserWindow {
 }
 
 function buildAppMenu(): void {
+
   const menu = Menu.buildFromTemplate([
     {
       label: "File",

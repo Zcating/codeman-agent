@@ -1,36 +1,20 @@
-//! ConversationRoute — Conversation route component (V2.2).
+//! ConversationRoute — Conversation route component (V2.2 + Q1 patch).
 //!
- //! Renders ChatView with back button. convId comes from route params.
+//! Renders ChatView only. convId comes from route params.
+//! Q1 (2026-07-04): removed the "← 返回首页" button. The CodemanSidebar
+//! (always-show after V2.3) is the primary way to navigate back to Home.
 
 import type { JSX } from "solid-js";
-import { useNavigate, useParams } from "@tanstack/solid-router";
-import { ArrowLeft } from "lucide-solid";
+import { useParams } from "@tanstack/solid-router";
 import { ChatView } from "../components/chat-view";
 
 export function ConversationRoute(): JSX.Element {
-  const navigate = useNavigate();
   const params = useParams({ from: "/chat/conversation/$convId" });
   const convId = (): string | undefined => params().convId;
 
-  const handleBack = () => {
-    navigate({ to: "/" });
-  };
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={handleBack}
-        class="flex items-center gap-1 px-4 py-2 text-sm text-muted-foreground hover:text-foreground border-b border-border transition-colors"
-        aria-label="返回首页"
-        data-testid="back-to-home"
-      >
-        <ArrowLeft class="h-4 w-4" aria-hidden="true" />
-        返回首页
-      </button>
-      <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <ChatView convId={convId()} />
-      </div>
-    </>
+    <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
+      <ChatView convId={convId()} />
+    </div>
   );
 }

@@ -15,6 +15,7 @@ import {
   deleteConversation,
   setSelectedWorkspaceId,
   loadWorkspaces,
+  loadConversations,
   renameWorkspace,
   removeWorkspace,
 } from "../stores/chat.store";
@@ -56,9 +57,10 @@ function buildSidebarNodes(): WorkspaceNode[] {
 
 export function ChatLayout(): JSX.Element {
   const navigate = useNavigate();
-  // Load workspaces on mount
+  // Load workspaces + conversations on mount
   onMount(() => {
     Effect.runPromiseExit(loadWorkspaces());
+    Effect.runPromiseExit(loadConversations());
   });
 
   const params = useParams({ strict: false });
