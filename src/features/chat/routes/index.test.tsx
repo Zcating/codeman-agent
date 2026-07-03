@@ -203,12 +203,12 @@ describe("ChatLayout", () => {
     expect(getByTestId("outlet")).toBeTruthy();
   });
 
-  it("Does not render sidebar when no workspaces", async () => {
+  it("Renders sidebar even when no workspaces (always-show)", async () => {
     const { workspaces$ } = await import("../stores/chat.store") as any;
     workspaces$.mockReturnValue([]);
 
     const { queryByTestId } = render(() => <ChatLayout />);
-    expect(queryByTestId("codeman-sidebar")).toBeNull();
+    expect(queryByTestId("codeman-sidebar")).not.toBeNull();
   });
 
   it("Highlights selected item from params", async () => {

@@ -2,7 +2,7 @@
 //!
 //! Provides the shared layout structure for all chat routes.
 
-import { Show, onMount, type JSX } from "solid-js";
+import { onMount, type JSX } from "solid-js";
 import { Outlet, useParams, useNavigate, Link } from "@tanstack/solid-router";
 import { Settings as SettingsIcon } from "lucide-solid";
 import { Effect, Exit } from "effect";
@@ -51,10 +51,6 @@ function buildSidebarNodes(): WorkspaceNode[] {
   });
 }
 /* v8 ignore stop */
-
-function workspacesExist(): boolean {
-  return (workspaces$()?.length ?? 0) > 0;
-}
 
 // ─── ChatLayout ─────────────────────────────────────────────────────────────
 
@@ -115,21 +111,19 @@ export function ChatLayout(): JSX.Element {
 
   return (
     <main class="flex h-screen w-full bg-background text-foreground">
-      <Show when={workspacesExist()}>
-        <CodemanSidebar
-          nodes={buildSidebarNodes()}
-          selectedItemId={selectedItemId()}
-          onSelectItem={handleSelectItem}
-          onDeleteItem={handleDeleteItem}
-          onCreateItem={handleBackToHome}
-          onAddWorkspace={() => {
-            window.location.href = "/settings";
-          }}
-          onEmptyWorkspaceClick={handleEmptyWorkspaceClick}
-          onRenameWorkspace={handleRenameWorkspace}
-          onDeleteWorkspace={handleDeleteWorkspace}
-        />
-      </Show>
+      <CodemanSidebar
+        nodes={buildSidebarNodes()}
+        selectedItemId={selectedItemId()}
+        onSelectItem={handleSelectItem}
+        onDeleteItem={handleDeleteItem}
+        onCreateItem={handleBackToHome}
+        onAddWorkspace={() => {
+          window.location.href = "/settings";
+        }}
+        onEmptyWorkspaceClick={handleEmptyWorkspaceClick}
+        onRenameWorkspace={handleRenameWorkspace}
+        onDeleteWorkspace={handleDeleteWorkspace}
+      />
 
       <section class="flex-1 flex flex-col overflow-hidden">
         <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
