@@ -23,7 +23,7 @@ import {
   ConversationServiceLive,
   MessageService,
   MessageServiceLive,
-} from "../../../shared/lib/tauri";
+} from "../../../shared/lib/ipc";
 import {
   WorkspaceService,
   WorkspaceServiceLive,

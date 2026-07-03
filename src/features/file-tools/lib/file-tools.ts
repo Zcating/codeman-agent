@@ -6,7 +6,7 @@
 import { Type, type Static } from "@sinclair/typebox";
 import type { AgentTool } from "@mariozechner/pi-ai";
 import { Effect, Exit } from "effect";
-import { FileService, FileServiceLive } from "../../../shared/lib/tauri";
+import { FileService, FileServiceLive } from "../../../shared/lib/ipc";
 import type { AppError, FileMatch } from "../../../shared/lib/types";
 
 // ============================================================================

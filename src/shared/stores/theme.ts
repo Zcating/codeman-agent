@@ -8,7 +8,7 @@
 //! - startThemeSync(): void 鈥?骞傜瓑锛涘惎鍔ㄨ疆璇?+ media listener
 
 import { createSignal, type Accessor } from "solid-js";
-import { getSettingsBridge } from "../lib/tauri";
+import { getSettingsBridge } from "../lib/ipc";
 
 // 妯″潡绾х姸鎬?鈥?鍦ㄥ悓涓€ session 鍐呭娆¤皟鐢?startThemeSync() 鏃朵繚鎸併€?
 // 娉ㄦ剰锛氬紑鍙戠幆澧冧笅浠庝笉娓呯悊锛坰tore 妯″紡涓棤 onCleanup锛夈€?

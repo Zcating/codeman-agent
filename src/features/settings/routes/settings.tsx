@@ -13,7 +13,7 @@ import { ArrowLeft, Plus, Trash2 } from "lucide-solid";
 import { ProviderCard } from "../components/provider-card";
 import { appStore } from "../../../shared/stores/app.store";
 import { settingsSaver } from "../lib/settings-saver";
-import { invoke } from "../../../shared/lib/tauri";
+import { invoke } from "../../../shared/lib/ipc";
 import { logger } from "../../../shared/lib/logger";
 import type { Provider } from "../../../shared/lib/types";
 

@@ -6,7 +6,7 @@
 import { it, expect, beforeEach } from "@effect/vitest";
 import { describe } from "vitest";
 import { Effect, Layer, Exit } from "effect";
-import { mockState } from "../../__mocks__/@tauri-apps/api/core";
+import { mockState } from "../../__mocks__/ipc-mock";
 import {
   invoke,
   ConversationService,
@@ -23,7 +23,7 @@ import {
   getSettingsBridge,
   updateSettingsBridge,
   clearAllHistoryBridge,
-} from "./tauri";
+} from "./ipc";
 import type { Provider } from "./types";
 
 // ─── Mock Data ────────────────────────────────────────────────

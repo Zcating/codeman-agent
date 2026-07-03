@@ -34,7 +34,7 @@ import {
   ProviderServiceLive,
   SettingsService,
   SettingsServiceLive,
-} from "../lib/tauri";
+} from "../lib/ipc";
 import { WorkspaceService, WorkspaceServiceLive } from "../../features/chat/lib/workspace-service";
 // Note: settingsSaver import removed - was used by deprecated addWorkspace method
 

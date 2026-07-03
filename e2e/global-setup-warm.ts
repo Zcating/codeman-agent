@@ -4,11 +4,11 @@
 //! own V3 Electron instance via `e2e/fixtures.ts` (worker-scoped fixture).
 //!
 //! Responsibilities:
-//!   1. `pnpm run build:dir` — produces `dist-electron/` (main + preload +
-//!      renderer) AND `release/win-unpacked/codeman-agent.exe` (via
-//!      electron-builder --dir). Single command covers both.
+//!   1. `pnpm run build` (= electron-vite build) — produces `dist-electron/`
+//!      (main + preload + renderer). Does NOT run electron-builder: the
+//!      per-worker fixture spawns the local Electron binary directly.
 //!   2. Kill stale CDP ports from any previous run.
-//!   3. Sanity-check the binary exists.
+//!   3. Sanity-check the build output exists.
 //!
 //! V3 difference from V2: NO shared Vite dev server. V3 Electron loads the
 //! bundled renderer via file:// (no devUrl). This eliminates the port-1420
@@ -18,14 +18,6 @@ import { execSync, spawnSync } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-
-const WARM_TIMEOUT_MS = 10 * 60_000; // electron-vite + electron-builder can be slow on cold cache
-const ELECTRON_BIN_REL = resolve(
-  process.cwd(),
-  "release",
-  "win-unpacked",
-  process.platform === "win32" ? "codeman-agent.exe" : "codeman-agent",
-);
 
 // Per-worker CDP ports: 9222 + parallelIndex. Kill any leftover processes
 // from previous runs so workers can bind cleanly. MAX_WORKERS must match
@@ -57,26 +49,18 @@ function runStep(name: string, fn: () => void): void {
 }
 
 export default async function globalSetup(): Promise<void> {
-  // 1. Build V3 Electron: electron-vite build (dist-electron/*) + electron-builder
-  //    --dir (release/win-unpacked/codeman-agent.exe). The npm script
-  //    `build:dir` chains both.
-  //    Skip if local Electron binary + dist-electron/ already exist (dev shortcut
-  //    when `electron-builder --dir` is blocked by offline icon download).
-  const electronBin = resolve(
-    process.cwd(),
-    "node_modules",
-    "electron",
-    "dist",
-    process.platform === "win32" ? "electron.exe" : "electron",
-  );
+  // 1. Build V3 Electron renderer + main process code (dist-electron/*).
+  //    Uses `pnpm run build` (= electron-vite build). Does NOT run
+  //    electron-builder --dir — the per-worker fixture falls back to
+  //    LOCAL_BIN mode (node_modules/electron + dist-electron/main/index.js).
+  //    Skip if dist-electron/ already exists (dev shortcut).
   const mainEntry = resolve(process.cwd(), "dist-electron", "main", "index.js");
-  if (existsSync(electronBin) && existsSync(mainEntry)) {
-    console.log(`[e2e warm] skip pnpm run build:dir — local Electron binary + dist-electron/ ready`);
+  if (existsSync(mainEntry)) {
+    console.log(`[e2e warm] skip pnpm run build — dist-electron/ ready`);
   } else {
-    runStep("pnpm run build:dir", () => {
-      execSync("pnpm run build:dir", {
+    runStep("pnpm run build", () => {
+      execSync("pnpm run build", {
         stdio: "ignore",
-        env: { ...process.env, ELECTRON_BUILDER_CACHE: resolve(process.cwd(), ".electron-builder-cache") },
       });
     });
   }
@@ -87,11 +71,7 @@ export default async function globalSetup(): Promise<void> {
     stdio: "inherit",
   });
 
-  // 3. Sanity: confirm at least one binary path is available.
-  //    We accept either the packaged release binary OR the local Electron binary
-  //    + dist-electron/main entry (dev shortcut when electron-builder --dir is
-  //    blocked by offline icon download).
-  const packagedExists = existsSync(ELECTRON_BIN_REL);
+  // 3. Sanity: confirm local Electron binary + dist-electron/ entry exist.
   const localBin = resolve(
     process.cwd(),
     "node_modules",
@@ -101,18 +81,16 @@ export default async function globalSetup(): Promise<void> {
   );
   const localEntry = resolve(process.cwd(), "dist-electron", "main", "index.js");
   const localExists = existsSync(localBin) && existsSync(localEntry);
-  if (!packagedExists && !localExists) {
+  if (!localExists) {
     throw new Error(
-      `[e2e warm] No V3 Electron binary available. ` +
-        `Expected either ${ELECTRON_BIN_REL} (from pnpm run build:dir) ` +
-        `or ${localBin} + ${localEntry} (local dev mode).`,
+      `[e2e warm] No Electron build available. ` +
+        `Expected ${localBin} + ${localEntry}. ` +
+        `Run \`pnpm run build\` (= electron-vite build) first.`,
     );
   }
-  console.log(
-    `[e2e warm] V3 Electron binary ready: ${packagedExists ? ELECTRON_BIN_REL : localBin}`,
-  );
+  console.log(`[e2e warm] Electron binary ready: ${localBin} (entry: ${localEntry})`);
 
-  // 4. Brief settle (electron-vite + electron-builder can leave file handles
-  //    open briefly after exit).
+  // 4. Brief settle (electron-vite build can leave file handles open briefly
+  //    after exit).
   await sleep(500);
 }

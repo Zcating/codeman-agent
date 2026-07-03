@@ -1,6 +1,6 @@
-//! Manual mock for @tauri-apps/api/core — used by Effect service tests.
-//! vitest automatically uses __mocks__ when the module is imported.
-//! Configure return values via the exported mockState object.
+//! V3 IPC mock — used by Effect service tests and jsdom test environment.
+//! Sets up `window.codeman` and exports `mockState` for test state control.
+//! (Replaces src/__mocks__/@tauri-apps/api/core.ts post-migration.)
 //!
 //! V1.5+ schema: Settings.providers[] (llm only — billing removed V2)
 //! V0 schema: Settings.llm_providers[] (legacy, migrated on read)
@@ -428,10 +428,9 @@ export const invoke = vi.fn().mockImplementation((name: string, args?: IPCArgs) 
 export { invoke as TauriInvoke };
 export default { invoke };
 
-// ─── V3: window.codeman Mock (T5/T6) ────────────────────────────
+// ─── V3: window.codeman Mock ───────────────────────────────────
 //
-// Per V3 consensus 1.3 shim: ipc.ts no longer imports `@tauri-apps/api/core`.
-// It dispatches via `window.codeman.<method>` (set by electron/preload).
+// ipc.ts dispatches via `window.codeman.<method>` (set by electron/preload).
 // This mock mirrors every command in `commandHandlers` as a method on
 // `window.codeman`, so V3 ipc.ts finds the mock at runtime in jsdom tests.
 

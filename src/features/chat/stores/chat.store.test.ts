@@ -29,11 +29,11 @@ import type { RuntimeEvent, ProviderConfig } from "../lib/runtime";
 
 // ─── Mock tauri services ─────────────────────────────────────────────
 
-vi.mock("../../../shared/lib/tauri", async () => {
+vi.mock("../../../shared/lib/ipc", async () => {
   const { Layer, Effect: E } = await import("effect");
   const { MessageService, ConversationService } = await vi.importActual<
-    typeof import("../../../shared/lib/tauri")
-  >("../../../shared/lib/tauri");
+    typeof import("../../../shared/lib/ipc")
+  >("../../../shared/lib/ipc");
   return {
     MessageService,
     ConversationService,

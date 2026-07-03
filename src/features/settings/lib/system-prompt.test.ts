@@ -1,6 +1,6 @@
 ﻿import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Effect } from "effect";
-import { mockState } from "../../../__mocks__/@tauri-apps/api/core";
+import { mockState } from "../../../__mocks__/ipc-mock";
 
 // Mock solid-js/store before importing app.store (same as app.store.test.ts)
 // 必须支持 Solid setStore 的两种签名：

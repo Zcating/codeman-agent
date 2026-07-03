@@ -8,7 +8,7 @@ import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, cleanup } from "@solidjs/testing-library";
 import { Effect } from "effect";
 import { SettingsPage } from "./settings";
-import { mockState, SettingsV15 } from "../../../__mocks__/@tauri-apps/api/core";
+import { mockState, SettingsV15 } from "../../../__mocks__/ipc-mock";
 import type { Provider } from "../../../shared/lib/types";
 
 // Mock solid-js/store — SettingsPage 导入 appStore, appStore 用 createStore。

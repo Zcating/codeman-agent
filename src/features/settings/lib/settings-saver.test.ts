@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Effect } from "effect";
-import { mockState } from "../../../__mocks__/@tauri-apps/api/core";
+import { mockState } from "../../../__mocks__/ipc-mock";
 import { logger } from "../../../shared/lib/logger";
 
 // Mock solid-js/store（jsdom 没有 Solid reactive context）

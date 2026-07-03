@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, screen, waitFor } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
 import { Effect } from "effect";
-import { mockState } from "../../../__mocks__/@tauri-apps/api/core";
+import { mockState } from "../../../__mocks__/ipc-mock";
 
 // 鈹€鈹€鈹€ Mock appStore 鈥?ALL variables inside factory to avoid hoisting issues 鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 

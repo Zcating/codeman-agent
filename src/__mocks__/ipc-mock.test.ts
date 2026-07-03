@@ -1,12 +1,10 @@
-//! Tests for the Tauri API mock (src/__mocks__/@tauri-apps/api/core.ts).
+//! Tests for the V3 IPC mock (src/__mocks__/ipc-mock.ts).
 //! These tests verify the V1.5+ mock implementation.
-//!
-//! V2: billing removed. All billing tests are deleted.
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { invoke, mockState, mockMinimaxProvider, mockDeepseekProvider, mockProvider } from "./core";
+import { invoke, mockState, mockMinimaxProvider, mockDeepseekProvider, mockProvider } from "./ipc-mock";
 
-describe("Tauri API Mock - V1.5+ Schema", () => {
+describe("IPC Mock - V1.5+ Schema", () => {
   beforeEach(() => {
     // Reset mock state before each test
     mockState.rejected = undefined;

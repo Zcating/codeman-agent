@@ -9,7 +9,7 @@ import type { Settings } from "../lib/types";
 // Mutable mock settings — 在每个测试导入前设置
 let mockTheme: Settings["theme"] = "dark";
 
-vi.mock("../lib/tauri", () => ({
+vi.mock("../lib/ipc", () => ({
   getSettingsBridge: async (): Promise<Settings> => ({
     llm_providers: [],
     user_language: "en",
