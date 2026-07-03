@@ -6,7 +6,7 @@
 
 | 子目录                 | 语义                                                                                                    | 现状                                                                                                          |
 | ---------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `lib/`                 | 纯函数 + 跨域类型：`cn.ts` / `logger.ts` / `tauri.ts` / `units.ts` / `types.ts` / `format-app-error.ts` / `design-tokens.ts` | 7 个文件（ADR-0010 前：3 文件；ADR-0018 加 `logger.ts`；ADR-0016 加 `format-app-error.ts`；**ADR-0022** 加 `design-tokens.ts`） |
+| `lib/`                 | 纯函数 + 跨域类型：`cn.ts` / `logger.ts` / `ipc.ts` / `units.ts` / `types.ts` / `format-app-error.ts` / `design-tokens.ts` | 7 个文件（ADR-0010 前：3 文件；ADR-0018 加 `logger.ts`；ADR-0016 加 `format-app-error.ts`；**ADR-0022** 加 `design-tokens.ts`；T5 迁移：`tauri.ts` → `ipc.ts`） |
 | `stores/`              | 跨域 Solid signal                                                                                       | `theme.ts`（从 `state/` 迁，ADR-0010）                                                                        |
 | `hooks/`               | 跨域 composable（`use-` 前缀）                                                                          | 空，V1 预留                                                                                                   |
 | `components/ui/`       | 跨域**设计系统原子**                                                                                    | 6 原子（Button / Card / Checkbox / Input / Textarea / **Dialog**）+ `codeman-select.tsx` + `codeman-group-select.tsx`（Select 包装，ADR-0023 D4-S）+ `AGENTS.md` |
@@ -17,7 +17,7 @@
 - `types/` — 旧跨域类型目录，合并到 `lib/types.ts`
 - `state/` — 旧 Solid 状态目录，重命名为 `stores/`
 - `ui/` — 旧设计系统目录，重命名为 `components/ui/`
-- `mocks/` — 已删除，唯一源在src/**mocks**/@tauri-apps/api/core.ts（ADR-0010 Q6 修复双源 bug）
+- `mocks/` — 已删除，唯一源在 `src/__mocks__/ipc-mock.ts`（T5 迁移：`@tauri-apps/api/core` → `ipc-mock`）
 - `assets/` — 当前无跨域静态资源需求；如未来有新增，走新 ADR 加进白名单
 
 ## components/ui vs components/internal 边界（Q4 决策）
@@ -72,25 +72,17 @@ import { cn } from "@/shared/lib/cn";
 
 **为什么**：tailwind-merge 解决同一 utility 的冲突（如 `px-2 px-4` → `px-4`），clsx 处理条件开关。两者缺一会有潜在样式 bug。
 
-## tauri IPC 唯一入口
+## IPC 唯一入口
 
-`src/shared/lib/tauri.ts` 是**整个项目唯一允许 `import { invoke } from "@tauri-apps/api"` 的地方**。所有 IPC 走里面的 `invoke<T>()` 包装 + Service Tag + Live Layer。`invoke()` 写在别处 = 契约漂移。
+`src/shared/lib/ipc.ts` 是**整个项目唯一的 Electron IPC 入口**。所有 IPC 走 `window.codeman.invoke<T>(channel, args)`（由 preload 通过 contextBridge 暴露）。不应直接 `import { invoke } from "@tauri-apps/api"`（该依赖已移除）。
 
 跨域类型（Settings / Message / Conversation / Snapshot / AppError）镜像在 `src/shared/lib/types.ts`，不单独 `types/` 目录。
 
-## mockState 唯一源（ADR-0010 Q6）
+## mockState 唯一源（T5 迁移）
 
-`mockState` 唯一源在src/**mocks**/@tauri-apps/api/core.ts（vitest 约定路径，自动应用）。`src/shared/shared-mock-state.ts` 已删除，**所有**测试 import 从 src/**mocks**/ 路径走。
+`mockState` 唯一源在 `src/__mocks__/ipc-mock.ts`。原 `src/__mocks__/@tauri-apps/api/core.ts` 已删除。
 
-```ts
-// 正确
-import { mockState } from "src/__mocks__/@tauri-apps/api/core";
-
-// 错误（已删除）
-import { mockState } from "@/shared/shared-mock-state";
-```
-
-`vitest.setup.ts` 用 `vi.mock("@tauri-apps/api/core", () => ({ invoke: ... }))` 配置 invoke 默认行为，`mockState` 从 src/**mocks**/ 唯一源 import，运行时配置与测试 import 是同一引用。
+`vitest.setup.ts` 用 `import "./__mocks__/ipc-mock"` 静态初始化 `window.codeman` mock。`mockState` 从 `ipc-mock.ts` 唯一源 import，运行时配置与测试 import 是同一引用。
 
 ## 测试策略
 
@@ -98,7 +90,7 @@ import { mockState } from "@/shared/shared-mock-state";
 | --------------------------- | ---------------------------------------------------------------------------- |
 | `lib/cn.ts`                 | 独立测试（`cn.test.ts`），覆盖冲突合并 + 条件拼接                            |
 | `lib/logger.ts`             | 独立测试（`logger.test.ts`），覆盖 level 路由 + args 透传 + prefix 大写      |
-| `lib/tauri.ts`              | 跟随消费方 feature 的集成测试，不单独写                                      |
+| `lib/ipc.ts`              | 跟随消费方 feature 的集成测试，不单独写                                      |
 | `lib/types.ts`              | 纯类型，无运行时，不单独测                                                   |
 | `lib/units.ts`              | 独立测试（`units.test.ts`），覆盖格式化边界                                  |
 | `stores/theme.ts`           | 独立测试（`theme.test.ts`），覆盖 dark mode 切换                             |
@@ -110,5 +102,5 @@ import { mockState } from "@/shared/shared-mock-state";
 
 1. 改动 `shared/` 下的基础设施前，确认没有 feature 会意外破坏
 2. `cn.ts` 改动需要独立测试全量通过
-3. 新增 shared 类型需要同步 Rust backend（走 Tauri 命令或 shared 类型定义）
+3. 新增 shared 类型需要同步 Electron backend（`electron/types.ts` 或 IPC handler 参数）
 4. 新增 `components/internal/` 首例组件前，开新 ADR 跟进（命名 / 数量上限 / 维护者）

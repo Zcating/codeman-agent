@@ -63,7 +63,7 @@ src/features/chat/
   - `sendMessage(convId, content, provider)`：`append user msg`（local + DB persist）→ `context = [...byId[convId].messages]` → `runtime.run({ context, provider })` → `Stream.runForEach` 订阅，更新 `byId[convId].messages` / `streamingMessageId`。
   - UI 读 `store.byId[activeId()]?.messages`，Solid proxy 自动按路径细粒度反应式，跨 conv streaming 不互相重算。
   - ADR-0016 D4-D5-D6 的"组件不直接 import runtime"约束保留：组件调 `conversations.store.sendMessage(...)` / `conversations.store.cancel(convId)` / `conversations.store.archiveConversation(convId)`，不直接 import `lib/runtime.ts`。
-- **组件不调 IPC。** 所有 Tauri IPC 走 `src/shared/lib/tauri.ts` Service Tags，在 `conversations.store.ts` 内 `yield*` 使用。
+- **组件不调 IPC。** 所有 IPC 走 `src/shared/lib/ipc.ts` Service Tags（由 preload contextBridge 暴露的 `window.codeman.invoke`），在 `conversations.store.ts` 内 `yield*` 使用。
 - ~~**`Sidebar` 用 `createSignal` 做局部状态。**~~（V1.x sidebar 移除 — 由 `shared/components/internal/codeman-sidebar` 替代，详见 [ADR-0022](../../docs/adr/0022-internal-components-and-design-tokens.md) D1 + D3）
 - **CodemanSidebar 是 accordion 模式嵌套 tree**（[ADR-0023 D7-CS](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md)）：`CodemanSidebar` 内部维护 `expandedWorkspaceId` signal，workspace 永远不 active，只有 conv 可以 active。Sidebar 不调用任何 `last_used_workspace_id` 相关 API——该字段已删除（D8-W）。
 - **Home（无 active conv 时）渲染 CodemanSidebar + HomeAgentForm 两栏布局。** Home 是 `/` 路由在 `activeId === null` 时的形态。`CodemanSidebar` 由 chat feature 喂数据（workspaces + items + handlers），不直接 import `conversations.store`；`HomeAgentForm` 包含 input box（disabled until workspace 选中）+ workspace picker（必选解锁 input）。详见下方 "Home 路由 + Codex form" section。
@@ -148,7 +148,7 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 
 **Runtime tests**: `createAgentRuntime()` 无 `Layer` 依赖,直接调用工厂函数 + mock `Agent` / `Queue` / `AbortController`。`run()` 内部 Effect 通过 `Effect.runPromise` 或 `Effect.runSync` 触发,断言 stream 输出。
 
-**Store tests**: Solid Testing Library `createRoot` 包裹 reactive scope,直接读 `store.byId[convId].messages` / `streamingMessageId` 断言反应式更新。Mock `MessageService` / `ConversationService` 在 store 测试 entry 通过 `vi.mock("../../../shared/lib/tauri", ...)` 注入。
+**Store tests**: Solid Testing Library `createRoot` 包裹 reactive scope,直接读 `store.byId[convId].messages` / `streamingMessageId` 断言反应式更新。Mock `MessageService` / `ConversationService` 在 store 测试 entry 通过 `vi.mock("../../../shared/lib/ipc", ...)` 注入。
 
 **Component tests**: 通过 `vi.mock("../stores/conversations.store")` mock store 模块。`chat-view.test.tsx` 不再 mock `messages.store` / `agent.store`(已删除)。
 
@@ -170,7 +170,7 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 - **Billing tools**：`src/features/billing/lib/billing.ts` 导出 `billingTools`，本 feature `lib/runtime.ts` 注册到 `Agent`。
 - **File tools**：`src/features/file-tools/lib/file-tools.ts` 导出 `fileTools`（5 个：read / write / edit / search / delete），本 feature `lib/runtime.ts` 注册到 `Agent`（与 billingTools 并列）。
 - **跨域类型**：从 `src/shared/lib/types.ts` 导入（ADR-0010 后从 `shared/types/` 迁）。
-- **跨域 IPC**：从 `src/shared/lib/tauri.ts` 导入 Service Tags。
+- **跨域 IPC**：从 `src/shared/lib/ipc.ts` 导入 Service Tags。
 - **`codeman-select` / `codeman-group-select` wrappers from `shared/components/ui/`** — used by HomeAgentForm (workspace picker) + chat-view ProviderSelect (provider picker)
 
 ## Wave 笔记
@@ -180,4 +180,5 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 - **Wave V2**（2026-06-25，ADR-0019）：`AgentRuntime` service 单例 + Map → `createAgentRuntime()` 工厂 + per-conv `ConversationState.runtime`；`messages.store` + `agent.store` 合并到 `conversations.store`；`createStore<{ activeId, byId }>` 取代全局 signal + Map；supersede ADR-0014 D1 + D4
 - **Wave V2.1**（2026-06-27，ADR-0022）：V1.x `sidebar.tsx` **删除**；新增 `home.tsx` (Codex-like 2 栏)；`/shared/components/ui/sidebar.tsx` primitive + `/shared/components/internal/codeman-sidebar.tsx` 业务组合落地（首例 internal/）；emoji 全面迁移 lucide-solid (Loader2/CheckCircle2/XCircle/FolderOpen)；`Conversation.workspace_id` 必填（per-Conv 绑定）；`Settings.last_used_workspace_id` 引入（**D8-W 删除**）
 - **Wave V2.1 polish**（2026-06-27，ADR-0023）：`agent-sidebar` → `codeman-sidebar` 原子重命名；`agent-sidebar` → `codeman-sidebar` 全部原子化（单 commit + 全部 consumer 同步）；home.tsx `WorkspaceCard` 卡片网格 → `codeman-select` 下拉（含 Action slot "+ Add new workspace…"）；chat-view.tsx `ProviderSelect` 本地 `<select>` → `codeman-group-select`（按 provider 分组）；`buildEnabledProviders` helper 抽取到 `src/features/chat/lib/build-enabled-providers.ts`；e2e spec 10 重写；CONTEXT.md 加 Codeman Component + UI Primitive 词条；src/shared/AGENTS.md 加 codeman-* 命名空间规则 + Naming convention for internal/ 段。
-- **Wave V2.2**（2026-06-28，ADR-0023 D8-W）：`conversations.store.ts` → `chat.store.ts` 重命名；Workspace 所有权从 appStore 迁入 chat domain（WorkspaceService Effect Context.Tag + Rust SQLite + Tauri 命令）；`Settings.workspaces[]` + `enabled` 字段删除；`WorkspaceCard` 删除；sidebar hover rename/delete dialog 落地；`shared/components/ui/dialog.tsx` + `internal/codeman-dialog.tsx` 新增。
+- **Wave V2.2**（2026-06-28，ADR-0023 D8-W）：`conversations.store.ts` → `chat.store.ts` 重命名；Workspace 所有权从 appStore 迁入 chat domain（WorkspaceService Effect Context.Tag + Electron SQLite + IPC）；`Settings.workspaces[]` + `enabled` 字段删除；`WorkspaceCard` 删除；sidebar hover rename/delete dialog 落地；`shared/components/ui/dialog.tsx` + `internal/codeman-dialog.tsx` 新增。
+- **Wave V2.3**（2026-07-04）：Sidebar always-show — 删除 `chat-layout.tsx` 中 `<Show when={workspacesExist()}>` 包裹，sidebar 在 0 workspace 时也渲染（此前仅 workspace>0 时显示）。CodemanSidebar 自身处理 0 workspace 空态。

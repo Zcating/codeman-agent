@@ -38,7 +38,7 @@ src/features/file-tools/
 ## 本 Feature 不包含的内容
 
 - **无工具执行。** 工具是纯 schema 声明。执行由 chat runtime 的 `agent.subscribe` 监听器分发——该逻辑在 `src/features/chat/lib/runtime.ts` 中，不在本目录。
-- **无 IPC。** 所有文件 IPC（`read_file` / `write_file` / `edit_file` / `search_files` / `delete_file`）位于 `FileService`（`src/shared/lib/tauri.ts`）。工具通过 `FileService` 方法调用 IPC，不直接调用 `invoke`。
+- **无 IPC。** 所有文件 IPC（`read_file` / `write_file` / `edit_file` / `search_files` / `delete_file`）位于 `FileService`（`src/shared/lib/ipc.ts`）。工具通过 `FileService` 方法调用 IPC，不直接调用 `window.codeman.invoke`。
 - **无 UI 组件。** 本 feature 只有 `lib/` 子目录。
 
 ## 工具注册方式
@@ -60,7 +60,7 @@ new Agent({
 
 ## 测试
 
-`lib/file-tools.test.ts` 使用 vitest + `mockState`（`src/__mocks__/@tauri-apps/api/core.ts`）来 mock Tauri invoke。
+`lib/file-tools.test.ts` 使用 vitest + `mockState`（`src/__mocks__/ipc-mock.ts`）来 mock Electron IPC。
 
 ```bash
 vp run test src/features/file-tools

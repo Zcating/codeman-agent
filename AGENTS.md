@@ -89,7 +89,7 @@
 
 | 层           | 选型                                             | 版本                                           |
 | ------------ | ------------------------------------------------ | ---------------------------------------------- |
-| 桌面壳       | Tauri 2 (Rust)                                   | `2.x`                                          |
+| 桌面壳       | Electron (main + preload)                        | `43.x`                                         |
 | UI           | Solid.js + TypeScript                            | `solid-js ^1.9.3` / `tsc ~5.6.2`               |
 | 构建         | Vite + vite-plugin-solid                         | `^6.0.3`                                       |
 | 样式         | Tailwind v4 + cva + cn (clsx+twMerge)            | `^4.3.0` / `cva 0.7.1` / `lucide-solid 1.18.0` |
@@ -113,7 +113,7 @@ codeman-agent/
 │   │
 │   ├── shared/                    # 跨 feature 共享（5+1 白名单）
 │   │   ├── AGENTS.md
-│   │   ├── lib/                   # 纯函数 + 跨域类型：cn.ts / tauri.ts / units.ts / types.ts
+│   │   ├── lib/                   # 纯函数 + 跨域类型：cn.ts / ipc.ts / units.ts / types.ts
 │   │   ├── stores/                # 跨域 Solid signal：theme.ts
 │   │   ├── hooks/                 # 跨域 composable（V1 预留位，use- 前缀）
 │   │   ├── components/ui/         # 跨域设计系统原子：Button / Input / Textarea / Checkbox / Card
@@ -143,7 +143,7 @@ codeman-agent/
 │           ├── index.ts
 │           └── lib/               # file-tools.ts + file-tools.test.ts
 │
-├── src-tauri/                     # Rust 后端（详见 src-tauri/AGENTS.md）
+├── electron/                      # Electron 后端（main + preload）
 ├── docs/adr/                      # 10 个 ADR（0001-0010，见下方索引）
 ├── (mocks 改在 src/__mocks__/ — 详见 src/AGENTS.md)
 ├── docs/                          # 治理文档（translation-rules 等）
@@ -157,11 +157,9 @@ codeman-agent/
 vp run install
 vp run test              # 前端 vitest (jsdom)
 vp run build             # 前端产物到 dist/
-vp run dev
-vp run tauri:dev         # 自动调 scripts/kill-port.mjs 1420 1421
-vp run tauri:test        # 后端（带 wiremock 集成测试）
-vp run tauri:build       # 出 MSI + NSIS 安装包
+vp run dev               # electron-vite dev（自动调 scripts/kill-port.mjs 1420 1421）
+vp run build:win         # 出 MSI + NSIS 安装包
 vp run typecheck         # tsc --noEmit
 vp run typecheck:e2e     # tsc --noEmit -p tsconfig.e2e.json
-vp run e2e               # Playwright + 真 Tauri 端到端 (本地)
+vp run e2e               # Playwright + 真 Electron 端到端 (本地)
 ```

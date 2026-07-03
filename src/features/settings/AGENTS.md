@@ -100,7 +100,7 @@ it.effect("description", () =>
 
 `MockSettingsServiceLive = Layer.succeed(SettingsService, { getSettings, updateSettings, ... })`
 
-**注意**（ADR-0010 Q6）：`lib/*.test.ts` 中 `import { mockState } from "src/__mocks__/@tauri-apps/api/core"`——`mockState` 唯一源在`src/__mocks__/`，**不是** `@/shared/shared-mock-state`（该文件已删除）。
+**注意**（T5 迁移）：`lib/*.test.ts` 中 `import { mockState } from "src/__mocks__/ipc-mock"`——`mockState` 唯一源在 `src/__mocks__/ipc-mock.ts`，**不是** `@/shared/shared-mock-state`。
 
 ### 测试：UI 组件
 
