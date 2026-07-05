@@ -290,8 +290,49 @@ describe("sendMessage — G4: 调用 runtime.run({ context, provider })", () => 
       await Effect.runPromise(sendMessage("c1", "hello", defaultProvider));
       expect(runSpy).toHaveBeenCalledTimes(1);
       const opts = runSpy.mock.calls[0][0] as { context: Message[]; provider: ProviderConfig };
+      // mockConv.workspace_id === "" → augmentation is a no-op → provider identity preserved
       expect(opts.provider).toBe(defaultProvider);
       expect(opts.context).toBeDefined();
+      dispose();
+    });
+  });
+
+  // Regression: LLM-hallucinated workspace_id → IPC "Workspace not found: <label>".
+  // Fix: chat.store.sendMessage injects the real workspace_id (UUID) into the
+  // system prompt so the LLM uses it for ALL file tools.
+  it("sendMessage() 当 conv.workspace_id 非空时 → 在 provider.systemPrompt 注入真实 workspace_id", async () => {
+    await createRoot(async (dispose) => {
+      const convWithWs: Conversation = {
+        ...mockConv,
+        id: "c-ws-fix",
+        workspace_id: "real-uuid-7c8e9f10",
+      };
+      setupConvState(convWithWs, []);
+      const runSpy = vi
+        .spyOn(store.byId["c-ws-fix"]!.runtime, "run")
+        .mockReturnValue(Stream.fromIterable([]));
+      await Effect.runPromise(sendMessage("c-ws-fix", "write to miniMax-workspace", defaultProvider));
+      expect(runSpy).toHaveBeenCalledTimes(1);
+      const opts = runSpy.mock.calls[0][0] as { provider: ProviderConfig };
+      // Augmented provider must include the real workspace_id so LLM does NOT
+      // hallucinate "miniMax-workspace" from the user's message text.
+      expect(opts.provider.systemPrompt).toContain('workspace_id="real-uuid-7c8e9f10"');
+      expect(opts.provider.systemPrompt).toContain("read_file, write_file, edit_file, search_files, delete_file");
+      expect(opts.provider.systemPrompt).toContain("Do NOT infer the id from user messages");
+      dispose();
+    });
+  });
+
+  it("sendMessage() 当 conv.workspace_id 为空时 → 不修改 provider (passthrough)", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, []); // mockConv.workspace_id === ""
+      const runSpy = vi
+        .spyOn(store.byId["c1"]!.runtime, "run")
+        .mockReturnValue(Stream.fromIterable([]));
+      await Effect.runPromise(sendMessage("c1", "hello", defaultProvider));
+      const opts = runSpy.mock.calls[0][0] as { provider: ProviderConfig };
+      expect(opts.provider).toBe(defaultProvider); // identity preserved
+      expect(opts.provider.systemPrompt).toBe(defaultProvider.systemPrompt); // untouched
       dispose();
     });
   });

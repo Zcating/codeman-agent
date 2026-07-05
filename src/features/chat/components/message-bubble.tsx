@@ -6,7 +6,8 @@
 import { Show, For } from "solid-js";
 import { marked } from "marked";
 import { XCircle, CheckCircle2 } from "lucide-solid";
-import type { Message, ToolCall, ToolResult, FileMatch } from "../../../shared/lib/types";
+import { ToolCallsPanel } from "./tool-calls-panel";
+import type { Message, ToolResult, FileMatch } from "../../../shared/lib/types";
 
 /** 转义用户提供的文本以防止 XSS。 */
 function escapeHtml(s: string): string {
@@ -41,18 +42,10 @@ export function MessageBubble(props: { message: Message }) {
           class="max-w-prose p-3 rounded-lg leading-relaxed break-words bg-card text-card-foreground border border-border"
           innerHTML={renderMarkdown(props.message.content)}
         />
-        <Show when={props.message.tool_calls && props.message.tool_calls.length > 0}>
-          <details class="mt-2 text-sm border-t border-border pt-2">
-            <summary>工具调用 ({props.message.tool_calls!.length})</summary>
-            <For each={props.message.tool_calls!}>
-              {(tc: ToolCall) => (
-                <pre class="mt-1 p-2 bg-muted rounded font-mono text-xs overflow-x-auto whitespace-pre-wrap">
-                  {tc.name}({JSON.stringify(tc.args, null, 2)})
-                </pre>
-              )}
-            </For>
-          </details>
-        </Show>
+        <ToolCallsPanel
+          convId={props.message.conversation_id}
+          messageId={props.message.id}
+        />
       </Show>
       <Show when={role() === "tool"}>
         <details class="mt-2 text-sm border-t border-border pt-2">

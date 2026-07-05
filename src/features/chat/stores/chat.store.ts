@@ -135,8 +135,27 @@ export function sendMessage(
     // 2. Build context (浅拷贝,含最新 user msg)
     const context = [...store.byId[convId]!.messages];
 
-    // 3. Run runtime + subscribe
-    const stream = cs.runtime.run({ context, provider });
+    // 3. Augment system prompt with real workspace_id so the LLM uses the
+    //    UUID (not a hallucinated label/path it saw in the user message) when
+    //    calling file tools. Without this, LLM picks e.g. "miniMax-workspace"
+    //    (the workspace label derived from the folder name) and the IPC
+    //    write_file/read_file/etc. fails with "Workspace not found: <label>".
+    const augmentedProvider: ProviderConfig = cs.workspace_id
+      ? {
+          ...provider,
+          systemPrompt:
+            `${provider.systemPrompt}\n\n` +
+            `[Workspace context]\n` +
+            `You are operating inside workspace_id="${cs.workspace_id}".\n` +
+            `You MUST pass this exact id as the workspace_id parameter for ALL file tools ` +
+            `(read_file, write_file, edit_file, search_files, delete_file).\n` +
+            `Do NOT infer the id from user messages, folder names, or any other context — ` +
+            `use ONLY the id given above.`,
+        }
+      : provider;
+
+    // 4. Run runtime + subscribe
+    const stream = cs.runtime.run({ context, provider: augmentedProvider });
     yield* Stream.runForEach(stream, (evt) =>
       Effect.sync(() => handleEvent(convId, evt)),
     ).pipe(Effect.scoped);

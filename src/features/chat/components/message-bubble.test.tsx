@@ -1,11 +1,26 @@
 ﻿//! MessageBubble 组件测试 — 每个角色一个（user, assistant, tool, system）。
 //!
 //! 纯 UI 组件。无 Effect 导入。无 store mock 需要。
+//! ToolCallsPanel mock 在本文件顶部 — message-bubble 委托给它的 props 由该 mock 暴露。
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import { MessageBubble } from "./message-bubble";
 import type { Message, ToolCall, ToolResult, FileMatch } from "../../../shared/lib/types";
+
+// Mock ToolCallsPanel: 暴露调用 props 让 MessageBubble 的委托可断言。
+// ToolCallsPanel 自身的渲染逻辑在 tool-calls-panel.test.tsx 里覆盖。
+vi.mock("./tool-calls-panel", () => ({
+  ToolCallsPanel: (props: { convId: string; messageId: string }) => (
+    <div
+      data-testid="tool-calls-panel-mock"
+      data-conv-id={props.convId}
+      data-message-id={props.messageId}
+    >
+      ToolCallsPanel convId={props.convId} messageId={props.messageId}
+    </div>
+  ),
+}));
 
 describe("MessageBubble", () => {
   afterEach(() => cleanup());
@@ -95,7 +110,7 @@ describe("MessageBubble", () => {
     expect(bubble?.textContent).toContain("You are a helpful assistant.");
   });
 
-  it("带 tool_calls 的 assistant 显示可展开工具调用详情", () => {
+  it("assistant + tool_calls → 委托给 ToolCallsPanel with convId+messageId", () => {
     const toolCalls: ToolCall[] = [
       { id: "tc-1", name: "read_file", args: { path: "/tmp/x.txt" } },
     ];
@@ -112,12 +127,15 @@ describe("MessageBubble", () => {
       created_at: 1710000004,
     };
     const { container } = render(() => <MessageBubble message={msg} />);
-    const details = container.querySelector("details");
-    expect(details).toBeTruthy();
-    const summary = details?.querySelector("summary");
-    expect(summary?.textContent).toContain("工具调用 (1)");
-    expect(details?.textContent).toContain("read_file");
+    const panel = container.querySelector("[data-testid='tool-calls-panel-mock']");
+    expect(panel).toBeTruthy();
+    expect(panel?.getAttribute("data-conv-id")).toBe("conv-1");
+    expect(panel?.getAttribute("data-message-id")).toBe("msg-5");
   });
+
+  // 注: 空 tool_calls 时的"不渲染"由 ToolCallsPanel 内部的 <Show when={counts().total > 0}> 保证,
+  // 在 tool-calls-panel.test.tsx "message 无 tool_calls → 不渲染面板" 覆盖。
+  // 这里不重复断言 — Mock 无法模拟 ToolCallsPanel 内部的 counts 计算。
 
   // ─── tool_results error/success 分支测试 ─────────────────────────────
   it("tool_results[0].error 存在时用 text-destructive + ❌", () => {
