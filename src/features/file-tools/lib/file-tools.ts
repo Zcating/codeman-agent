@@ -4,7 +4,7 @@
 //! 每个工具调用 FileService 方法，FileService 通过 Effect.provide(Layer) 提供（Effect v3 API）。
 
 import { Type, type Static } from "@sinclair/typebox";
-import type { AgentTool } from "@mariozechner/pi-ai";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Effect, Exit } from "effect";
 import { FileService, FileServiceLive } from "../../../shared/lib/ipc";
 import type { AppError, FileMatch } from "../../../shared/lib/types";

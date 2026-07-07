@@ -1,4 +1,4 @@
-﻿//! ToolCallCard 组件测试。
+//! ToolCallCard 组件测试。
 //!
 //! 状态：running（无结果）、success（result，无 error）、error（result 带 error）。
 //! 纯 UI 组件。无 Effect 导入。无 store mocks 需要。
@@ -44,7 +44,8 @@ describe("ToolCallCard", () => {
     expect(card).toBeTruthy();
     const icon = card?.querySelector("[data-testid='icon-success']");
     expect(icon?.getAttribute("aria-label")).toBe("success");
-    const resultPre = card?.querySelector("details:last-of-type pre");
+    // V3.1: result section 不再折叠,直接拿 data-testid 断言
+    const resultPre = card?.querySelector("[data-testid='tool-call-result']");
     expect(resultPre?.textContent).toContain("file content here");
   });
 
@@ -77,10 +78,11 @@ describe("ToolCallCard", () => {
       args: { path: "/tmp/x.txt", encoding: "utf-8" },
     };
     const { container } = render(() => <ToolCallCard toolCall={toolCall} />);
-    const argsDetails = container.querySelector("details");
-    expect(argsDetails).toBeTruthy();
-    expect(argsDetails?.textContent).toContain("/tmp/x.txt");
-    expect(argsDetails?.textContent).toContain("utf-8");
+    // V3.1: args section 不再折叠,直接拿 data-testid 断言
+    const argsPre = container.querySelector("[data-testid='tool-call-args']");
+    expect(argsPre).toBeTruthy();
+    expect(argsPre?.textContent).toContain("/tmp/x.txt");
+    expect(argsPre?.textContent).toContain("utf-8");
   });
 
   it("read_file 工具显示文件路径标签", () => {

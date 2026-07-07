@@ -1,64 +1,34 @@
-//! Mock LLM provider for e2e tests.
+//! Mock LLM provider helper for e2e tests.
 //!
-//! Replaces the real MiniMax/DeepSeek provider with a deterministic canned-response
-//! provider. Tests enqueue responses into a queue, and the transport pops one per
-//! LLM turn, simulating SSE streaming (text chunks + tool_use blocks).
+//! Registers a Provider record whose `base_url` points at the Electron Main
+//! started local mock server (`http://127.0.0.1:50000/mock/anthropic`, per
+//! CONTEXT.md 「Fake LLM Provider」). The mock server (`electron/main/mock-server.ts`)
+//! reads Q→A entries from the worker's `qa-w{N}.json` file (env var
+//! `CODEMAN_TEST_QA_TABLE`, set per-worker in `e2e/fixtures.ts`) and serves
+//! Anthropic-format SSE responses. Tests send user messages whose substring
+//! matches a `question:` field in the Q→A table.
 //!
 //! Usage:
 //!   await useMockProvider(page);
-//!   await enqueueMockResponse(page, { text: "Hello!" });
-//!   await enqueueMockResponse(page, { toolCalls: [{ name: "read_file", input: {...} }] });
-//!   await enqueueMockResponse(page, { text: "Done." });
+//!   // user sends a message whose substring is in qa-w{N}.json#question entry
 //!
-//! The mock provider has baseUrl "mock://test" which the AnthropicTransport
-//! recognizes and dispatches to the mockStreamTurn method (see
-//! src/features/chat/lib/anthropic-transport.ts).
+//! Per-Worker Q→A Isolation (per CONTEXT.md): 各 spec 在同一 worker 内共用
+//! `qa-w{N}.json`,需保证每个 spec 的 question 字符串在 worker 内 unique,
+//! first-wins 命中。e2e/fixtures/qa-w{0..3}.json 由各 spec 协调 question 字串。
 
 import { TauriPage } from "./cdp-driver";
 import { invoke } from "./helpers";
 
-/** A single mock LLM turn response. */
-export interface MockTurn {
-  /** Text content for the assistant. Streamed as text_delta events in 4-char chunks. */
-  text?: string;
-  /** Tool calls to emit. Each becomes a tool_use block in the assistant message. */
-  toolCalls?: Array<{
-    name: string;
-    /** Tool input. Field names use snake_case to match the Anthropic API contract. */
-    input: Record<string, unknown>;
-  }>;
-  /** Per-chunk delay in ms (default 5). Simulates streaming latency. */
-  delayMs?: number;
-}
-
 const MOCK_PROVIDER_ID = "mock";
-const MOCK_BASE_URL = "mock://test";
+const MOCK_BASE_URL = "http://127.0.0.1:50000/mock/anthropic";
 const MOCK_MODEL = "mock-model";
-
-/** Enqueue a mock response. Called by tests before sending messages to the LLM. */
-export async function enqueueMockResponse(page: TauriPage, turn: MockTurn): Promise<void> {
-  await page.evaluate((t: unknown) => {
-    const w = window as unknown as {
-      __MOCK_LLM_QUEUE__?: MockTurn[];
-    };
-    if (!w.__MOCK_LLM_QUEUE__) {
-      w.__MOCK_LLM_QUEUE__ = [];
-    }
-    w.__MOCK_LLM_QUEUE__.push(t as MockTurn);
-  }, turn);
-}
-
-/** Clear all queued mock responses. */
-export async function clearMockQueue(page: TauriPage): Promise<void> {
-  await page.evaluate(() => {
-    const w = window as unknown as { __MOCK_LLM_QUEUE__?: MockTurn[] };
-    w.__MOCK_LLM_QUEUE__ = [];
-  });
-}
 
 /**
  * Switch settings to use the mock provider. Sets the mock provider as the
- * default LLM with baseUrl "mock://test" and a default model.
+ * default LLM with baseUrl pointing at the local mock server.
+ *
+ * The mock provider accepts any non-empty api_key (Authorization header is sent
+ * but the local server ignores it; this is real fetch, no JS shim).
  */
 export async function useMockProvider(page: TauriPage): Promise<void> {
   const current = await invoke<any>(page, "get_settings");
@@ -84,7 +54,7 @@ export async function useMockProvider(page: TauriPage): Promise<void> {
       models_endpoint: "",
     },
   };
-  // Add mock provider to the list (or update if already exists), then make it default.
+  // Add mock provider to the list (or replace if already exists), then make it default.
   const existing = (current.providers ?? []).filter((p: any) => p.id !== MOCK_PROVIDER_ID);
   const newSettings: any = {
     ...current,
@@ -93,7 +63,6 @@ export async function useMockProvider(page: TauriPage): Promise<void> {
   };
 
   await invoke(page, "update_settings", { newSettings });
-  await clearMockQueue(page);
   // 关键: update_settings 是 raw IPC,只更新后端。chat-view 的 handleSend 读
   // appStore.state.value(内存 Solid signal),这 signal 不会因为 IPC 而变。
   // 必须显式调 appStore.refreshAsync() 把后端新值拉回前端,否则 send 时还用旧 provider。

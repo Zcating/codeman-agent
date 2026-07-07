@@ -6,11 +6,12 @@
 //! 与 spec 07 结构一致：mock provider → enqueue 响应 → 发送消息 → 验证气泡。
 
 import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
-import { useMockProvider, enqueueMockResponse, clearMockQueue } from "./mock-provider";
+import { useMockProvider } from "./mock-provider";
 import * as path from "node:path";
 import * as os from "node:os";
 
-const USER_PROMPT = "用一句话介绍你自己";
+// Q→A question substring: 04::hello-intro
+const USER_PROMPT = "04::hello-intro 用一句话介绍你自己";
 
 test.describe("04 — 流式 LLM 非空文本", () => {
   test.beforeAll(async ({ tauriEnv }) => {
@@ -32,9 +33,7 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     const { page } = tauriEnv;
     await cancelRunningAgent(page);
     await clearAllHistory(page);
-    await clearMockQueue(page);
-    // clickNewConversationAndWait 走 UI 发送标题时会触发 LLM
-    await enqueueMockResponse(page, { text: "Mock setup", delayMs: 50 });
+    // clickNewConversationAndWait 走 UI 发送标题时会触发 LLM（用 default Q→A entry）
     await clickNewConversationAndWait(page);
   });
 
@@ -42,9 +41,8 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     test.setTimeout(60_000);
     const { page } = tauriEnv;
 
-    // 预置 mock 响应
-    const cannedText = "你好！我是一个 AI 助手，很高兴认识你。";
-    await enqueueMockResponse(page, { text: cannedText, delayMs: 20 });
+    // Q→A entry 04::hello-intro 输出 "你好！我是一个 AI 助手，很高兴认识你。"
+    // 见 e2e/fixtures/qa-w{0..3}.json。
 
     // 等待 Send 按钮出现（clickNewConversationAndWait 触发的 mock 完成后）
     try {

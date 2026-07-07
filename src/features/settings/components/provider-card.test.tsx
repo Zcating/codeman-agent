@@ -333,4 +333,23 @@ describe("ProviderCard", () => {
       expect(screen.getByText(/Delete failed.*IPC.*delete failed: provider not found/i)).toBeInTheDocument();
     });
   });
+
+  // ── Test 15 (TDD RED): dev badge renders when base_url points at local mock server ──
+  it("llm.base_url 指向本地 mock server (http://127.0.0.1:...) → 显示 (dev) 徽标", () => {
+    const devProvider = {
+      id: "mock-test",
+      label: "Mock Test",
+      enabled: true,
+      api_key: "",
+      llm: {
+        default_model: "mock-default",
+        base_url: "http://127.0.0.1:50000/mock/anthropic",
+        api_type: "anthropic-messages" as const,
+        models: [{ id: "mock-default", label: "Mock", deprecated: false, thinking: false }],
+        models_endpoint: "",
+      },
+    };
+    render(() => <ProviderCard provider={devProvider} onUpdate={vi.fn()} onDelete={vi.fn()} />);
+    expect(screen.getByText("(dev)")).toBeInTheDocument();
+  });
 });

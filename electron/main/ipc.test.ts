@@ -61,6 +61,7 @@ const EXPECTED_CHANNELS = [
   "notify",
   "open_external",
   "get_log_path",
+  // QA 表由 electron/main/mock-server.ts 直接经 qa-loader.ts 读,不暴露 IPC
 ];
 
 describe("T3 — electron/main/ipc.ts", () => {
@@ -69,7 +70,7 @@ describe("T3 — electron/main/ipc.ts", () => {
     fakeWin.webContents.send.mockClear();
   });
 
-  it("registers all 24 expected ipcMain.handle channels", async () => {
+  it("registers all 23 expected ipcMain.handle channels (qa:get_table removed — handled by mock-server)", async () => {
     const { registerIpcHandlers } = await import("./ipc");
     registerIpcHandlers({ getMainWindow: () => fakeWin as any });
     const channels = fakeIpcMain.handle.mock.calls.map((c) => c[0]);

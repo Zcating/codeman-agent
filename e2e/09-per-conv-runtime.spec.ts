@@ -26,7 +26,7 @@
 import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm, type TauriPage } from "./fixtures";
 import * as path from "node:path";
 import * as os from "node:os";
-import { useMockProvider, enqueueMockResponse, clearMockQueue } from "./mock-provider";
+import { useMockProvider } from "./mock-provider";
 
 // 慢流式:每次 chunk 间隔 500ms,text ~17 字符 = 5 chunks × 500ms = 2.5s,
 // 给切 conv + 检查 sidebar 足够 margin,避免 CI 下因 I/O 抖动 flake。
@@ -84,11 +84,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     await cancelRunningAgent(page);
     // 2) 清 DB 历史
     await clearAllHistory(page);
-    // 3) 清 mock 队列
-    await clearMockQueue(page);
-    // 4) Enqueue mock response for clickNewConversationAndWait's send
-    await enqueueMockResponse(page, { text: "Mock setup", delayMs: 50 });
-    // 5) 新建会话 — capture conv id for use in test bodies
+    // 3) clickNewConversationAndWait title → default Q→A entry (warning SSE)
     const { convId } = await clickNewConversationAndWait(page);
     beforeEachConvId = convId;
   });
@@ -107,17 +103,14 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     const convIdx0 = page.locator(`[data-conv-id="${beforeEachConvId}"]`);
     const convIdx1 = page.locator(`[data-conv-id="${newConvId}"]`);
 
-    // 预置 2 个 mock 响应 — mock 队列是 webview 全局,按 send 顺序消费
-    await enqueueMockResponse(page, { text: TEXT_A, delayMs: SLOW_DELAY_MS });
-    await enqueueMockResponse(page, { text: TEXT_B, delayMs: SLOW_DELAY_MS });
-
+    // Q→A: 09::msg-in-idx0 → TEXT_A, 09::msg-in-idx1 → TEXT_B
     // 切到 idx 0 发消息。后续断言: idx 0 的流式内容不 leak 到 idx 1 的 view。
     await convIdx0.click();
     await new Promise((r) => setTimeout(r, 200));
 
     const textarea = page.locator('textarea[placeholder="发条消息\u2026"]');
     await assert.enabled(textarea);
-    await textarea.fill("msg-in-idx0");
+    await textarea.fill("09::msg-in-idx0 msg-in-idx0");
     await submitForm(page);
 
     // 等第一个 chunk(4 chars)到达 — 触发 streamingMessageId 设置
@@ -179,7 +172,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     await convIdx1.click();
     await new Promise((r) => setTimeout(r, 200));
     await assert.enabled(textarea);
-    await textarea.fill("msg-in-idx1");
+    await textarea.fill("09::msg-in-idx1 msg-in-idx1");
     await submitForm(page);
 
     // 等 idx1 的 assistant 完整文本
@@ -196,11 +189,10 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     const { page } = tauriEnv;
 
     // beforeEach 已经建好一个 conv (idx 0),store 已清干净
-    await enqueueMockResponse(page, { text: TEXT_A, delayMs: SLOW_DELAY_MS });
-
+    // Q→A: 09::msg → TEXT_A
     const textarea = page.locator('textarea[placeholder="发条消息\u2026"]');
     await assert.enabled(textarea);
-    await textarea.fill("msg");
+    await textarea.fill("09::msg msg");
     await submitForm(page);
 
     // 等第一个 token chunk 到达 → 触发 streamingMessageId 设置
@@ -235,13 +227,10 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     test.setTimeout(30_000);
     const { page } = tauriEnv;
 
-    // 预置 2 个响应:第一个会被 cancel 掉(partial),第二个正常消费
-    await enqueueMockResponse(page, { text: TEXT_A, delayMs: SLOW_DELAY_MS });
-    await enqueueMockResponse(page, { text: "Second response after cancel", delayMs: 50 });
-
+    // Q→A: 09::first → TEXT_A (cancel 后), 09::second → "Second response after cancel"
     const textarea = page.locator('textarea[placeholder="发条消息\u2026"]');
     await assert.enabled(textarea);
-    await textarea.fill("first");
+    await textarea.fill("09::first first");
     await submitForm(page);
 
     // 等 Cancel 按钮出现
@@ -256,7 +245,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     await assert.enabled(textarea);
 
     // 发第二条,验证 runtime 还能用
-    await textarea.fill("second");
+    await textarea.fill("09::second second");
     await submitForm(page);
 
     // 等第二条完成
@@ -280,15 +269,13 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     const convIdx0 = page.locator(`[data-conv-id="${beforeEachConvId}"]`);
     const convIdx1 = page.locator(`[data-conv-id="${newConvId}"]`);
 
-    await enqueueMockResponse(page, { text: TEXT_A, delayMs: SLOW_DELAY_MS });
-    await enqueueMockResponse(page, { text: TEXT_B, delayMs: SLOW_DELAY_MS });
-
+    // Q→A: 09::msg-A → TEXT_A, 09::msg-B → TEXT_B
     // 切到 idx 0,发消息
     await convIdx0.click();
     await new Promise((r) => setTimeout(r, 200));
     const textarea = page.locator('textarea[placeholder="发条消息\u2026"]');
     await assert.enabled(textarea);
-    await textarea.fill("msg-A");
+    await textarea.fill("09::msg-A msg-A");
     await submitForm(page);
 
     // 等 idx 0 第一个 chunk
@@ -315,7 +302,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     // 在 idx1 发消息(切换后 textarea 应启用,因为 idx1 不在 streaming)
     const submitBtn = page.locator('button[type="submit"]');
     await assert.visible(submitBtn, { timeout: 5_000 });
-    await textarea.fill("msg-B");
+    await textarea.fill("09::msg-B msg-B");
     await submitForm(page);
 
     // 等 idx1 第一个 chunk

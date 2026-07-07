@@ -14,6 +14,8 @@ import { app, BrowserWindow, Menu, protocol, net } from "electron";
 import { join, sep, normalize } from "node:path";
 import { pathToFileURL } from "node:url";
 import { registerIpcHandlers } from "./ipc";
+import { loadQaTable } from "./qa-loader";
+import { startMockServer } from "./mock-server";
 
 // Worker suffix for e2e parallel workers (CODEMAN_TEST_WORKER = w0, w1, …).
 // When set, paths are suffixed (codeman-agent.w0, codeman-agent.w1) so
@@ -147,6 +149,8 @@ app.whenReady().then(() => {
   registerAppProtocol();
   buildAppMenu();
   registerIpcHandlers({ getMainWindow: () => mainWindow });
+  loadQaTable();
+  startMockServer();
   mainWindow = createMainWindow();
 });
 

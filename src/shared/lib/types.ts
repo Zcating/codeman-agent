@@ -1,4 +1,4 @@
-﻿//! Rust IPC 与 TS 之间的导线契约。镜像 src-tauri/src/types.rs。
+//! Rust IPC 与 TS 之间的导线契约。镜像 src-tauri/src/types.rs。
 //! 所有字段 snake_case 以匹配 Rust serde。在此处添加新类型，绝不
 //! 直接从 Rust 导入。
 
@@ -126,7 +126,10 @@ export interface Message {
   id: string;
   conversation_id: string;
   role: Role;
+  /** 助手正文（Markdown 渲染）。thinking 不在此处。 */
   content: string;
+  /** 助手思考过程（来自 Anthropic thinking_delta）。仅 assistant role；user/tool/system 一律 null。 */
+  thinking: string | null;
   tool_calls: ToolCall[] | null;
   tool_results: ToolResult[] | null;
   model: string | null;
@@ -158,3 +161,18 @@ export type AppError =
   | { kind: "ToolCall"; tool_call_id: string; message: string }
   | { kind: "SandboxViolation"; path: string; workspace_label: string }
   | { kind: "Unknown"; message: string };
+
+// ============================================================================
+// V2 Local Dev Mock LLM Pipeline (ADR-TBD)
+// ============================================================================
+
+/**
+ * Q→A Entry — pre-formatted Anthropic SSE response keyed by user-message substring.
+ * Used by the local-dev mock LLM provider pipeline. `default?: true` entries are
+ * first-wins fallbacks when no `question` substring matches.
+ */
+export interface QaEntry {
+  question: string;
+  answer: string;
+  default?: boolean;
+}

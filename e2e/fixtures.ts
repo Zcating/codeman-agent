@@ -151,6 +151,15 @@ export const test = base.extend<{}, { tauriEnv: ElectronEnv; electronEnv: Electr
           env: {
             ...process.env,
             CODEMAN_TEST_WORKER: `w${idx}`,
+            // Per-worker Q→A fixture (per CONTEXT.md 「Per-Worker Q→A Isolation」):
+            // mock-server (electron/main/mock-server.ts) 读 CODEMAN_TEST_QA_TABLE
+            // env var 定位 Q→A JSON 文件。每个 worker 一份独立的 qa-w{N}.json。
+            CODEMAN_TEST_QA_TABLE: resolve(
+              process.cwd(),
+              "e2e",
+              "fixtures",
+              `qa-w${idx}.json`,
+            ),
             ELECTRON_DISABLE_GPU: "1",
             ELECTRON_NO_ATTACH_CONSOLE: "1",
           },

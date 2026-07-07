@@ -6,11 +6,12 @@
 //!  3. DOM 里恰好 1 user + 1 assistant = 合计 2 个 bubble
 
 import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
-import { useMockProvider, enqueueMockResponse, clearMockQueue } from "./mock-provider";
+import { useMockProvider } from "./mock-provider";
 import * as path from "node:path";
 import * as os from "node:os";
 
-const USER_PROMPT = "用一句话介绍你自己";
+// Q→A question substring: 06::user-prompt
+const USER_PROMPT = "06::user-prompt 用一句话介绍你自己";
 
 test.describe("06 — LLM round-trip (mock)", () => {
   test.beforeAll(async ({ tauriEnv }) => {
@@ -32,9 +33,7 @@ test.describe("06 — LLM round-trip (mock)", () => {
     const { page } = tauriEnv;
     await cancelRunningAgent(page);
     await clearAllHistory(page);
-    await clearMockQueue(page);
-    // clickNewConversationAndWait 走 UI 发送标题时会触发 LLM
-    await enqueueMockResponse(page, { text: "Mock setup", delayMs: 50 });
+    // clickNewConversationAndWait 走 UI 发送标题时会触发 LLM（用 default Q→A entry）
     await clickNewConversationAndWait(page);
   });
 
@@ -42,9 +41,8 @@ test.describe("06 — LLM round-trip (mock)", () => {
     test.setTimeout(60_000);
     const { page } = tauriEnv;
 
-    // 预置 mock 响应
+    // 预置 mock 响应（通过 Q→A table: user text → 06::user-prompt → SSE response）
     const cannedText = "你好！这是 mock LLM 的回复。";
-    await enqueueMockResponse(page, { text: cannedText, delayMs: 20 });
 
     // 等待 Send 按钮重新出现（clickNewConversationAndWait 的 mock 完成）
     try {

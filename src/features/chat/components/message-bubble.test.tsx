@@ -1,222 +1,304 @@
-﻿//! MessageBubble 组件测试 — 每个角色一个（user, assistant, tool, system）。
+//! MessageBubble 组件测试 — 每个角色一个（user, assistant, tool, system）。
 //!
-//! 纯 UI 组件。无 Effect 导入。无 store mock 需要。
-//! ToolCallsPanel mock 在本文件顶部 — message-bubble 委托给它的 props 由该 mock 暴露。
+//! 纯 UI 组件。无 Effect 导入。
+//!
+//! V3 重构:tool_calls 不再委托 ToolCallsPanel,直接在 assistant bubble 内 inline
+//! 渲染 ToolCallCard。thinking section (Brain 图标 + 可折叠 pre) 新增,仅在
+//! message.thinking 非空时出现。
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import { MessageBubble } from "./message-bubble";
 import type { Message, ToolCall, ToolResult, FileMatch } from "../../../shared/lib/types";
 
-// Mock ToolCallsPanel: 暴露调用 props 让 MessageBubble 的委托可断言。
-// ToolCallsPanel 自身的渲染逻辑在 tool-calls-panel.test.tsx 里覆盖。
-vi.mock("./tool-calls-panel", () => ({
-  ToolCallsPanel: (props: { convId: string; messageId: string }) => (
+// Mock chat.store (MessageBubble 内部用 isStreaming memo 读 store.byId[…].streamingMessageId)
+vi.mock("../stores/chat.store", () => ({
+  store: {
+    byId: {} as Record<string, { streamingMessageId: string | null }>,
+  },
+}));
+
+// Mock ToolCallCard — 让 inline tool_call 渲染断言更聚焦,无需展开 args/result 子树
+vi.mock("./tool-call-card", () => ({
+  ToolCallCard: (props: { toolCall: ToolCall; result?: ToolResult }) => (
     <div
-      data-testid="tool-calls-panel-mock"
-      data-conv-id={props.convId}
-      data-message-id={props.messageId}
+      data-testid="inline-tool-card"
+      data-tool-name={props.toolCall.name}
+      data-tool-id={props.toolCall.id}
+      data-has-result={props.result ? "true" : "false"}
     >
-      ToolCallsPanel convId={props.convId} messageId={props.messageId}
+      ToolCallCard {props.toolCall.name}
     </div>
   ),
 }));
 
+// ─── Helpers ────────────────────────────────────────────────────────
+
+function makeUserMsg(overrides: Partial<Message> = {}): Message {
+  return {
+    id: "msg-user",
+    conversation_id: "conv-1",
+    role: "user",
+    content: "hello",
+    thinking: null,
+    tool_calls: null,
+    tool_results: null,
+    model: null,
+    input_tokens: null,
+    output_tokens: null,
+    created_at: 1,
+    ...overrides,
+  };
+}
+
+function makeAssistantMsg(overrides: Partial<Message> = {}): Message {
+  return {
+    id: "msg-asst",
+    conversation_id: "conv-1",
+    role: "assistant",
+    content: "world",
+    thinking: null,
+    tool_calls: null,
+    tool_results: null,
+    model: "gpt-4o",
+    input_tokens: null,
+    output_tokens: null,
+    created_at: 2,
+    ...overrides,
+  };
+}
+
 describe("MessageBubble", () => {
   afterEach(() => cleanup());
 
+  // ─── user 角色 ─────────────────────────────────────────────────────
+
   it("user 角色：HTML 转义内容", () => {
-    const msg: Message = {
-      id: "msg-1",
-      conversation_id: "conv-1",
-      role: "user",
+    const msg = makeUserMsg({
       content: "<script>alert('xss')</script>",
-      tool_calls: null,
-      tool_results: null,
-      model: null,
-      input_tokens: null,
-      output_tokens: null,
-      created_at: 1710000000,
-    };
+    });
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-end");
     expect(bubble).toBeTruthy();
-    // 内容应该被转义（无原始 <script> 标签）
     expect(bubble?.innerHTML).not.toContain("<script>");
     expect(bubble?.textContent).toContain("<script>alert('xss')</script>");
   });
 
+  // ─── assistant 角色 ────────────────────────────────────────────────
+
   it("assistant 角色：Markdown 渲染加粗", () => {
-    const msg: Message = {
-      id: "msg-2",
-      conversation_id: "conv-1",
-      role: "assistant",
-      content: "Hello **world**",
-      tool_calls: null,
-      tool_results: null,
-      model: "gpt-4o",
-      input_tokens: null,
-      output_tokens: null,
-      created_at: 1710000001,
-    };
+    const msg = makeAssistantMsg({ content: "Hello **world**" });
     const { container } = render(() => <MessageBubble message={msg} />);
-    const bubble = container.querySelector(".justify-start");
+    const bubble = container.querySelector('[data-testid="agent-bubble"]');
     expect(bubble).toBeTruthy();
-    // marked 将 **text** 解析为 <strong>
     const strong = bubble?.querySelector("strong");
     expect(strong?.textContent).toBe("world");
   });
 
+  it("assistant 角色：纯文本无 tool_calls → bubble 出现 + 三个子节点都不渲染", () => {
+    const msg = makeAssistantMsg({ content: "just text" });
+    const { container } = render(() => <MessageBubble message={msg} />);
+    expect(container.querySelector('[data-testid="agent-bubble"]')).toBeTruthy();
+    expect(container.querySelector('[data-testid="thinking-section"]')).toBeNull();
+    expect(container.querySelector('[data-testid="inline-tool-calls"]')).toBeNull();
+    expect(container.querySelector('[data-testid="agent-text-content"]')).toBeTruthy();
+  });
+
+  it("assistant 角色：tool_calls 内联渲染为 ToolCallCard (不再用独立 panel)", () => {
+    const toolCalls: ToolCall[] = [
+      { id: "tc-1", name: "read_file", args: { path: "/tmp/x.txt" } },
+    ];
+    const msg = makeAssistantMsg({
+      content: "Let me check that.",
+      tool_calls: toolCalls,
+    });
+    const { container } = render(() => <MessageBubble message={msg} />);
+    const inline = container.querySelector('[data-testid="inline-tool-calls"]');
+    expect(inline).toBeTruthy();
+    const card = container.querySelector('[data-testid="inline-tool-card"]');
+    expect(card).toBeTruthy();
+    expect(card?.getAttribute("data-tool-name")).toBe("read_file");
+    expect(card?.getAttribute("data-tool-id")).toBe("tc-1");
+    expect(card?.getAttribute("data-has-result")).toBe("false");
+  });
+
+  it("assistant 角色：tool_calls + tool_results 配对 → ToolCallCard 拿到 result", () => {
+    const toolCalls: ToolCall[] = [
+      { id: "tc-1", name: "read_file", args: { path: "/a" } },
+    ];
+    const toolResults: ToolResult[] = [
+      { tool_call_id: "tc-1", result: "ok", error: null },
+    ];
+    const msg = makeAssistantMsg({
+      content: "done",
+      tool_calls: toolCalls,
+      tool_results: toolResults,
+    });
+    const { container } = render(() => <MessageBubble message={msg} />);
+    const card = container.querySelector('[data-testid="inline-tool-card"]');
+    expect(card?.getAttribute("data-has-result")).toBe("true");
+  });
+
+  it("assistant 角色：thinking 非空 → 渲染 ThinkingSection", () => {
+    const msg = makeAssistantMsg({
+      content: "answer",
+      thinking: "Let me think about this...",
+    });
+    const { container } = render(() => <MessageBubble message={msg} />);
+    const section = container.querySelector('[data-testid="thinking-section"]');
+    expect(section).toBeTruthy();
+    expect(section?.textContent).toContain("Let me think about this...");
+  });
+
+  it("assistant 角色：thinking 为空字符串 → 不渲染 ThinkingSection", () => {
+    const msg = makeAssistantMsg({
+      content: "answer",
+      thinking: "",
+    });
+    const { container } = render(() => <MessageBubble message={msg} />);
+    expect(container.querySelector('[data-testid="thinking-section"]')).toBeNull();
+  });
+
+  it("assistant 角色：thinking null → 不渲染 ThinkingSection", () => {
+    const msg = makeAssistantMsg({
+      content: "answer",
+      thinking: null,
+    });
+    const { container } = render(() => <MessageBubble message={msg} />);
+    expect(container.querySelector('[data-testid="thinking-section"]')).toBeNull();
+  });
+
+  it("assistant 三块全空 (abort 在第一个 token 之前) → 渲染占位文本", () => {
+    const msg = makeAssistantMsg({
+      content: "",
+      thinking: null,
+      tool_calls: null,
+      tool_results: null,
+    });
+    const { container } = render(() => <MessageBubble message={msg} />);
+    expect(container.querySelector('[data-testid="agent-bubble"]')).toBeTruthy();
+    expect(container.textContent).toContain("空响应");
+  });
+
+  it("assistant 全部三块都存在 → 渲染顺序 thinking → tool calls → text", () => {
+    const toolCalls: ToolCall[] = [{ id: "tc-1", name: "read_file", args: {} }];
+    const msg = makeAssistantMsg({
+      content: "answer",
+      thinking: "thinking text",
+      tool_calls: toolCalls,
+    });
+    const { container } = render(() => <MessageBubble message={msg} />);
+    const bubble = container.querySelector('[data-testid="agent-bubble"]');
+    expect(bubble).toBeTruthy();
+    const children = Array.from(bubble!.children).map(
+      (c) => c.getAttribute("data-testid") ?? c.tagName,
+    );
+    // 顺序:thinking → tool calls → text content
+    expect(children.indexOf("thinking-section")).toBeLessThan(
+      children.indexOf("inline-tool-calls"),
+    );
+    expect(children.indexOf("inline-tool-calls")).toBeLessThan(
+      children.indexOf("agent-text-content"),
+    );
+  });
+
+  // ─── tool 角色 (保留 V2 既有行为,这块无重构) ─────────────────────
+
   it("tool 角色：显示 Tool 结果摘要", () => {
     const toolResults: ToolResult[] = [{ tool_call_id: "tc-1", result: { ok: true }, error: null }];
-    const msg: Message = {
+    const msg: Message = makeUserMsg({
       id: "msg-3",
-      conversation_id: "conv-1",
       role: "tool",
       content: '{"status":"ok"}',
-      tool_calls: null,
+      thinking: null,
       tool_results: toolResults,
-      model: null,
-      input_tokens: null,
-      output_tokens: null,
-      created_at: 1710000002,
-    };
+    });
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");
     expect(bubble).toBeTruthy();
-    // Polish C3: tool 角色摘要走中文 "工具结果" (前是 "Tool result")
     const summary = bubble?.querySelector("summary");
     expect(summary?.textContent).toBe("工具结果");
-    // 显示带 ✓ 的工具结果项
     expect(container.querySelector("[data-testid='tool-success']")).toBeTruthy();
   });
 
+  // ─── system 角色 ────────────────────────────────────────────────────
+
   it("system 角色：静音文本", () => {
-    const msg: Message = {
+    const msg: Message = makeUserMsg({
       id: "msg-4",
-      conversation_id: "conv-1",
       role: "system",
       content: "You are a helpful assistant.",
-      tool_calls: null,
-      tool_results: null,
-      model: null,
-      input_tokens: null,
-      output_tokens: null,
-      created_at: 1710000003,
-    };
+      thinking: null,
+    });
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");
     expect(bubble).toBeTruthy();
     expect(bubble?.textContent).toContain("You are a helpful assistant.");
   });
 
-  it("assistant + tool_calls → 委托给 ToolCallsPanel with convId+messageId", () => {
-    const toolCalls: ToolCall[] = [
-      { id: "tc-1", name: "read_file", args: { path: "/tmp/x.txt" } },
-    ];
-    const msg: Message = {
-      id: "msg-5",
-      conversation_id: "conv-1",
-      role: "assistant",
-      content: "Let me check that.",
-      tool_calls: toolCalls,
-      tool_results: null,
-      model: "gpt-4o",
-      input_tokens: null,
-      output_tokens: null,
-      created_at: 1710000004,
-    };
-    const { container } = render(() => <MessageBubble message={msg} />);
-    const panel = container.querySelector("[data-testid='tool-calls-panel-mock']");
-    expect(panel).toBeTruthy();
-    expect(panel?.getAttribute("data-conv-id")).toBe("conv-1");
-    expect(panel?.getAttribute("data-message-id")).toBe("msg-5");
-  });
+  // ─── tool_results error/success 分支测试 (V2 既有) ─────────────────
 
-  // 注: 空 tool_calls 时的"不渲染"由 ToolCallsPanel 内部的 <Show when={counts().total > 0}> 保证,
-  // 在 tool-calls-panel.test.tsx "message 无 tool_calls → 不渲染面板" 覆盖。
-  // 这里不重复断言 — Mock 无法模拟 ToolCallsPanel 内部的 counts 计算。
-
-  // ─── tool_results error/success 分支测试 ─────────────────────────────
   it("tool_results[0].error 存在时用 text-destructive + ❌", () => {
     const toolResults: ToolResult[] = [
       { tool_call_id: "tc-1", result: "ok", error: "boom" },
     ];
-    const msg: Message = {
+    const msg: Message = makeUserMsg({
       id: "msg-6",
-      conversation_id: "conv-1",
       role: "tool",
       content: "",
-      tool_calls: null,
+      thinking: null,
       tool_results: toolResults,
-      model: null,
-      input_tokens: null,
-      output_tokens: null,
-      created_at: 1710000005,
-    };
+    });
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");
     expect(bubble).toBeTruthy();
-    // text-destructive class for error
     const errorDiv = bubble?.querySelector(".text-destructive");
     expect(errorDiv).toBeTruthy();
     expect(container.querySelector("[data-testid='tool-error']")).toBeTruthy();
-    expect(errorDiv?.textContent).toContain("tc-1");
   });
 
   it("tool_results[0].error = null 时用 text-success + ✓", () => {
     const toolResults: ToolResult[] = [
       { tool_call_id: "tc-1", result: "ok", error: null },
     ];
-    const msg: Message = {
+    const msg: Message = makeUserMsg({
       id: "msg-7",
-      conversation_id: "conv-1",
       role: "tool",
       content: "",
-      tool_calls: null,
+      thinking: null,
       tool_results: toolResults,
-      model: null,
-      input_tokens: null,
-      output_tokens: null,
-      created_at: 1710000006,
-    };
+    });
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");
     expect(bubble).toBeTruthy();
-    // text-success class for success
     const successDiv = bubble?.querySelector(".text-success");
     expect(successDiv).toBeTruthy();
     expect(container.querySelector("[data-testid='tool-success']")).toBeTruthy();
   });
 
-  // ─── 长字符串 tool result 渲染 details 测试 ─────────────────────────
+  // ─── 长字符串 tool result 渲染 details 测试 (V2 既有) ────────────
+
   it("tool result string.length > 200 渲染 details + 行数", () => {
-    // Create a string longer than 200 characters
     const longResult = "a".repeat(250);
     const toolResults: ToolResult[] = [
       { tool_call_id: "tc-1", result: longResult, error: null },
     ];
-    const msg: Message = {
+    const msg: Message = makeUserMsg({
       id: "msg-8",
-      conversation_id: "conv-1",
       role: "tool",
       content: "",
-      tool_calls: null,
+      thinking: null,
       tool_results: toolResults,
-      model: null,
-      input_tokens: null,
-      output_tokens: null,
-      created_at: 1710000007,
-    };
+    });
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");
     expect(bubble).toBeTruthy();
-    // Should have nested details for long content
     const nestedDetails = bubble?.querySelectorAll("details");
     expect(nestedDetails?.length).toBeGreaterThan(1);
   });
 
-  // ─── FileMatch[] array 渲染测试 ─────────────────────────────────────
+  // ─── FileMatch[] array 渲染测试 (V2 既有) ─────────────────────────
+
   it("tool result array (FileMatch[]) 渲染 match list", () => {
     const toolResults: ToolResult[] = [
       {
@@ -228,76 +310,52 @@ describe("MessageBubble", () => {
         error: null,
       },
     ];
-    const msg: Message = {
+    const msg: Message = makeUserMsg({
       id: "msg-9",
-      conversation_id: "conv-1",
       role: "tool",
       content: "",
-      tool_calls: null,
+      thinking: null,
       tool_results: toolResults,
-      model: null,
-      input_tokens: null,
-      output_tokens: null,
-      created_at: 1710000008,
-    };
+    });
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");
     expect(bubble).toBeTruthy();
-    // Should show line numbers
     expect(bubble?.textContent).toContain("42");
     expect(bubble?.textContent).toContain("100");
-    // Should show paths in <code>
     const codeElements = bubble?.querySelectorAll("code");
     const paths = Array.from(codeElements ?? []).map((c) => c.textContent);
     expect(paths).toContain("src/x.ts");
     expect(paths).toContain("src/y.ts");
   });
 
-  // ─── tool role 仅有 content 无 tool_results 测试 ─────────────────────
   it("tool role 仅有 content (无 tool_results) 渲染 JSON", () => {
-    const msg: Message = {
+    const msg: Message = makeUserMsg({
       id: "msg-10",
-      conversation_id: "conv-1",
       role: "tool",
       content: '{"x":1}',
-      tool_calls: null,
+      thinking: null,
       tool_results: null,
-      model: null,
-      input_tokens: null,
-      output_tokens: null,
-      created_at: 1710000009,
-    };
+    });
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");
     expect(bubble).toBeTruthy();
-    // Should render JSON content in <pre>
     const pre = bubble?.querySelector("pre");
     expect(pre).toBeTruthy();
-    // JSON.stringify of '{"x":1}' produces escaped string
     expect(pre?.textContent).toContain("x");
   });
 
-  // ─── system 消息样式测试 ─────────────────────────────────────────────
   it("system 消息含 italic + bg-warning/10", () => {
-    const msg: Message = {
+    const msg: Message = makeUserMsg({
       id: "msg-11",
-      conversation_id: "conv-1",
       role: "system",
       content: "System prompt here.",
-      tool_calls: null,
-      tool_results: null,
-      model: null,
-      input_tokens: null,
-      output_tokens: null,
-      created_at: 1710000010,
-    };
+      thinking: null,
+    });
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");
     expect(bubble).toBeTruthy();
-    // italic class for system
     const italicDiv = bubble?.querySelector(".italic");
     expect(italicDiv).toBeTruthy();
-    // bg-warning/10 (using bg-warning/10 class)
     expect(bubble?.innerHTML).toContain("warning");
   });
 });

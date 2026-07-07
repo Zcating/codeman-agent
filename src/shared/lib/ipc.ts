@@ -241,6 +241,7 @@ export class MessageService extends Context.Tag("MessageService")<
       conversationId: string;
       role: string;
       content: string;
+      thinking?: string;
       toolCalls?: string;
       toolResults?: string;
       model?: string;

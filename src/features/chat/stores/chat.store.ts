@@ -122,6 +122,7 @@ export function sendMessage(
       conversation_id: convId,
       role: "user",
       content,
+      thinking: null,
       tool_calls: null,
       tool_results: null,
       model: null,
@@ -186,6 +187,7 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
           conversation_id: convId,
           role: "assistant",
           content: "",
+          thinking: "",
           tool_calls: null,
           tool_results: null,
           model: null,
@@ -200,6 +202,38 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       }
       setStore("byId", convId, "messages", (msgs) =>
         msgs.map((m) => (m.id === stubId ? { ...m, content: evt.content } : m)),
+      );
+      break;
+    }
+    case "thinking": {
+      // thinking 在 text 之前可能到达,也可能没有 streaming stub — 也需要 lazy-init
+      // (因为 mock-server 的 'think' entry 第一个事件就是 thinking_delta,先于 text)。
+      const cs = store.byId[convId];
+      if (!cs) {
+        return;
+      }
+      let stubId = cs.streamingMessageId;
+      if (!stubId) {
+        stubId = crypto.randomUUID();
+        const stub: Message = {
+          id: stubId,
+          conversation_id: convId,
+          role: "assistant",
+          content: "",
+          thinking: "",
+          tool_calls: null,
+          tool_results: null,
+          model: null,
+          input_tokens: null,
+          output_tokens: null,
+          created_at: Date.now(),
+        };
+        setStore("byId", convId, "messages", (msgs) => [...msgs, stub]);
+        setStore("byId", convId, "streamingMessageId", stubId);
+        setConversationsSignal(Object.values(store.byId));
+      }
+      setStore("byId", convId, "messages", (msgs) =>
+        msgs.map((m) => (m.id === stubId ? { ...m, thinking: evt.content } : m)),
       );
       break;
     }
@@ -231,7 +265,18 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       break;
     case "done": {
       const stubId = store.byId[convId]?.streamingMessageId;
-      console.log("[chat.store/diag] done event: stubId=" + stubId + " content.length=" + (evt.message.content ?? "").length + " content_preview=" + String(evt.message.content ?? "").slice(0, 100) + " tool_calls=" + JSON.stringify(evt.message.tool_calls));
+      console.log(
+        "[chat.store/diag] done event: stubId=" +
+          stubId +
+          " content.length=" +
+          (evt.message.content ?? "").length +
+          " content_preview=" +
+          String(evt.message.content ?? "").slice(0, 100) +
+          " thinking.length=" +
+          (evt.message.thinking?.length ?? 0) +
+          " tool_calls=" +
+          JSON.stringify(evt.message.tool_calls),
+      );
       if (stubId) {
         setStore("byId", convId, "messages", (msgs) =>
           msgs.map((m) => (m.id === stubId ? { ...evt.message, id: stubId } : m)),
@@ -280,6 +325,7 @@ function persistAssistantMessageEffect(msg: Message): Effect.Effect<void, AppErr
       conversationId: msg.conversation_id,
       role: msg.role,
       content: msg.content,
+      thinking: msg.thinking ?? undefined,
       toolCalls: msg.tool_calls ? JSON.stringify(msg.tool_calls) : undefined,
       toolResults: msg.tool_results ? JSON.stringify(msg.tool_results) : undefined,
       model: msg.model ?? undefined,

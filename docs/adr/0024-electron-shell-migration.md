@@ -127,7 +127,7 @@ V3 决策：流式 chunk 走 **Main → Renderer 的 `webContents.send(channel, 
 | Main process 单测 | `wiremock` + Rust integration test | vitest Node mode（`vitest run --project main`） |
 | E2E (Playwright) | `_tauri.launch` | `_electron.launch`（Playwright `_electron` API） |
 
-**Q→A Table 机制不变**：fake LLM provider 通过 `mock://` URL 识别 → 读 `CODEMAN_TEST_QA_TABLE` 文件 → emit SSE。V3 加载位置从 Rust `src-tauri/src/lib.rs` 启动钩子 → Node `electron/main/index.ts` 启动钩子。
+**Q→A Table 机制**：fake LLM provider 的 `base_url` 指向 Electron Main 启动的本地 HTTP server（默认 `http://127.0.0.1:50000/mock/anthropic`），server 读 `CODEMAN_TEST_QA_TABLE` 或 dev seed → emit SSE 字符串回复 client。transport 层不识别 mock 性质，所有 request 都走标准 fetch。加载位置从 Rust `src-tauri/src/lib.rs` 启动钩子 → Node `electron/main/index.ts` 启动钩子 + `electron/main/mock-server.ts`。V2 起的 `mock://` prefix + `mockStreamTurn` JS shim 路径整体移除。
 
 **Per-worker Q→A Isolation 不变**（per ADR-0023 Q→A Entry 词条）：每个 worker 独立 SQLite + WebView2 state + Settings JSON + Q→A Table 的隔离模式保留。
 

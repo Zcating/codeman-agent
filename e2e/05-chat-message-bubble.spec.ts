@@ -10,14 +10,13 @@
 //!   - 两者失败原因不同;两个都跑将回归隔离到正确层(UI 渲染 vs. 运行时 plumbing)。
 
 import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, resetChatState, submitForm } from "./fixtures";
-import { useMockProvider, enqueueMockResponse, clearMockQueue } from "./mock-provider";
+import { useMockProvider } from "./mock-provider";
 import * as path from "node:path";
 import * as os from "node:os";
 import * as fs from "node:fs";
 
-// 有意独特的字符串,以便我们永远不会将其与其他测试数据行
-// 或默认 Sidebar "New conversation" 占位符混淆。
-const USER_INPUT = "测试气泡渲染为用户气泡";
+// Q→A question substring: 05b::user-bubble
+const USER_INPUT = "05b::user-bubble 测试气泡渲染为用户气泡";
 
 interface MessageRow {
   id: string;
@@ -56,7 +55,6 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
     // 彻底重置 chat 域: cancel in-flight → 清 DB → navigate to /
     await cancelRunningAgent(page);
     await clearAllHistory(page);
-    await clearMockQueue(page);
     await page.goto("/");
     await assert.visible(page.locator('[data-testid="codex-input"]'), { timeout: 15_000 });
   });
@@ -76,11 +74,8 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
       console.log(`[page pageerror] ${err.message}`);
     });
 
-    // Enqueue mocks: one for clickNewConversationAndWait (title send), one for USER_INPUT
-    await enqueueMockResponse(page, { text: "Mock for setup", delayMs: 50 });
-    await enqueueMockResponse(page, { text: "Mock response for USER_INPUT", delayMs: 50 });
-
-    // 1. 创建全新会话 via UI-driven flow.
+    // 1. 创建全新会话 via UI-driven flow. Q→A table handles responses:
+    // clickNewConversationAndWait title send → default entry (warning SSE).
     const { convId } = await clickNewConversationAndWait(page);
 
     // 3. Verify the conv element exists in the DOM (may be inside accordion).
@@ -196,12 +191,7 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
     // 完整重置 — 前 spec LLM 完成/取消,DB 清空,页面 reload
     await resetChatState(page);
 
-    // Enqueue mocks: 1 for clickNewConversationAndWait + 3 for messages
-    await enqueueMockResponse(page, { text: "Mock for setup", delayMs: 50 });
-    await enqueueMockResponse(page, { text: "Mock 1", delayMs: 50 });
-    await enqueueMockResponse(page, { text: "Mock 2", delayMs: 50 });
-    await enqueueMockResponse(page, { text: "Mock 3", delayMs: 50 });
-
+    // Q→A table: clickNewConversationAndWait title → default entry (warning SSE)
     await clickNewConversationAndWait(page);
 
     const textarea = page.locator('textarea[placeholder="发条消息\u2026"]');
@@ -210,7 +200,8 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
 
     // 顺序发送 3 条不同消息。每条必须产生自己的
     // bubble;如果 store 去重或覆盖,这个测试会捕获它。
-    const inputs = ["第一个气泡", "第二个气泡", "第三个气泡"];
+    // Q→A question substrings added to avoid first-wins collisions.
+    const inputs = ["05b::first-bubble 第一个气泡", "05b::second-bubble 第二个气泡", "05b::third-bubble 第三个气泡"];
 
     for (let i = 0; i < inputs.length; i++) {
       const text = inputs[i];

@@ -192,6 +192,8 @@ export const mockState = {
   // This allows tests to override return values for specific commands without
   // affecting get_settings (which needs to return full settings for provider validation).
   resolvedByCommand: {} as Record<string, unknown>,
+  // QA table for file-tools feature
+  qaTable: [] as Array<{ question: string; answer: string; default?: boolean }>,
 };
 
 // ─── V0 → V1.5 Migration ───────────────────────────────────────
@@ -381,6 +383,11 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
   // ─── Workspace IPC ──────────────────────────────────────────────
   pick_workspace_path(): unknown {
     return mockState.resolved ?? null;
+  },
+
+  // ─── QA Table IPC ───────────────────────────────────────────────
+  qa_get_table(_args?: IPCArgs): unknown {
+    return mockState.qaTable ?? [];
   },
 };
 

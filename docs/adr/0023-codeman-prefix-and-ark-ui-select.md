@@ -170,6 +170,8 @@ D6-H established `addWorkspace` as an `appStore` sync method with `deriveLabelFr
     - `show<T>((resolve: (value: T) => void) => node): Promise<T>`
   - `codeman-dialog` is the **2nd** `internal/` component after `codeman-sidebar`. Must be prop-driven, no feature-store dependency (ADR-0022 D3).
 
+*Note (amended later)*: `Dialog.show<T>` 同样服务于 **form dialogs**（不限于 workspace rename/delete 等 confirm dialogs），如 settings 域 `createProviderFormDialog()`——renderFn 闭包内持 form signals，Add → `resolve(Provider)`，dismiss → `resolve(null)`。两类消费（confirm / form）共用同一 `@ark-ui/solid` Dialog 原语，互不冲突。
+
 **D8-W7 — chat.store.ts public API shape**
 - **Effect-returning methods** per ADR-0016 D4 + CONTEXT.md "Bridge":
   - `chatStore.addWorkspace(): Effect.Effect<Workspace | null, AppError, never>` — OS picker → `WorkspaceService.add` → `setStore`.

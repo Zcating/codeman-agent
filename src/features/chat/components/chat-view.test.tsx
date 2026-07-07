@@ -27,6 +27,7 @@ vi.mock("../stores/chat.store", () => ({
             conversation_id: "conv-1",
             role: "user",
             content: "Hello",
+            thinking: null,
             tool_calls: null,
             tool_results: null,
             model: null,
@@ -39,6 +40,7 @@ vi.mock("../stores/chat.store", () => ({
             conversation_id: "conv-1",
             role: "assistant",
             content: "Hi there!",
+            thinking: null,
             tool_calls: null,
             tool_results: null,
             model: "gpt-4o",
@@ -51,6 +53,7 @@ vi.mock("../stores/chat.store", () => ({
             conversation_id: "conv-1",
             role: "tool",
             content: "file content here",
+            thinking: null,
             tool_calls: null,
             tool_results: [
               {

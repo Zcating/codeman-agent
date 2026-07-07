@@ -1,4 +1,4 @@
-﻿//! ToolCallCard — 单个工具调用卡片。
+//! ToolCallCard — 单个工具调用卡片。
 //!
 //! 状态：running（尚无结果）、success（有结果无错误）、error（有错误的结果）。
 //! 纯 UI。不导入 effect。
@@ -90,20 +90,23 @@ export function ToolCallCard(props: { toolCall: ToolCall; result?: ToolResult })
         </Show>
         <code class="text-xs text-muted-foreground font-mono ml-auto">{props.toolCall.id}</code>
       </div>
-      <details class="text-sm border-t border-border pt-2 mt-2" open={status() === "error"}>
-        <summary class="cursor-pointer hover:text-primary font-medium select-none py-1">
-          参数
-        </summary>
-        <pre class="mt-2 p-2 bg-muted rounded text-xs font-mono overflow-x-auto whitespace-pre-wrap border border-border">
+      {/* V3.1: 参数 / 结果 section 去掉折叠,常驻显示 — 用户反馈"找不到展开入口" */}
+      <div class="text-sm border-t border-border pt-2 mt-2">
+        <div class="font-medium text-muted-foreground py-1">参数</div>
+        <pre
+          class="p-2 bg-muted rounded text-xs font-mono overflow-x-auto whitespace-pre-wrap border border-border"
+          data-testid="tool-call-args"
+        >
           {JSON.stringify(props.toolCall.args, null, 2)}
         </pre>
-      </details>
+      </div>
       <Show when={props.result}>
-        <details class="text-sm border-t border-border pt-2 mt-2" open>
-          <summary class="cursor-pointer hover:text-primary font-medium select-none py-1">
-            结果
-          </summary>
-          <pre class="mt-2 p-2 bg-muted rounded text-xs font-mono overflow-x-auto whitespace-pre-wrap border border-border">
+        <div class="text-sm border-t border-border pt-2 mt-2">
+          <div class="font-medium text-muted-foreground py-1">结果</div>
+          <pre
+            class="p-2 bg-muted rounded text-xs font-mono overflow-x-auto whitespace-pre-wrap border border-border"
+            data-testid="tool-call-result"
+          >
             {JSON.stringify(props.result!.result, null, 2)}
           </pre>
           <Show when={props.result!.error}>
@@ -111,7 +114,7 @@ export function ToolCallCard(props: { toolCall: ToolCall; result?: ToolResult })
               {props.result!.error}
             </div>
           </Show>
-        </details>
+        </div>
       </Show>
     </div>
   );

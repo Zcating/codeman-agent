@@ -12,6 +12,8 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 import { initDatabase, getDatabase } from "./db/mod";
+// QA 路由由 electron/main/mock-server.ts 负责(POST /mock/anthropic/v1/messages
+// 经 qa-loader.ts 读 Q→A 文件);不再走 IPC。
 import { sanitize, migrationsV0ToV15, type SettingsV15 } from "./settings-schema";
 import {
   validatePathInWorkspace,
@@ -83,6 +85,7 @@ interface RawMsgRow {
   conversation_id: string;
   role: string;
   content: string;
+  thinking: string | null;
   tool_calls: string | null;
   tool_results: string | null;
   model: string | null;
@@ -114,6 +117,7 @@ function toMessage(row: RawMsgRow) {
     conversation_id: row.conversation_id,
     role: row.role,
     content: row.content,
+    thinking: row.thinking ?? null,
     tool_calls: row.tool_calls ? JSON.parse(row.tool_calls) : null,
     tool_results: row.tool_results ? JSON.parse(row.tool_results) : null,
     model: row.model,
@@ -294,6 +298,7 @@ export function registerIpcHandlers(_deps: {
     conversation_id?: string;
     role: string;
     content: string;
+    thinking?: string | null;
     toolCalls?: string;
     tool_calls?: string;
     toolResults?: string;
@@ -304,18 +309,30 @@ export function registerIpcHandlers(_deps: {
     const id = randomUUID();
     const now = Math.floor(Date.now() / 1000);
     const convId = args.conversationId ?? args.conversation_id ?? "";
+    const thinking = args.thinking ?? null;
     const toolCalls = args.toolCalls ?? args.tool_calls ?? null;
     const toolResults = args.toolResults ?? args.tool_results ?? null;
     getDatabase()
       .prepare(
-        "INSERT INTO messages (id, conversation_id, role, content, tool_calls, tool_results, model, input_tokens, output_tokens, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)",
+        "INSERT INTO messages (id, conversation_id, role, content, thinking, tool_calls, tool_results, model, input_tokens, output_tokens, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)",
       )
-      .run(id, convId, args.role, args.content, toolCalls, toolResults, args.model ?? null, now);
+      .run(
+        id,
+        convId,
+        args.role,
+        args.content,
+        thinking,
+        toolCalls,
+        toolResults,
+        args.model ?? null,
+        now,
+      );
     return toMessage({
       id,
       conversation_id: convId,
       role: args.role,
       content: args.content,
+      thinking,
       tool_calls: toolCalls,
       tool_results: toolResults,
       model: args.model ?? null,
@@ -445,6 +462,9 @@ export function registerIpcHandlers(_deps: {
     const abs = await validatePathInWorkspace(args.path, ws.root_path);
     await unlink(abs);
   }));
+
+  // QA 路由由 electron/main/mock-server.ts 负责(POST /mock/anthropic/v1/messages
+  // 经 qa-loader.ts 读 Q→A 文件);不再走 IPC。
 
   // Native shims
   ipcMain.handle("set_login_item", (_e, args) => {

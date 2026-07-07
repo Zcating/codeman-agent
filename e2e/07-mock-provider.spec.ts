@@ -8,7 +8,7 @@
 //! 工具调用的 mock 行为在 08-file-tools-mock.spec.ts 验证。
 
 import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
-import { useMockProvider, enqueueMockResponse, clearMockQueue } from "./mock-provider";
+import { useMockProvider } from "./mock-provider";
 import * as path from "node:path";
 import * as os from "node:os";
 
@@ -46,18 +46,15 @@ test.describe("07 — Mock LLM provider", () => {
     });
     await cancelRunningAgent(page);
     await clearAllHistory(page);
-    await clearMockQueue(page);
-    // Enqueue mock response for clickNewConversationAndWait's UI-driven send
-    await enqueueMockResponse(page, { text: "Mock setup", delayMs: 50 });
+    // clickNewConversationAndWait title send → default Q→A entry (warning SSE)
     await clickNewConversationAndWait(page);
   });
 
   test("纯文本响应:assistant bubble 包含预置的固定文本", async ({ tauriEnv }) => {
     const { page } = tauriEnv;
 
-    // 预置一个固定文本响应
-    const cannedText = "Hello from mock LLM!";
-    await enqueueMockResponse(page, { text: cannedText });
+    // 通过 Q→A table: user text → 07::hi → SSE response
+    const cannedText = "07::hi Hello from mock LLM!";
 
     // 等待 Send 按钮重新出现(clickNewConversationAndWait 触发的 mock 还在跑时
     // 按钮是 Cancel;等它完成才发第二条)
@@ -68,9 +65,9 @@ test.describe("07 — Mock LLM provider", () => {
       await cancelRunningAgent(page);
     }
 
-    // 发送消息
+    // 发送消息（Q→A question substring: 07::hi）
     const textarea = page.locator('textarea[placeholder="发条消息…"]');
-    await textarea.fill("Hi");
+    await textarea.fill("07::hi Hi");
     await submitForm(page);
 
     // 等 assistant bubble 出现并包含预置文本

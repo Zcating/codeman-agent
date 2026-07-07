@@ -11,6 +11,7 @@ import { Effect } from "effect";
 import { Link } from "@tanstack/solid-router";
 import { ArrowLeft, Plus, Trash2 } from "lucide-solid";
 import { ProviderCard } from "../components/provider-card";
+import { createProviderFormDialog } from "../components/add-provider-dialog";
 import { appStore } from "../../../shared/stores/app.store";
 import { settingsSaver } from "../lib/settings-saver";
 import { invoke } from "../../../shared/lib/ipc";
@@ -55,10 +56,13 @@ export function SettingsPage() {
     appStore.set({ providers });
   };
 
-  // V1.5: Add provider 是未来工作，当前只 alert
-  const onAddProvider = () => {
-    // V1.5+ 只有一个默认 MiniMax provider，用户可以配置但不能添加更多
-    alert("Add provider: future work (V1.5+ has 1 pre-fill MiniMax)");
+  // V2.x: 命令式弹窗 — 点按钮 → 弹出 createProviderFormDialog() → await Provider | null
+  const onAddProvider = async () => {
+    const provider = await createProviderFormDialog();
+    if (!provider) return;
+    const current = appStore.state.value.providers ?? [];
+    appStore.set({ providers: [...current, provider] });
+    settingsSaver.scheduleSave();
   };
 
   const clearHistory = async () => {

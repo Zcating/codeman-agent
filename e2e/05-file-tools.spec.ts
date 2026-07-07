@@ -5,14 +5,13 @@
 
 import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
 import type { Workspace } from "../src/shared/lib/types";
-import { useMockProvider, enqueueMockResponse, clearMockQueue } from "./mock-provider";
+import { useMockProvider } from "./mock-provider";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 
 test.describe("05 — 文件工具 (mock LLM)", () => {
   const e2eRoot = path.join(os.tmpdir(), "codeman-e2e-mock-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8));
-  let workspaceId = "";
 
   let consoleErrors: string[] = [];
 
@@ -23,11 +22,12 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
 
-    // D8-W: workspace provisioned via WorkspaceService IPC
-    workspaceId = (await invoke<Workspace>(page, "add_workspace", {
+    // D8-W: workspace provisioned via WorkspaceService IPC (workspace not referenced
+    // by name in tests; mock-server 不调真实 file tool — workspace 仅保证 chat-view 渲染)
+    await invoke<Workspace>(page, "add_workspace", {
       label: "Mock E2E Test Workspace",
       rootPath: e2eRoot,
-    })).id;
+    });
 
     await useMockProvider(page);
   });
@@ -45,9 +45,7 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
     });
     await cancelRunningAgent(page);
     await clearAllHistory(page);
-    await clearMockQueue(page);
-    // Enqueue mock response for clickNewConversationAndWait's UI-driven send
-    await enqueueMockResponse(page, { text: "Mock setup", delayMs: 50 });
+    // clickNewConversationAndWait title send → default Q→A entry (warning SSE)
     await clickNewConversationAndWait(page);
     // Wait for streaming from clickNewConversationAndWait to complete
     // (Send button reappears when streamingMessageId is cleared)
@@ -70,26 +68,9 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
     fs.writeFileSync(targetFile, "TODO: fix bug\nDONE: ok", "utf-8");
 
     const textarea = page.locator('textarea[placeholder="发条消息…"]');
-    await textarea.fill("Try edit_file with ambiguous match");
+    // Q→A: 05f::ambiguous-edit → tool_use(edit_file) + 05f::ambiguous-error → error text
+    await textarea.fill("05f::ambiguous-edit Try edit_file with ambiguous match");
     await submitForm(page);
-
-    await enqueueMockResponse(page, {
-      toolCalls: [
-        {
-          name: "edit_file",
-          input: {
-            workspaceId,
-            path: "target.txt",
-            oldText: "TODO",
-            newText: "TASK",
-            replaceAll: false,
-          },
-        },
-      ],
-    });
-    await enqueueMockResponse(page, {
-      text: "Error: edit_file failed because 'TODO' matches 2 times. Try being more specific.",
-    });
 
     const deadline1 = Date.now() + 30_000;
     let sawResult = false;
@@ -116,14 +97,9 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
 
   test("mock plain text response appears (diagnostic)", async ({ tauriEnv }) => {
     const { page } = tauriEnv;
-    // Send a simple plain-text message (no toolCalls) to verify streaming pipeline
-    await enqueueMockResponse(page, {
-      text: "Hello from search_files diagnostic test!",
-      delayMs: 10,
-    });
-
+    // Q→A: 05f::plain-text → text response
     const textarea = page.locator('textarea[placeholder="发条消息…"]');
-    await textarea.fill("Test plain text response");
+    await textarea.fill("05f::plain-text Test plain text response");
     await submitForm(page);
 
     // Wait for assistant bubble (up to 15s)
@@ -150,19 +126,8 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
 
     const textarea = page.locator('textarea[placeholder="发条消息…"]');
 
-    await enqueueMockResponse(page, {
-      toolCalls: [
-        {
-          name: "search_files",
-          input: { workspaceId, glob: "**/*.ts", contentPattern: "TODO" },
-        },
-      ],
-    });
-    await enqueueMockResponse(page, {
-      text: "Search results:\nsrc/a.ts:1: TODO: refactor\n(1 file matched, 1 line)",
-    });
-
-    await textarea.fill("Find all .ts files containing 'TODO'");
+    // Q→A: 05f::search-todo → tool_use(search_files) + 05f::search-results → text
+    await textarea.fill("05f::search-todo Find all .ts files containing 'TODO'");
     await submitForm(page);
 
     // Wait for user message to appear (confirms sendMessage was called)
@@ -171,16 +136,8 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
     } catch { /* ok */ }
     await new Promise((r) => setTimeout(r, 1000));
 
-    // DIAGNOSE: check if mock queue was consumed
-    const afterConsumed = await page.evaluate(() => {
-      const w = window as unknown as { __MOCK_LLM_QUEUE__?: unknown[] };
-      return { len: w.__MOCK_LLM_QUEUE__?.length ?? 0, items: JSON.stringify(w.__MOCK_LLM_QUEUE__ ?? []) };
-    });
-    console.log("[diag/search_files] queue AFTER 1s:", afterConsumed);
-
     // DIAGNOSE: check if assistant stub exists
     const hasAssistant = await page.evaluate(() => {
-      const msgs = document.querySelectorAll("[data-testid='thinking-indicator'], div.justify-start > div");
       const body = document.body.textContent ?? "";
       return { bodyPreview: body.slice(0, 500), thinkingEl: document.querySelector("[data-testid='thinking-indicator']") !== null };
     });
