@@ -45,6 +45,22 @@ export interface QaTurn {
   text: string;
   /** Tool_use blocks — emitted AFTER text. Each becomes a full tool_use content block. */
   toolUses?: QaToolUse[];
+  /**
+   * 显式终止标记 — T28 Stop operation。
+   *
+   * 当 true 且这条 turn 是 entry 的最后一轮时,mock-server 在
+   * `asstCount >= entry.turns.length` 时合成一条 `end_turn` 完成响应
+   * (`"(mock) Script complete."`),不再走 turns[N] 循环。
+   *
+   * 用途:单 toolUse entry(`turns.length === 1` + `toolUses`) — 工具执行
+   * 后 agent 再调 LLM,如果不标 done,mock 会回到 turns[0] 再发一次同
+   * toolUse,死循环。多 turn entry 的最后一轮若是纯 text 自然 end_turn,
+   * 不需要标 done。
+   *
+   * 约定:标在非最后一 turn 无效(后续 turn 仍会被服务)。未标 done 的旧
+   * entry 保持原行为(单 turn 会循环 — 调用方应升级 entry 加 done:true)。
+   */
+  done?: boolean;
 }
 
 /**
@@ -216,6 +232,9 @@ function normalizeQaEntries(raw: unknown[]): QaEntry[] {
         legacyTurn.toolUses = tuses;
       }
     }
+    if (r.done === true) {
+      legacyTurn.done = true;
+    }
     entry.turns = [legacyTurn];
     return entry;
   });
@@ -240,6 +259,9 @@ function normalizeTurn(t: unknown): QaTurn | null {
     if (tuses.length > 0) {
       turn.toolUses = tuses;
     }
+  }
+  if (tr.done === true) {
+    turn.done = true;
   }
   return turn;
 }

@@ -416,6 +416,32 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
       const turnIdx = Math.min(asstCount, entry.turns.length - 1);
       const turn = entry.turns[turnIdx];
 
+      // T28 Stop operation: 显式 done:true 短路。
+      // 单 toolUse entry 的 turns.length === 1,turnIdx 永远 = 0 — 工具执行后
+      // agent 再调 LLM 时如果不做短路,会回到同 toolUse 死循环。
+      // 当 entry 最后一 turn 标了 done:true 且 asstCount 已越过该 turn,合成
+      // 一条 end_turn 完成响应("(mock) Script complete."),agent loop 自然终止。
+      const lastTurn = entry.turns[entry.turns.length - 1];
+      const isPastLastTurn = asstCount >= entry.turns.length;
+      if (isPastLastTurn && lastTurn?.done === true) {
+        const events = buildSseTurnEvents(
+          { text: SHORT_CIRCUIT_TEXT },
+          SHORT_CIRCUIT_TEXT.length,
+        );
+        logger.info(
+          `[mock-server] done short-circuit "${entry.question}" ` +
+            `asstCount=${asstCount} turns.length=${entry.turns.length} ` +
+            `lastTurn.done=true -> end_turn (${events.length} events)`,
+        );
+        writeHeadWithCors(res, 200, {
+          "Content-Type": "application/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        });
+        writeSseStream(res, events, readMockServerConfig().streamDelayMs);
+        return;
+      }
+
       const { streamDelayMs: delayMs, deltaSize } = readMockServerConfig();
       const events = buildSseTurnEvents(turn, deltaSize);
       logger.info(

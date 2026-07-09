@@ -36,25 +36,47 @@ function pickArgs<T extends Record<string, any>>(args: T, snake: string, camel?:
   return undefined;
 }
 
+/** T27: workspace_id may now be missing from LLM args (schema is Optional).
+ *  Return an `Effect.fail(InvalidConfig)` when neither LLM nor the runtime
+ *  wrapper provided one — bubbles up via the normal tool error path and
+ *  renders cleanly in ToolCallCard. Using `Effect.fail` (not sync `throw`)
+ *  so the cause reaches `runFileEffect` as `Cause.Fail`, not `Cause.Die`. */
+function requireWorkspaceId(args: Record<string, any>): Effect.Effect<string, AppError> {
+  const ws = pickArgs(args, "workspace_id", "workspaceId");
+  if (typeof ws === "string" && ws.length > 0) {
+    return Effect.succeed(ws);
+  }
+  return Effect.fail({
+    kind: "InvalidConfig",
+    field: "workspace_id",
+    message:
+      "workspace_id is required. The runtime should inject it from the conversation context — " +
+      "if you see this, the chat.runtime.run() call is missing ProviderConfig.workspaceId.",
+  });
+}
+
 // ============================================================================
 // Tool Schemas
 // ============================================================================
 
+// T27: workspace_id 改为可选 — runtime (chat.store.sendMessage) 通过
+// `createFileTools(provider.workspaceId)` 自动注入,避免 LLM (或 mock JSON)
+// 不知道 UUID 时校验失败。LLM 也可以显式覆盖(优先用 LLM 传的)。
 const ReadFileSchema = Type.Object({
-  workspace_id: Type.String(),
+  workspace_id: Type.Optional(Type.String()),
   path: Type.String(),
 });
 type ReadFileArgs = Static<typeof ReadFileSchema>;
 
 const WriteFileSchema = Type.Object({
-  workspace_id: Type.String(),
+  workspace_id: Type.Optional(Type.String()),
   path: Type.String(),
   content: Type.String(),
 });
 type WriteFileArgs = Static<typeof WriteFileSchema>;
 
 const EditFileSchema = Type.Object({
-  workspace_id: Type.String(),
+  workspace_id: Type.Optional(Type.String()),
   path: Type.String(),
   old_text: Type.String(),
   new_text: Type.String(),
@@ -63,14 +85,14 @@ const EditFileSchema = Type.Object({
 type EditFileArgs = Static<typeof EditFileSchema>;
 
 const SearchFilesSchema = Type.Object({
-  workspace_id: Type.String(),
+  workspace_id: Type.Optional(Type.String()),
   glob: Type.String(),
   content_pattern: Type.Optional(Type.String()),
 });
 type SearchFilesArgs = Static<typeof SearchFilesSchema>;
 
 const DeleteFileSchema = Type.Object({
-  workspace_id: Type.String(),
+  workspace_id: Type.Optional(Type.String()),
   path: Type.String(),
 });
 type DeleteFileArgs = Static<typeof DeleteFileSchema>;
@@ -127,11 +149,9 @@ export const readFileTool: AgentTool<typeof ReadFileSchema, string | AppError> =
   parameters: ReadFileSchema,
   execute: async (_toolCallId, args: ReadFileArgs) => {
     const program = Effect.gen(function* () {
+      const workspaceId = yield* requireWorkspaceId(args);
       const svc = yield* FileService;
-      return yield* svc.readFile(
-        pickArgs(args, "workspace_id", "workspaceId"),
-        pickArgs(args, "path"),
-      );
+      return yield* svc.readFile(workspaceId, pickArgs(args, "path"));
     }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, (content) => `Content:\n${content}`);
   },
@@ -145,9 +165,10 @@ export const writeFileTool: AgentTool<typeof WriteFileSchema, void | AppError> =
   parameters: WriteFileSchema,
   execute: async (_toolCallId, args: WriteFileArgs) => {
     const program = Effect.gen(function* () {
+      const workspaceId = yield* requireWorkspaceId(args);
       const svc = yield* FileService;
       return yield* svc.writeFile(
-        pickArgs(args, "workspace_id", "workspaceId"),
+        workspaceId,
         pickArgs(args, "path"),
         pickArgs(args, "content"),
       );
@@ -165,9 +186,10 @@ export const editFileTool: AgentTool<typeof EditFileSchema, void | AppError> = {
   parameters: EditFileSchema,
   execute: async (_toolCallId, args: EditFileArgs) => {
     const program = Effect.gen(function* () {
+      const workspaceId = yield* requireWorkspaceId(args);
       const svc = yield* FileService;
       return yield* svc.editFile(
-        pickArgs(args, "workspace_id", "workspaceId"),
+        workspaceId,
         pickArgs(args, "path"),
         pickArgs(args, "old_text", "oldText"),
         pickArgs(args, "new_text", "newText"),
@@ -189,9 +211,10 @@ export const searchFilesTool: AgentTool<typeof SearchFilesSchema, FileMatch[] | 
   parameters: SearchFilesSchema,
   execute: async (_toolCallId, args: SearchFilesArgs) => {
     const program = Effect.gen(function* () {
+      const workspaceId = yield* requireWorkspaceId(args);
       const svc = yield* FileService;
       return yield* svc.searchFiles(
-        pickArgs(args, "workspace_id", "workspaceId"),
+        workspaceId,
         pickArgs(args, "glob"),
         pickArgs(args, "content_pattern", "contentPattern") ?? null,
       );
@@ -221,17 +244,20 @@ export const deleteFileTool: AgentTool<typeof DeleteFileSchema, void | AppError>
   parameters: DeleteFileSchema,
   execute: async (_toolCallId, args: DeleteFileArgs) => {
     const program = Effect.gen(function* () {
+      const workspaceId = yield* requireWorkspaceId(args);
       const svc = yield* FileService;
-      return yield* svc.deleteFile(
-        pickArgs(args, "workspace_id", "workspaceId"),
-        pickArgs(args, "path"),
-      );
+      return yield* svc.deleteFile(workspaceId, pickArgs(args, "path"));
     }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, () => "Done: file moved to recycle bin.");
   },
 };
 
-/** 所有 file-tools 工具数组（供 runtime 注册） */
+/** 所有 file-tools 工具数组（向后兼容 — 调用方无 workspaceId 时仍可使用）。
+ *
+ *  绝大多数路径请用 `createFileTools(workspaceId)`,它会包装 execute 注入
+ *  `workspace_id` 到 args(LLM 省略或 mock JSON 不带时)。`fileTools` 这个
+ *  直导数组保留,供测试或一次性脚本调用 — 调用方必须自己在 args 里提供
+ *  `workspace_id`,否则工具返回 `InvalidConfig` 错误。 */
 export const fileTools: AgentTool<any, any>[] = [
   readFileTool,
   writeFileTool,
@@ -239,3 +265,37 @@ export const fileTools: AgentTool<any, any>[] = [
   searchFilesTool,
   deleteFileTool,
 ];
+
+/** 创建带 `workspace_id` 自动注入的 file tools 列表(T27)。
+ *
+ *  pi-agent-core 的 schema 校验在 `execute` 之前运行,因此我们无法在收到
+ *  args 后再补 `workspace_id` — 必须**在 schema 校验之前**把 field 填好。
+ *  包装层在 Agent 校验后的 execute 调用里,把 `provider.workspaceId` 注入
+ *  args(若 LLM 自己传了,以 LLM 为准,允许覆盖)。
+ *
+ *  @param workspaceId - 当前 conversation 绑定的 workspace UUID。
+ *                       若省略 / 空字符串,等价于 `fileTools`(工具接收
+ *                       不带 workspace_id 的 args 时返回 InvalidConfig)。
+ */
+export function createFileTools(workspaceId?: string): AgentTool<any, any>[] {
+  const tools: AgentTool<any, any>[] = [readFileTool, writeFileTool, editFileTool, searchFilesTool, deleteFileTool];
+  if (!workspaceId) {
+    return tools;
+  }
+  return tools.map((tool) => ({
+    ...tool,
+    execute: async (toolCallId: string, params: unknown, signal?: AbortSignal) => {
+      // 若 LLM 已显式给 workspace_id / workspaceId,优先用 LLM 的(允许覆盖
+      // 默认值 — 比如未来多 workspace 场景)。否则注入 runtime 提供的值。
+      const args = (params && typeof params === "object"
+        ? (params as Record<string, unknown>)
+        : {}) as Record<string, unknown>;
+      const alreadyHas = pickArgs(args, "workspace_id", "workspaceId");
+      const finalArgs =
+        typeof alreadyHas === "string" && alreadyHas.length > 0
+          ? args
+          : { ...args, workspace_id: workspaceId };
+      return tool.execute(toolCallId, finalArgs, signal);
+    },
+  }));
+}

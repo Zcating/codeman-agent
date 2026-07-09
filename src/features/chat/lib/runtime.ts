@@ -19,7 +19,39 @@ import type { Message } from "../../../shared/lib/types";
 import { anthropicStream } from "./anthropic-transport";
 import { Agent } from "@earendil-works/pi-agent-core";
 import type { Model, Message as PiMessage } from "@earendil-works/pi-ai";
-import { fileTools } from "../../file-tools/lib/file-tools";
+import { createFileTools } from "../../file-tools/lib/file-tools";
+
+// ─── Tool error extraction (T27 fix for [object Object] display) ────────────
+
+interface AgentToolResultShape {
+    content?: Array<{ type?: string; text?: unknown }>;
+    details?: unknown;
+}
+
+/** Extract human-readable error text from a tool result.
+ *
+ *  When pi-agent-core fails a tool call (validation, sandbox, runtime error) it
+ *  wraps the failure in `AgentToolResult<{content:[{type:"text", text:"..."}], details:{}}>`
+ *  with `isError: true`. Calling `String(result)` on that shape yields the
+ *  unhelpful `"[object Object]"` which then leaks into the UI error banner.
+ *
+ *  This helper pulls the actual text out of `content[0].text`, falling back to
+ *  `String(result)` for unexpected shapes.
+ */
+export function extractToolErrorText(result: unknown): string {
+    if (result && typeof result === "object" && "content" in result) {
+        const r = result as AgentToolResultShape;
+        const first = Array.isArray(r.content) ? r.content[0] : undefined;
+        const text = first?.text;
+        if (typeof text === "string" && text.length > 0) {
+            return text;
+        }
+    }
+    if (result instanceof Error) {
+        return result.message;
+    }
+    return String(result);
+}
 
 // ─── Runtime event types (6 variants,ADR-0017 + thinking) ──────────────────
 
@@ -39,6 +71,11 @@ export interface ProviderConfig {
     defaultModel: string;
     systemPrompt: string;
     tools: unknown[];
+    /**
+     * ADR-0013 / T27: per-run workspace context — 当工具 schema 接受 `workspace_id`
+     * 但 LLM 没传时,`createFileTools()` 自动注入。空 = 不注入(保留 LLM 传的或让工具报错)。
+     */
+    workspaceId?: string;
 }
 
 // ─── Run options ────────────────────────────────────────────────
@@ -78,7 +115,7 @@ export function createAgentRuntime(): AgentRuntime {
                     maxTokens: 8192,
                 };
 
-                const tools = [...fileTools];
+                const tools = createFileTools(provider.workspaceId);
 
                 const agent = new Agent({
                     initialState: {
@@ -153,7 +190,7 @@ export function createAgentRuntime(): AgentRuntime {
                                     type: "tool_result",
                                     toolCallId: e.toolCallId ?? "unknown",
                                     result: e.result,
-                                    error: e.isError ? String(e.result) : undefined,
+                                    error: e.isError ? extractToolErrorText(e.result) : undefined,
                                 });
                                 break;
                             }

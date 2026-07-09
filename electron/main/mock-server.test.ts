@@ -712,13 +712,10 @@ describe("mock-server HTTP — POST /mock/anthropic/v1/messages", () => {
     loadQaTable();
   });
 
-  it("T23: single-turn entry + asstCount>=1 → serves turns[0] AGAIN (capped, no short-circuit)", async () => {
-    // v2026-07-07+: turnIdx = min(asstCount, turns.length-1). For single-turn
-    // entries (turns.length=1) this means turnIdx always = 0, regardless of
-    // asstCount. Mock-server serves turns[0] content again instead of the old
-    // "(mock) Tool execution acknowledged." / "(mock) Script complete." text.
-    // The agent loop terminates naturally because subsequent tool execution
-    // changes the LAST user msg to toolResult content, which fails lookup.
+  it("T23: single-turn entry WITHOUT done + asstCount>=1 → serves turns[0] AGAIN (capped, no short-circuit — legacy loop behavior)", async () => {
+    // T28 Stop operation: 单 toolUse entry 没标 done 时,turnIdx = min(asstCount, 0)
+    // 永远 = 0,工具执行后 agent 再调 LLM 又走到 turns[0] → 死循环。
+    // 没 done 的旧 entry 保留这个行为(调用方应升级 entry 加 done:true — 见 T28)。
     writeFileSync(
       qaPath,
       JSON.stringify([
@@ -737,7 +734,7 @@ describe("mock-server HTTP — POST /mock/anthropic/v1/messages", () => {
     loadQaTable();
 
     // Body: [user:"tool", asst(tool_use), toolResult].
-    // asstCount=1, turns.length=1 → min(1, 0)=0 → serve turns[0] = "Reading the file now." + read_file tool_use.
+    // asstCount=1, turns.length=1, lastTurn.done !== true → serve turns[0] = "Reading the file now." + read_file tool_use.
     const res = await fetch(`${BASE_URL}/mock/anthropic/v1/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -753,13 +750,10 @@ describe("mock-server HTTP — POST /mock/anthropic/v1/messages", () => {
     expect(res.status).toBe(200);
     const body = await res.text();
     // serves turns[0] content (per-char deltas with delta=1).
-    // "Reading the file now." is 21 chars, so each char arrives in its own
-    // text_delta. Verify representative letters + count to confirm full text.
     expect(body).toContain('"text":"R"');
     expect(body).toContain('"text":"i"');
     expect(body).toContain('"text":"n"');
     expect(body).toContain('"text":"g"');
-    // 21 text deltas for "Reading the file now."
     expect((body.match(/"text":"[A-Za-z. ]"/g) ?? []).length).toBe(21);
     // No more "(mock) Script complete." / "(mock) Tool execution acknowledged."
     expect(body).not.toContain("(mock) Script complete.");
@@ -768,6 +762,90 @@ describe("mock-server HTTP — POST /mock/anthropic/v1/messages", () => {
     expect(body).toContain('"type":"tool_use"');
     expect(body).toContain('"name":"read_file"');
     expect(body).toContain('"stop_reason":"tool_use"');
+  });
+
+  // T28 Stop operation: 显式 done:true 短路。
+  it("T28a: single-turn entry WITH done:true + asstCount>=1 → synthesize end_turn '(mock) Script complete.'", async () => {
+    // 不再回 turns[0],而是合成一条 text-only end_turn 完成响应。
+    writeFileSync(
+      qaPath,
+      JSON.stringify([
+        {
+          question: "tool",
+          turns: [
+            {
+              text: "Reading the file now.",
+              toolUses: [{ name: "read_file", input: { path: "README.md" } }],
+              done: true,
+            },
+          ],
+        },
+      ]),
+    );
+    resetQaLoaderForTest();
+    loadQaTable();
+
+    // Body: [user:"tool", asst(tool_use), toolResult].
+    // asstCount=1 >= turns.length=1, lastTurn.done=true → synthesize end_turn.
+    const res = await fetch(`${BASE_URL}/mock/anthropic/v1/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "m",
+        messages: [
+          { role: "user", content: "tool" },
+          { role: "assistant", content: [{ type: "tool_use", name: "read_file", input: { path: "x" } }] },
+          { role: "toolResult", content: [{ type: "text", text: "result of read_file" }] },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    // 合成消息只有一条 text,内容为 "(mock) Script complete." (整段发,不做 per-char streaming — done 短路不需要 streaming)。
+    // 重要:不再含 tool_use 块,stop_reason=end_turn(合成 turn 没有 toolUses)。
+    expect(body).toContain('"text":"(mock) Script complete."');
+    expect((body.match(/\(mock\) Script complete\./g) ?? []).length).toBe(1);
+    expect(body).not.toContain('"type":"tool_use"');
+    expect(body).not.toContain('"name":"read_file"');
+    expect(body).toContain('"stop_reason":"end_turn"');
+  });
+
+  it("T28b: single-turn entry WITH done:true + asstCount=0 (initial request) → still serves turns[0] (短�� 不触发)", async () => {
+    // done:true 只在 agent 走完最后一轮后才触发;初次请求照常服务 turns[0]。
+    writeFileSync(
+      qaPath,
+      JSON.stringify([
+        {
+          question: "tool",
+          turns: [
+            {
+              text: "Reading the file now.",
+              toolUses: [{ name: "read_file", input: { path: "README.md" } }],
+              done: true,
+            },
+          ],
+        },
+      ]),
+    );
+    resetQaLoaderForTest();
+    loadQaTable();
+
+    const res = await fetch(`${BASE_URL}/mock/anthropic/v1/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "m",
+        messages: [{ role: "user", content: "tool" }],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    // 初次请求:serve turns[0] — 含 tool_use,stop_reason=tool_use
+    expect(body).toContain('"text":"R"');
+    expect(body).toContain('"type":"tool_use"');
+    expect(body).toContain('"name":"read_file"');
+    expect(body).toContain('"stop_reason":"tool_use"');
+    expect(body).not.toContain("(mock) Script complete.");
   });
 
   // ─── Scripted multi-turn entries (2026-07-06) ──────────────────────────

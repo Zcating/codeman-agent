@@ -217,4 +217,92 @@ describe("qa-loader", () => {
     expect(entries[0].turns).toEqual([{ text: "" }]);
   });
 
+  // T28 Stop operation: done:true 在 turns[] 路径下被保留。
+  it("T28c: turns[] path 保留 done:true (单 toolUse 显式终止)", async () => {
+    const { vi } = await import("vitest");
+    const { loadQaTable } = await import("./qa-loader");
+
+    tempJsonPath = resolve(tmpdir(), `qa-loader-done-${Date.now()}.json`);
+    await writeFile(
+      tempJsonPath,
+      JSON.stringify([
+        {
+          question: "tool",
+          turns: [
+            {
+              text: "Reading the file now.",
+              toolUses: [{ name: "read_file", input: { path: "README.md" } }],
+              done: true,
+            },
+          ],
+        },
+      ]),
+      "utf-8",
+    );
+    vi.stubEnv("CODEMAN_TEST_QA_TABLE", tempJsonPath);
+
+    const entries = loadQaTable();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].turns).toHaveLength(1);
+    expect(entries[0].turns[0].done).toBe(true);
+    expect(entries[0].turns[0].text).toBe("Reading the file now.");
+    expect(entries[0].turns[0].toolUses).toEqual([
+      { name: "read_file", input: { path: "README.md" } },
+    ]);
+  });
+
+  // T28 Stop operation: 未标 done 的 turn 不携带 done 字段(undefined,不是 false)。
+  it("T28d: 没标 done 的 turn 不带 done 字段 (非 false,让 mock-server 的 lastTurn?.done === true 检查不会假阳性触发)", async () => {
+    const { vi } = await import("vitest");
+    const { loadQaTable } = await import("./qa-loader");
+
+    tempJsonPath = resolve(tmpdir(), `qa-loader-no-done-${Date.now()}.json`);
+    await writeFile(
+      tempJsonPath,
+      JSON.stringify([
+        {
+          question: "summarize",
+          turns: [
+            { text: "Reading.", toolUses: [{ name: "read_file", input: {} }] },
+            { text: "Done." },
+          ],
+        },
+      ]),
+      "utf-8",
+    );
+    vi.stubEnv("CODEMAN_TEST_QA_TABLE", tempJsonPath);
+
+    const entries = loadQaTable();
+    expect(entries[0].turns[1].done).toBeUndefined();
+    expect("done" in entries[0].turns[1]).toBe(false);
+  });
+
+  // T28 Stop operation: legacy {question, text, toolUses, done} 路径也保留 done。
+  it("T28e: legacy {question, text, toolUses, done:true} 路径也保留 done", async () => {
+    const { vi } = await import("vitest");
+    const { loadQaTable } = await import("./qa-loader");
+
+    tempJsonPath = resolve(tmpdir(), `qa-loader-legacy-done-${Date.now()}.json`);
+    await writeFile(
+      tempJsonPath,
+      JSON.stringify([
+        {
+          question: "legacy-tool",
+          text: "Reading.",
+          toolUses: [{ name: "read_file", input: { path: "x" } }],
+          done: true,
+        },
+      ]),
+      "utf-8",
+    );
+    vi.stubEnv("CODEMAN_TEST_QA_TABLE", tempJsonPath);
+
+    const entries = loadQaTable();
+    expect(entries).toHaveLength(1);
+    expect(entries[0].turns).toHaveLength(1);
+    expect(entries[0].turns[0].done).toBe(true);
+    // legacy top-level done 不应泄漏
+    expect((entries[0] as unknown as Record<string, unknown>).done).toBeUndefined();
+  });
+
 });
