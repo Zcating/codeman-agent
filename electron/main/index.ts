@@ -9,6 +9,18 @@
 // from a clean `app://./index.html` URL instead of `file:///C:/.../index.html`.
 // TanStack Router's createBrowserHistory reads window.location.pathname which
 // on file:// is the absolute Windows path and never matches the `/` route.
+//
+// ─── .env loading ──────────────────────────────────────────────────────────
+// `import "dotenv/config"` runs as a side-effect import, BEFORE any other
+// import in this file. It populates `process.env` from the repo-root `.env`
+// (per `dotenv` default lookup at `process.cwd()/.env`). It does NOT touch
+// electron's `app` namespace, so the V3 `app.setPath`-first constraint above
+// is preserved (the constraint applies to imports that transitively call
+// `app.getPath('userData')` — dotenv has no such dependency). Shell-exported
+// env vars WIN over `.env` values (`dotenv` default: never overwrite existing
+// `process.env` keys). Missing `.env` is silently ignored.
+
+import "dotenv/config";
 
 import { app, BrowserWindow, Menu, protocol, net } from "electron";
 import { join, sep, normalize } from "node:path";
@@ -79,8 +91,8 @@ function registerAppProtocol(): void {
 
 function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1400,
+    height: 700,
     minWidth: 600,
     minHeight: 400,
     title: "Codeman",

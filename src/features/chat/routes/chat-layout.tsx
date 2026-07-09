@@ -18,7 +18,6 @@ import {
   loadConversations,
   renameWorkspace,
   removeWorkspace,
-  addWorkspace,
 } from "../stores/chat.store";
 import { showRenameDialog } from "../components/workspace-rename-dialog";
 
@@ -85,15 +84,6 @@ export function ChatLayout(): JSX.Element {
     setSelectedWorkspaceId(wsId);
   };
 
-  const handleAddWorkspace = async () => {
-    // D8-W: workspace 所有权在 chat 域，不再走 /settings。Mirror home.tsx 的逻辑：
-    // 调 pickWorkspacePath + WorkspaceService.add 写 DB，更新 store 信号，选中新 ws。
-    const exit = await Effect.runPromiseExit(addWorkspace());
-    if (Exit.isFailure(exit)) {
-      console.error("[chat-layout] addWorkspace failed:", exit.cause);
-    }
-  };
-
   const handleRenameWorkspace = async (workspaceId: string, currentLabel: string) => {
     const newLabel = await showRenameDialog(currentLabel);
 
@@ -130,10 +120,10 @@ export function ChatLayout(): JSX.Element {
         onSelectItem={handleSelectItem}
         onDeleteItem={handleDeleteItem}
         onCreateItem={handleBackToHome}
-        onAddWorkspace={handleAddWorkspace}
         onEmptyWorkspaceClick={handleEmptyWorkspaceClick}
         onRenameWorkspace={handleRenameWorkspace}
         onDeleteWorkspace={handleDeleteWorkspace}
+        class="border-r border-sidebar-border"
       />
 
       <section class="flex-1 flex flex-col overflow-hidden">

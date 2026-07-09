@@ -24,56 +24,7 @@
 
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { loadQaTable, type QaEntry, type QaTurn } from "./qa-loader";
-
-// ─── Config ────────────────────────────────────────────────────────────────
-
-const DEFAULT_PORT = 50000;
-const DEFAULT_HOST = "127.0.0.1";
-const DEFAULT_STREAM_DELAY_MS = 1; // 1ms per SSE event — visible streaming without slowing tests
-const DEFAULT_DELTA_SIZE = 1; // characters per content_block_delta
-
-function resolvePort(): number {
-  const raw = process.env["CODEMAN_MOCK_PORT"];
-  if (!raw) {
-    return DEFAULT_PORT;
-  }
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isFinite(n) || n <= 0 || n > 65535) {
-    logger.warn(`[mock-server] invalid CODEMAN_MOCK_PORT=${raw}, fallback to ${DEFAULT_PORT}`);
-    return DEFAULT_PORT;
-  }
-  return n;
-}
-
-function resolveHost(): string {
-  return process.env["CODEMAN_MOCK_HOST"] ?? DEFAULT_HOST;
-}
-
-function resolveStreamDelayMs(): number {
-  const raw = process.env["CODEMAN_MOCK_STREAM_DELAY_MS"];
-  if (!raw) {
-    return DEFAULT_STREAM_DELAY_MS;
-  }
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isFinite(n) || n < 0 || n > 10000) {
-    logger.warn(`[mock-server] invalid CODEMAN_MOCK_STREAM_DELAY_MS=${raw}, fallback to ${DEFAULT_STREAM_DELAY_MS}`);
-    return DEFAULT_STREAM_DELAY_MS;
-  }
-  return n;
-}
-
-function resolveDeltaSize(): number {
-  const raw = process.env["CODEMAN_MOCK_DELTA_SIZE"];
-  if (!raw) {
-    return DEFAULT_DELTA_SIZE;
-  }
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isFinite(n) || n < 1 || n > 100) {
-    logger.warn(`[mock-server] invalid CODEMAN_MOCK_DELTA_SIZE=${raw}, fallback to ${DEFAULT_DELTA_SIZE}`);
-    return DEFAULT_DELTA_SIZE;
-  }
-  return n;
-}
+import { readMockServerConfig } from "./config-service";
 
 // ─── Logger (avoid pulling in shared/lib/logger which is renderer-side) ────
 
@@ -457,7 +408,7 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
           "Cache-Control": "no-cache",
           Connection: "keep-alive",
         });
-        writeSseStream(res, events, resolveStreamDelayMs());
+        writeSseStream(res, events, readMockServerConfig().streamDelayMs);
         return;
       }
 
@@ -465,8 +416,7 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
       const turnIdx = Math.min(asstCount, entry.turns.length - 1);
       const turn = entry.turns[turnIdx];
 
-      const delayMs = resolveStreamDelayMs();
-      const deltaSize = resolveDeltaSize();
+      const { streamDelayMs: delayMs, deltaSize } = readMockServerConfig();
       const events = buildSseTurnEvents(turn, deltaSize);
       logger.info(
         `[mock-server] hit "${entry.question}" turn=${turnIdx}/${entry.turns.length - 1} ` +
@@ -500,15 +450,19 @@ export function startMockServer(): void {
     return;
   }
 
+  // Snapshot config at startup — host/port don't change after bind.
+  // Per-request values (streamDelayMs / deltaSize) are read inside handleRequest
+  // so tests can flip env between requests.
+  const cfg = readMockServerConfig();
+
   // Production: skip — 节省资源(user 不大可能配 127.0.0.1:50000 mock provider 在生产)
-  const isProd = process.env["NODE_ENV"] === "production";
-  if (isProd && !process.env["CODEMAN_MOCK_FORCE"]) {
+  if (cfg.isProduction && !cfg.forceEnableInProduction) {
     logger.info(`[mock-server] production mode, skipping (set CODEMAN_MOCK_FORCE=1 to override)`);
     return;
   }
 
-  const host = resolveHost();
-  const port = resolvePort();
+  const host = cfg.host;
+  const port = cfg.port;
 
   server = createServer(handleRequest);
   server.on("error", (err: Error) => {

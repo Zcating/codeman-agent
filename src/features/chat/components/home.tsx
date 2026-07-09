@@ -14,7 +14,7 @@
 //! - 2+ workspaces → no pre-select, input disabled until user picks
 
 import { createMemo, createSignal, Show, type JSX } from "solid-js";
-import { FolderPlus, Send } from "lucide-solid";
+import { Send } from "lucide-solid";
 import { Effect, Exit } from "effect";
 import { useNavigate } from "@tanstack/solid-router";
 import { appStore } from "../../../shared/stores/app.store";
@@ -167,6 +167,12 @@ export function HomeAgentForm(): JSX.Element {
             rows={3}
             value={input()}
             onInput={(e) => setInput(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                e.preventDefault();
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
             disabled={isInputDisabled()}
             placeholder={
               wsCount() === 0
@@ -180,46 +186,33 @@ export function HomeAgentForm(): JSX.Element {
 
           {/* Row: workspace picker + LLM picker (D6-H4) */}
           <div class="flex items-center gap-2">
-            {/* Workspace picker area — CTA or picker */}
-            <Show
-              when={wsCount() > 0}
-              fallback={
-                <div class="w-[200px]">
-                  <div class="flex h-10 items-center justify-center rounded-md border border-dashed border-input bg-background px-3 py-2 text-sm text-muted-foreground">
-                    <FolderPlus class="h-4 w-4 mr-2" aria-hidden="true" />
-                    No workspaces
-                  </div>
-                </div>
-              }
-            >
-              <div class="w-[200px]">
-                <CodemanSelect
-                  options={workspaces().map((w) => ({ label: w.label, value: w.id }))}
-                  value={selectedWorkspaceId()}
-                  onChange={(id) => {
-                    setSelectedWorkspaceId(id);
+            {/* Workspace picker — always rendered (Select mode, even with 0 workspaces) */}
+            <div class="w-[200px]">
+              <CodemanSelect
+                options={workspaces().map((w) => ({ label: w.label, value: w.id }))}
+                value={selectedWorkspaceId()}
+                onChange={(id) => {
+                  setSelectedWorkspaceId(id);
+                }}
+                placeholder="Select a workspace…"
+                disabled={false}
+                data-testid="workspace-select"
+              >
+                {/* Action slot: "+ Add new workspace" button (D6-H1) */}
+                <button
+                  type="button"
+                  data-testid="workspace-select-add-btn"
+                  class="w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                  onClick={async () => {
+                    const exit = await Effect.runPromiseExit(addWorkspace());
+                    if (exit._tag === "Failure") return;
+                    textareaRef?.focus();
                   }}
-                  placeholder="Select a workspace…"
-                  disabled={false}
-                  data-testid="workspace-select"
                 >
-                  {/* Action slot: "+ Add new workspace" button (D6-H1) */}
-                  <hr role="separator" />
-                  <button
-                    type="button"
-                    data-testid="workspace-select-add-btn"
-                    class="w-full px-3 py-2 text-left text-sm hover:bg-accent"
-                    onClick={async () => {
-                      const exit = await Effect.runPromiseExit(addWorkspace());
-                      if (exit._tag === "Failure") return;
-                      textareaRef?.focus();
-                    }}
-                  >
-                    + Add new workspace…
-                  </button>
-                </CodemanSelect>
-              </div>
-            </Show>
+                  + Add new workspace…
+                </button>
+              </CodemanSelect>
+            </div>
 
             {/* LLM picker (D6-H5) */}
             <LlmPicker />

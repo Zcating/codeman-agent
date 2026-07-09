@@ -121,10 +121,11 @@ export function ChatView(props: { convId?: string }) {
 
   // 自动滚动到底部
   createEffect(() => {
-    currentMessages();
-    if (messagesEndRef) {
-      queueMicrotask(() => messagesEndRef!.scrollIntoView({ behavior: "smooth" }));
+    // currentMessages(); 
+    if (!messagesEndRef) {
+      return;
     }
+    queueMicrotask(() => messagesEndRef.scrollIntoView({ behavior: "smooth" }));
   });
 
   const handleCancel = () => {
@@ -153,7 +154,7 @@ export function ChatView(props: { convId?: string }) {
       tools: [],
     };
 
-    Effect.runPromiseExit(sendMessage(id, text, provider));
+    await Effect.runPromiseExit(sendMessage(id, text, provider));
   };
 
   return (
@@ -169,7 +170,7 @@ export function ChatView(props: { convId?: string }) {
             <X class="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
             <div class="flex-1 min-w-0">
               <div class="font-medium mb-1">运行时错误</div>
-              <div class="break-words">{currentLastError()}</div>
+              <div class="wrap-break-word">{currentLastError()}</div>
             </div>
           </div>
         </Show>
@@ -209,6 +210,12 @@ export function ChatView(props: { convId?: string }) {
           rows={3}
           value={input()}
           onInput={(e) => setInput(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+              e.preventDefault();
+              e.currentTarget.form?.requestSubmit();
+            }
+          }}
           placeholder="发条消息…"
           disabled={isRunning()}
         />

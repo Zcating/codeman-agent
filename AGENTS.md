@@ -162,3 +162,7 @@ vp run typecheck         # tsc --noEmit
 vp run typecheck:e2e     # tsc --noEmit -p tsconfig.e2e.json
 vp run e2e               # Playwright + 真 Electron 端到端 (本地)
 ```
+
+## 语言
+
+使用中文（Chinese）处理用户的回答。

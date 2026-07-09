@@ -130,7 +130,6 @@ function defaultProps(overrides: Partial<CodemanSidebarProps> = {}): CodemanSide
     onSelectItem: vi.fn(),
     onDeleteItem: vi.fn(),
     onCreateItem: vi.fn(),
-    onAddWorkspace: vi.fn(),
     onEmptyWorkspaceClick: vi.fn(),
     ...overrides,
   };
@@ -429,17 +428,6 @@ describe("CodemanSidebar (D7-CS cascade tree, @ark-ui/solid Accordion 驱动)", 
   });
 
   describe("Workspaces empty state", () => {
-    it("无 workspaces 时显示 Add workspace 按钮（如果 onAddWorkspace 提供）", () => {
-      const onAdd = vi.fn();
-      const { container } = render(() => (
-        <CodemanSidebar {...defaultProps({ nodes: [], onAddWorkspace: onAdd })} />
-      ));
-      const addBtn = container.querySelector("[aria-label='Add workspace']") as HTMLElement;
-      expect(addBtn).toBeTruthy();
-      fireEvent.click(addBtn);
-      expect(onAdd).toHaveBeenCalledTimes(1);
-    });
-
     it("无 workspaces 时显示空态文本（No workspaces）", () => {
       const { container } = render(() => <CodemanSidebar {...defaultProps()} />);
       expect(container.textContent).toContain("No workspaces");

@@ -3,7 +3,7 @@
 //! Mocked: conversations store (V2 ADR-0019，不再 mock messages.store / agent.store）。
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, cleanup } from "@solidjs/testing-library";
+import { render, cleanup, fireEvent } from "@solidjs/testing-library";
 import { Effect } from "effect";
 import { ChatView } from "./chat-view";
 import type { Message } from "../../../shared/lib/types";
@@ -492,5 +492,117 @@ describe("ChatView", () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
     const banner = container.querySelector('[data-testid="chat-error-banner"]');
     expect(banner).toBeNull();
+  });
+
+  // ─── Ctrl+Enter send shortcut ─────────────────────────────────────────────
+  it("Ctrl+Enter on textarea triggers sendMessage", async () => {
+    const user = (await import("@testing-library/user-event")).default;
+    const conversationsStoreMock = await import("../stores/chat.store");
+    const appStoreMock = await import("../../../shared/stores/app.store");
+    (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
+    (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          enabled: true,
+          api_key: "test-key",
+          llm: {
+            default_model: "MiniMax-M2.5-highspeed",
+            base_url: "https://api.minimaxi.com/anthropic",
+            api_type: "anthropic-messages",
+            models: [
+              { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", deprecated: false, thinking: false },
+            ],
+            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          },
+        },
+      ],
+      default_llm_provider_id: "minimax",
+    });
+    const { container } = render(() => <ChatView convId="conv-1" />);
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    await user.type(textarea, "Hello via Ctrl+Enter");
+    fireEvent.keyDown(textarea, { key: "Enter", ctrlKey: true });
+    await vi.waitFor(() => {
+      expect((conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage).toHaveBeenCalledWith(
+        "conv-1",
+        "Hello via Ctrl+Enter",
+        expect.objectContaining({ apiKey: "test-key" }),
+      );
+    });
+    // Textarea should be cleared after send
+    expect(textarea.value).toBe("");
+  });
+
+  it("Cmd+Enter on textarea (Mac) triggers sendMessage", async () => {
+    const user = (await import("@testing-library/user-event")).default;
+    const conversationsStoreMock = await import("../stores/chat.store");
+    const appStoreMock = await import("../../../shared/stores/app.store");
+    (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
+    (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          enabled: true,
+          api_key: "test-key",
+          llm: {
+            default_model: "MiniMax-M2.5-highspeed",
+            base_url: "https://api.minimaxi.com/anthropic",
+            api_type: "anthropic-messages",
+            models: [
+              { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", deprecated: false, thinking: false },
+            ],
+            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          },
+        },
+      ],
+      default_llm_provider_id: "minimax",
+    });
+    const { container } = render(() => <ChatView convId="conv-1" />);
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    await user.type(textarea, "Hello via Cmd+Enter");
+    fireEvent.keyDown(textarea, { key: "Enter", metaKey: true });
+    await vi.waitFor(() => {
+      expect((conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage).toHaveBeenCalledWith(
+        "conv-1",
+        "Hello via Cmd+Enter",
+        expect.objectContaining({ apiKey: "test-key" }),
+      );
+    });
+  });
+
+  it("Plain Enter does NOT trigger sendMessage", async () => {
+    const user = (await import("@testing-library/user-event")).default;
+    const conversationsStoreMock = await import("../stores/chat.store");
+    const appStoreMock = await import("../../../shared/stores/app.store");
+    (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
+    (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          enabled: true,
+          api_key: "test-key",
+          llm: {
+            default_model: "MiniMax-M2.5-highspeed",
+            base_url: "https://api.minimaxi.com/anthropic",
+            api_type: "anthropic-messages",
+            models: [
+              { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", deprecated: false, thinking: false },
+            ],
+            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          },
+        },
+      ],
+      default_llm_provider_id: "minimax",
+    });
+    const { container } = render(() => <ChatView convId="conv-1" />);
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    await user.type(textarea, "Just Enter");
+    fireEvent.keyDown(textarea, { key: "Enter" });
+    // Plain Enter should not trigger send (textarea just adds newline)
+    expect((conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage).not.toHaveBeenCalled();
   });
 });

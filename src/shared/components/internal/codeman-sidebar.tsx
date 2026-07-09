@@ -9,7 +9,7 @@
 //!   符合 ADR-0023 D7-CS2「组件内部 signal，不持久化、不耦合 appStore」。
 
 import { createSignal, For, Show, type JSX } from "solid-js";
-import { ChevronRight, Folder, MessageSquare, Loader2, Plus, FolderPlus, Pencil, Trash2 } from "lucide-solid";
+import { ChevronRight, Folder, MessageSquare, Loader2, Plus, Pencil, Trash2 } from "lucide-solid";
 import { Accordion } from "@ark-ui/solid";
 import {
   Sidebar,
@@ -53,16 +53,17 @@ export interface CodemanSidebarProps {
   onSelectItem: (id: string) => void;
   onDeleteItem?: (id: string) => void;
   onCreateItem?: () => void;
-  onAddWorkspace?: () => void;
   onEmptyWorkspaceClick?: (workspaceId: string) => void; // D7-CS6
   onRenameWorkspace?: (workspaceId: string, currentLabel: string) => void;
   onDeleteWorkspace?: (workspaceId: string, label: string) => void;
 
   // Customization
   createLabel?: string; // default: "新对话"
-  addWorkspaceLabel?: string; // default: "Add workspace"
   workspacesEmptyText?: string; // default: "No workspaces"
   emptyConvText?: string; // default: "该 workspace 暂无会话"
+
+  // Additional styling
+  class?: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -77,7 +78,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
   const [confirmingId, setConfirmingId] = createSignal<string | null>(null);
 
   return (
-    <Sidebar>
+    <Sidebar class={props.class}>
       {/* Create button — only when onCreateItem provided */}
       <Show when={props.onCreateItem}>
         <SidebarHeader>
@@ -105,17 +106,6 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
               fallback={
                 <div class="p-3 text-sm text-muted-foreground">
                   <p>{props.workspacesEmptyText ?? "No workspaces"}</p>
-                  <Show when={props.onAddWorkspace}>
-                    <button
-                      type="button"
-                      class="mt-2 flex w-full items-center justify-center gap-2 rounded-md border border-input px-3 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
-                      onClick={() => props.onAddWorkspace?.()}
-                      aria-label={props.addWorkspaceLabel ?? "Add workspace"}
-                    >
-                      <FolderPlus class="h-4 w-4" />
-                      {props.addWorkspaceLabel ?? "Add workspace"}
-                    </button>
-                  </Show>
                 </div>
               }
             >

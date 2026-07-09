@@ -173,17 +173,41 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
     cleanup();
   });
 
-  it("T4.1.1: 0 workspaces → shows 'No workspaces' placeholder, input permanently disabled", async () => {
+  it("T4.1.1: 0 workspaces → Select trigger renders, input permanently disabled", async () => {
     // Workspaces already empty from beforeEach
-    const { getByTestId, getByText } = render(() => <HomeAgentForm />);
+    const { getByTestId } = render(() => <HomeAgentForm />);
 
     // Textarea should be visible but disabled
     const textarea = getByTestId("codex-input") as HTMLTextAreaElement;
     expect(textarea.disabled).toBe(true);
     expect(textarea.placeholder).toBe("Add a workspace to start");
 
-    // Workspace picker area shows "No workspaces" placeholder
-    expect(getByText("No workspaces")).toBeTruthy();
+    // Workspace Select trigger is rendered even with 0 workspaces
+    expect(getByTestId("workspace-select-trigger")).toBeTruthy();
+  });
+
+  it("T4.1.1b: 0 workspaces → Select trigger click opens dropdown with Add workspace action", async () => {
+    const { getByTestId } = render(() => <HomeAgentForm />);
+
+    // Open the Select dropdown
+    const selectTrigger = getByTestId("workspace-select-trigger");
+    fireEvent.click(selectTrigger);
+
+    // Action slot button "+ Add new workspace…" should be present
+    expect(getByTestId("workspace-select-add-btn")).toBeTruthy();
+  });
+
+  it("T4.1.1c: 0 workspaces → Action slot click triggers addWorkspace", async () => {
+    const { getByTestId } = render(() => <HomeAgentForm />);
+
+    // Open the Select dropdown and click Add workspace button
+    const selectTrigger = getByTestId("workspace-select-trigger");
+    fireEvent.click(selectTrigger);
+    const addBtn = getByTestId("workspace-select-add-btn");
+    fireEvent.click(addBtn);
+
+    // addWorkspace from chat.store is called
+    expect(addWorkspaceFromStore).toHaveBeenCalledTimes(1);
   });
 
   it("T4.1.2: 1 workspace → input immediately enabled (draftWorkspaceId auto-set)", async () => {
@@ -646,5 +670,117 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
     // First provider minimax → model "MiniMax-M2.5-highspeed"
     const modelOption = document.querySelector('li[data-value="MiniMax-M2.5-highspeed"]');
     expect(modelOption).toBeTruthy();
+  });
+});
+
+// ─── Ctrl+Enter send shortcut (T4.3) ─────────────────────────────────────────
+
+describe("HomeAgentForm — Ctrl+Enter / Cmd+Enter send shortcut (T4.3)", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    mockIsOpen = false;
+    sharedOnValueChanges = [];
+    mockWorkspaces.length = 0;
+    mockSelectedWsId = "ws-1";
+    const { appStore } = await import("../../../shared/stores/app.store");
+    appStore.state.value.providers = [
+      {
+        id: "minimax",
+        label: "MiniMax",
+        api_key: "test-key",
+        enabled: true,
+        llm: {
+          default_model: "MiniMax-M2.5-highspeed",
+          base_url: "https://api.minimaxi.com/anthropic",
+          api_type: "anthropic-messages" as const,
+          models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          models: [
+            { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", context_window: 200000, deprecated: false, thinking: false },
+          ],
+        },
+      },
+    ];
+    appStore.state.value.system_prompt = { default: "You are a helpful assistant.", user_can_edit: true };
+    mockDefaultLlmProvider.id = "minimax";
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("T4.3.1: Ctrl+Enter on textarea triggers form submit → createConversation + sendMessage called", async () => {
+    mockWorkspaces.push({ id: "ws-1", label: "Project A", root_path: "C:\\a" });
+
+    const { container } = render(() => <HomeAgentForm />);
+
+    const textarea = container.querySelector("[data-testid='codex-input']") as HTMLTextAreaElement;
+    fireEvent.input(textarea, { target: { value: "Hello via Ctrl+Enter" } });
+
+    // Simulate Ctrl+Enter keydown
+    fireEvent.keyDown(textarea, { key: "Enter", ctrlKey: true });
+
+    await waitFor(() => {
+      expect(createConversation).toHaveBeenCalledWith("ws-1", "Hello via Ctrl+Enter");
+    });
+    await waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledWith(
+        "new-conv-id",
+        "Hello via Ctrl+Enter",
+        expect.objectContaining({ apiKey: "test-key" }),
+      );
+    });
+  });
+
+  it("T4.3.2: Cmd+Enter on textarea (Mac) triggers form submit → createConversation + sendMessage called", async () => {
+    mockWorkspaces.push({ id: "ws-1", label: "Project A", root_path: "C:\\a" });
+
+    const { container } = render(() => <HomeAgentForm />);
+
+    const textarea = container.querySelector("[data-testid='codex-input']") as HTMLTextAreaElement;
+    fireEvent.input(textarea, { target: { value: "Hello via Cmd+Enter" } });
+
+    // Simulate Cmd+Enter keydown (metaKey)
+    fireEvent.keyDown(textarea, { key: "Enter", metaKey: true });
+
+    await waitFor(() => {
+      expect(createConversation).toHaveBeenCalledWith("ws-1", "Hello via Cmd+Enter");
+    });
+    await waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledWith(
+        "new-conv-id",
+        "Hello via Cmd+Enter",
+        expect.objectContaining({ apiKey: "test-key" }),
+      );
+    });
+  });
+
+  it("T4.3.3: Enter without modifier does NOT trigger send", async () => {
+    mockWorkspaces.push({ id: "ws-1", label: "Project A", root_path: "C:\\a" });
+
+    const { container } = render(() => <HomeAgentForm />);
+
+    const textarea = container.querySelector("[data-testid='codex-input']") as HTMLTextAreaElement;
+    fireEvent.input(textarea, { target: { value: "Just Enter" } });
+
+    // Simulate plain Enter keydown (no modifiers)
+    fireEvent.keyDown(textarea, { key: "Enter" });
+
+    // createConversation should NOT be called
+    expect(createConversation).not.toHaveBeenCalled();
+  });
+
+  it("T4.3.4: Ctrl+Enter with empty input does not trigger send", async () => {
+    mockWorkspaces.push({ id: "ws-1", label: "Project A", root_path: "C:\\a" });
+
+    const { container } = render(() => <HomeAgentForm />);
+
+    const textarea = container.querySelector("[data-testid='codex-input']") as HTMLTextAreaElement;
+    // textarea is empty (no fireEvent.input)
+
+    // Simulate Ctrl+Enter with empty input
+    fireEvent.keyDown(textarea, { key: "Enter", ctrlKey: true });
+
+    expect(createConversation).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });
