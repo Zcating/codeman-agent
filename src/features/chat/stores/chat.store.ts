@@ -27,7 +27,7 @@ import {
 import {
   WorkspaceService,
   WorkspaceServiceLive,
-} from "../lib/workspace-service";
+} from "../../../shared/lib/workspace-service";
 import { deriveLabelFromPath } from "../../../shared/lib/derive-label-from-path";
 
 // ─── ConversationState 类型 (inline 在 chat.store) ──────
@@ -141,9 +141,13 @@ export function sendMessage(
     //    calling file tools. Without this, LLM picks e.g. "miniMax-workspace"
     //    (the workspace label derived from the folder name) and the IPC
     //    write_file/read_file/etc. fails with "Workspace not found: <label>".
+    //    T27: 同时把 workspaceId 通过 ProviderConfig 传给 runtime,作为兜底 —
+    //    即使 LLM 没传 workspace_id(系统 prompt 是 hint,不是 contract),
+    //    `createFileTools(workspaceId)` 包装层会在 schema 校验后注入到 args。
     const augmentedProvider: ProviderConfig = cs.workspace_id
       ? {
           ...provider,
+          workspaceId: cs.workspace_id,
           systemPrompt:
             `${provider.systemPrompt}\n\n` +
             `[Workspace context]\n` +

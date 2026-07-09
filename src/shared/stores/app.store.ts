@@ -35,7 +35,7 @@ import {
   SettingsService,
   SettingsServiceLive,
 } from "../lib/ipc";
-import { WorkspaceService, WorkspaceServiceLive } from "../../features/chat/lib/workspace-service";
+import { WorkspaceService, WorkspaceServiceLive } from "../lib/workspace-service";
 // Note: settingsSaver import removed - was used by deprecated addWorkspace method
 
 // ─── Default Settings (ADR-0015) ──────────────────────────────────────

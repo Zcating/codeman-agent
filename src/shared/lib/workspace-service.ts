@@ -1,8 +1,21 @@
 import { Context, Effect, Layer } from "effect";
-import { invoke as ipcInvoke } from "../../../shared/lib/ipc";
-import { logger } from "../../../shared/lib/logger";
-import type { AppError, Workspace } from "../../../shared/lib/types";
+import { invoke as ipcInvoke } from "./ipc";
+import { logger } from "./logger";
+import type { AppError, Workspace } from "./types";
 
+/**
+ * V3 ADR-0023 D8-W: Workspace ownership moved from Settings to chat domain
+ * (Electron SQLite). Effect Context.Tag + Layer pattern.
+ *
+ * **历史**：本服务最初位于 `src/features/chat/lib/workspace-service.ts`。
+ * 因 `src/shared/stores/app.store.ts` 的 `pickWorkspacePath()` 需要 Effect
+ * service 注入（ADR-0016 D4），shared/ 不能 import features/，违反单向依赖
+ * 规则（src/shared/AGENTS.md line 52）。**V3+ 重构**：本服务提升到 shared/lib/。
+ *
+ * **chat domain 仍然消费** `WorkspaceService.list()` / `add()` / `rename()` /
+ * `remove()` 渲染 sidebar / home workspace picker。chat.store.ts 现在从
+ * `../../shared/lib/workspace-service` import（保持 feature 业务逻辑本地化）。
+ */
 export class WorkspaceService extends Context.Tag("WorkspaceService")<WorkspaceService, {
   readonly list: () => Effect.Effect<Workspace[], AppError>;
   readonly add: (label: string, rootPath: string) => Effect.Effect<Workspace, AppError>;

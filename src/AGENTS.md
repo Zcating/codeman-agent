@@ -88,8 +88,8 @@ Vite 单页应用，渲染到单个 Electron BrowserWindow。路由走 TanStack 
 | 新增 sidebar 组件                 | 改 `shared/components/ui/sidebar.tsx`（primitive） + `shared/components/internal/codeman-sidebar.tsx`（业务组合），遵循 [ADR-0022](../docs/adr/0022-internal-components-and-design-tokens.md) + [ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md)（codeman-* namespace） |
 | 改 Home 布局 / Codex form         | 改 `src/features/chat/routes/index.tsx`（状态机）+ `src/features/chat/components/home.tsx`（Codex form）                            |
 | 改 `Conversation.workspace_id`    | 改 `electron/main/db/conversations.ts` + `src/shared/lib/types.ts`（TS 镜像）+ SQLite migration 在 `electron/main/db/migrations/` |
-| 改 `last_used_workspace_id`       | 改 `WorkspaceService`（`src/features/chat/lib/workspace-service.ts`）+ `src/features/chat/stores/chat.store.ts`（chatStore reactive 状态）。**不再**是 Settings 字段，**不再**走 `appStore`（ADR-0023 D8-W）。|
-| 新增 Workspace CRUD               | `electron/main/db/workspaces.ts`（Electron SQLite）+ `electron/main/ipc.ts`（IPC handler）+ `src/features/chat/lib/workspace-service.ts`（Effect Context.Tag + Live Layer）+ `src/features/chat/stores/chat.store.ts`（reactive bridge）。遵循 [ADR-0023 D8-W](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md)。|
+| 改 `last_used_workspace_id`       | 改 `WorkspaceService`（`src/shared/lib/workspace-service.ts`，V3+ 从 features/chat/lib 提升）+ `src/features/chat/stores/chat.store.ts`（chatStore reactive 状态）。**不再**是 Settings 字段，**不再**走 `appStore`（ADR-0023 D8-W）。|
+| 新增 Workspace CRUD               | `electron/main/db/workspaces.ts`（Electron SQLite）+ `electron/main/ipc.ts`（IPC handler）+ `src/shared/lib/workspace-service.ts`（Effect Context.Tag + Live Layer）+ `src/features/chat/stores/chat.store.ts`（reactive bridge）。遵循 [ADR-0023 D8-W](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md）。|
 | 新增 Dialog 原子                  | `shared/components/ui/dialog.tsx`（@ark-ui/solid Dialog 包装，shadcn/ui 风格）+ `shared/components/internal/codeman-dialog.tsx`（命令式 alert / confirm / show）。遵循 [ADR-0023 D8-W6](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md)。|
 | 新增跨域设计系统原子              | `shared/components/ui/<Name>.tsx`（PascalCase）+ 同名 `<Name>.test.tsx`；Select primitive 走 @ark-ui/solid 包装（[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-S）            |
 | 新增跨域业务组件                  | `shared/components/internal/codeman-<Name>.tsx`（**ADR-0022** 首例 `codeman-sidebar`；[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-N codeman-* prefix 锁定；新组件须严格 prop-driven）      |
@@ -99,7 +99,7 @@ Vite 单页应用，渲染到单个 Electron BrowserWindow。路由走 TanStack 
 | 新增 feature 子组件               | `features/<feature>/components/<name>.tsx`（kebab-case + PascalCase 导出）                                                         |
 | 新增 Effect 桥接                  | `features/<feature>/stores/<domain>.ts`（Accessor 暴露 + Effect.gen 包 IPC）                                                       |
 | 新增 feature-level Effect service | `features/<feature>/lib/<name>.ts`（Context.Tag + Layer.effect）                                                                   |
-| 新增 LLM 工具                     | `features/billing/lib/<name>.ts`（Type.Object schema + execute handler）+ 同步 `features/chat/lib/runtime.ts` 的 billingTools 数组 |
+| 新增 LLM 工具                     | `features/file-tools/lib/<name>.ts`（Type.Object schema + execute handler）+ 同步 `features/chat/lib/runtime.ts` 的 `tools` 数组。**注意**：`features/billing/` 目录从未落地（ADR-0012 V2 反转时合并到 file-tools 工具 schema 模式）。 |
 | 反应式异常                        | 先查 `features/<feature>/stores/*.ts` 监听器注册，再查组件                                                                         |
 | 改样式                            | 改 `@theme` token（`src/index.css`）；组件只写 utility class                                                                       |
 | 改主题行为                        | 改 `src/shared/stores/theme.ts`（Solid effect 监听 `prefers-color-scheme`）                                                        |

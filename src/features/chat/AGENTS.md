@@ -1,8 +1,10 @@
 # src/features/chat/ — Chat Feature (聊天域)
 
-> **chat feature** = lib (`createAgentRuntime` + `WorkspaceService`) + stores (`chat.store` Solid createStore) + components (4 UI 原子 + 2 workspace dialogs) + routes。
+> **chat feature** = lib (`createAgentRuntime`) + stores (`chat.store` Solid createStore) + components (4 UI 原子 + 2 workspace dialogs) + routes。
 > 本目录结构遵循 [ADR-0010](../../docs/adr/0010-frontend-5-1-folder-whitelist.md) 的 5 子目录白名单（`stores` / `components` / `routes` / `hooks` / `lib`）。
-> Billing tools（`src/features/billing/lib/billing.ts`）由本 feature 的 `lib/runtime.ts` 引用注册。
+> WorkspaceService **V3+ 提升到 `src/shared/lib/workspace-service.ts`**（共享基础设施）。因 appStore.pickWorkspacePath()（ADR-0016 D4）需要 Effect service 注入，shared/ 不能 import features/，违反 src/shared/AGENTS.md line 52 单向依赖规则。
+> File tools（`src/features/file-tools/lib/file-tools.ts`）由本 feature 的 `lib/runtime.ts` 引用注册。
+> **注意**：`src/features/billing/` 目录从未落地（ADR-0012 V2 反转时合并到 file-tools 工具 schema 模式）。billing tools 概念已并入 file-tools 的统一 tools 数组。
 > Workspace 是 chat 域子概念（per ADR-0023 D8-W），不再归 Settings。
 
 ## 目录布局（ADR-0010 V1.5 + ADR-0019 V2）
@@ -14,9 +16,11 @@ src/features/chat/
 │
 ├── lib/                  # 纯逻辑 / Effect-TS 运行时
 │   ├── runtime.ts        # createAgentRuntime() 工厂 + ProviderConfig / RunOptions / AgentRuntime 类型
-│   ├── runtime.test.ts   # 工厂模式 + mock Agent + per-run lifecycle
-│   ├── workspace-service.ts  # WorkspaceService (Effect Context.Tag + SQLite persistence, per ADR-0023 D8-W2)
-│   └── workspace-service.test.ts
+│   └── runtime.test.ts   # 工厂模式 + mock Agent + per-run lifecycle
+│
+│ # WorkspaceService 已 V3+ 提升到 `src/shared/lib/workspace-service.ts`（共享基础设施）。
+│ # 因 appStore.pickWorkspacePath()（ADR-0016 D4）需要 Effect service 注入，shared/
+│ # 不能 import features/，违反 src/shared/AGENTS.md line 52 单向依赖规则。
 │
 ├── stores/               # 反应式状态（Solid createStore）
 │   ├── chat.store.ts     # 原 conversations.store.ts (renamed); ConversationState + workspace CRUD + bridge
@@ -32,9 +36,10 @@ src/features/chat/
 │   ├── chat-view.tsx     # Main chat UI（用 chat.store，不再 import messages.store / agent.store）
 │   ├── chat-view.test.tsx
 │   ├── workspace-rename-dialog.tsx  # Sidebar hover → rename modal (calls chatStore.renameWorkspace)
-│   ├── workspace-rename-dialog.test.tsx
-│   ├── workspace-delete-dialog.tsx  # Sidebar hover → delete confirm modal (calls chatStore.removeWorkspace)
-│   └── workspace-delete-dialog.test.tsx
+│   └── workspace-rename-dialog.test.tsx
+│ # 注意：`workspace-delete-dialog.tsx` + test 在 V2.2 ADR-0023 D8-W 计划中列出
+│ # 但未单独落地 — delete workspace 走 `codeman-dialog` 命令式 `Dialog.confirm()` inline
+│ # 在 `routes/chat-layout.tsx` 的 `handleDeleteWorkspace` 中（per ADR-0023 D8-W6）。
 │
 └── routes/
     └── index.tsx         # ChatLayout — Sidebar + ChatView + Settings link
@@ -167,8 +172,8 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 
 ## 跨 feature 引用
 
-- **Billing tools**：`src/features/billing/lib/billing.ts` 导出 `billingTools`，本 feature `lib/runtime.ts` 注册到 `Agent`。
-- **File tools**：`src/features/file-tools/lib/file-tools.ts` 导出 `fileTools`（5 个：read / write / edit / search / delete），本 feature `lib/runtime.ts` 注册到 `Agent`（与 billingTools 并列）。
+- **Billing tools**：**未实现**（见上述 billing 目录未落地的说明）。若未来需要独立 LLM 工具域（web search / image gen），按 ADR-0010 5+1 白名单新建 `features/<domain>/lib/<name>.ts` 并注册到本 feature 的 `lib/runtime.ts`。
+- **File tools**：`src/features/file-tools/lib/file-tools.ts` 导出 `fileTools`（5 个：read / write / edit / search / delete），本 feature `lib/runtime.ts` 注册到 `Agent`。
 - **跨域类型**：从 `src/shared/lib/types.ts` 导入（ADR-0010 后从 `shared/types/` 迁）。
 - **跨域 IPC**：从 `src/shared/lib/ipc.ts` 导入 Service Tags。
 - **`codeman-select` / `codeman-group-select` wrappers from `shared/components/ui/`** — used by HomeAgentForm (workspace picker) + chat-view ProviderSelect (provider picker)

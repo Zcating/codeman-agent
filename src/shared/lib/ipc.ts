@@ -51,6 +51,12 @@ export interface CodemanApi {
   renameWorkspace: (id: string, label: string) => Promise<unknown>;
   deleteWorkspace: (id: string) => Promise<unknown>;
   pickWorkspacePath: () => Promise<unknown>;
+  /**
+   * V3+ ADR-0023 D8-W: 删除 provider（注意：当前 Electron 后端未实现，
+   * ProviderService.delete 仍会触发 IPC 失败 — 由 mapError 转 AppError）。
+   * 留此声明是为 renderer/preload 类型一致，避免 dispatchInvoke 命中 default 抛 Unknown。
+   */
+  deleteProvider: (id: string) => Promise<unknown>;
   readFile: (workspaceId: string, path: string) => Promise<unknown>;
   writeFile: (workspaceId: string, path: string, content: string) => Promise<unknown>;
   editFile: (
@@ -130,6 +136,8 @@ async function dispatchInvoke<T>(
       return (await a.deleteWorkspace(arg("id") as string)) as T;
     case "pick_workspace_path":
       return (await a.pickWorkspacePath()) as T;
+    case "delete_provider":
+      return (await a.deleteProvider(arg("id") as string)) as T;
     case "read_file":
       return (await a.readFile(arg("workspaceId") as string, arg("path") as string)) as T;
     case "write_file":

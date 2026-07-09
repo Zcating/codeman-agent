@@ -134,17 +134,13 @@ codeman-agent/
 │       │   ├── components/        # provider-card
 │       │   ├── routes/            # /settings 路由
 │       │   └── lib/               # llm-providers + system-prompt（从 subsystems/ 迁入；snake_case 已修）
-│       └── billing/               # 工具域 — 仅 lib（无 UI）
-│           ├── AGENTS.md
-│           ├── index.ts
-│           └── lib/               # billing.ts（从 tools/ 迁入）
 │       └── file-tools/           # 文件工具域 — lib（无 UI，V2 新增）
 │           ├── AGENTS.md
 │           ├── index.ts
 │           └── lib/               # file-tools.ts + file-tools.test.ts
 │
 ├── electron/                      # Electron 后端（main + preload）
-├── docs/adr/                      # 10 个 ADR（0001-0010，见下方索引）
+├── docs/adr/                      # 25 个 ADR（0001-0024，见下方索引）
 ├── (mocks 改在 src/__mocks__/ — 详见 src/AGENTS.md)
 ├── docs/                          # 治理文档（translation-rules 等）
 └── .agents/                       # 本地 agent skills

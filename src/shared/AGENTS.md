@@ -43,10 +43,12 @@ Per [ADR-0023](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-N:
 ```
 features/chat  ──imports──►  shared/
 features/settings              shared/components/ui/
-features/billing                shared/lib/
+features/file-tools            shared/lib/
                                 shared/stores/
                                 shared/hooks/        (V1 预留)
-                                shared/components/internal/  (V1 预留)
+                                shared/components/internal/
+                                （注：features/billing/ 从未落地，
+                                 若未来需要按 ADR-0010 5+1 白名单新建并接入此规则）
 ```
 
 **反向禁止**：`shared/` 目录下任何文件不得 import `src/features/` 下的任何模块。

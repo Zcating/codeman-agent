@@ -93,11 +93,11 @@ vi.mock("../../../shared/lib/ipc", async () => {
 
 // ─── Mock workspace-service ──────────────────────────────────────────
 
-vi.mock("../lib/workspace-service", async () => {
+vi.mock("../../../shared/lib/workspace-service", async () => {
   const { Layer, Effect: E } = await import("effect");
   const { WorkspaceService } = await vi.importActual<
-    typeof import("../lib/workspace-service")
-  >("../lib/workspace-service");
+    typeof import("../../../shared/lib/workspace-service")
+  >("../../../shared/lib/workspace-service");
   // Default mock behavior
   return {
     WorkspaceService,

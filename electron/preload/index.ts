@@ -57,6 +57,12 @@ const codeman = {
     ipcRenderer.invoke("delete_workspace", { id }),
   pickWorkspacePath: () => ipcRenderer.invoke("pick_workspace_path"),
 
+  // Provider CRUD (V3+ ADR-0023 D8-W). NOTE: Electron main process does NOT
+  // currently register a "delete_provider" handler — the IPC will surface a
+  // "no handler registered" error from main. Local appStore.deleteProvider()
+  // already mutates client state; backend sync is a follow-up task.
+  deleteProvider: (id: string) => ipcRenderer.invoke("delete_provider", { id }),
+
   // Filesystem
   readFile: (workspaceId: string, path: string) =>
     ipcRenderer.invoke("read_file", { workspaceId, path }),

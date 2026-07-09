@@ -24,11 +24,14 @@ describe("T1 — package.json V3 state (D2 + D5 + D6 amendments)", () => {
       expect(devDeps?.["vite-plus"]).toBeUndefined();
     });
 
-    it("@tauri-apps/api core REMAINS until T5 source migration", () => {
-      // Per consensus 1.3 shim: tauri.ts re-exports from ipc.ts, but
-      // tauri.ts body still imports from @tauri-apps/api/core until T5.
-      // Removal is T5's responsibility.
-      expect(deps?.["@tauri-apps/api"]).toBeDefined();
+    it("@tauri-apps/api REMOVED (T5 source migration complete: ipc.ts fully replaces tauri.ts)", () => {
+      // V3.x+: tauri.ts → ipc.ts migration done. `window.codeman.invoke()` (set by
+      // electron/preload/index.ts via contextBridge) is the sole IPC entry. No
+      // `@tauri-apps/api` import remains in src/ (verified by `grep -r @tauri-apps src`).
+      // The 3-line tauri.ts re-export shim (if any) is no longer needed and can be deleted
+      // in a follow-up cleanup. Removing this dep shrinks install footprint and prevents
+      // accidental reintroduction of Tauri-specific code.
+      expect(deps?.["@tauri-apps/api"]).toBeUndefined();
     });
   });
 
