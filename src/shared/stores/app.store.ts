@@ -25,6 +25,7 @@
 import { createStore } from "solid-js/store";
 import { Effect } from "effect";
 import type { Settings, Provider, ModelMeta, AppError, Workspace } from "../lib/types";
+import { logger } from "../lib/logger";
 // V3: route IPC through the V3 canonical (window.codeman dispatch) instead of
 // the V2 @tauri-apps/api/core which reads window.__TAURI_INTERNALS__ (missing
 // in V3 Electron).
@@ -241,7 +242,7 @@ export const appStore = {
   addWorkspace(_rootPath: string): Workspace | null {
     // D8-W: Workspaces are now managed by Rust backend via WorkspaceService
     // The UI should use WorkspaceService.pickPath() + WorkspaceService.add() instead
-    console.warn("appStore.addWorkspace is deprecated - use WorkspaceService instead");
+    logger.warn("appStore.addWorkspace is deprecated - use WorkspaceService instead");
     return null;
   },
 

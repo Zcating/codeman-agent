@@ -312,7 +312,7 @@ describe("ChatLayout", () => {
     // Wait for console.error to be called (async rename)
     await vi.waitFor(() => {
       // Exit.fail produces a Cause (Fail) object — just verify the prefix
-      const calls = consoleSpy.mock.calls.filter(c => c[0] === "[chat-layout] rename failed:");
+      const calls = consoleSpy.mock.calls.filter(c => c[0] === "[ERROR] [chat-layout] rename failed:");
       expect(calls.length).toBeGreaterThanOrEqual(1);
     }, { timeout: 2_000 });
     consoleSpy.mockRestore();
@@ -333,7 +333,7 @@ describe("ChatLayout", () => {
 
     // Wait for console.error to be called (async delete)
     await vi.waitFor(() => {
-      const calls = consoleSpy.mock.calls.filter(c => c[0] === "[chat-layout] delete failed:");
+      const calls = consoleSpy.mock.calls.filter(c => c[0] === "[ERROR] [chat-layout] delete failed:");
       expect(calls.length).toBeGreaterThanOrEqual(1);
     }, { timeout: 2_000 });
     consoleSpy.mockRestore();

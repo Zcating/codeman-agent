@@ -16,6 +16,7 @@
 
 import { Effect, Stream } from "effect";
 import type { Message } from "../../../shared/lib/types";
+import { logger } from "../../../shared/lib/logger";
 import { anthropicStream } from "./anthropic-transport";
 import { Agent } from "@earendil-works/pi-agent-core";
 import type { Model, Message as PiMessage } from "@earendil-works/pi-ai";
@@ -303,7 +304,7 @@ export function createAgentRuntime(): AgentRuntime {
                                               args: b.arguments ?? {},
                                           }))
                                         : null;
-                                console.log(
+                                logger.debug(
                                     "[runtime/diag] agent_end: msgs.length=" +
                                         msgs.length +
                                         " text.length=" +

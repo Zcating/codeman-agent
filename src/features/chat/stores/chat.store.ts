@@ -8,10 +8,11 @@
 //! 后续 Task 5/6/7 加 sendMessage / cancel / archive / delete / loadConversations / createConversation。
 
 import { createSignal, type Accessor } from "solid-js";
-import { createStore } from "solid-js/store";
+import { createStore, produce } from "solid-js/store";
 
 import { Effect, Stream } from "effect";
 import type { AppError, Conversation, Message, Workspace } from "../../../shared/lib/types";
+import { logger } from "../../../shared/lib/logger";
 import {
   createAgentRuntime,
   type AgentRuntime,
@@ -167,7 +168,7 @@ export function sendMessage(
   }).pipe(
     Effect.catchAll((err) =>
       Effect.sync(() => {
-        console.error("[chat.store] sendMessage stream failure:", err);
+        logger.error("[chat.store] sendMessage stream failure:", err);
       }),
     ),
   );
@@ -269,7 +270,7 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       break;
     case "done": {
       const stubId = store.byId[convId]?.streamingMessageId;
-      console.log(
+      logger.debug(
         "[chat.store/diag] done event: stubId=" +
           stubId +
           " content.length=" +
@@ -292,7 +293,7 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       // Notify sidebar re: streaming ended (triggers conversations$ update → badge removal)
       setConversationsSignal(Object.values(store.byId));
       Effect.runPromise(persistAssistantMessageEffect({ ...evt.message, conversation_id: convId })).catch((err) =>
-        console.error("[chat.store] persistAssistantMessage failed:", err),
+        logger.error("[chat.store] persistAssistantMessage failed:", err),
       );
       break;
     }
@@ -301,7 +302,7 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       // 这里必须清 streamingMessageId,否则 UI 永远 stuck in "running" 状态
       // (Cancel 按钮不消失,Send 按钮不恢复 — e2e spec 09 D2 失败的原因)。
       // Bug B: 同步写 lastError，UI 渲染红色 banner 提示用户 (而非静默)。
-      console.error("[chat.store] runtime error:", evt.error);
+      logger.error("[chat.store] runtime error:", evt.error);
       setStore("byId", convId, "streamingMessageId", null);
       setStore("byId", convId, "lastError", evt.error.message);
       setConversationsSignal(Object.values(store.byId));
@@ -350,8 +351,7 @@ export function archiveConversation(convId: string): Effect.Effect<void, AppErro
     cancel(convId);
     const svc = yield* ConversationService;
     yield* svc.archive(convId);
-    // @ts-expect-error — setStore delete
-    setStore("byId", convId, undefined);
+    setStore("byId", produce(prev => { delete prev[convId]; }));
     setConversationsSignal(Object.values(store.byId));
   }).pipe(Effect.provide(ConversationServiceLive));
 }
@@ -363,8 +363,7 @@ export function deleteConversation(convId: string): Effect.Effect<void, AppError
     cancel(convId);
     const svc = yield* ConversationService;
     yield* svc.delete(convId);
-    // @ts-expect-error — setStore delete
-    setStore("byId", convId, undefined);
+    setStore("byId", produce(prev => { delete prev[convId]; }));
     setConversationsSignal(Object.values(store.byId));
   }).pipe(Effect.provide(ConversationServiceLive));
 }

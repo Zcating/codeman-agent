@@ -6,6 +6,7 @@ import { onMount, type JSX } from "solid-js";
 import { Outlet, useParams, useNavigate, Link } from "@tanstack/solid-router";
 import { Settings as SettingsIcon } from "lucide-solid";
 import { Effect, Exit } from "effect";
+import { logger } from "../../../shared/lib/logger";
 import { CodemanSidebar, type WorkspaceNode } from "../../../shared/components/internal/codeman-sidebar";
 import { Dialog } from "../../../shared/components/internal/codeman-dialog";
 import {
@@ -90,7 +91,7 @@ export function ChatLayout(): JSX.Element {
     if (newLabel && newLabel !== currentLabel) {
       const exit = await Effect.runPromiseExit(renameWorkspace(workspaceId, newLabel));
       if (Exit.isFailure(exit)) {
-        console.error("[chat-layout] rename failed:", exit.cause);
+        logger.error("[chat-layout] rename failed:", exit.cause);
       }
     }
   };
@@ -108,7 +109,7 @@ export function ChatLayout(): JSX.Element {
 
     const exit = await Effect.runPromiseExit(removeWorkspace(workspaceId));
     if (Exit.isFailure(exit)) {
-      console.error("[chat-layout] delete failed:", exit.cause);
+        logger.error("[chat-layout] delete failed:", exit.cause);
     }
   };
 

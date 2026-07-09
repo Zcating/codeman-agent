@@ -15,6 +15,8 @@ Vite 单页应用，渲染到单个 Electron BrowserWindow。路由走 TanStack 
 | `router.tsx`    | TanStack Router code-based 配置                                                    | 不用 `@tanstack/router-plugin`（ADR-0007）                          |
 | `vitest.setup.ts` | vitest setup（`import "./__mocks__/ipc-mock"` + `scrollIntoView` polyfill） | mockState 唯一源在 src/__mocks__/ipc-mock.ts |
 | `vite-env.d.ts` | Vite 类型                                                                          | 不可删                                                              |
+| `debug-bubble-harness.tsx` | dev-only Playwright harness for `MessageBubble` QA（never shipped to production） | ⚠️ 例外：根级白名单禁止新文件，此文件保留用于 Playwright 可视化验证 |
+| `__tests__/` | 迁移测试（`__tests__/*.test.ts` 风格的 in-source 测试临时代码） | ⚠️ 例外：根级白名单禁止新目录，`__tests__/` 仅用于测试基础设施迁移 |
 
 ## src/ 子目录（5+1 白名单）
 
@@ -38,7 +40,7 @@ Vite 单页应用，渲染到单个 Electron BrowserWindow。路由走 TanStack 
 
 ## 硬性规则
 
-- **文件命名 kebab-case，导出组件 PascalCase。** `message-bubble.tsx` 导出 `MessageBubble`。单词文件保持小写（`index.tsx` 不写 `Index.tsx`）。**唯一例外已修复**：`llm_providers.ts` → `llm-providers.ts`（ADR-0010）。
+- **文件命名 kebab-case，导出组件 PascalCase。** `message-bubble.tsx` 导出 `MessageBubble`。单词文件保持小写（`index.tsx` 不写 `Index.tsx`）。
 - **`shared/lib/ipc.ts` 是唯一 Electron IPC 入口。** 所有 IPC 走 `window.codeman.invoke()`（由 preload 通过 contextBridge 暴露）。不应直接 `import { invoke } from "@tauri-apps/api"`（该依赖已移除）。
 - **UI 层不导入 `effect`。** `src/features/*/components/*.tsx` 是 Solid 信号的纯消费者，订阅 `src/features/*/stores/*.ts` 暴露的 `Accessor<T>`。逻辑层（`lib/*.ts` / `stores/*.ts`）用 Effect-TS。
 - **总是通过 appStore / chatStore 读跨域状态，不走原始 IPC。** 组件订阅 Solid signal，不直接调 `window.codeman.invoke`。
