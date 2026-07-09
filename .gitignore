@@ -61,3 +61,6 @@ lcov.info
 
 # Worktrees
 .worktrees/
+
+# Vendored source repos (cloned by scripts/prepare-effect.sh per skill setup)
+.repos/
