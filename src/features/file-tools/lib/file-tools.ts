@@ -61,24 +61,38 @@ function requireWorkspaceId(args: Record<string, any>): Effect.Effect<string, Ap
 // Tool Schemas
 // ============================================================================
 
+/**
+ * T27 + ADR-0025 PR 3 + this PR (Task 4): workspace_id 是 optional.
+ *
+ * Runtime injection: `createFileTools(workspaceId)` wraps every tool's `execute`
+ * and injects `workspace_id` into args BEFORE schema validation (per
+ * `pickArgs` / `createFileTools` block below). LLM may also pass it explicitly
+ * (explicit value wins).
+ *
+ * Centralised here so the 5 sibling `Schema.Struct({...})` definitions stay in
+ * sync if the rule ever flips back to required, or to constrain it further
+ * (e.g., branded `WorkspaceId` per `src/shared/lib/workspace-id.ts`).
+ */
+export const workspaceIdField = Schema.optional(Schema.String);
+
 // T27: workspace_id 改为可选 — runtime (chat.store.sendMessage) 通过
 // `createFileTools(provider.workspaceId)` 自动注入,避免 LLM (或 mock JSON)
 // 不知道 UUID 时校验失败。LLM 也可以显式覆盖(优先用 LLM 传的)。
 const ReadFileSchema = Schema.Struct({
-  workspace_id: Schema.optional(Schema.String),
+  workspace_id: workspaceIdField,
   path: Schema.String,
 });
 type ReadFileArgs = Schema.Schema.Type<typeof ReadFileSchema>;
 
 const WriteFileSchema = Schema.Struct({
-  workspace_id: Schema.optional(Schema.String),
+  workspace_id: workspaceIdField,
   path: Schema.String,
   content: Schema.String,
 });
 type WriteFileArgs = Schema.Schema.Type<typeof WriteFileSchema>;
 
 const EditFileSchema = Schema.Struct({
-  workspace_id: Schema.optional(Schema.String),
+  workspace_id: workspaceIdField,
   path: Schema.String,
   old_text: Schema.String,
   new_text: Schema.String,
@@ -87,14 +101,14 @@ const EditFileSchema = Schema.Struct({
 type EditFileArgs = Schema.Schema.Type<typeof EditFileSchema>;
 
 const SearchFilesSchema = Schema.Struct({
-  workspace_id: Schema.optional(Schema.String),
+  workspace_id: workspaceIdField,
   glob: Schema.String,
   content_pattern: Schema.optional(Schema.String),
 });
 type SearchFilesArgs = Schema.Schema.Type<typeof SearchFilesSchema>;
 
 const DeleteFileSchema = Schema.Struct({
-  workspace_id: Schema.optional(Schema.String),
+  workspace_id: workspaceIdField,
   path: Schema.String,
 });
 type DeleteFileArgs = Schema.Schema.Type<typeof DeleteFileSchema>;

@@ -338,3 +338,38 @@ describe("deleteFileTool", () => {
     });
   });
 });
+
+// Task 4 (Phase-3 review Hard #1 + J3): single workspace_id field constant.
+// Proves the constant is exported and round-trips for both present and absent
+// values (i.e., is genuinely optional).
+//
+// Note: `Schema.optional(...)` returns a PropertySignature, which is only
+// decodable inside a `Schema.Struct({...})`. So each test wraps the field in
+// a one-key Struct to mirror how the 5 tool schemas consume it.
+import { Schema } from "effect";
+import { workspaceIdField } from "./file-tools";
+
+const wrap = Schema.Struct({ workspace_id: workspaceIdField });
+
+describe("workspaceIdField — single source of truth (Phase-3 review)", () => {
+  it("decodeUnknown: present string value parses Right", () => {
+    const out = Schema.decodeUnknownEither(wrap)({ workspace_id: "ws-1" });
+    expect(out._tag).toBe("Right");
+    if (out._tag === "Right") expect(out.right.workspace_id).toBe("ws-1");
+  });
+
+  it("decodeUnknown: missing key parses Right (proves field is optional)", () => {
+    const out = Schema.decodeUnknownEither(wrap)({});
+    expect(out._tag).toBe("Right");
+  });
+
+  it("decodeUnknown: explicit undefined parses Right", () => {
+    const out = Schema.decodeUnknownEither(wrap)({ workspace_id: undefined });
+    expect(out._tag).toBe("Right");
+  });
+
+  it("decodeUnknown: numeric workspace_id parses Left (proves field is string)", () => {
+    const out = Schema.decodeUnknownEither(wrap)({ workspace_id: 42 });
+    expect(out._tag).toBe("Left");
+  });
+});
