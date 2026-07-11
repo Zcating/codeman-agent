@@ -43,3 +43,27 @@ describe("toToolParameters (ADR-0025 PR 3)", () => {
     expect(props["replace_all"]).toEqual({ type: "boolean" });
   });
 });
+
+// Task 5 (ADR-0025.1 D-C / Phase-3 review Spec Deviation #3):
+// `toToolParameters` uses `JsonSchema.fromAST` (NOT `Schema.toJsonSchema`).
+// These parity tests capture the current output shape as a regression guard
+// against future helper-body refactors.
+describe("toToolParameters — ADR-0025.1 D-C parity guard", () => {
+  it("emits type=object JSON Schema for a Struct with a required string field", () => {
+    const S = Schema.Struct({ path: Schema.String });
+    const json = toToolParameters(S) as unknown as Record<string, unknown>;
+    expect(json["type"]).toBe("object");
+    const props = json["properties"] as Record<string, unknown>;
+    expect(props["path"]).toEqual({ type: "string" });
+  });
+
+  it("preserves optional fields as non-required (workspace_id is optional)", () => {
+    const S = Schema.Struct({
+      workspace_id: Schema.optional(Schema.String),
+      path: Schema.String,
+    });
+    const json = toToolParameters(S) as unknown as { required?: string[] };
+    expect(json.required ?? []).not.toContain("workspace_id");
+    expect(json.required ?? []).toContain("path");
+  });
+});
