@@ -48,6 +48,7 @@ Vite 单页应用，渲染到单个 Electron BrowserWindow。路由走 TanStack 
 - **`as any` 禁止。** `tsconfig` 开了 `strict + noUnusedLocals + noUnusedParameters + noFallthroughCasesInSwitch`；逃逸这些 = 编译错误，**去修类型**。
 - **测试用 vitest + jsdom。** `import.meta.vitest` 风格的 in-source test 暂不用，测试都走 `*.test.ts(x)` 旁挂。test 文件位于被测文件同目录。
 - **优先使用：** es-toolkit, ts-parttern, effect-ts 等工具，优先使用已存在的组件、工具函数等，目录在 `src/shared`
+- **业务函数（返回 `Effect` 的可复用 top-level 函数）默认用 `Effect.fn("name")` 包装。** 引用 `.agents/skills/effect-ts/references/guide-observability.md` 的 "Preferred Rule"。命名用 camelCase 业务 op 名（如 `refreshProviderModels`），**不**加 namespace 前缀。内联组合块（Service Live body / 嵌套 callback / 测试）保留 `Effect.gen` 不动。**不**引入 `Effect.annotateCurrentSpan` / `Effect.withSpan` / `Effect.log*` 替换（属后续 wave）。
 
 ## Styling（Tailwind v4）
 
@@ -97,6 +98,7 @@ Vite 单页应用，渲染到单个 Electron BrowserWindow。路由走 TanStack 
 | 新增跨域业务组件                  | `shared/components/internal/codeman-<Name>.tsx`（**ADR-0022** 首例 `codeman-sidebar`；[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-N codeman-* prefix 锁定；新组件须严格 prop-driven）      |
 | 新增跨域 Select wrapper          | `shared/components/ui/codeman-select.tsx`（flat options）或 `codeman-group-select.tsx`（groups）；内部用 @ark-ui/solid Select（[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-S） |
 | 新增跨域 Solid signal             | `shared/stores/<name>.ts`（Accessor 暴露）                                                                                         |
+| 新增业务 Effect 函数              | 顶层业务函数（`stores/*.ts` 中返回 `Effect` 的公开方法）默认 `Effect.fn("name")` 包装；参见 `.agents/skills/effect-ts/references/guide-observability.md`；参考实现 `src/shared/stores/app.store.ts::refreshProviderModels` |
 | 新增跨域 composable               | `shared/hooks/use-<name>.ts`（V1 预留）                                                                                            |
 | 新增 feature 子组件               | `features/<feature>/components/<name>.tsx`（kebab-case + PascalCase 导出）                                                         |
 | 新增 Effect 桥接                  | `features/<feature>/stores/<domain>.ts`（Accessor 暴露 + Effect.gen 包 IPC）                                                       |
