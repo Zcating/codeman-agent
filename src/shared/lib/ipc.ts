@@ -13,6 +13,7 @@
 import { Effect, Stream, Context, Layer } from "effect";
 import { logger } from "./logger";
 import { Unknown, type AppError } from "./errors";
+import { decodeAppError } from "./decode-app-error";
 import type {
   Conversation,
   Message,
@@ -191,7 +192,7 @@ export const invoke = <T>(
             const candidate = msg.slice(braceStart);
             const parsed = JSON.parse(candidate) as Record<string, unknown>;
             if (parsed && typeof parsed === "object" && "kind" in parsed) {
-              return parsed as unknown as AppError;
+              return decodeAppError(parsed);
             }
           } catch { /* not our JSON — fall through */ }
         }
@@ -199,12 +200,12 @@ export const invoke = <T>(
         try {
           const parsed = JSON.parse(msg) as Record<string, unknown>;
           if (parsed && typeof parsed === "object" && "kind" in parsed) {
-            return parsed as unknown as AppError;
+            return decodeAppError(parsed);
           }
         } catch { /* nope */ }
       }
-      if (e && typeof e === "object" && "kind" in e) {
-        return e as unknown as AppError;
+      if (e && typeof e === "object" && ("kind" in e || "_tag" in e)) {
+        return decodeAppError(e);
       }
       logger.error("IPC 调用失败", name, e);
       return new Unknown({ message: String(e) });

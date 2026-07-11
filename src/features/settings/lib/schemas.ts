@@ -47,9 +47,23 @@ export const SettingsSchema = Schema.Struct({
   user_language: Schema.Literal("zh", "en", "auto"),
   theme: Schema.Literal("light", "dark", "system"),
   start_at_login: Schema.Boolean,
-  window: Schema.Struct({}), // WindowSettings — structure unknown, accept opaque
-  system_prompt: Schema.Struct({}), // SystemPromptSettings — opaque
-  conversations: Schema.Struct({}), // ConversationSettings — opaque
+  // WindowSettings / SystemPromptSettings / ConversationSettings shapes mirrored
+  // from `src/shared/lib/types.ts`. Each is a typed Schema.Struct so partial /
+  // malformed entries fail at decode time (was `Schema.Struct({})`).
+  window: Schema.Struct({
+    remember_position: Schema.Boolean,
+    remember_size: Schema.Boolean,
+    default_size: Schema.Struct({ width: Schema.Number, height: Schema.Number }),
+    min_size: Schema.Struct({ width: Schema.Number, height: Schema.Number }),
+  }),
+  system_prompt: Schema.Struct({
+    default: Schema.String,
+    user_can_edit: Schema.Boolean,
+  }),
+  conversations: Schema.Struct({
+    auto_archive_after_days: Schema.Number,
+    max_history: Schema.Number,
+  }),
   llm_providers: Schema.Array(Schema.Unknown), // deprecated, kept for back-compat
 });
 

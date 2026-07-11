@@ -61,24 +61,38 @@ function requireWorkspaceId(args: Record<string, any>): Effect.Effect<string, Ap
 // Tool Schemas
 // ============================================================================
 
+/**
+ * T27 + ADR-0025 PR 3 + this PR (Task 4): workspace_id 是 optional.
+ *
+ * Runtime injection: `createFileTools(workspaceId)` wraps every tool's `execute`
+ * and injects `workspace_id` into args BEFORE schema validation (per
+ * `pickArgs` / `createFileTools` block below). LLM may also pass it explicitly
+ * (explicit value wins).
+ *
+ * Centralised here so the 5 sibling `Schema.Struct({...})` definitions stay in
+ * sync if the rule ever flips back to required, or to constrain it further
+ * (e.g., branded `WorkspaceId` per `src/shared/lib/workspace-id.ts`).
+ */
+export const workspaceIdField = Schema.optional(Schema.String);
+
 // T27: workspace_id 改为可选 — runtime (chat.store.sendMessage) 通过
 // `createFileTools(provider.workspaceId)` 自动注入,避免 LLM (或 mock JSON)
 // 不知道 UUID 时校验失败。LLM 也可以显式覆盖(优先用 LLM 传的)。
 const ReadFileSchema = Schema.Struct({
-  workspace_id: Schema.optional(Schema.String),
+  workspace_id: workspaceIdField,
   path: Schema.String,
 });
 type ReadFileArgs = Schema.Schema.Type<typeof ReadFileSchema>;
 
 const WriteFileSchema = Schema.Struct({
-  workspace_id: Schema.optional(Schema.String),
+  workspace_id: workspaceIdField,
   path: Schema.String,
   content: Schema.String,
 });
 type WriteFileArgs = Schema.Schema.Type<typeof WriteFileSchema>;
 
 const EditFileSchema = Schema.Struct({
-  workspace_id: Schema.optional(Schema.String),
+  workspace_id: workspaceIdField,
   path: Schema.String,
   old_text: Schema.String,
   new_text: Schema.String,
@@ -87,14 +101,14 @@ const EditFileSchema = Schema.Struct({
 type EditFileArgs = Schema.Schema.Type<typeof EditFileSchema>;
 
 const SearchFilesSchema = Schema.Struct({
-  workspace_id: Schema.optional(Schema.String),
+  workspace_id: workspaceIdField,
   glob: Schema.String,
   content_pattern: Schema.optional(Schema.String),
 });
 type SearchFilesArgs = Schema.Schema.Type<typeof SearchFilesSchema>;
 
 const DeleteFileSchema = Schema.Struct({
-  workspace_id: Schema.optional(Schema.String),
+  workspace_id: workspaceIdField,
   path: Schema.String,
 });
 type DeleteFileArgs = Schema.Schema.Type<typeof DeleteFileSchema>;
@@ -265,7 +279,7 @@ export const deleteFileTool: AgentTool<TSchema, void | AppError> = {
  *  `workspace_id` 到 args(LLM 省略或 mock JSON 不带时)。`fileTools` 这个
  *  直导数组保留,供测试或一次性脚本调用 — 调用方必须自己在 args 里提供
  *  `workspace_id`,否则工具返回 `InvalidConfig` 错误。 */
-export const fileTools: AgentTool<any, any>[] = [
+export const fileTools: AgentTool<TSchema, unknown>[] = [
   readFileTool,
   writeFileTool,
   editFileTool,
@@ -284,8 +298,8 @@ export const fileTools: AgentTool<any, any>[] = [
  *                       若省略 / 空字符串,等价于 `fileTools`(工具接收
  *                       不带 workspace_id 的 args 时返回 InvalidConfig)。
  */
-export function createFileTools(workspaceId?: string): AgentTool<any, any>[] {
-  const tools: AgentTool<any, any>[] = [readFileTool, writeFileTool, editFileTool, searchFilesTool, deleteFileTool];
+export function createFileTools(workspaceId?: string): AgentTool<TSchema, unknown>[] {
+  const tools: AgentTool<TSchema, unknown>[] = [readFileTool, writeFileTool, editFileTool, searchFilesTool, deleteFileTool];
   if (!workspaceId) {
     return tools;
   }

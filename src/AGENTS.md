@@ -105,7 +105,7 @@ Vite 单页应用，渲染到单个 Electron BrowserWindow。路由走 TanStack 
 | 新增 feature 子组件               | `features/<feature>/components/<name>.tsx`（kebab-case + PascalCase 导出）                                                         |
 | 新增 Effect 桥接                  | `features/<feature>/stores/<domain>.ts`（Accessor 暴露 + Effect.gen 包 IPC）                                                       |
 | 新增 feature-level Effect service | `features/<feature>/lib/<name>.ts`（Context.Tag + Layer.effect）                                                                   |
-| 新增 LLM 工具                     | `features/file-tools/lib/<name>.ts`（Type.Object schema + execute handler）+ 同步 `features/chat/lib/runtime.ts` 的 `tools` 数组。**注意**：`features/billing/` 目录从未落地（ADR-0012 V2 反转时合并到 file-tools 工具 schema 模式）。 |
+| 新增 LLM 工具                     | `features/file-tools/lib/<name>.ts`（`Schema.Struct({...})` + execute handler；`parameters` 字段通过 `toToolParameters` 桥到 pi-ai 的 `TSchema`，详见 ADR-0025 D8 / ADR-0025.1 D-C）+ 同步 `features/chat/lib/runtime.ts` 的 `tools` 数组。**注意**：`features/billing/` 目录从未落地（ADR-0012 V2 反转时合并到 file-tools 工具 schema 模式）。 |
 | 新增 Branded ID / domain schema | 跨域 ID (WorkspaceId) 在 `shared/lib/`；feature 自治 ID (FilePath / ToolCallId / ConversationId) 在各 feature `lib/schemas.ts`；domain config (Provider / Settings) 在 `features/settings/lib/schemas.ts` |
 | 反应式异常                        | 先查 `features/<feature>/stores/*.ts` 监听器注册，再查组件                                                                         |
 | 改样式                            | 改 `@theme` token（`src/index.css`）；组件只写 utility class                                                                       |

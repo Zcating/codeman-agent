@@ -4,12 +4,16 @@
 //! 使用 mockState（src/__mocks__/@tauri-apps/api/core.ts）mock IPC invoke。
 
 import { describe, it, expect, beforeEach } from "vitest";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
+import type { TSchema } from "@sinclair/typebox";
 import {
   readFileTool,
   writeFileTool,
   editFileTool,
   searchFilesTool,
   deleteFileTool,
+  fileTools,
+  createFileTools,
 } from "./file-tools";
 import { mockState } from "../../../__mocks__/ipc-mock";
 import {
@@ -336,5 +340,75 @@ describe("deleteFileTool", () => {
       type: "text",
       text: expect.stringContaining("Blocked file type: .exe"),
     });
+  });
+});
+
+// Task 4 (Phase-3 review Hard #1 + J3): single workspace_id field constant.
+// Proves the constant is exported and round-trips for both present and absent
+// values (i.e., is genuinely optional).
+//
+// Note: `Schema.optional(...)` returns a PropertySignature, which is only
+// decodable inside a `Schema.Struct({...})`. So each test wraps the field in
+// a one-key Struct to mirror how the 5 tool schemas consume it.
+import { Schema } from "effect";
+import { workspaceIdField } from "./file-tools";
+
+const wrap = Schema.Struct({ workspace_id: workspaceIdField });
+
+describe("workspaceIdField — single source of truth (Phase-3 review)", () => {
+  it("decodeUnknown: present string value parses Right", () => {
+    const out = Schema.decodeUnknownEither(wrap)({ workspace_id: "ws-1" });
+    expect(out._tag).toBe("Right");
+    if (out._tag === "Right") expect(out.right.workspace_id).toBe("ws-1");
+  });
+
+  it("decodeUnknown: missing key parses Right (proves field is optional)", () => {
+    const out = Schema.decodeUnknownEither(wrap)({});
+    expect(out._tag).toBe("Right");
+  });
+
+  it("decodeUnknown: explicit undefined parses Right", () => {
+    const out = Schema.decodeUnknownEither(wrap)({ workspace_id: undefined });
+    expect(out._tag).toBe("Right");
+  });
+
+  it("decodeUnknown: numeric workspace_id parses Left (proves field is string)", () => {
+    const out = Schema.decodeUnknownEither(wrap)({ workspace_id: 42 });
+    expect(out._tag).toBe("Left");
+  });
+});
+
+// Task 8 (Phase-3 review J2): `fileTools` and `createFileTools` return type must
+// be `AgentTool<TSchema, unknown>[]` (NOT `AgentTool<any, any>[]`).
+// This is a compile-time check using a type alias that fails loudly if reverted.
+describe("fileTools / createFileTools array type (ADR-0025 review J2)", () => {
+  it("returns AgentTool<TSchema, unknown>[] — never 'any'", () => {
+    type IsAny<T> = 0 extends 1 & T ? true : false;
+    type IsExactTSchema<T> = IsAny<T> extends true
+      ? false
+      : [T] extends [TSchema]
+        ? [TSchema] extends [T]
+          ? true
+          : false
+        : false;
+    type IsExactUnknown<T> = IsAny<T> extends true
+      ? false
+      : unknown extends T
+        ? [T] extends [unknown]
+          ? true
+          : false
+        : false;
+    type IsExpectedToolArray<T> = T extends AgentTool<infer TParameters, infer TResult>[]
+      ? IsExactTSchema<TParameters> extends true
+        ? IsExactUnknown<TResult>
+        : false
+      : false;
+    type ExpectTrue<T extends true> = T;
+    type FileToolsTypeCheck = ExpectTrue<IsExpectedToolArray<typeof fileTools>>;
+    type CreatedToolsTypeCheck = ExpectTrue<IsExpectedToolArray<ReturnType<typeof createFileTools>>>;
+    const _check: FileToolsTypeCheck = true;
+    const _check2: CreatedToolsTypeCheck = true;
+    expect(_check).toBe(true);
+    expect(_check2).toBe(true);
   });
 });
