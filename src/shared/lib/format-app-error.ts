@@ -12,9 +12,10 @@
 //!   }
 import { Cause } from "effect";
 import { isAppError, type AppError } from "./errors";
+import type { TauriError } from "./ipc";
 
 /** 把 Effect Cause 拍平成人类可读字符串，保留错误判别信息（_tag 或 kind）。 */
-export function formatAppError(cause: Cause.Cause<AppError>): string {
+export function formatAppError(cause: Cause.Cause<AppError | TauriError>): string {
   // Cause.failures 提取所有 failure，按出现顺序排列。
   // Empty cause → []；单个 fail → [err]；Sequential/Parallel → 多个 err。
   const failures = Cause.failures(cause);
@@ -28,7 +29,7 @@ export function formatAppError(cause: Cause.Cause<AppError>): string {
   return Array.from(failures).map(formatOne).join("; ");
 }
 
-function formatOne(e: AppError): string {
+function formatOne(e: AppError | TauriError): string {
   // ADR-0025 PR 2: AppError 是 Schema.TaggedError 实例。
   if (isAppError(e)) {
     return `${e._tag}: ${e.message || "(no message)"}`;
