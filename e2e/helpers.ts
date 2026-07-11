@@ -143,7 +143,7 @@ export async function setupWorkspaceAndCreateConvViaIpc(
   opts: { workspaceLabel?: string; workspaceRoot?: string; title?: string } = {},
 ): Promise<{ workspaceId: string; convId: string }> {
   const label = opts.workspaceLabel ?? "E2E Test Workspace";
-  const root = opts.workspaceRoot ?? path.join(os.tmpdir(), "codeman-e2e-" + Date.now());
+  const root = opts.workspaceRoot ?? path.join(os.tmpdir(), `codeman-e2e-${process.pid}-${Math.random().toString(36).slice(2, 8)}`);
   const title = opts.title ?? "E2E Test Conv";
 
   await p.goto("/");

@@ -1,0 +1,135 @@
+[
+  {
+    "question": "04::hello-intro",
+    "turns": [
+      { "text": "你好！我是 mock LLM,这段话超过五个字符以上,验证流式非空文本。", "done": true }
+    ]
+  },
+  {
+    "question": "05b::user-bubble",
+    "turns": [
+      { "text": "(mock) 收到第一条 05b::user-bubble,渲染为用户气泡。", "done": true }
+    ]
+  },
+  {
+    "question": "05b::first-bubble",
+    "turns": [
+      { "text": "(mock) 05b::first-bubble 第一条 mock 回复。", "done": true }
+    ]
+  },
+  {
+    "question": "05b::second-bubble",
+    "turns": [
+      { "text": "(mock) 05b::second-bubble 第二条 mock 回复。", "done": true }
+    ]
+  },
+  {
+    "question": "05b::third-bubble",
+    "turns": [
+      { "text": "(mock) 05b::third-bubble 第三条 mock 回复,验证多次发送产生多个气泡。", "done": true }
+    ]
+  },
+  {
+    "question": "05f::ambiguous-edit",
+    "turns": [
+      {
+        "text": "Pattern matches 2 times - use replaceAll or be more specific (must match exactly once).",
+        "toolUses": [
+          { "name": "edit_file", "input": { "path": "x.txt", "oldText": "TODO", "newText": "DONE" } }
+        ],
+        "done": true
+      }
+    ]
+  },
+  {
+    "question": "05f::plain-text",
+    "turns": [
+      { "text": "Hello from search_files diagnostic test! mock LLM ack.", "done": true }
+    ]
+  },
+  {
+    "question": "05f::search-todo",
+    "turns": [
+      {
+        "text": "Searched: a.ts contains TODO, b.ts clean.",
+        "toolUses": [
+          { "name": "search_files", "input": { "glob": "*.ts", "contentPattern": "TODO" } }
+        ],
+        "done": true
+      }
+    ]
+  },
+  {
+    "question": "06::user-prompt",
+    "turns": [
+      { "text": "你好！这是 mock LLM 的回复。", "done": true }
+    ]
+  },
+  {
+    "question": "07::hi",
+    "turns": [
+      { "text": "07::hi Hello from mock LLM!", "done": true }
+    ]
+  },
+  {
+    "question": "08::write-read",
+    "turns": [
+      { "text": "written the file and read it back", "done": true }
+    ]
+  },
+  {
+    "question": "08::sandbox",
+    "turns": [
+      { "text": "I cannot read that file because it is outside the workspace sandbox.", "done": true }
+    ]
+  },
+  {
+    "question": "09::msg-in-idx0",
+    "turns": [
+      { "text": "Hello from conv A", "done": true }
+    ]
+  },
+  {
+    "question": "09::msg-in-idx1",
+    "turns": [
+      { "text": "Hello from conv B", "done": true }
+    ]
+  },
+  {
+    "question": "09::msg",
+    "turns": [
+      { "text": "Hello from conv A", "done": true }
+    ]
+  },
+  {
+    "question": "09::first",
+    "turns": [
+      { "text": "Hello from conv A", "done": true }
+    ]
+  },
+  {
+    "question": "09::second",
+    "turns": [
+      { "text": "Second response after cancel", "done": true }
+    ]
+  },
+  {
+    "question": "09::msg-A",
+    "turns": [
+      { "text": "Hello from conv A", "done": true }
+    ]
+  },
+  {
+    "question": "09::msg-B",
+    "turns": [
+      { "text": "Hello from conv B", "done": true }
+    ]
+  },
+  {
+    "question": "*",
+    "turns": [
+      { "text": "(mock) I don't know how to answer that. Try asking: hello, read, list, ping, think, tool, three-blocks" }
+    ],
+    "default": true
+  }
+]

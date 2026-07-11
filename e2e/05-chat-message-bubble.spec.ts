@@ -32,7 +32,7 @@ interface MessageRow {
 }
 
 test.describe("05 — agent 页面输入 → 用户气泡", () => {
-  const e2eRoot = path.join(os.tmpdir(), "codeman-e2e-bubble-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8));
+  const e2eRoot = path.join(os.tmpdir(), `codeman-e2e-bubble-${process.pid}-${Math.random().toString(36).slice(2, 8)}`);
 
   test.beforeAll(async ({ tauriEnv }) => {
     const { page } = tauriEnv;

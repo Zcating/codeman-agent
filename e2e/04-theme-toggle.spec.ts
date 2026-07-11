@@ -84,7 +84,7 @@ test.describe("04 — 主题", () => {
     } catch { /* best-effort */ }
     const wsId = (await invoke<{ id: string }>(page, "add_workspace", {
       label: "Theme Test Workspace",
-      rootPath: "C:\\Temp\\codeman-e2e-theme-" + Date.now(),
+      rootPath: `C:\\Temp\\codeman-e2e-theme-${process.pid}-${Math.random().toString(36).slice(2, 8)}`,
     })).id;
     await clickNewConversationAndWait(page, { workspaceId: wsId });
 

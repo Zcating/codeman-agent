@@ -5,7 +5,7 @@
 //!  2. 找到第一个 provider 的 LLM API Key input（`input[type=password]`）。
 //!  3. 输入一个假 key。
 //!  4. 点击 footer 的 Save 按钮（`settingsSaver.flushNow()`）。
-//!  5. 通过 IPC `get_settings` 验证 `providers[0].api_key` 写入成功。
+//!  5. 通过 IPC `get_settings` 验证 `providers[0].apiKey` 写入成功（per ADR-0024 D10:camelCase）。
 //!  6. 重新加载页面（应用内 navigate）— password input 永远不反射已保存值。
 //!
 //! 我们用假 key — 只测写入路径，不测真实 LLM 网络。
@@ -18,14 +18,14 @@ const FAKE_KEY = "sk-e2e-fake-key-not-real-do-not-use-12345";
 test.describe("02 — 设置 LLM API key", () => {
   test.beforeAll(async ({ tauriEnv }) => {
     const { page } = tauriEnv;
-    // 重置 settings 到默认状态(enabled=true, api_key="")。
+    // 重置 settings 到默认状态(enabled=true, apiKey="";per ADR-0024 D10 camelCase)。
     // 之前 test run 可能把 enabled 改成 false 或留下 FAKE_KEY,
     // 跨 test 共享 Rust 状态导致污染。
     const defaults = await invoke<Settings>(page, "get_settings");
     const reset = {
       ...defaults,
-      providers: (defaults.providers ?? []).map((p) => ({ ...p, enabled: true, api_key: "" })),
-      default_llm_provider_id: "minimax",
+      providers: (defaults.providers ?? []).map((p) => ({ ...p, enabled: true, apiKey: "" })),
+      defaultLlmProviderId: "minimax",
     };
     await invoke(page, "update_settings", { newSettings: reset });
   });
@@ -60,18 +60,18 @@ test.describe("02 — 设置 LLM API key", () => {
     await assert.visible(footerSaveButton, { timeout: 5_000 });
     await footerSaveButton.click();
 
-    // 4. After Save, input should reflect FAKE_KEY in the store (api_key reflects back to DOM).
+    // 4. After Save, input should reflect FAKE_KEY in the store (apiKey reflects back to DOM).
     //    footer Save calls flushNow() which triggers IPC; wait 2s for store update.
     await assert.value(passwordInput, FAKE_KEY, { timeout: 2_000 });
 
     // 5. 通过 IPC `get_settings` 验证 key 实际在磁盘上。
-    //    V1.5+ 使用 unified providers 数组；第一个 provider id 是 "minimax"。
-    const settings = await invoke<{ providers?: Array<{ id: string; api_key: string }> }>(
+    //    V1.5+ 使用 unified providers 数组(per ADR-0024 D10 camelCase);第一个 provider id 是 "minimax"。
+    const settings = await invoke<{ providers?: Array<{ id: string; apiKey: string }> }>(
       page,
       "get_settings",
     );
     const minimaxProvider = settings.providers?.find((p) => p.id === "minimax");
-    expect(minimaxProvider?.api_key, `minimax provider api_key 应为 ${FAKE_KEY}`).toBe(FAKE_KEY);
+    expect(minimaxProvider?.apiKey, `minimax provider apiKey 应为 ${FAKE_KEY}`).toBe(FAKE_KEY);
 
     // 6. Navigate back to / then to /settings -- password input should reflect saved value.
     await page.locator('a[href="/"]').click();

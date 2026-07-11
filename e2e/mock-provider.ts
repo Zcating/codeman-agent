@@ -1,6 +1,6 @@
 //! Mock LLM provider helper for e2e tests.
 //!
-//! Registers a Provider record whose `base_url` points at the Electron Main
+//! Registers a Provider record whose `baseUrl` points at the Electron Main
 //! started local mock server (`http://127.0.0.1:50000/mock/anthropic`, per
 //! CONTEXT.md 「Fake LLM Provider」). The mock server (`electron/main/mock-server.ts`)
 //! reads Q→A entries from the worker's `qa-w{N}.json` file (env var
@@ -15,6 +15,9 @@
 //! Per-Worker Q→A Isolation (per CONTEXT.md): 各 spec 在同一 worker 内共用
 //! `qa-w{N}.json`,需保证每个 spec 的 question 字符串在 worker 内 unique,
 //! first-wins 命中。e2e/fixtures/qa-w{0..3}.json 由各 spec 协调 question 字串。
+//!
+//! Field-name policy: e2e fixture writes camelCase to match V3.1+ Settings JSON
+//! wire format (per ADR-0024 D10). See `electron/main/settings-schema.ts:5`.
 
 import { TauriPage } from "./cdp-driver";
 import { invoke } from "./helpers";
@@ -27,7 +30,7 @@ const MOCK_MODEL = "mock-model";
  * Switch settings to use the mock provider. Sets the mock provider as the
  * default LLM with baseUrl pointing at the local mock server.
  *
- * The mock provider accepts any non-empty api_key (Authorization header is sent
+ * The mock provider accepts any non-empty apiKey (Authorization header is sent
  * but the local server ignores it; this is real fetch, no JS shim).
  */
 export async function useMockProvider(page: TauriPage): Promise<void> {
@@ -36,22 +39,21 @@ export async function useMockProvider(page: TauriPage): Promise<void> {
     id: MOCK_PROVIDER_ID,
     label: "Mock LLM (E2E test)",
     enabled: true,
-    api_key: "mock-key-not-used",
+    apiKey: "mock-key-not-used",
     llm: {
-      default_model: MOCK_MODEL,
-      base_url: MOCK_BASE_URL,
-      api_type: "anthropic-messages",
-      llm_api_key_ref: "",
+      defaultModel: MOCK_MODEL,
+      baseUrl: MOCK_BASE_URL,
+      apiType: "anthropic-messages",
       models: [
         {
           id: MOCK_MODEL,
           label: MOCK_MODEL,
-          context_window: 200_000,
+          contextWindow: 200_000,
           deprecated: false,
           thinking: false,
         },
       ],
-      models_endpoint: "",
+      modelsEndpoint: "",
     },
   };
   // Add mock provider to the list (or replace if already exists), then make it default.
@@ -59,7 +61,7 @@ export async function useMockProvider(page: TauriPage): Promise<void> {
   const newSettings: any = {
     ...current,
     providers: [...existing, mockProvider],
-    default_llm_provider_id: MOCK_PROVIDER_ID,
+    defaultLlmProviderId: MOCK_PROVIDER_ID,
   };
 
   await invoke(page, "update_settings", { newSettings });

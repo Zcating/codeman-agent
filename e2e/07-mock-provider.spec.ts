@@ -21,15 +21,15 @@ test.describe("07 — Mock LLM provider", () => {
     // home form send flow which triggers LLM streaming with whatever provider is active).
     await invoke(page, "add_workspace", {
       label: "Mock E2E Test Workspace",
-      rootPath: path.join(os.tmpdir(), "codeman-e2e-mock-" + Date.now()),
+      rootPath: path.join(os.tmpdir(), `codeman-e2e-mock-${process.pid}-${Math.random().toString(36).slice(2, 8)}`),
     });
     // 切换到 mock provider — 不依赖 .env 里的真实 LLM key
     await useMockProvider(page);
     // 验证 mock provider 已配置 (避免之前 test 残留的真实 LLM provider 被优先使用)
-    const settings = await invoke<{ default_llm_provider_id?: string }>(page, "get_settings");
-    if (settings.default_llm_provider_id !== "mock") {
+    const settings = await invoke<{ defaultLlmProviderId?: string }>(page, "get_settings");
+    if (settings.defaultLlmProviderId !== "mock") {
       throw new Error(
-        "default_llm_provider_id 应为 mock,实际: " + (settings.default_llm_provider_id ?? "null"),
+        "defaultLlmProviderId 应为 mock,实际: " + (settings.defaultLlmProviderId ?? "null"),
       );
     }
   });
