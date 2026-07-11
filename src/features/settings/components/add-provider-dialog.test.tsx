@@ -2,7 +2,7 @@
 //! Function does NOT exist yet — tests will fail with import error. That is CORRECT for RED.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { cleanup, screen } from "@solidjs/testing-library";
+import { screen } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
 
 // ─── Import the imperative API under test (will fail until function exists) ─────
@@ -40,7 +40,15 @@ function cleanupDialogContainers(): void {
       toRemove.push(el);
     }
   });
-  toRemove.forEach((el) => el.remove());
+  toRemove.forEach((el) => {
+    // Pre-existing teardown race: @solidjs/testing-library auto-cleanup can
+    // detach the node between querySelectorAll and el.remove(). Tolerate.
+    try {
+      el.remove();
+    } catch {
+      /* already detached by auto-cleanup */
+    }
+  });
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -51,7 +59,10 @@ describe("createProviderFormDialog", () => {
   });
 
   afterEach(() => {
-    cleanup();
+    // @solidjs/testing-library auto-registers afterEach cleanup via import
+    // side-effect; explicit cleanup() double-call races with portal-mounted
+    // dialog containers (pre-existing teardown NotFoundError). Custom
+    // cleanupDialogContainers() handles Portal leak cleanup.
     cleanupDialogContainers();
   });
 
@@ -81,12 +92,12 @@ describe("createProviderFormDialog", () => {
     expect(provider!.id).toMatch(/^provider-/);
     expect(provider!.label).toBe("My Provider");
     expect(provider!.enabled).toBe(true);
-    expect(provider!.api_key).toBe("sk-test-12345");
-    expect(provider!.llm.default_model).toBe("gpt-4o");
-    expect(provider!.llm.base_url).toBe("https://api.example.com");
-    expect(provider!.llm.api_type).toBe("anthropic-messages");
+    expect(provider!.apiKey).toBe("sk-test-12345");
+    expect(provider!.llm.defaultModel).toBe("gpt-4o");
+    expect(provider!.llm.baseUrl).toBe("https://api.example.com");
+    expect(provider!.llm.apiType).toBe("anthropic-messages");
     expect(Array.isArray(provider!.llm.models)).toBe(true);
-    expect(provider!.llm.models_endpoint).toBe("");
+    expect(provider!.llm.modelsEndpoint).toBe("");
   });
 
   // S2: Select Mock (fields filled) → select Real (fields cleared)
@@ -161,7 +172,7 @@ describe("createProviderFormDialog", () => {
     const provider = await promise;
 
     expect(provider).not.toBeNull();
-    expect(provider!.llm.base_url).toBe("http://127.0.0.1:51000/mock/anthropic");
+    expect(provider!.llm.baseUrl).toBe("http://127.0.0.1:51000/mock/anthropic");
     expect(provider!.id).toMatch(/^mock-/);
   });
 });
