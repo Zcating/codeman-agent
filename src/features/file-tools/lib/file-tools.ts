@@ -3,7 +3,9 @@
 //! T11-T15：read_file / write_file / edit_file / search_files / delete_file。
 //! 每个工具调用 FileService 方法，FileService 通过 Effect.provide(Layer) 提供（Effect v3 API）。
 
-import { Type, type Static } from "@sinclair/typebox";
+import { Schema } from "effect";
+import { toToolParameters } from "../../../shared/lib/tool-schema";
+import type { TSchema } from "@sinclair/typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Effect, Exit } from "effect";
 import { FileService, FileServiceLive } from "../../../shared/lib/ipc";
@@ -62,40 +64,40 @@ function requireWorkspaceId(args: Record<string, any>): Effect.Effect<string, Ap
 // T27: workspace_id 改为可选 — runtime (chat.store.sendMessage) 通过
 // `createFileTools(provider.workspaceId)` 自动注入,避免 LLM (或 mock JSON)
 // 不知道 UUID 时校验失败。LLM 也可以显式覆盖(优先用 LLM 传的)。
-const ReadFileSchema = Type.Object({
-  workspace_id: Type.Optional(Type.String()),
-  path: Type.String(),
+const ReadFileSchema = Schema.Struct({
+  workspace_id: Schema.optional(Schema.String),
+  path: Schema.String,
 });
-type ReadFileArgs = Static<typeof ReadFileSchema>;
+type ReadFileArgs = Schema.Schema.Type<typeof ReadFileSchema>;
 
-const WriteFileSchema = Type.Object({
-  workspace_id: Type.Optional(Type.String()),
-  path: Type.String(),
-  content: Type.String(),
+const WriteFileSchema = Schema.Struct({
+  workspace_id: Schema.optional(Schema.String),
+  path: Schema.String,
+  content: Schema.String,
 });
-type WriteFileArgs = Static<typeof WriteFileSchema>;
+type WriteFileArgs = Schema.Schema.Type<typeof WriteFileSchema>;
 
-const EditFileSchema = Type.Object({
-  workspace_id: Type.Optional(Type.String()),
-  path: Type.String(),
-  old_text: Type.String(),
-  new_text: Type.String(),
-  replace_all: Type.Boolean(),
+const EditFileSchema = Schema.Struct({
+  workspace_id: Schema.optional(Schema.String),
+  path: Schema.String,
+  old_text: Schema.String,
+  new_text: Schema.String,
+  replace_all: Schema.Boolean,
 });
-type EditFileArgs = Static<typeof EditFileSchema>;
+type EditFileArgs = Schema.Schema.Type<typeof EditFileSchema>;
 
-const SearchFilesSchema = Type.Object({
-  workspace_id: Type.Optional(Type.String()),
-  glob: Type.String(),
-  content_pattern: Type.Optional(Type.String()),
+const SearchFilesSchema = Schema.Struct({
+  workspace_id: Schema.optional(Schema.String),
+  glob: Schema.String,
+  content_pattern: Schema.optional(Schema.String),
 });
-type SearchFilesArgs = Static<typeof SearchFilesSchema>;
+type SearchFilesArgs = Schema.Schema.Type<typeof SearchFilesSchema>;
 
-const DeleteFileSchema = Type.Object({
-  workspace_id: Type.Optional(Type.String()),
-  path: Type.String(),
+const DeleteFileSchema = Schema.Struct({
+  workspace_id: Schema.optional(Schema.String),
+  path: Schema.String,
 });
-type DeleteFileArgs = Static<typeof DeleteFileSchema>;
+type DeleteFileArgs = Schema.Schema.Type<typeof DeleteFileSchema>;
 
 // ============================================================================
 // Helper: run Effect and convert to AgentToolResult
@@ -141,82 +143,86 @@ async function runFileEffect<T>(
 // Tool Definitions
 // ============================================================================
 
-export const readFileTool: AgentTool<typeof ReadFileSchema, string | AppError> = {
+export const readFileTool: AgentTool<TSchema, string | AppError> = {
   label: "read_file",
   name: "read_file",
   description:
     "Read a file from a workspace directory (UTF-8, ≤10MB). Returns the full file content.",
-  parameters: ReadFileSchema,
-  execute: async (_toolCallId, args: ReadFileArgs) => {
+  parameters: toToolParameters(ReadFileSchema),
+  execute: async (_toolCallId, args) => {
+    const typedArgs = args as unknown as ReadFileArgs;
     const program = Effect.gen(function* () {
-      const workspaceId = yield* requireWorkspaceId(args);
+      const workspaceId = yield* requireWorkspaceId(typedArgs);
       const svc = yield* FileService;
-      return yield* svc.readFile(workspaceId, pickArgs(args, "path"));
+      return yield* svc.readFile(workspaceId, pickArgs(typedArgs, "path"));
     }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, (content) => `Content:\n${content}`);
   },
 };
 
-export const writeFileTool: AgentTool<typeof WriteFileSchema, void | AppError> = {
+export const writeFileTool: AgentTool<TSchema, void | AppError> = {
   label: "write_file",
   name: "write_file",
   description:
     "Write content to a file in a workspace (atomic write, ≤10MB). Creates or overwrites.",
-  parameters: WriteFileSchema,
-  execute: async (_toolCallId, args: WriteFileArgs) => {
+  parameters: toToolParameters(WriteFileSchema),
+  execute: async (_toolCallId, args) => {
+    const typedArgs = args as unknown as WriteFileArgs;
     const program = Effect.gen(function* () {
-      const workspaceId = yield* requireWorkspaceId(args);
+      const workspaceId = yield* requireWorkspaceId(typedArgs);
       const svc = yield* FileService;
       return yield* svc.writeFile(
         workspaceId,
-        pickArgs(args, "path"),
-        pickArgs(args, "content"),
+        pickArgs(typedArgs, "path"),
+        pickArgs(typedArgs, "content"),
       );
     }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, () => "Done: file written successfully.");
   },
 };
 
-export const editFileTool: AgentTool<typeof EditFileSchema, void | AppError> = {
+export const editFileTool: AgentTool<TSchema, void | AppError> = {
   label: "edit_file",
   name: "edit_file",
   description:
     "Replace text in a file (unique match required unless replace_all=true). " +
     "Use replace_all=false for single replacement. Returns error if old_text matches 0 or 2+ times (unless replace_all=true).",
-  parameters: EditFileSchema,
-  execute: async (_toolCallId, args: EditFileArgs) => {
+  parameters: toToolParameters(EditFileSchema),
+  execute: async (_toolCallId, args) => {
+    const typedArgs = args as unknown as EditFileArgs;
     const program = Effect.gen(function* () {
-      const workspaceId = yield* requireWorkspaceId(args);
+      const workspaceId = yield* requireWorkspaceId(typedArgs);
       const svc = yield* FileService;
       return yield* svc.editFile(
         workspaceId,
-        pickArgs(args, "path"),
-        pickArgs(args, "old_text", "oldText"),
-        pickArgs(args, "new_text", "newText"),
-        pickArgs(args, "replace_all", "replaceAll"),
+        pickArgs(typedArgs, "path"),
+        pickArgs(typedArgs, "old_text", "oldText"),
+        pickArgs(typedArgs, "new_text", "newText"),
+        pickArgs(typedArgs, "replace_all", "replaceAll"),
       );
     }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, () =>
-      args.replace_all ? "Done: all occurrences replaced." : "Done: text replaced.",
+      typedArgs.replace_all ? "Done: all occurrences replaced." : "Done: text replaced.",
     );
   },
 };
 
-export const searchFilesTool: AgentTool<typeof SearchFilesSchema, FileMatch[] | AppError> = {
+export const searchFilesTool: AgentTool<TSchema, FileMatch[] | AppError> = {
   label: "search_files",
   name: "search_files",
   description:
     "Find files in workspace by glob pattern, optionally filtered by content substring (≤100 results). " +
     "Returns array of matches with path, line_number, and line_content.",
-  parameters: SearchFilesSchema,
-  execute: async (_toolCallId, args: SearchFilesArgs) => {
+  parameters: toToolParameters(SearchFilesSchema),
+  execute: async (_toolCallId, args) => {
+    const typedArgs = args as unknown as SearchFilesArgs;
     const program = Effect.gen(function* () {
-      const workspaceId = yield* requireWorkspaceId(args);
+      const workspaceId = yield* requireWorkspaceId(typedArgs);
       const svc = yield* FileService;
       return yield* svc.searchFiles(
         workspaceId,
-        pickArgs(args, "glob"),
-        pickArgs(args, "content_pattern", "contentPattern") ?? null,
+        pickArgs(typedArgs, "glob"),
+        pickArgs(typedArgs, "content_pattern", "contentPattern") ?? null,
       );
     }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, (matches: FileMatch[]) => {
@@ -235,18 +241,19 @@ export const searchFilesTool: AgentTool<typeof SearchFilesSchema, FileMatch[] | 
   },
 };
 
-export const deleteFileTool: AgentTool<typeof DeleteFileSchema, void | AppError> = {
+export const deleteFileTool: AgentTool<TSchema, void | AppError> = {
   label: "delete_file",
   name: "delete_file",
   description:
     "Move a file to the recycle bin (recoverable, no permanent delete in V2). " +
     "Blocked extensions: .exe/.dll/.sys/.ini and other system files.",
-  parameters: DeleteFileSchema,
-  execute: async (_toolCallId, args: DeleteFileArgs) => {
+  parameters: toToolParameters(DeleteFileSchema),
+  execute: async (_toolCallId, args) => {
+    const typedArgs = args as unknown as DeleteFileArgs;
     const program = Effect.gen(function* () {
-      const workspaceId = yield* requireWorkspaceId(args);
+      const workspaceId = yield* requireWorkspaceId(typedArgs);
       const svc = yield* FileService;
-      return yield* svc.deleteFile(workspaceId, pickArgs(args, "path"));
+      return yield* svc.deleteFile(workspaceId, pickArgs(typedArgs, "path"));
     }).pipe(Effect.provide(FileServiceLive));
     return runFileEffect(program, () => "Done: file moved to recycle bin.");
   },
