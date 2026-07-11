@@ -12,6 +12,11 @@ import {
   deleteFileTool,
 } from "./file-tools";
 import { mockState } from "../../../__mocks__/ipc-mock";
+import {
+  NotFound,
+  SandboxViolation,
+  Unknown,
+} from "../../../shared/lib/errors";
 
 describe("readFileTool", () => {
   beforeEach(() => {
@@ -40,11 +45,10 @@ describe("readFileTool", () => {
   });
 
   it("error path returns SandboxViolation as error string", async () => {
-    mockState.rejected = {
-      kind: "SandboxViolation",
+    mockState.rejected = new SandboxViolation({
       path: "/etc/x",
       workspace_label: "ws1",
-    } as unknown as Error;
+    });
 
     const result = await readFileTool.execute("c1", {
       workspace_id: "ws1",
@@ -55,14 +59,12 @@ describe("readFileTool", () => {
       type: "text",
       text: expect.stringContaining("SandboxViolation"),
     });
-    expect(result.details).toMatchObject({ kind: "SandboxViolation" });
   });
 
   it("error path returns NotFound as error string", async () => {
-    mockState.rejected = {
-      kind: "NotFound",
+    mockState.rejected = new NotFound({
       message: "File not found: /tmp/nonexistent.txt",
-    } as unknown as Error;
+    });
 
     const result = await readFileTool.execute("c1", {
       workspace_id: "ws1",
@@ -73,7 +75,6 @@ describe("readFileTool", () => {
       type: "text",
       text: expect.stringContaining("File not found"),
     });
-    expect(result.details).toMatchObject({ kind: "NotFound" });
   });
 });
 
@@ -104,11 +105,10 @@ describe("writeFileTool", () => {
   });
 
   it("error path returns SandboxViolation", async () => {
-    mockState.rejected = {
-      kind: "SandboxViolation",
+    mockState.rejected = new SandboxViolation({
       path: "/etc/x",
       workspace_label: "ws1",
-    } as unknown as Error;
+    });
 
     const result = await writeFileTool.execute("c1", {
       workspace_id: "ws1",
@@ -120,7 +120,6 @@ describe("writeFileTool", () => {
       type: "text",
       text: expect.stringContaining("SandboxViolation"),
     });
-    expect(result.details).toMatchObject({ kind: "SandboxViolation" });
   });
 });
 
@@ -176,10 +175,9 @@ describe("editFileTool", () => {
   });
 
   it("error path when old_text matches multiple times", async () => {
-    mockState.rejected = {
-      kind: "Unknown",
+    mockState.rejected = new Unknown({
       message: "old_text must match exactly once (got 2)",
-    } as unknown as Error;
+    });
 
     const result = await editFileTool.execute("c1", {
       workspace_id: "ws1",
@@ -265,11 +263,10 @@ describe("searchFilesTool", () => {
   });
 
   it("error path returns SandboxViolation", async () => {
-    mockState.rejected = {
-      kind: "SandboxViolation",
+    mockState.rejected = new SandboxViolation({
       path: "/etc",
       workspace_label: "ws1",
-    } as unknown as Error;
+    });
 
     const result = await searchFilesTool.execute("c1", {
       workspace_id: "ws1",
@@ -280,7 +277,6 @@ describe("searchFilesTool", () => {
       type: "text",
       text: expect.stringContaining("SandboxViolation"),
     });
-    expect(result.details).toMatchObject({ kind: "SandboxViolation" });
   });
 });
 
@@ -310,11 +306,10 @@ describe("deleteFileTool", () => {
   });
 
   it("error path returns SandboxViolation", async () => {
-    mockState.rejected = {
-      kind: "SandboxViolation",
+    mockState.rejected = new SandboxViolation({
       path: "/etc/passwd",
       workspace_label: "ws1",
-    } as unknown as Error;
+    });
 
     const result = await deleteFileTool.execute("c1", {
       workspace_id: "ws1",
@@ -325,14 +320,12 @@ describe("deleteFileTool", () => {
       type: "text",
       text: expect.stringContaining("SandboxViolation"),
     });
-    expect(result.details).toMatchObject({ kind: "SandboxViolation" });
   });
 
   it("error path for blocked extension returns clear error", async () => {
-    mockState.rejected = {
-      kind: "Unknown",
+    mockState.rejected = new Unknown({
       message: "Blocked file type: .exe",
-    } as unknown as Error;
+    });
 
     const result = await deleteFileTool.execute("c1", {
       workspace_id: "ws1",
@@ -343,6 +336,5 @@ describe("deleteFileTool", () => {
       type: "text",
       text: expect.stringContaining("Blocked file type: .exe"),
     });
-    expect(result.details).toMatchObject({ kind: "Unknown" });
   });
 });

@@ -149,18 +149,8 @@ export interface ToolResult {
 }
 
 // ============================================================================
-// Error (preserved)
+// AppError moved to ./errors.ts (ADR-0025 PR 2)
 // ============================================================================
-
-export type AppError =
-  | { kind: "NotFound"; message: string }
-  | { kind: "Unauthorized"; message: string }
-  | { kind: "Network"; message: string; cause?: string }
-  | { kind: "InvalidConfig"; message: string; field?: string }
-  | { kind: "Database"; message: string; cause?: string }
-  | { kind: "ToolCall"; tool_call_id: string; message: string }
-  | { kind: "SandboxViolation"; path: string; workspace_label: string }
-  | { kind: "Unknown"; message: string };
 
 // ============================================================================
 // V2 Local Dev Mock LLM Pipeline (ADR-TBD)

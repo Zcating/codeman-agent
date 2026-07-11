@@ -11,8 +11,9 @@ import { createSignal, type Accessor } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 
 import { Effect, Stream } from "effect";
-import type { AppError, Conversation, Message, Workspace } from "../../../shared/lib/types";
+import type { Conversation, Message, Workspace } from "../../../shared/lib/types";
 import { logger } from "../../../shared/lib/logger";
+import type { AppError } from "../../../shared/lib/errors";
 import {
   createAgentRuntime,
   type AgentRuntime,

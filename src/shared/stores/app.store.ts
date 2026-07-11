@@ -24,8 +24,9 @@
 
 import { createStore } from "solid-js/store";
 import { Effect } from "effect";
-import type { Settings, Provider, ModelMeta, AppError, Workspace } from "../lib/types";
+import type { Settings, Provider, ModelMeta, Workspace } from "../lib/types";
 import { logger } from "../lib/logger";
+import { Unknown, type AppError } from "../lib/errors";
 // V3: route IPC through the V3 canonical (window.codeman dispatch) instead of
 // the V2 @tauri-apps/api/core which reads window.__TAURI_INTERNALS__ (missing
 // in V3 Electron).
@@ -100,9 +101,9 @@ function applyPatch(patch: Partial<Settings>): void {
 
 function toAppError(e: unknown): AppError {
   if (e && typeof e === "object" && "kind" in e) {
-    return e as AppError;
+    return e as unknown as AppError;
   }
-  return { kind: "Unknown", message: e instanceof Error ? e.message : String(e) };
+  return new Unknown({ message: e instanceof Error ? e.message : String(e) });
 }
 
 // V3: ipcInvoke returns Effect.Effect<T, AppError> (not Promise) — use
