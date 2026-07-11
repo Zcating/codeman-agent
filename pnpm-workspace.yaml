@@ -2,6 +2,7 @@ allowBuilds:
   "@google/genai": true
   better-sqlite3: false
   electron: true
+  electron-winstaller: false
   esbuild: true
   msgpackr-extract: true
   protobufjs: true
