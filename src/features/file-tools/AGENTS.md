@@ -87,7 +87,7 @@ import type { FileMatch } from "@/features/file-tools";
 - 禁止在此添加 UI 组件——文件工具 UI（若有）属于 `src/features/chat/components/`。
 - 禁止在此创建 5 子目录白名单外的子目录（无 `components/` / `routes/` / `stores/` / `hooks/` 等）。
 - 禁止在 5 个子目录外添加文件——file-tools feature 根级只允许 `index.ts` + `AGENTS.md`。
-- 所有工具 `parameters` 必须以 `workspace_id: Type.String()` 开头。
+- 所有工具 `parameters` 必须以 `workspace_id: Schema.String()` 开头。
 
 ## ADR 参考
 
