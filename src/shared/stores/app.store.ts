@@ -27,6 +27,7 @@ import { Effect } from "effect";
 import type { Settings, Provider, ModelMeta, Workspace } from "../lib/types";
 import { logger } from "../lib/logger";
 import { Unknown, type AppError } from "../lib/errors";
+import { decodeAppError } from "../lib/decode-app-error";
 // V3: route IPC through the V3 canonical (window.codeman dispatch) instead of
 // the V2 @tauri-apps/api/core which reads window.__TAURI_INTERNALS__ (missing
 // in V3 Electron).
@@ -100,8 +101,8 @@ function applyPatch(patch: Partial<Settings>): void {
 }
 
 function toAppError(e: unknown): AppError {
-  if (e && typeof e === "object" && "kind" in e) {
-    return e as unknown as AppError;
+  if (e && typeof e === "object" && ("kind" in e || "_tag" in e)) {
+    return decodeAppError(e);
   }
   return new Unknown({ message: e instanceof Error ? e.message : String(e) });
 }
