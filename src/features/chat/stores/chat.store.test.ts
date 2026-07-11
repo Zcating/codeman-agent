@@ -49,17 +49,17 @@ vi.mock("../../../shared/lib/ipc", async () => {
       }) =>
         E.succeed({
           id: "msg-id",
-          conversation_id: args.conversationId,
+          conversationId: args.conversationId,
           role: args.role,
           content: args.content,
-          tool_calls: args.toolCalls ? (JSON.parse(args.toolCalls) as Message["tool_calls"]) : null,
-          tool_results: args.toolResults
-            ? (JSON.parse(args.toolResults) as Message["tool_results"])
+          toolCalls: args.toolCalls ? (JSON.parse(args.toolCalls) as Message["toolCalls"]) : null,
+          toolResults: args.toolResults
+            ? (JSON.parse(args.toolResults) as Message["toolResults"])
             : null,
           model: args.model ?? null,
-          input_tokens: null,
-          output_tokens: null,
-          created_at: Date.now(),
+          inputTokens: null,
+          outputTokens: null,
+          createdAt: Date.now(),
         } as Message),
       search: () => E.succeed([] as Message[]),
     }),
@@ -69,21 +69,21 @@ vi.mock("../../../shared/lib/ipc", async () => {
         E.succeed({
           id,
           title: "x",
-          system_prompt: null,
-          workspace_id: "",
-          created_at: 1,
-          updated_at: 1,
-          archived_at: null,
+          systemPrompt: null,
+          workspaceId: "",
+          createdAt: 1,
+          updatedAt: 1,
+          archivedAt: null,
         } as Conversation),
       create: (title: string, _systemPrompt: string | null, _workspaceId: string) =>
         E.succeed({
           id: "new-id",
           title,
-          system_prompt: null,
-          workspace_id: _workspaceId,
-          created_at: 1,
-          updated_at: 1,
-          archived_at: null,
+          systemPrompt: null,
+          workspaceId: _workspaceId,
+          createdAt: 1,
+          updatedAt: 1,
+          archivedAt: null,
         } as Conversation),
       archive: () => E.void,
       delete: () => E.void,
@@ -104,11 +104,11 @@ vi.mock("../../../shared/lib/workspace-service", async () => {
     WorkspaceServiceLive: Layer.succeed(WorkspaceService, {
       list: () =>
         E.succeed([
-          { id: "ws-1", label: "Workspace 1", root_path: "/path/ws1", created_at: 1, updated_at: 1 } as Workspace,
-          { id: "ws-2", label: "Workspace 2", root_path: "/path/ws2", created_at: 2, updated_at: 2 } as Workspace,
+          { id: "ws-1", label: "Workspace 1", rootPath: "/path/ws1", createdAt: 1, updatedAt: 1 } as Workspace,
+          { id: "ws-2", label: "Workspace 2", rootPath: "/path/ws2", createdAt: 2, updatedAt: 2 } as Workspace,
         ]),
       add: (label: string, _rootPath: string) =>
-        E.succeed({ id: "new-ws-id", label, root_path: "/new/path", created_at: 3, updated_at: 3 } as Workspace),
+        E.succeed({ id: "new-ws-id", label, rootPath: "/new/path", createdAt: 3, updatedAt: 3 } as Workspace),
       rename: (_id: string, _label: string) => E.void,
       remove: (_id: string) => E.void,
       pickPath: () => E.succeed("/picked/path"),
@@ -130,26 +130,26 @@ vi.mock("../lib/runtime", () => ({
 const mockConv: Conversation = {
   id: "c1",
   title: "测试",
-  system_prompt: null,
-  workspace_id: "",
-  created_at: 1,
-  updated_at: 1,
-  archived_at: null,
+  systemPrompt: null,
+  workspaceId: "",
+  createdAt: 1,
+  updatedAt: 1,
+  archivedAt: null,
 };
 
 const mockHistory: Message[] = [
   {
     id: "u1",
-    conversation_id: "c1",
+    conversationId: "c1",
     role: "user",
     content: "hi",
     thinking: null,
-    tool_calls: null,
-    tool_results: null,
+    toolCalls: null,
+    toolResults: null,
     model: null,
-    input_tokens: null,
-    output_tokens: null,
-    created_at: 1,
+    inputTokens: null,
+    outputTokens: null,
+    createdAt: 1,
   },
 ];
 
@@ -206,16 +206,16 @@ describe("sendMessage — 跨会话隔离", () => {
       setStore("byId", "cA", "messages", [
         {
           id: "x",
-          conversation_id: "cA",
+          conversationId: "cA",
           role: "user",
           content: "test",
           thinking: null,
-          tool_calls: null,
-          tool_results: null,
+          toolCalls: null,
+          toolResults: null,
           model: null,
-          input_tokens: null,
-          output_tokens: null,
-          created_at: 1,
+          inputTokens: null,
+          outputTokens: null,
+          createdAt: 1,
         },
       ]);
       expect(store.byId["cA"]?.messages.length).toBe(1);
@@ -307,7 +307,7 @@ describe("sendMessage — G4: 调用 runtime.run({ context, provider })", () => 
       const convWithWs: Conversation = {
         ...mockConv,
         id: "c-ws-fix",
-        workspace_id: "real-uuid-7c8e9f10",
+        workspaceId: "real-uuid-7c8e9f10",
       };
       setupConvState(convWithWs, []);
       const runSpy = vi
@@ -316,9 +316,9 @@ describe("sendMessage — G4: 调用 runtime.run({ context, provider })", () => 
       await Effect.runPromise(sendMessage("c-ws-fix", "write to miniMax-workspace", defaultProvider));
       expect(runSpy).toHaveBeenCalledTimes(1);
       const opts = runSpy.mock.calls[0][0] as { provider: ProviderConfig };
-      // Augmented provider must include the real workspace_id so LLM does NOT
+      // Augmented provider must include the real workspaceId so LLM does NOT
       // hallucinate "miniMax-workspace" from the user's message text.
-      expect(opts.provider.systemPrompt).toContain('workspace_id="real-uuid-7c8e9f10"');
+      expect(opts.provider.systemPrompt).toContain('workspaceId="real-uuid-7c8e9f10"');
       expect(opts.provider.systemPrompt).toContain("read_file, write_file, edit_file, search_files, delete_file");
       expect(opts.provider.systemPrompt).toContain("Do NOT infer the id from user messages");
       dispose();
@@ -350,16 +350,16 @@ describe("sendMessage — G5: 处理 token event → 在首个 event 时创建 s
           type: "done",
           message: {
             id: "final",
-            conversation_id: "c1",
+            conversationId: "c1",
             role: "assistant",
             content: "Hello",
             thinking: null,
-            tool_calls: null,
-            tool_results: null,
+            toolCalls: null,
+            toolResults: null,
             model: null,
-            input_tokens: null,
-            output_tokens: null,
-            created_at: Date.now(),
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
           },
         },
       ];
@@ -388,16 +388,16 @@ describe("sendMessage — G6: 处理后续 token events → 更新 stub.content"
           type: "done",
           message: {
             id: "final",
-            conversation_id: "c1",
+            conversationId: "c1",
             role: "assistant",
             content: "Hello World",
             thinking: null,
-            tool_calls: null,
-            tool_results: null,
+            toolCalls: null,
+            toolResults: null,
             model: null,
-            input_tokens: null,
-            output_tokens: null,
-            created_at: Date.now(),
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
           },
         },
       ];
@@ -423,26 +423,26 @@ describe("sendMessage — G7: 处理 tool_call event → 添加到 stub.tool_cal
           type: "done",
           message: {
             id: "final",
-            conversation_id: "c1",
+            conversationId: "c1",
             role: "assistant",
             content: "The weather is nice.",
             thinking: null,
-            tool_calls: [toolCall],
-            tool_results: null,
+            toolCalls: [toolCall],
+            toolResults: null,
             model: null,
-            input_tokens: null,
-            output_tokens: null,
-            created_at: Date.now(),
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
           },
         },
       ];
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
       await Effect.runPromise(sendMessage("c1", "weather?", defaultProvider));
       const msgs = store.byId["c1"]?.messages ?? [];
-      // Find the assistant message - it should have tool_calls from the done event
+      // Find the assistant message - it should have toolCalls from the done event
       const assistantMsg = msgs.find((m) => m.role === "assistant");
-      expect(assistantMsg?.tool_calls).toBeDefined();
-      expect(assistantMsg?.tool_calls?.length).toBeGreaterThan(0);
+      expect(assistantMsg?.toolCalls).toBeDefined();
+      expect(assistantMsg?.toolCalls?.length).toBeGreaterThan(0);
       dispose();
     });
   });
@@ -461,16 +461,16 @@ describe("sendMessage — G8: 处理 tool_result event → 添加到 stub.tool_r
           type: "done",
           message: {
             id: "final",
-            conversation_id: "c1",
+            conversationId: "c1",
             role: "assistant",
             content: "It's 22°C.",
             thinking: null,
-            tool_calls: [toolCall],
-            tool_results: [{ tool_call_id: "tc1", result: { temp: 22 }, error: null }],
+            toolCalls: [toolCall],
+            toolResults: [{ toolCallId: "tc1", result: { temp: 22 }, error: null }],
             model: null,
-            input_tokens: null,
-            output_tokens: null,
-            created_at: Date.now(),
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
           },
         },
       ];
@@ -478,8 +478,8 @@ describe("sendMessage — G8: 处理 tool_result event → 添加到 stub.tool_r
       await Effect.runPromise(sendMessage("c1", "weather?", defaultProvider));
       const msgs = store.byId["c1"]?.messages ?? [];
       const stub = msgs.find((m) => m.role === "assistant");
-      expect(stub?.tool_results).toBeDefined();
-      expect(stub?.tool_results?.length).toBeGreaterThan(0);
+      expect(stub?.toolResults).toBeDefined();
+      expect(stub?.toolResults?.length).toBeGreaterThan(0);
       dispose();
     });
   });
@@ -495,16 +495,16 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
           type: "done",
           message: {
             id: "final",
-            conversation_id: "c1",
+            conversationId: "c1",
             role: "assistant",
             content: "Final response",
             thinking: null,
-            tool_calls: null,
-            tool_results: null,
+            toolCalls: null,
+            toolResults: null,
             model: "test-model",
-            input_tokens: null,
-            output_tokens: null,
-            created_at: Date.now(),
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
           },
         },
       ];
@@ -683,16 +683,16 @@ describe("persistUserMessage — G20: 调用 MessageService.append 并传入正�
           type: "done",
           message: {
             id: "final",
-            conversation_id: "c1",
+            conversationId: "c1",
             role: "assistant",
             content: "Hi",
             thinking: null,
-            tool_calls: null,
-            tool_results: null,
+            toolCalls: null,
+            toolResults: null,
             model: null,
-            input_tokens: null,
-            output_tokens: null,
-            created_at: Date.now(),
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
           },
         },
       ];
@@ -717,16 +717,16 @@ describe("persistAssistantMessage — G21: 当存在时将 toolCalls/toolResults
           type: "done",
           message: {
             id: "final",
-            conversation_id: "c1",
+            conversationId: "c1",
             role: "assistant",
             content: "Done",
             thinking: null,
-            tool_calls: [toolCall],
-            tool_results: [{ tool_call_id: "tc1", result: "ok", error: null }],
+            toolCalls: [toolCall],
+            toolResults: [{ toolCallId: "tc1", result: "ok", error: null }],
             model: null,
-            input_tokens: null,
-            output_tokens: null,
-            created_at: Date.now(),
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
           },
         },
       ];
@@ -785,12 +785,12 @@ describe("createAndSendConversation — G24: setupConvState copies workspace_id"
       const convWithWsId: Conversation = {
         ...mockConv,
         id: "c-ws-test",
-        workspace_id: "ws-specific-123",
+        workspaceId: "ws-specific-123",
       };
       setupConvState(convWithWsId, []);
       const cs = store.byId["c-ws-test"] as ConversationState | undefined;
       expect(cs).toBeDefined();
-      expect(cs?.workspace_id).toBe("ws-specific-123");
+      expect(cs?.workspaceId).toBe("ws-specific-123");
       dispose();
     });
   });

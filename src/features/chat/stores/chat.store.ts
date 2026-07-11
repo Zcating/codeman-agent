@@ -38,11 +38,11 @@ export interface ConversationState {
   // DB-backed fields (mirror shared/lib/types.ts Conversation)
   id: string;
   title: string;
-  system_prompt: string | null;
-  workspace_id: string;
-  created_at: number;
-  updated_at: number;
-  archived_at: number | null;
+  systemPrompt: string | null;
+  workspaceId: string;
+  createdAt: number;
+  updatedAt: number;
+  archivedAt: number | null;
   // Per-conv reactive state
   messages: Message[];
   streamingMessageId: string | null;
@@ -89,11 +89,11 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
   const cs: ConversationState = {
     id: conv.id,
     title: conv.title,
-    system_prompt: conv.system_prompt,
-    workspace_id: conv.workspace_id,
-    created_at: conv.created_at,
-    updated_at: conv.updated_at,
-    archived_at: conv.archived_at,
+    systemPrompt: conv.systemPrompt,
+    workspaceId: conv.workspaceId,
+    createdAt: conv.createdAt,
+    updatedAt: conv.updatedAt,
+    archivedAt: conv.archivedAt,
     messages: history,
     streamingMessageId: null,
     lastError: null,
@@ -105,14 +105,51 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
   return cs;
 }
 
+// ─── DB 持久化辅助 (Effect.fnUntraced) ───────────────────────────────
+//
+// 与公共 store API (sendMessage / archiveConversation / ...) 不同,这两个是
+// sendMessage 的紧耦合内部分支,嵌套在已 traced 的 sendMessage span 内。
+// 按上游 .repos/effect/.patterns/effect.md "Prefer Effect.fnUntraced over
+// functions that only return Effect.gen" 改写:
+//  - 复用 generator body(避免每次 sendMessage 重新分配 closure)
+//  - 跳过 trace span(嵌套 span 价值低,加 span 是 noise)
+//  - 提供 MessageServiceLive 通过 fnUntraced 第二参数 transform,与 Effect.provide 同效
+//
+// 注意:必须 const + module-top,不能 function 声明 — sendMessage 在 line 110
+// 引用这俩,const 没有 hoisting,TDZ 会炸。
+
+const persistUserMessage = Effect.fnUntraced(
+  function* (msg: Message) {
+    const svc = yield* MessageService;
+    yield* svc.append({
+      conversationId: msg.conversationId,
+      role: msg.role,
+      content: msg.content,
+    });
+  },
+  Effect.provide(MessageServiceLive),
+);
+
+const persistAssistantMessage = Effect.fnUntraced(
+  function* (msg: Message) {
+    const svc = yield* MessageService;
+    yield* svc.append({
+      conversationId: msg.conversationId,
+      role: msg.role,
+      content: msg.content,
+      thinking: msg.thinking ?? undefined,
+      toolCalls: msg.toolCalls ? JSON.stringify(msg.toolCalls) : undefined,
+      toolResults: msg.toolResults ? JSON.stringify(msg.toolResults) : undefined,
+      model: msg.model ?? undefined,
+    });
+  },
+  Effect.provide(MessageServiceLive),
+);
+
 // ─── sendMessage: append user msg + run + subscribe ───────────
 
-export function sendMessage(
-  convId: string,
-  content: string,
-  provider: ProviderConfig,
-): Effect.Effect<void, never, never> {
-  return Effect.fn("sendMessage")(function* () {
+export const sendMessage = Effect.fnUntraced(
+  function* (convId: string, content: string, provider: ProviderConfig) {
     const cs = store.byId[convId];
     if (!cs) {
       return;
@@ -121,44 +158,44 @@ export function sendMessage(
     // 1. Append user message to local + DB
     const userMsg: Message = {
       id: crypto.randomUUID(),
-      conversation_id: convId,
+      conversationId: convId,
       role: "user",
       content,
       thinking: null,
-      tool_calls: null,
-      tool_results: null,
+      toolCalls: null,
+      toolResults: null,
       model: null,
-      input_tokens: null,
-      output_tokens: null,
-      created_at: Date.now(),
+      inputTokens: null,
+      outputTokens: null,
+      createdAt: Date.now(),
     };
     setStore("byId", convId, "messages", (msgs) => [...msgs, userMsg]);
-    yield* persistUserMessageEffect(userMsg);
+    yield* persistUserMessage(userMsg);
 
     // 2. Build context (浅拷贝,含最新 user msg)
     const context = [...store.byId[convId]!.messages];
 
-    // 3. Augment system prompt with real workspace_id so the LLM uses the
+    // 3. Augment system prompt with real workspaceId so the LLM uses the
     //    UUID (not a hallucinated label/path it saw in the user message) when
     //    calling file tools. Without this, LLM picks e.g. "miniMax-workspace"
     //    (the workspace label derived from the folder name) and the IPC
     //    write_file/read_file/etc. fails with "Workspace not found: <label>".
     //    T27: 同时把 workspaceId 通过 ProviderConfig 传给 runtime,作为兜底 —
-    //    即使 LLM 没传 workspace_id(系统 prompt 是 hint,不是 contract),
+    //    即使 LLM 没传 workspaceId(系统 prompt 是 hint,不是 contract),
     //    `createFileTools(workspaceId)` 包装层会在 schema 校验后注入到 args。
-    const augmentedProvider: ProviderConfig = cs.workspace_id
+    const augmentedProvider: ProviderConfig = cs.workspaceId
       ? {
-          ...provider,
-          workspaceId: cs.workspace_id,
-          systemPrompt:
-            `${provider.systemPrompt}\n\n` +
-            `[Workspace context]\n` +
-            `You are operating inside workspace_id="${cs.workspace_id}".\n` +
-            `You MUST pass this exact id as the workspace_id parameter for ALL file tools ` +
-            `(read_file, write_file, edit_file, search_files, delete_file).\n` +
-            `Do NOT infer the id from user messages, folder names, or any other context — ` +
-            `use ONLY the id given above.`,
-        }
+        ...provider,
+        workspaceId: cs.workspaceId,
+        systemPrompt:
+          `${provider.systemPrompt}\n\n` +
+          `[Workspace context]\n` +
+          `You are operating inside workspaceId="${cs.workspaceId}".\n` +
+           `You MUST pass this exact id as the workspaceId parameter for ALL file tools ` +
+          `(read_file, write_file, edit_file, search_files, delete_file).\n` +
+          `Do NOT infer the id from user messages, folder names, or any other context — ` +
+          `use ONLY the id given above.`,
+      }
       : provider;
 
     // 4. Run runtime + subscribe
@@ -166,14 +203,13 @@ export function sendMessage(
     yield* Stream.runForEach(stream, (evt) =>
       Effect.sync(() => handleEvent(convId, evt)),
     ).pipe(Effect.scoped);
-  })().pipe(
-    Effect.catchAll((err) =>
-      Effect.sync(() => {
-        logger.error("[chat.store] sendMessage stream failure:", err);
-      }),
-    ),
-  );
-}
+  },
+  Effect.catchAll((err) =>
+    Effect.sync(() => {
+      logger.error("[chat.store] sendMessage stream failure:", err);
+    }),
+  ),
+);
 
 // ─── handleEvent: RuntimeEvent → setStore ─────────────────────
 
@@ -190,16 +226,16 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
         stubId = crypto.randomUUID();
         const stub: Message = {
           id: stubId,
-          conversation_id: convId,
+          conversationId: convId,
           role: "assistant",
           content: "",
           thinking: "",
-          tool_calls: null,
-          tool_results: null,
+          toolCalls: null,
+          toolResults: null,
           model: null,
-          input_tokens: null,
-          output_tokens: null,
-          created_at: Date.now(),
+          inputTokens: null,
+          outputTokens: null,
+          createdAt: Date.now(),
         };
         setStore("byId", convId, "messages", (msgs) => [...msgs, stub]);
         setStore("byId", convId, "streamingMessageId", stubId);
@@ -223,16 +259,16 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
         stubId = crypto.randomUUID();
         const stub: Message = {
           id: stubId,
-          conversation_id: convId,
+          conversationId: convId,
           role: "assistant",
           content: "",
           thinking: "",
-          tool_calls: null,
-          tool_results: null,
+          toolCalls: null,
+          toolResults: null,
           model: null,
-          input_tokens: null,
-          output_tokens: null,
-          created_at: Date.now(),
+          inputTokens: null,
+          outputTokens: null,
+          createdAt: Date.now(),
         };
         setStore("byId", convId, "messages", (msgs) => [...msgs, stub]);
         setStore("byId", convId, "streamingMessageId", stubId);
@@ -249,7 +285,7 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
           if (m.id !== store.byId[convId]?.streamingMessageId) {
             return m;
           }
-          return { ...m, tool_calls: [...(m.tool_calls ?? []), evt.toolCall] };
+          return { ...m, toolCalls: [...(m.toolCalls ?? []), evt.toolCall] };
         }),
       );
       break;
@@ -261,9 +297,9 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
           }
           return {
             ...m,
-            tool_results: [
-              ...(m.tool_results ?? []),
-              { tool_call_id: evt.toolCallId, result: evt.result, error: evt.error ?? null },
+            toolResults: [
+              ...(m.toolResults ?? []),
+              { toolCallId: evt.toolCallId, result: evt.result, error: evt.error ?? null },
             ],
           };
         }),
@@ -273,15 +309,15 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       const stubId = store.byId[convId]?.streamingMessageId;
       logger.debug(
         "[chat.store/diag] done event: stubId=" +
-          stubId +
-          " content.length=" +
-          (evt.message.content ?? "").length +
-          " content_preview=" +
-          String(evt.message.content ?? "").slice(0, 100) +
-          " thinking.length=" +
-          (evt.message.thinking?.length ?? 0) +
-          " tool_calls=" +
-          JSON.stringify(evt.message.tool_calls),
+        stubId +
+        " content.length=" +
+        (evt.message.content ?? "").length +
+        " content_preview=" +
+        String(evt.message.content ?? "").slice(0, 100) +
+        " thinking.length=" +
+        (evt.message.thinking?.length ?? 0) +
+        " tool_calls=" +
+        JSON.stringify(evt.message.toolCalls),
       );
       if (stubId) {
         setStore("byId", convId, "messages", (msgs) =>
@@ -293,7 +329,7 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       setStore("byId", convId, "streamingMessageId", null);
       // Notify sidebar re: streaming ended (triggers conversations$ update → badge removal)
       setConversationsSignal(Object.values(store.byId));
-      Effect.runPromise(persistAssistantMessageEffect({ ...evt.message, conversation_id: convId })).catch((err) =>
+      Effect.runPromise(persistAssistantMessage({ ...evt.message, conversationId: convId })).catch((err) =>
         logger.error("[chat.store] persistAssistantMessage failed:", err),
       );
       break;
@@ -311,34 +347,6 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
   }
 }
 
-// ─── DB 持久化辅助 ────────────────────────────────────────────
-
-function persistUserMessageEffect(msg: Message): Effect.Effect<void, AppError, never> {
-  return Effect.gen(function* () {
-    const svc = yield* MessageService;
-    yield* svc.append({
-      conversationId: msg.conversation_id,
-      role: msg.role,
-      content: msg.content,
-    });
-  }).pipe(Effect.provide(MessageServiceLive));
-}
-
-function persistAssistantMessageEffect(msg: Message): Effect.Effect<void, AppError, never> {
-  return Effect.gen(function* () {
-    const svc = yield* MessageService;
-    yield* svc.append({
-      conversationId: msg.conversation_id,
-      role: msg.role,
-      content: msg.content,
-      thinking: msg.thinking ?? undefined,
-      toolCalls: msg.tool_calls ? JSON.stringify(msg.tool_calls) : undefined,
-      toolResults: msg.tool_results ? JSON.stringify(msg.tool_results) : undefined,
-      model: msg.model ?? undefined,
-    });
-  }).pipe(Effect.provide(MessageServiceLive));
-}
-
 // ─── cancel: 调 runtime.cancel() 中断 in-flight stream ───────
 
 export function cancel(convId: string): void {
@@ -347,32 +355,34 @@ export function cancel(convId: string): void {
 
 // ─── archiveConversation: cancel + 从 store 移除 + DB archive ──
 
-export function archiveConversation(convId: string): Effect.Effect<void, AppError, never> {
-  return Effect.fn("archiveConversation")(function* () {
+export const archiveConversation = Effect.fnUntraced(
+  function* (convId: string) {
     cancel(convId);
     const svc = yield* ConversationService;
     yield* svc.archive(convId);
     setStore("byId", produce(prev => { delete prev[convId]; }));
     setConversationsSignal(Object.values(store.byId));
-  })().pipe(Effect.provide(ConversationServiceLive));
-}
+  },
+  Effect.provide(ConversationServiceLive),
+);
 
 // ─── deleteConversation: cancel + 从 store 移除 + DB delete ───
 
-export function deleteConversation(convId: string): Effect.Effect<void, AppError, never> {
-  return Effect.fn("deleteConversation")(function* () {
+export const deleteConversation = Effect.fnUntraced(
+  function* (convId: string) {
     cancel(convId);
     const svc = yield* ConversationService;
     yield* svc.delete(convId);
     setStore("byId", produce(prev => { delete prev[convId]; }));
     setConversationsSignal(Object.values(store.byId));
-  })().pipe(Effect.provide(ConversationServiceLive));
-}
+  },
+  Effect.provide(ConversationServiceLive),
+);
 
 // ─── loadConversations: DB → byId ─────────────────────────────
 
-export function loadConversations(includeArchived = false): Effect.Effect<void, AppError, never> {
-  return Effect.fn("loadConversations")(function* () {
+export const loadConversations = Effect.fnUntraced(
+  function* (includeArchived: boolean = false) {
     const svc = yield* ConversationService;
     const convs = yield* svc.list(includeArchived);
     for (const conv of convs) {
@@ -380,11 +390,10 @@ export function loadConversations(includeArchived = false): Effect.Effect<void, 
       const history = yield* msgSvc.list(conv.id);
       setupConvState(conv, history);
     }
-  })().pipe(
-    Effect.provide(ConversationServiceLive),
-    Effect.provide(MessageServiceLive),
-  );
-}
+  },
+  Effect.provide(ConversationServiceLive),
+  Effect.provide(MessageServiceLive),
+);
 
 // ─── createConversation: DB 新建 + setupConvState ─────────────
 
@@ -396,18 +405,15 @@ export function loadConversations(includeArchived = false): Effect.Effect<void, 
  * @param title - 会话标题
  * @param systemPrompt - 可选，覆盖 settings.system_prompt.default
  */
-export function createConversation(
-  workspaceId: string,
-  title: string,
-  systemPrompt?: string,
-): Effect.Effect<string, AppError, never> {
-  return Effect.fn("createConversation")(function* () {
+export const createConversation = Effect.fnUntraced(
+  function* (workspaceId: string, title: string, systemPrompt?: string) {
     const svc = yield* ConversationService;
     const conv = yield* svc.create(title, systemPrompt ?? null, workspaceId);
     setupConvState(conv, []);
     return conv.id;
-  })().pipe(Effect.provide(ConversationServiceLive));
-}
+  },
+  Effect.provide(ConversationServiceLive),
+);
 
 // ─── createAndSendConversation: Home send flow ─────────────────
 
@@ -435,22 +441,26 @@ export function createAndSendConversation(
 
 // ─── Workspace CRUD (D8-W) ──────────────────────────────────────────
 
-export const pickWorkspacePath = (): Effect.Effect<string | null, AppError, never> =>
-  Effect.fn("pickWorkspacePath")(function* () {
+export const pickWorkspacePath = Effect.fnUntraced(
+  function* () {
     const svc = yield* WorkspaceService;
     return yield* svc.pickPath();
-  })().pipe(Effect.provide(WorkspaceServiceLive));
+  },
+  Effect.provide(WorkspaceServiceLive),
+);
 
-export const loadWorkspaces = (): Effect.Effect<void, AppError, never> =>
-  Effect.fn("loadWorkspaces")(function* () {
+export const loadWorkspaces = Effect.fnUntraced(
+  function* () {
     const svc = yield* WorkspaceService;
     const result = yield* svc.list();
     setStore("workspaces", result);
     setWorkspacesSignal(Object.values(store.workspaces));
-  })().pipe(Effect.provide(WorkspaceServiceLive));
+  },
+  Effect.provide(WorkspaceServiceLive),
+);
 
-export const addWorkspace = (): Effect.Effect<Workspace | null, AppError, never> =>
-  Effect.fn("addWorkspace")(function* () {
+export const addWorkspace = Effect.fnUntraced(
+  function* () {
     const rootPath = yield* pickWorkspacePath();
     if (rootPath === null) return null;
     const label = deriveLabelFromPath(rootPath);
@@ -460,22 +470,28 @@ export const addWorkspace = (): Effect.Effect<Workspace | null, AppError, never>
     setWorkspacesSignal(Object.values(store.workspaces));
     setSelectedWorkspaceIdSignal(result.id);
     return result;
-  })().pipe(Effect.provide(WorkspaceServiceLive));
+  },
+  Effect.provide(WorkspaceServiceLive),
+);
 
-export const removeWorkspace = (id: string): Effect.Effect<void, AppError, never> =>
-  Effect.fn("removeWorkspace")(function* () {
+export const removeWorkspace = Effect.fnUntraced(
+  function* (id: string) {
     const svc = yield* WorkspaceService;
     yield* svc.remove(id);
-    // CASCADE deletes conversations with this workspace_id in SQLite
+    // CASCADE deletes conversations with this workspaceId in SQLite
     setStore("workspaces", (ws) => ws.filter((w) => w.id !== id));
     setWorkspacesSignal(Object.values(store.workspaces));
     if (selectedWorkspaceId() === id) setSelectedWorkspaceIdSignal(null);
-  })().pipe(Effect.provide(WorkspaceServiceLive));
+  },
+  Effect.provide(WorkspaceServiceLive),
+);
 
-export const renameWorkspace = (id: string, label: string): Effect.Effect<void, AppError, never> =>
-  Effect.fn("renameWorkspace")(function* () {
+export const renameWorkspace = Effect.fnUntraced(
+  function* (id: string, label: string) {
     const svc = yield* WorkspaceService;
     yield* svc.rename(id, label);
     setStore("workspaces", (ws) => ws.map((w) => (w.id === id ? { ...w, label } : w)));
     setWorkspacesSignal(Object.values(store.workspaces));
-  })().pipe(Effect.provide(WorkspaceServiceLive));
+  },
+  Effect.provide(WorkspaceServiceLive),
+);

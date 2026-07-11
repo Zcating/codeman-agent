@@ -44,7 +44,7 @@ function LlmPicker(): JSX.Element {
   );
 
   const currentModelId = (): string | null => {
-    const providerId = appStore.state.value.default_llm_provider_id;
+    const providerId = appStore.state.value.defaultLlmProviderId;
     const enabled = buildEnabledProviders(appStore.state.value.providers ?? []);
     const provider = enabled.find((p) => p.id === providerId);
     if (!provider) return enabled[0]?.models[0]?.id ?? null;
@@ -57,7 +57,7 @@ function LlmPicker(): JSX.Element {
       p.models.some((m) => m.id === modelId),
     );
     if (provider) {
-      appStore.set({ default_llm_provider_id: provider.id });
+      appStore.set({ defaultLlmProviderId: provider.id });
       settingsSaver.scheduleSave();
     }
   };
@@ -96,7 +96,7 @@ export function HomeAgentForm(): JSX.Element {
     return list.map((w) => ({
       id: w.id,
       label: w.label,
-      rootPath: w.root_path,
+      rootPath: w.rootPath,
     }));
   });
 
@@ -121,13 +121,13 @@ export function HomeAgentForm(): JSX.Element {
     if (!text || !wsId) return;
 
     // Build ProviderConfig from appStore
-    const providerId = appStore.state.value.default_llm_provider_id;
+    const providerId = appStore.state.value.defaultLlmProviderId;
     const providerConfig = appStore.state.value.providers?.find((p) => p.id === providerId);
     const provider: ProviderConfig = {
-      apiKey: providerConfig?.api_key ?? null,
-      baseUrl: providerConfig?.llm?.base_url ?? "",
-      defaultModel: providerConfig?.llm?.default_model ?? "auto",
-      systemPrompt: appStore.state.value.system_prompt?.default ?? "",
+      apiKey: providerConfig?.apiKey ?? null,
+      baseUrl: providerConfig?.llm?.baseUrl ?? "",
+      defaultModel: providerConfig?.llm?.defaultModel ?? "auto",
+      systemPrompt: appStore.state.value.systemPrompt?.default ?? "",
       tools: [],
     };
 

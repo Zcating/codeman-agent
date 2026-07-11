@@ -51,7 +51,7 @@ describe("readFileTool", () => {
   it("error path returns SandboxViolation as error string", async () => {
     mockState.rejected = new SandboxViolation({
       path: "/etc/x",
-      workspace_label: "ws1",
+      workspaceLabel: "ws1",
     });
 
     const result = await readFileTool.execute("c1", {
@@ -111,7 +111,7 @@ describe("writeFileTool", () => {
   it("error path returns SandboxViolation", async () => {
     mockState.rejected = new SandboxViolation({
       path: "/etc/x",
-      workspace_label: "ws1",
+      workspaceLabel: "ws1",
     });
 
     const result = await writeFileTool.execute("c1", {
@@ -212,8 +212,8 @@ describe("searchFilesTool", () => {
 
   it("happy path returns matches with line numbers", async () => {
     mockState.resolved = [
-      { path: "src/main.ts", line_number: 10, line_content: "TODO: fix" },
-      { path: "src/main.ts", line_number: 42, line_content: "TODO: test" },
+      { path: "src/main.ts", lineNumber: 10, lineContent: "TODO: fix" },
+      { path: "src/main.ts", lineNumber: 42, lineContent: "TODO: test" },
     ];
 
     const result = await searchFilesTool.execute("c1", {
@@ -237,7 +237,7 @@ describe("searchFilesTool", () => {
   });
 
   it("happy path with no content_pattern (glob only)", async () => {
-    mockState.resolved = [{ path: "src/main.ts", line_number: null, line_content: null }];
+    mockState.resolved = [{ path: "src/main.ts", lineNumber: null, lineContent: null }];
 
     const result = await searchFilesTool.execute("c1", {
       workspace_id: "ws1",
@@ -269,7 +269,7 @@ describe("searchFilesTool", () => {
   it("error path returns SandboxViolation", async () => {
     mockState.rejected = new SandboxViolation({
       path: "/etc",
-      workspace_label: "ws1",
+      workspaceLabel: "ws1",
     });
 
     const result = await searchFilesTool.execute("c1", {
@@ -312,7 +312,7 @@ describe("deleteFileTool", () => {
   it("error path returns SandboxViolation", async () => {
     mockState.rejected = new SandboxViolation({
       path: "/etc/passwd",
-      workspace_label: "ws1",
+      workspaceLabel: "ws1",
     });
 
     const result = await deleteFileTool.execute("c1", {

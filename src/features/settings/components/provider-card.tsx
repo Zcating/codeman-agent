@@ -33,7 +33,7 @@ export interface ProviderCardProps {
 
 export function ProviderCard(props: ProviderCardProps) {
   // Local UI state
-  const [selectedModel, setSelectedModel] = createSignal(props.provider.llm.default_model);
+  const [selectedModel, setSelectedModel] = createSignal(props.provider.llm.defaultModel);
   const [isRefreshing, setIsRefreshing] = createSignal(false);
   const [refreshMsg, setRefreshMsg] = createSignal<string | null>(null);
   const [isDeleting, setIsDeleting] = createSignal(false);
@@ -54,7 +54,7 @@ export function ProviderCard(props: ProviderCardProps) {
     setSelectedModel(modelId);
     const updated: Provider = {
       ...props.provider,
-      llm: { ...props.provider.llm, default_model: modelId },
+      llm: { ...props.provider.llm, defaultModel: modelId },
     };
     const providers = appStore.state.value.providers!.map((p) =>
       p.id === updated.id ? updated : p,
@@ -64,10 +64,10 @@ export function ProviderCard(props: ProviderCardProps) {
     props.onUpdate(updated);
   };
 
-  const handleBaseUrlChange = (base_url: string) => {
+  const handleBaseUrlChange = (baseUrl: string) => {
     const updated: Provider = {
       ...props.provider,
-      llm: { ...props.provider.llm, base_url },
+      llm: { ...props.provider.llm, baseUrl },
     };
     const providers = appStore.state.value.providers!.map((p) =>
       p.id === updated.id ? updated : p,
@@ -116,7 +116,7 @@ export function ProviderCard(props: ProviderCardProps) {
         <div class="flex flex-col gap-0.5">
           <CardTitle class="text-base font-semibold">
             {props.provider.label}
-            <Show when={props.provider.llm.base_url.startsWith("http://127.0.0.1:")}>
+            <Show when={props.provider.llm.baseUrl.startsWith("http://127.0.0.1:")}>
               <span data-testid="provider-dev-badge" class="ml-2 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">(dev)</span>
             </Show>
           </CardTitle>
@@ -163,7 +163,7 @@ export function ProviderCard(props: ProviderCardProps) {
             <label class="text-xs text-muted-foreground">Base URL</label>
             <Input
               type="text"
-              value={props.provider.llm.base_url}
+              value={props.provider.llm.baseUrl}
               onInput={(e) => handleBaseUrlChange(e.currentTarget.value)}
               placeholder="https://api.example.com/v1"
             />
@@ -189,9 +189,9 @@ export function ProviderCard(props: ProviderCardProps) {
             <label class="text-xs text-muted-foreground">LLM API Key</label>
             <Input
               type="password"
-              value={props.provider.api_key}
+              value={props.provider.apiKey}
               onInput={(e) => {
-                const updated: Provider = { ...props.provider, api_key: e.currentTarget.value };
+                const updated: Provider = { ...props.provider, apiKey: e.currentTarget.value };
                 const providers = appStore.state.value.providers!.map((p) =>
                   p.id === updated.id ? updated : p,
                 );

@@ -50,16 +50,16 @@ const mockProvider: ProviderConfig = {
 const mockContext: Message[] = [
     {
         id: "u1",
-        conversation_id: "c1",
+        conversationId: "c1",
         role: "user",
         content: "hi",
         thinking: null,
-        tool_calls: null,
-        tool_results: null,
+        toolCalls: null,
+        toolResults: null,
         model: null,
-        input_tokens: null,
-        output_tokens: null,
-        created_at: 1,
+        inputTokens: null,
+        outputTokens: null,
+        createdAt: 1,
     },
 ];
 
@@ -608,12 +608,12 @@ describe("run() �� agent_end �¼�", () => {
             await new Promise((resolve) => setTimeout(resolve, 20));
             const doneEvent = events.find((e) => e.type === "done") as {
                 type: "done";
-                message: { content: string; tool_calls: unknown[] };
+                message: { content: string; toolCalls: unknown[] };
             };
             expect(doneEvent).toBeDefined();
             expect(doneEvent.message.content).toBe("hi");
-            expect(doneEvent.message.tool_calls).toHaveLength(1);
-            expect((doneEvent.message.tool_calls[0] as { id: string }).id).toBe("tc-1");
+            expect(doneEvent.message.toolCalls).toHaveLength(1);
+            expect((doneEvent.message.toolCalls[0] as { id: string }).id).toBe("tc-1");
         } finally {
             mockedAgent.mockImplementation(originalImpl as never);
         }
@@ -742,7 +742,7 @@ describe("run() �� agent_end �¼�", () => {
                 message: {
                     content: string;
                     thinking: string | null;
-                    tool_calls:
+                    toolCalls:
                         | Array<{ id: string; name: string; args: Record<string, unknown> }>
                         | null;
                 };
@@ -756,11 +756,11 @@ describe("run() �� agent_end �¼�", () => {
             expect(doneEvent!.message.thinking).toBe(
                 "user wants search files; calling search_files with *.ts",
             );
-            expect(doneEvent!.message.tool_calls).not.toBeNull();
-            expect(doneEvent!.message.tool_calls).toHaveLength(1);
-            expect(doneEvent!.message.tool_calls![0]!.id).toBe("toolu_turn1_search");
-            expect(doneEvent!.message.tool_calls![0]!.name).toBe("search_files");
-            expect(doneEvent!.message.tool_calls![0]!.args).toEqual({ pattern: "*.ts" });
+            expect(doneEvent!.message.toolCalls).not.toBeNull();
+            expect(doneEvent!.message.toolCalls).toHaveLength(1);
+            expect(doneEvent!.message.toolCalls![0]!.id).toBe("toolu_turn1_search");
+            expect(doneEvent!.message.toolCalls![0]!.name).toBe("search_files");
+            expect(doneEvent!.message.toolCalls![0]!.args).toEqual({ pattern: "*.ts" });
         } finally {
             mockedAgent.mockImplementation(originalImpl as never);
         }

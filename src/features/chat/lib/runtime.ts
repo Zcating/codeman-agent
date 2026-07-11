@@ -324,16 +324,16 @@ export function createAgentRuntime(): AgentRuntime {
                                     type: "done",
                                     message: {
                                         id: crypto.randomUUID(),
-                                        conversation_id: "",
+                                        conversationId: "",
                                         role: "assistant",
                                         content: doneContent,
                                         thinking: doneThinking,
-                                        tool_calls: doneToolCalls,
-                                        tool_results: null,
+                                        toolCalls: doneToolCalls,
+                                        toolResults: null,
                                         model: provider.defaultModel || null,
-                                        input_tokens: null,
-                                        output_tokens: null,
-                                        created_at: Date.now(),
+                                        inputTokens: null,
+                                        outputTokens: null,
+                                        createdAt: Date.now(),
                                     },
                                 });
                                 emit.end();

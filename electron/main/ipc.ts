@@ -104,34 +104,34 @@ function toConversation(row: RawConvRow) {
   return {
     id: row.id,
     title: row.title,
-    system_prompt: row.system_prompt ?? null,
-    workspace_id: row.workspace_id ?? "",
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    archived_at: row.archived_at ?? null,
+    systemPrompt: row.system_prompt ?? null,
+    workspaceId: row.workspace_id ?? "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    archivedAt: row.archived_at ?? null,
   };
 }
 function toMessage(row: RawMsgRow) {
   return {
     id: row.id,
-    conversation_id: row.conversation_id,
+    conversationId: row.conversation_id,
     role: row.role,
     content: row.content,
     thinking: row.thinking ?? null,
-    tool_calls: row.tool_calls ? JSON.parse(row.tool_calls) : null,
-    tool_results: row.tool_results ? JSON.parse(row.tool_results) : null,
+    toolCalls: row.tool_calls ? JSON.parse(row.tool_calls) : null,
+    toolResults: row.tool_results ? JSON.parse(row.tool_results) : null,
     model: row.model,
-    input_tokens: row.input_tokens,
-    output_tokens: row.output_tokens,
-    created_at: row.created_at,
+    inputTokens: row.input_tokens,
+    outputTokens: row.output_tokens,
+    createdAt: row.created_at,
   };
 }
 function toWorkspace(row: RawWorkspace) {
   return {
     id: row.id,
     label: row.label,
-    root_path: row.root_path,
-    created_at: row.created_at,
+    rootPath: row.root_path,
+    createdAt: row.created_at,
   };
 }
 

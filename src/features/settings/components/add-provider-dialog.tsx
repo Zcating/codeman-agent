@@ -39,9 +39,9 @@ export function createProviderFormDialog(): Promise<Provider | null> {
         const id = `mock-${Date.now().toString(36)}`;
         const tpl = buildMockDevTemplate(id);
         setLabel(tpl.label);
-        setBaseUrl(tpl.llm.base_url);
-        setDefaultModel(tpl.llm.default_model);
-        setApiKey(tpl.api_key);
+        setBaseUrl(tpl.llm.baseUrl);
+        setDefaultModel(tpl.llm.defaultModel);
+        setApiKey(tpl.apiKey);
         setEnabled(true);
       } else {
         setLabel("");
@@ -59,13 +59,13 @@ export function createProviderFormDialog(): Promise<Provider | null> {
         id,
         label: label(),
         enabled: enabled(),
-        api_key: apiKey(),
+        apiKey: apiKey(),
         llm: {
-          default_model: defaultModel(),
-          base_url: baseUrl(),
-          api_type: "anthropic-messages",
+          defaultModel: defaultModel(),
+          baseUrl: baseUrl(),
+          apiType: "anthropic-messages",
           models: defaultModel() ? [{ id: defaultModel(), label: defaultModel(), deprecated: false, thinking: false }] : [],
-          models_endpoint: "",
+          modelsEndpoint: "",
         },
       });
     };

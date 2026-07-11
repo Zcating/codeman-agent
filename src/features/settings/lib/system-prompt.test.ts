@@ -50,7 +50,7 @@ describe("system-prompt (ADR-0015)", () => {
     _resetAppStoreForTest();
     mockState.settings = {
       ...mockState.settings,
-      system_prompt: { default: "You are a helpful assistant.", user_can_edit: true },
+      systemPrompt: { default: "You are a helpful assistant.", userCanEdit: true },
     };
     await Effect.runPromise(appStore.refresh());
   });
@@ -72,15 +72,15 @@ describe("system-prompt (ADR-0015)", () => {
     expect(getDefaultSystemPrompt()).toBe("New prompt");
   });
 
-  it("resolveSystemPromptForConversation prefers conversation.system_prompt", () => {
+  it("resolveSystemPromptForConversation prefers conversation.systemPrompt", () => {
     const conv = {
       id: "c1",
       title: "T",
-      system_prompt: "Conv prompt",
-      workspace_id: "",
-      created_at: 0,
-      updated_at: 0,
-      archived_at: null,
+      systemPrompt: "Conv prompt",
+      workspaceId: "",
+      createdAt: 0,
+      updatedAt: 0,
+      archivedAt: null,
     };
     expect(resolveSystemPromptForConversation(conv)).toBe("Conv prompt");
   });
@@ -89,11 +89,11 @@ describe("system-prompt (ADR-0015)", () => {
     const conv = {
       id: "c1",
       title: "T",
-      system_prompt: null,
-      workspace_id: "",
-      created_at: 0,
-      updated_at: 0,
-      archived_at: null,
+      systemPrompt: null,
+      workspaceId: "",
+      createdAt: 0,
+      updatedAt: 0,
+      archivedAt: null,
     };
     expect(resolveSystemPromptForConversation(conv)).toBe("You are a helpful assistant.");
   });

@@ -17,55 +17,55 @@ vi.mock("../stores/chat.store", () => ({
       "conv-1": {
         id: "conv-1",
         title: "Test",
-        system_prompt: null,
-        created_at: 1710000000,
-        updated_at: 1710000000,
-        archived_at: null,
+        systemPrompt: null,
+        createdAt: 1710000000,
+        updatedAt: 1710000000,
+        archivedAt: null,
         messages: [
           {
             id: "msg-1",
-            conversation_id: "conv-1",
+            conversationId: "conv-1",
             role: "user",
             content: "Hello",
             thinking: null,
-            tool_calls: null,
-            tool_results: null,
+            toolCalls: null,
+            toolResults: null,
             model: null,
-            input_tokens: null,
-            output_tokens: null,
-            created_at: 1710000000,
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: 1710000000,
           },
           {
             id: "msg-2",
-            conversation_id: "conv-1",
+            conversationId: "conv-1",
             role: "assistant",
             content: "Hi there!",
             thinking: null,
-            tool_calls: null,
-            tool_results: null,
+            toolCalls: null,
+            toolResults: null,
             model: "gpt-4o",
-            input_tokens: null,
-            output_tokens: null,
-            created_at: 1710000001,
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: 1710000001,
           },
           {
             id: "msg-3",
-            conversation_id: "conv-1",
+            conversationId: "conv-1",
             role: "tool",
             content: "file content here",
             thinking: null,
-            tool_calls: null,
-            tool_results: [
+            toolCalls: null,
+            toolResults: [
               {
-                tool_call_id: "tc-read-1",
+                toolCallId: "tc-read-1",
                 result: "const x = 1;\nconst y = 2;\nconsole.log(x + y);",
                 error: null,
               },
             ],
             model: null,
-            input_tokens: null,
-            output_tokens: null,
-            created_at: 1710000002,
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: 1710000002,
           },
         ] as Message[],
         streamingMessageId: null,
@@ -74,10 +74,10 @@ vi.mock("../stores/chat.store", () => ({
       "conv-err": {
         id: "conv-err",
         title: "Err",
-        system_prompt: null,
-        created_at: 1710000000,
-        updated_at: 1710000000,
-        archived_at: null,
+        systemPrompt: null,
+        createdAt: 1710000000,
+        updatedAt: 1710000000,
+        archivedAt: null,
         messages: [],
         streamingMessageId: null,
         lastError: "AnthropicTransport: 缺 apiKey",
@@ -89,10 +89,10 @@ vi.mock("../stores/chat.store", () => ({
     {
       id: "conv-1",
       title: "Test",
-      system_prompt: null,
-      created_at: 1710000000,
-      updated_at: 1710000000,
-      archived_at: null,
+      systemPrompt: null,
+      createdAt: 1710000000,
+      updatedAt: 1710000000,
+      archivedAt: null,
     },
   ]),
   sendMessage: vi.fn(() => Effect.succeed(undefined)),
@@ -110,11 +110,11 @@ vi.mock("../../../shared/stores/app.store", () => {
         id: "minimax",
         label: "MiniMax",
         enabled: true,
-        api_key: "",
+        apiKey: "",
         llm: {
-          default_model: "MiniMax-M2.5-highspeed",
-          base_url: "https://api.minimaxi.com/anthropic",
-          api_type: "anthropic-messages",
+          defaultModel: "MiniMax-M2.5-highspeed",
+          baseUrl: "https://api.minimaxi.com/anthropic",
+          apiType: "anthropic-messages",
           models: [
             {
               id: "MiniMax-M2.5-highspeed",
@@ -123,11 +123,11 @@ vi.mock("../../../shared/stores/app.store", () => {
               thinking: false,
             },
           ],
-          models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
         },
       },
     ],
-    default_llm_provider_id: "minimax",
+    defaultLlmProviderId: "minimax",
   };
   return {
     appStore: {
@@ -150,7 +150,7 @@ vi.mock("../../../shared/stores/app.store", () => {
       clearAllHistory: vi.fn(),
     },
     _resetAppStoreForTest: vi.fn(),
-    __setAppStoreState: (s: { providers: any[]; default_llm_provider_id: string }) => {
+    __setAppStoreState: (s: { providers: any[]; defaultLlmProviderId: string }) => {
       settings = s;
     },
     __getAppStoreState: () => settings,
@@ -257,19 +257,19 @@ describe("ChatView", () => {
           id: "deepseek",
           label: "DeepSeek",
           enabled: false,
-          api_key: "",
+          apiKey: "",
           llm: {
-            default_model: "deepseek-chat",
-            base_url: "https://api.deepseek.com/anthropic",
-            api_type: "anthropic-messages",
+            defaultModel: "deepseek-chat",
+            baseUrl: "https://api.deepseek.com/anthropic",
+            apiType: "anthropic-messages",
             models: [
               { id: "deepseek-chat", label: "deepseek-chat", deprecated: false, thinking: false },
             ],
-            models_endpoint: "https://api.deepseek.com/models",
+            modelsEndpoint: "https://api.deepseek.com/models",
           },
         },
       ],
-      default_llm_provider_id: "deepseek",
+      defaultLlmProviderId: "deepseek",
     });
     const { container } = render(() => <ChatView convId="conv-1" />);
     const trigger = container.querySelector('button[data-testid="provider-select-trigger"]');
@@ -292,11 +292,11 @@ describe("ChatView", () => {
           id: "minimax",
           label: "MiniMax",
           enabled: true,
-          api_key: "",
+          apiKey: "",
           llm: {
-            default_model: "MiniMax-M2.5-highspeed",
-            base_url: "https://api.minimaxi.com/anthropic",
-            api_type: "anthropic-messages",
+            defaultModel: "MiniMax-M2.5-highspeed",
+            baseUrl: "https://api.minimaxi.com/anthropic",
+            apiType: "anthropic-messages",
             models: [
               {
                 id: "MiniMax-M2.5-highspeed",
@@ -305,11 +305,11 @@ describe("ChatView", () => {
                 thinking: false,
               },
             ],
-            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+            modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           },
         },
       ],
-      default_llm_provider_id: "minimax",
+      defaultLlmProviderId: "minimax",
     });
     const { container } = render(() => <ChatView convId="conv-1" />);
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
@@ -354,11 +354,11 @@ describe("ChatView", () => {
           id: "minimax",
           label: "MiniMax",
           enabled: true,
-          api_key: "",
+          apiKey: "",
           llm: {
-            default_model: "MiniMax-M2.5-highspeed",
-            base_url: "https://api.minimaxi.com/anthropic",
-            api_type: "anthropic-messages",
+            defaultModel: "MiniMax-M2.5-highspeed",
+            baseUrl: "https://api.minimaxi.com/anthropic",
+            apiType: "anthropic-messages",
             models: [
               {
                 id: "MiniMax-M2.5-highspeed",
@@ -367,11 +367,11 @@ describe("ChatView", () => {
                 thinking: false,
               },
             ],
-            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+            modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           },
         },
       ],
-      default_llm_provider_id: "minimax",
+      defaultLlmProviderId: "minimax",
     });
     const { container } = render(() => <ChatView convId="conv-1" />);
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
@@ -441,11 +441,11 @@ describe("ChatView", () => {
           id: "minimax",
           label: "MiniMax",
           enabled: true,
-          api_key: "",
+          apiKey: "",
           llm: {
-            default_model: "MiniMax-M2.5-highspeed",
-            base_url: "https://api.minimaxi.com/anthropic",
-            api_type: "anthropic-messages",
+            defaultModel: "MiniMax-M2.5-highspeed",
+            baseUrl: "https://api.minimaxi.com/anthropic",
+            apiType: "anthropic-messages",
             models: [
               {
                 id: "MiniMax-M2.5-highspeed",
@@ -454,11 +454,11 @@ describe("ChatView", () => {
                 thinking: false,
               },
             ],
-            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+            modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           },
         },
       ],
-      default_llm_provider_id: "minimax",
+      defaultLlmProviderId: "minimax",
     });
     const { container } = render(() => <ChatView convId="conv-1" />);
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
@@ -506,19 +506,19 @@ describe("ChatView", () => {
           id: "minimax",
           label: "MiniMax",
           enabled: true,
-          api_key: "test-key",
+          apiKey: "test-key",
           llm: {
-            default_model: "MiniMax-M2.5-highspeed",
-            base_url: "https://api.minimaxi.com/anthropic",
-            api_type: "anthropic-messages",
+            defaultModel: "MiniMax-M2.5-highspeed",
+            baseUrl: "https://api.minimaxi.com/anthropic",
+            apiType: "anthropic-messages",
             models: [
               { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", deprecated: false, thinking: false },
             ],
-            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+            modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           },
         },
       ],
-      default_llm_provider_id: "minimax",
+      defaultLlmProviderId: "minimax",
     });
     const { container } = render(() => <ChatView convId="conv-1" />);
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
@@ -546,19 +546,19 @@ describe("ChatView", () => {
           id: "minimax",
           label: "MiniMax",
           enabled: true,
-          api_key: "test-key",
+          apiKey: "test-key",
           llm: {
-            default_model: "MiniMax-M2.5-highspeed",
-            base_url: "https://api.minimaxi.com/anthropic",
-            api_type: "anthropic-messages",
+            defaultModel: "MiniMax-M2.5-highspeed",
+            baseUrl: "https://api.minimaxi.com/anthropic",
+            apiType: "anthropic-messages",
             models: [
               { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", deprecated: false, thinking: false },
             ],
-            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+            modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           },
         },
       ],
-      default_llm_provider_id: "minimax",
+      defaultLlmProviderId: "minimax",
     });
     const { container } = render(() => <ChatView convId="conv-1" />);
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
@@ -584,19 +584,19 @@ describe("ChatView", () => {
           id: "minimax",
           label: "MiniMax",
           enabled: true,
-          api_key: "test-key",
+          apiKey: "test-key",
           llm: {
-            default_model: "MiniMax-M2.5-highspeed",
-            base_url: "https://api.minimaxi.com/anthropic",
-            api_type: "anthropic-messages",
+            defaultModel: "MiniMax-M2.5-highspeed",
+            baseUrl: "https://api.minimaxi.com/anthropic",
+            apiType: "anthropic-messages",
             models: [
               { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", deprecated: false, thinking: false },
             ],
-            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+            modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           },
         },
       ],
-      default_llm_provider_id: "minimax",
+      defaultLlmProviderId: "minimax",
     });
     const { container } = render(() => <ChatView convId="conv-1" />);
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;

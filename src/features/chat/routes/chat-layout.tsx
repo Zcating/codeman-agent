@@ -35,18 +35,18 @@ function buildSidebarNodes(): WorkspaceNode[] {
   const wsList = workspaces$() ?? [];
   return wsList.map((ws) => {
     const wsConvs = allConvs
-      .filter((c) => c.workspace_id === ws.id)
-      .sort((a, b) => b.updated_at - a.updated_at);
+      .filter((c) => c.workspaceId === ws.id)
+      .sort((a, b) => b.updatedAt - a.updatedAt);
     return {
       kind: "workspace" as const,
       id: ws.id,
       label: ws.label,
-      rootPath: ws.root_path,
+      rootPath: ws.rootPath,
       children: wsConvs.map((c) => ({
         kind: "conv" as const,
         id: c.id,
         label: c.title,
-        subLabel: new Date(c.updated_at * 1000).toLocaleDateString("zh-CN"),
+        subLabel: new Date(c.updatedAt * 1000).toLocaleDateString("zh-CN"),
         isStreaming: store.byId[c.id]?.streamingMessageId != null,
       })),
     };

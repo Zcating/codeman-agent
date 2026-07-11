@@ -5,7 +5,7 @@ import { WorkspaceService } from "./workspace-service";
 
 const TestLayer = Layer.succeed(WorkspaceService, {
   list: () => Effect.succeed([]),
-  add: (_l, _r) => Effect.succeed({ id: "test", label: "Test", root_path: "/tmp", created_at: Date.now() }),
+  add: (_l, _r) => Effect.succeed({ id: "test", label: "Test", rootPath: "/tmp", createdAt: Date.now() }),
   rename: () => Effect.void,
   remove: () => Effect.void,
   pickPath: () => Effect.succeed("/tmp/test"),

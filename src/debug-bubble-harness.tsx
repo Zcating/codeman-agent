@@ -13,7 +13,7 @@ const messages: Message[] = [
   // Case A: thinking only (think mock entry — empty content + thinking)
   {
     id: "caseA",
-    conversation_id: convId,
+    conversationId: convId,
     role: "assistant",
     content: "",
     thinking:
@@ -21,17 +21,17 @@ const messages: Message[] = [
       "I need to verify that thinking text appears inline at the top of the bubble " +
       "after streaming completes (no collapse, no fold). " +
       "If this text is fully visible in the DOM, the V3.1 常驻 display is working correctly.",
-    tool_calls: null,
-    tool_results: null,
+    toolCalls: null,
+    toolResults: null,
     model: "mock",
-    input_tokens: null,
-    output_tokens: null,
-    created_at: 1,
+    inputTokens: null,
+    outputTokens: null,
+    createdAt: 1,
   },
   // Case B: thinking + text + tool use + tool result (three-blocks)
   {
     id: "caseB",
-    conversation_id: convId,
+    conversationId: convId,
     role: "assistant",
     content:
       "Case B — Let me search for TypeScript files. I expect to find several `.ts` files " +
@@ -39,54 +39,54 @@ const messages: Message[] = [
     thinking:
       "Case B — The user asked about TypeScript files. I should use the search_files tool " +
       "with a `*.ts` glob. This demonstrates thinking + text + tool use all in one bubble.",
-    tool_calls: [
+    toolCalls: [
       {
         id: "tc-search-1",
         name: "search_files",
-        args: { workspace_id: "ws-1", pattern: "*.ts" },
+        args: { workspaceId: "ws-1", pattern: "*.ts" },
       },
     ],
-    tool_results: [
+    toolResults: [
       {
-        tool_call_id: "tc-search-1",
+        toolCallId: "tc-search-1",
         result: [
-          { path: "src/features/chat/lib/runtime.ts", line_number: 1, line_content: "..." },
-          { path: "src/features/chat/lib/anthropic-transport.ts", line_number: 1, line_content: "..." },
-          { path: "src/features/chat/stores/chat.store.ts", line_number: 1, line_content: "..." },
+          { path: "src/features/chat/lib/runtime.ts", lineNumber: 1, lineContent: "..." },
+          { path: "src/features/chat/lib/anthropic-transport.ts", lineNumber: 1, lineContent: "..." },
+          { path: "src/features/chat/stores/chat.store.ts", lineNumber: 1, lineContent: "..." },
         ],
         error: null,
       },
     ],
     model: "mock",
-    input_tokens: null,
-    output_tokens: null,
-    created_at: 2,
+    inputTokens: null,
+    outputTokens: null,
+    createdAt: 2,
   },
   // Case C: tool use with error result
   {
     id: "caseC",
-    conversation_id: convId,
+    conversationId: convId,
     role: "assistant",
     content: "Case C — Let me try reading that file.",
     thinking: null,
-    tool_calls: [
+    toolCalls: [
       {
         id: "tc-err-1",
         name: "read_file",
-        args: { workspace_id: "ws-1", path: "/nonexistent/file.ts" },
+        args: { workspaceId: "ws-1", path: "/nonexistent/file.ts" },
       },
     ],
-    tool_results: [
+    toolResults: [
       {
-        tool_call_id: "tc-err-1",
+        toolCallId: "tc-err-1",
         result: null,
         error: "File not found: /nonexistent/file.ts",
       },
     ],
     model: "mock",
-    input_tokens: null,
-    output_tokens: null,
-    created_at: 3,
+    inputTokens: null,
+    outputTokens: null,
+    createdAt: 3,
   },
 ];
 
@@ -94,11 +94,11 @@ const messages: Message[] = [
 setStore("byId", convId, {
   id: convId,
   title: "debug",
-  system_prompt: null,
-  workspace_id: "ws-debug",
-  created_at: 1,
-  updated_at: 1,
-  archived_at: null,
+  systemPrompt: null,
+  workspaceId: "ws-debug",
+  createdAt: 1,
+  updatedAt: 1,
+  archivedAt: null,
   messages,
   streamingMessageId: null,
   lastError: null,

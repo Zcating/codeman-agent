@@ -11,20 +11,20 @@ describe("IPC Mock - V1.5+ Schema", () => {
     mockState.calls = [];
     mockState.settings = {
       providers: [mockMinimaxProvider],
-      schema_version: "1.5",
-      default_llm_provider_id: "minimax",
-      user_language: "en",
+      schemaVersion: "1.5",
+      defaultLlmProviderId: "minimax",
+      userLanguage: "en",
       theme: "system",
-      start_at_login: false,
+      startAtLogin: false,
       window: {
-        remember_position: false,
-        remember_size: false,
-        default_size: { width: 800, height: 600 },
-        min_size: { width: 400, height: 300 },
+        rememberPosition: false,
+        rememberSize: false,
+        defaultSize: { width: 800, height: 600 },
+        minSize: { width: 400, height: 300 },
       },
-      system_prompt: { default: "You are a helpful assistant.", user_can_edit: true },
-      conversations: { auto_archive_after_days: 30, max_history: 1000 },
-      llm_providers: [],
+      systemPrompt: { default: "You are a helpful assistant.", userCanEdit: true },
+      conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
+      llmProviders: [],
     };
     mockState.store = {};
     mockState.v0FixtureActive = false;
@@ -35,7 +35,7 @@ describe("IPC Mock - V1.5+ Schema", () => {
       const settings = await invoke("get_settings");
 
       expect(settings).toHaveProperty("providers");
-      expect(settings).toHaveProperty("schema_version", "1.5");
+      expect(settings).toHaveProperty("schemaVersion", "1.5");
       expect(Array.isArray((settings as any).providers)).toBe(true);
     });
 
@@ -46,12 +46,12 @@ describe("IPC Mock - V1.5+ Schema", () => {
       expect((settings as any).providers[0].id).toBe("minimax");
     });
 
-    it("returns preserved V1 fields (theme, user_language, etc.)", async () => {
+    it("returns preserved V1 fields (theme, userLanguage, etc.)", async () => {
       const settings = await invoke("get_settings");
 
       expect((settings as any).theme).toBe("system");
-      expect((settings as any).user_language).toBe("en");
-      expect((settings as any).start_at_login).toBe(false);
+      expect((settings as any).userLanguage).toBe("en");
+      expect((settings as any).startAtLogin).toBe(false);
     });
   });
 
@@ -62,29 +62,29 @@ describe("IPC Mock - V1.5+ Schema", () => {
         providers: [mockDeepseekProvider, mockMinimaxProvider],
       };
 
-      const result = await invoke("update_settings", { new_settings: newSettings });
+      const result = await invoke("update_settings", { newSettings: newSettings });
 
       expect((result as any).theme).toBe("dark");
       expect((result as any).providers).toHaveLength(2);
-      expect((result as any).schema_version).toBe("1.5");
+      expect((result as any).schemaVersion).toBe("1.5");
     });
 
     it("preserves existing settings when updating partial", async () => {
       const newSettings = { theme: "light" as const };
 
-      const result = await invoke("update_settings", { new_settings: newSettings });
+      const result = await invoke("update_settings", { newSettings: newSettings });
 
       expect((result as any).theme).toBe("light");
-      expect((result as any).user_language).toBe("en"); // preserved
+      expect((result as any).userLanguage).toBe("en"); // preserved
       expect((result as any).providers).toHaveLength(1); // preserved
     });
 
-    it("always sets schema_version to 1.5", async () => {
+    it("always sets schemaVersion to 1.5", async () => {
       const result = await invoke("update_settings", {
-        new_settings: { schema_version: "1.0" as any },
+        newSettings: { schemaVersion: "1.0" as any },
       });
 
-      expect((result as any).schema_version).toBe("1.5");
+      expect((result as any).schemaVersion).toBe("1.5");
     });
   });
 
@@ -107,7 +107,7 @@ describe("IPC Mock - V1.5+ Schema", () => {
       expect(provider.id).toBe("test");
       expect(provider.label).toBe("Test");
       expect(provider.enabled).toBe(true);
-      expect(provider.llm.api_type).toBe("anthropic-messages");
+      expect(provider.llm.apiType).toBe("anthropic-messages");
       expect(Array.isArray(provider.llm.models)).toBe(true);
     });
 
@@ -116,19 +116,19 @@ describe("IPC Mock - V1.5+ Schema", () => {
         id: "custom",
         label: "Custom",
         enabled: false,
-        api_key: "",
+        apiKey: "",
         llm: {
-          default_model: "custom-model",
-          base_url: "https://custom.example.com",
-          api_type: "anthropic-messages",
+          defaultModel: "custom-model",
+          baseUrl: "https://custom.example.com",
+          apiType: "anthropic-messages",
           models: [],
-          models_endpoint: "https://custom.example.com/models",
+          modelsEndpoint: "https://custom.example.com/models",
         },
       });
 
       expect(provider.id).toBe("custom");
       expect(provider.enabled).toBe(false);
-      expect(provider.llm.default_model).toBe("custom-model");
+      expect(provider.llm.defaultModel).toBe("custom-model");
     });
   });
 
@@ -142,37 +142,37 @@ describe("IPC Mock - V1.5+ Schema", () => {
     it("migrates V0 fixture on get_settings when v0FixtureActive is true", async () => {
       mockState.v0FixtureActive = true;
       mockState.resolved = {
-        llm_providers: [
+        llmProviders: [
           {
             id: "deepseek",
             label: "DeepSeek",
             enabled: true,
-            default_model: "deepseek-chat",
-            base_url: "https://api.deepseek.com",
-            api_type: "anthropic-messages",
-            api_key_ref: "llm_providers/deepseek/api_key",
+            defaultModel: "deepseek-chat",
+            baseUrl: "https://api.deepseek.com",
+            apiType: "anthropic-messages",
+            apiKeyRef: "llm_providers/deepseek/api_key",
           },
         ],
-        default_llm_provider_id: "deepseek",
-        user_language: "en",
+        defaultLlmProviderId: "deepseek",
+        userLanguage: "en",
         theme: "dark",
-        start_at_login: true,
+        startAtLogin: true,
         window: {
-          remember_position: true,
-          remember_size: true,
-          default_size: { width: 1024, height: 768 },
-          min_size: { width: 400, height: 300 },
+          rememberPosition: true,
+          rememberSize: true,
+          defaultSize: { width: 1024, height: 768 },
+          minSize: { width: 400, height: 300 },
         },
-        system_prompt: { default: "You are a coding assistant.", user_can_edit: false },
-        conversations: { auto_archive_after_days: 60, max_history: 500 },
+        systemPrompt: { default: "You are a coding assistant.", userCanEdit: false },
+        conversations: { autoArchiveAfterDays: 60, maxHistory: 500 },
       };
 
       const settings = await invoke("get_settings");
 
-      expect((settings as any).schema_version).toBe("1.5");
+      expect((settings as any).schemaVersion).toBe("1.5");
       expect((settings as any).providers).toHaveLength(1);
       expect((settings as any).providers[0].id).toBe("deepseek");
-      expect((settings as any).providers[0].llm.default_model).toBe("deepseek-chat");
+      expect((settings as any).providers[0].llm.defaultModel).toBe("deepseek-chat");
       expect((settings as any).theme).toBe("dark");
     });
   });

@@ -38,7 +38,7 @@ const invoke = <T>(name: string, args?: Record<string, unknown>): Effect.Effect<
 
 export const WorkspaceServiceLive = Layer.succeed(WorkspaceService, {
   list: () => invoke<Workspace[]>("list_workspaces"),
-  add: (label, rootPath) => invoke<Workspace>("add_workspace", { label, root_path: rootPath }),
+  add: (label, rootPath) => invoke<Workspace>("add_workspace", { label, rootPath }),
   rename: (id, label) => invoke<void>("rename_workspace", { id, label }),
   remove: (id) => invoke<void>("delete_workspace", { id }),
   pickPath: () => invoke<string | null>("pick_workspace_path"),

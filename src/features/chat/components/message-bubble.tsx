@@ -63,12 +63,12 @@ function ThinkingSection(props: {
  *  没匹配的 tool_call result 为 undefined (→ ToolCallCard 走 running 态)。
  */
 function pairToolCalls(message: Message): Array<{ toolCall: ToolCall; result: ToolResult | undefined }> {
-  if (!message.tool_calls) return [];
+  if (!message.toolCalls) return [];
   const resultsById = new Map<string, ToolResult>();
-  for (const tr of message.tool_results ?? []) {
-    resultsById.set(tr.tool_call_id, tr);
+  for (const tr of message.toolResults ?? []) {
+    resultsById.set(tr.toolCallId, tr);
   }
-  return message.tool_calls.map((tc) => ({
+  return message.toolCalls.map((tc) => ({
     toolCall: tc,
     result: resultsById.get(tc.id),
   }));
@@ -79,7 +79,7 @@ export function MessageBubble(props: { message: Message }) {
 
   // 该 message 是否还在 streaming (用于 ThinkingSection 默认展开 + 决定是否走 stream render)
   const isStreaming = createMemo(() => {
-    const cs = store.byId[props.message.conversation_id];
+    const cs = store.byId[props.message.conversationId];
     return cs?.streamingMessageId === props.message.id;
   });
 
@@ -143,11 +143,11 @@ export function MessageBubble(props: { message: Message }) {
           <pre class="mt-1 p-2 bg-muted rounded font-mono text-xs overflow-x-auto whitespace-pre-wrap">
             {JSON.stringify(props.message.content, null, 2)}
           </pre>
-          <Show when={props.message.tool_results && props.message.tool_results.length > 0}>
-            <For each={props.message.tool_results!}>
+          <Show when={props.message.toolResults && props.message.toolResults.length > 0}>
+            <For each={props.message.toolResults!}>
               {(tr: ToolResult) => (
                 <div class={`mt-1 text-xs ${tr.error ? "text-destructive" : "text-success"}`}>
-                  <code>{tr.tool_call_id}</code>: {tr.error ? (
+                  <code>{tr.toolCallId}</code>: {tr.error ? (
                     <XCircle class="h-3 w-3 inline align-middle text-destructive" aria-label="error" data-testid="tool-error" />
                   ) : (
                     <CheckCircle2 class="h-3 w-3 inline align-middle text-success" aria-label="success" data-testid="tool-success" />
@@ -175,13 +175,13 @@ export function MessageBubble(props: { message: Message }) {
                       <For each={tr.result as FileMatch[]}>
                         {(match: FileMatch) => (
                           <div class="flex gap-2 text-xs font-mono">
-                            <Show when={match.line_number !== null}>
-                              <span class="text-muted-foreground">{match.line_number}:</span>
+                            <Show when={match.lineNumber !== null}>
+                              <span class="text-muted-foreground">{match.lineNumber}:</span>
                             </Show>
                             <code class="text-primary">{match.path}</code>
-                            <Show when={match.line_content}>
+                            <Show when={match.lineContent}>
                               <span class="text-foreground truncate max-w-xs">
-                                {match.line_content}
+                                {match.lineContent}
                               </span>
                             </Show>
                           </div>

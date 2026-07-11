@@ -79,11 +79,11 @@ const mockMiniMaxProvider: Provider = {
   id: "minimax",
   label: "MiniMax",
   enabled: true,
-  api_key: "",
+  apiKey: "",
   llm: {
-    default_model: "MiniMax-M2.5-highspeed",
-    base_url: "https://api.minimaxi.com/anthropic",
-    api_type: "anthropic-messages",
+    defaultModel: "MiniMax-M2.5-highspeed",
+    baseUrl: "https://api.minimaxi.com/anthropic",
+    apiType: "anthropic-messages",
     models: [
       {
         id: "MiniMax-M2.5-highspeed",
@@ -98,26 +98,26 @@ const mockMiniMaxProvider: Provider = {
         thinking: false,
       },
     ],
-    models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+    modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
   },
 };
 
 const baseSettings: SettingsV15 = {
   providers: [],
-  schema_version: "1.5",
-  default_llm_provider_id: "minimax",
-  user_language: "en",
+  schemaVersion: "1.5",
+  defaultLlmProviderId: "minimax",
+  userLanguage: "en",
   theme: "system",
-  start_at_login: false,
+  startAtLogin: false,
   window: {
-    remember_position: true,
-    remember_size: true,
-    default_size: { width: 800, height: 600 },
-    min_size: { width: 800, height: 800 },
+    rememberPosition: true,
+    rememberSize: true,
+    defaultSize: { width: 800, height: 600 },
+    minSize: { width: 800, height: 800 },
   },
-  system_prompt: { default: "", user_can_edit: true },
-  conversations: { auto_archive_after_days: 30, max_history: 1000 },
-  llm_providers: [],
+  systemPrompt: { default: "", userCanEdit: true },
+  conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
+  llmProviders: [],
 };
 
 // ─── Tests ────────────────────────────────────────────────────
@@ -246,10 +246,10 @@ describe("SettingsRoute integration — provider UX", () => {
 
     await waitFor(() => {
       expect(fetchSpy).toHaveBeenCalledWith(
-        mockMiniMaxProvider.llm.models_endpoint,
+        mockMiniMaxProvider.llm.modelsEndpoint,
         expect.objectContaining({
           headers: expect.objectContaining({
-            Authorization: `Bearer ${mockMiniMaxProvider.api_key}`,
+            Authorization: `Bearer ${mockMiniMaxProvider.apiKey}`,
           }),
         }),
       );
@@ -264,13 +264,13 @@ describe("SettingsRoute integration — provider UX", () => {
       id: "provider-test01",
       label: "Test Provider",
       enabled: true,
-      api_key: "sk-test",
+      apiKey: "sk-test",
       llm: {
-        default_model: "test-model",
-        base_url: "https://test.example.com",
-        api_type: "anthropic-messages",
+        defaultModel: "test-model",
+        baseUrl: "https://test.example.com",
+        apiType: "anthropic-messages",
         models: [{ id: "test-model", label: "Test Model", deprecated: false, thinking: false }],
-        models_endpoint: "",
+        modelsEndpoint: "",
       },
     };
     mockFormDialog.mockResolvedValueOnce(newProvider);
@@ -330,7 +330,7 @@ describe("SettingsRoute integration — tab switching & handlers", () => {
   });
 
   // ── Tab switching ──
-  it("点击 'App' tab 显示 start_at_login checkbox", async () => {
+  it("点击 'App' tab 显示 startAtLogin checkbox", async () => {
     const user = userEvent.setup();
     render(() => <SettingsPage />);
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -342,10 +342,10 @@ describe("SettingsRoute integration — tab switching & handlers", () => {
     expect(screen.getByText("Start at login")).toBeInTheDocument();
     const checkbox = screen.getByRole("checkbox") as HTMLInputElement;
     expect(checkbox).toBeTruthy();
-    expect(checkbox.checked).toBe(false); // default start_at_login = false
+    expect(checkbox.checked).toBe(false); // default startAtLogin = false
   });
 
-  it("App tab checkbox onChange 调 appStore.set({ start_at_login })", async () => {
+  it("App tab checkbox onChange 调 appStore.set({ startAtLogin })", async () => {
     const user = userEvent.setup();
     render(() => <SettingsPage />);
     await new Promise((resolve) => setTimeout(resolve, 10));

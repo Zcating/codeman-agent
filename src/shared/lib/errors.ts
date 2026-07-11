@@ -38,7 +38,7 @@ export class Database extends Schema.TaggedError<Database>()("Database", {
 }) {}
 
 export class ToolCall extends Schema.TaggedError<ToolCall>()("ToolCall", {
-  tool_call_id: Schema.String,
+  toolCallId: Schema.String,
   message: Schema.String,
 }) {}
 
@@ -47,7 +47,7 @@ export class SandboxViolation extends Schema.TaggedError<SandboxViolation>()("Sa
   // requires no construction-site changes; PR 2 may populate it at throw sites.
   message: Schema.optional(Schema.String),
   path: Schema.String,
-  workspace_label: Schema.String,
+  workspaceLabel: Schema.String,
 }) {}
 
 export class Unknown extends Schema.TaggedError<Unknown>()("Unknown", {
