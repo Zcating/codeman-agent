@@ -279,7 +279,7 @@ export const deleteFileTool: AgentTool<TSchema, void | AppError> = {
  *  `workspace_id` 到 args(LLM 省略或 mock JSON 不带时)。`fileTools` 这个
  *  直导数组保留,供测试或一次性脚本调用 — 调用方必须自己在 args 里提供
  *  `workspace_id`,否则工具返回 `InvalidConfig` 错误。 */
-export const fileTools: AgentTool<any, any>[] = [
+export const fileTools: AgentTool<TSchema, unknown>[] = [
   readFileTool,
   writeFileTool,
   editFileTool,
@@ -298,8 +298,8 @@ export const fileTools: AgentTool<any, any>[] = [
  *                       若省略 / 空字符串,等价于 `fileTools`(工具接收
  *                       不带 workspace_id 的 args 时返回 InvalidConfig)。
  */
-export function createFileTools(workspaceId?: string): AgentTool<any, any>[] {
-  const tools: AgentTool<any, any>[] = [readFileTool, writeFileTool, editFileTool, searchFilesTool, deleteFileTool];
+export function createFileTools(workspaceId?: string): AgentTool<TSchema, unknown>[] {
+  const tools: AgentTool<TSchema, unknown>[] = [readFileTool, writeFileTool, editFileTool, searchFilesTool, deleteFileTool];
   if (!workspaceId) {
     return tools;
   }
