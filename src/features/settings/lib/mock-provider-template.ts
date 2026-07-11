@@ -21,13 +21,13 @@ export function buildMockDevTemplate(id: string): Provider {
     id,
     label: MOCK_DEV_TEMPLATE_CONSTANTS.label,
     enabled: true,
-    api_key: "",
+    apiKey: "",
     llm: {
-      default_model: MOCK_DEV_TEMPLATE_CONSTANTS.defaultModel,
-      base_url: MOCK_DEV_TEMPLATE_CONSTANTS.baseUrl,
-      api_type: MOCK_DEV_TEMPLATE_CONSTANTS.apiType,
+      defaultModel: MOCK_DEV_TEMPLATE_CONSTANTS.defaultModel,
+      baseUrl: MOCK_DEV_TEMPLATE_CONSTANTS.baseUrl,
+      apiType: MOCK_DEV_TEMPLATE_CONSTANTS.apiType,
       models: [{ id: MOCK_DEV_TEMPLATE_CONSTANTS.defaultModel, label: MOCK_DEV_TEMPLATE_CONSTANTS.label, deprecated: false, thinking: false }],
-      models_endpoint: MOCK_DEV_TEMPLATE_CONSTANTS.modelsEndpoint,
+      modelsEndpoint: MOCK_DEV_TEMPLATE_CONSTANTS.modelsEndpoint,
     },
   };
 }

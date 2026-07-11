@@ -28,8 +28,8 @@ export class BuildModelError extends Error {
  * provider.llm.api_type 固定为 "anthropic-messages" (ADR-0011)。
  */
 export function buildModel(provider: Provider, modelId: string): Model<"anthropic-messages"> {
-  // 1. 验证 api_key 存在
-  if (!provider.api_key) {
+  // 1. 验证 apiKey 存在
+  if (!provider.apiKey) {
     throw new BuildModelError(`No API key configured for provider '${provider.id}'`);
   }
 
@@ -52,11 +52,11 @@ export function buildModel(provider: Provider, modelId: string): Model<"anthropi
     name: meta.label,
     api: "anthropic-messages",
     provider: provider.id,
-    baseUrl: provider.llm.base_url ?? "",
+    baseUrl: provider.llm.baseUrl ?? "",
     reasoning: meta.thinking,
     input: ["text"], // V1.5 models 目前仅支持文本输入
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: meta.context_window ?? 128000,
+    contextWindow: meta.contextWindow ?? 128000,
     maxTokens: 8192,
   };
 

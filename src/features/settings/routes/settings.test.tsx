@@ -66,11 +66,11 @@ const mockMiniMaxProvider: Provider = {
   id: "minimax",
   label: "MiniMax",
   enabled: true,
-  api_key: "",
+  apiKey: "",
   llm: {
-    default_model: "MiniMax-M2.5-highspeed",
-    base_url: "https://api.minimaxi.com/anthropic",
-    api_type: "anthropic-messages",
+    defaultModel: "MiniMax-M2.5-highspeed",
+    baseUrl: "https://api.minimaxi.com/anthropic",
+    apiType: "anthropic-messages",
     models: [
       {
         id: "MiniMax-M2.5-highspeed",
@@ -79,7 +79,7 @@ const mockMiniMaxProvider: Provider = {
         thinking: false,
       },
     ],
-    models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+    modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
   },
 };
 
@@ -87,32 +87,32 @@ const mockDeepSeekProvider: Provider = {
   id: "deepseek",
   label: "DeepSeek",
   enabled: true,
-  api_key: "",
+  apiKey: "",
   llm: {
-    default_model: "deepseek-chat",
-    base_url: "https://api.deepseek.com/anthropic",
-    api_type: "anthropic-messages",
+    defaultModel: "deepseek-chat",
+    baseUrl: "https://api.deepseek.com/anthropic",
+    apiType: "anthropic-messages",
     models: [{ id: "deepseek-chat", label: "DeepSeek Chat", deprecated: false, thinking: false }],
-    models_endpoint: "https://api.deepseek.com/anthropic/v1/models",
+    modelsEndpoint: "https://api.deepseek.com/anthropic/v1/models",
   },
 };
 
 const baseSettings: SettingsV15 = {
   providers: [],
-  schema_version: "1.5",
-  default_llm_provider_id: "minimax",
-  user_language: "en",
+  schemaVersion: "1.5",
+  defaultLlmProviderId: "minimax",
+  userLanguage: "en",
   theme: "dark",
-  start_at_login: false,
+  startAtLogin: false,
   window: {
-    remember_position: true,
-    remember_size: true,
-    default_size: { width: 800, height: 600 },
-    min_size: { width: 600, height: 400 },
+    rememberPosition: true,
+    rememberSize: true,
+    defaultSize: { width: 800, height: 600 },
+    minSize: { width: 600, height: 400 },
   },
-  system_prompt: { default: "You are a helpful assistant.", user_can_edit: true },
-  conversations: { auto_archive_after_days: 30, max_history: 1000 },
-  llm_providers: [],
+  systemPrompt: { default: "You are a helpful assistant.", userCanEdit: true },
+  conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
+  llmProviders: [],
 };
 
 describe("SettingsPage — V1.5 provider rendering", () => {

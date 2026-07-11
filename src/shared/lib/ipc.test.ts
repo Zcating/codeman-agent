@@ -32,21 +32,21 @@ const mockProvider: Provider = {
   id: "minimax",
   label: "MiniMax",
   enabled: true,
-  api_key: "",
+  apiKey: "",
   llm: {
-    default_model: "MiniMax-M2.5-highspeed",
-    base_url: "https://api.minimaxi.com/anthropic",
-    api_type: "anthropic-messages",
+    defaultModel: "MiniMax-M2.5-highspeed",
+    baseUrl: "https://api.minimaxi.com/anthropic",
+    apiType: "anthropic-messages",
     models: [
       {
         id: "MiniMax-M2.5-highspeed",
         label: "MiniMax-M2.5-highspeed",
-        context_window: 200000,
+        contextWindow: 200000,
         deprecated: false,
         thinking: false,
       },
     ],
-    models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+    modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
   },
 };
 
@@ -77,9 +77,9 @@ const MockProviderServiceLive = Layer.succeed(ProviderService, {
     }
     return Effect.tryPromise({
       try: async () => {
-        const res = await fetch(provider.llm.models_endpoint, {
+        const res = await fetch(provider.llm.modelsEndpoint, {
           headers: {
-            Authorization: `Bearer ${provider.api_key}`,
+            Authorization: `Bearer ${provider.apiKey}`,
             "Content-Type": "application/json",
           },
         });
@@ -92,7 +92,7 @@ const MockProviderServiceLive = Layer.succeed(ProviderService, {
         return data.data.map((m) => ({
           id: m.id,
           label: m.name,
-          context_window: m.context_window,
+          contextWindow: m.context_window,
           deprecated: false,
           thinking: false,
         }));
@@ -118,20 +118,20 @@ beforeEach(() => {
   mockState.rejected = undefined;
   mockState.settings = {
     providers: [mockProvider],
-    schema_version: "1.5",
-    default_llm_provider_id: "minimax",
-    user_language: "en",
+    schemaVersion: "1.5",
+    defaultLlmProviderId: "minimax",
+    userLanguage: "en",
     theme: "system",
-    start_at_login: false,
+    startAtLogin: false,
     window: {
-      remember_position: true,
-      remember_size: true,
-      default_size: { width: 1280, height: 1280 },
-      min_size: { width: 800, height: 800 },
+      rememberPosition: true,
+      rememberSize: true,
+      defaultSize: { width: 1280, height: 1280 },
+      minSize: { width: 800, height: 800 },
     },
-    system_prompt: { default: "test", user_can_edit: true },
-    conversations: { auto_archive_after_days: 30, max_history: 1000 },
-    llm_providers: [],
+    systemPrompt: { default: "test", userCanEdit: true },
+    conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
+    llmProviders: [],
   };
   mockState.v0FixtureActive = false;
 });
@@ -208,7 +208,7 @@ describe("SettingsService", () => {
     Effect.gen(function* () {
       const svc = yield* SettingsService;
       const settings = yield* svc.getSettings();
-      expect(settings.schema_version).toBe("1.5");
+      expect(settings.schemaVersion).toBe("1.5");
     }).pipe(Effect.provide(SettingsServiceLive)),
   );
 });
@@ -216,7 +216,7 @@ describe("SettingsService", () => {
 describe("Bridge Functions", () => {
   it("getSettingsBridge returns current settings", async () => {
     const settings = await getSettingsBridge();
-    expect(settings.schema_version).toBe("1.5");
+    expect(settings.schemaVersion).toBe("1.5");
   });
 
   it("updateSettingsBridge patches settings", async () => {

@@ -5,19 +5,19 @@ import type { Provider } from "../../../shared/lib/types";
 import { buildMockDevTemplate } from "./mock-provider-template";
 
 describe("buildMockDevTemplate", () => {
-  it("返回 prefill shape with given id (base_url 指向本地 mock server)", () => {
+  it("返回 prefill shape with given id (baseUrl 指向本地 mock server)", () => {
     const result = buildMockDevTemplate("mock-1");
     expect(result).toEqual({
       id: "mock-1",
       label: "Mock",
       enabled: true,
-      api_key: "",
+      apiKey: "",
       llm: {
-        base_url: "http://127.0.0.1:50000/mock/anthropic",
-        default_model: "mock-default",
-        api_type: "anthropic-messages",
+        baseUrl: "http://127.0.0.1:50000/mock/anthropic",
+        defaultModel: "mock-default",
+        apiType: "anthropic-messages",
         models: [{ id: "mock-default", label: "Mock", deprecated: false, thinking: false }],
-        models_endpoint: "",
+        modelsEndpoint: "",
       },
     } satisfies Provider);
   });
@@ -27,13 +27,13 @@ describe("buildMockDevTemplate", () => {
     expect(result.id).toBe("mock-foo");
     expect(result.label).toBe("Mock");
     expect(result.enabled).toBe(true);
-    expect(result.api_key).toBe("");
-    expect(result.llm.base_url).toBe("http://127.0.0.1:50000/mock/anthropic");
-    expect(result.llm.default_model).toBe("mock-default");
-    expect(result.llm.api_type).toBe("anthropic-messages");
+    expect(result.apiKey).toBe("");
+    expect(result.llm.baseUrl).toBe("http://127.0.0.1:50000/mock/anthropic");
+    expect(result.llm.defaultModel).toBe("mock-default");
+    expect(result.llm.apiType).toBe("anthropic-messages");
     expect(result.llm.models).toHaveLength(1);
     expect(result.llm.models[0]).toEqual({ id: "mock-default", label: "Mock", deprecated: false, thinking: false });
-    expect(result.llm.models_endpoint).toBe("");
+    expect(result.llm.modelsEndpoint).toBe("");
   });
 
   it("返回对象结构匹配 Provider interface", () => {
@@ -44,7 +44,7 @@ describe("buildMockDevTemplate", () => {
     expect(typeof _provider.id).toBe("string");
     expect(typeof _provider.label).toBe("string");
     expect(typeof _provider.enabled).toBe("boolean");
-    expect(typeof _provider.api_key).toBe("string");
+    expect(typeof _provider.apiKey).toBe("string");
     expect(typeof _provider.llm).toBe("object");
   });
 });

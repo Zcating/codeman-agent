@@ -105,45 +105,45 @@ vi.mock("../../../shared/stores/app.store", () => ({
   appStore: {
     state: {
       value: {
-        workspaces: [] as Array<{ id: string; label: string; root_path: string; enabled: boolean }>,
-        get default_llm_provider_id() { return mockDefaultLlmProvider.id; },
+        workspaces: [] as Array<{ id: string; label: string; rootPath: string; enabled: boolean }>,
+        get defaultLlmProviderId() { return mockDefaultLlmProvider.id; },
         providers: [
           {
             id: "minimax",
             label: "MiniMax",
-            api_key: "test-key",
+            apiKey: "test-key",
             enabled: true,
             llm: {
-              default_model: "MiniMax-M2.5-highspeed",
-              base_url: "https://api.minimaxi.com/anthropic",
-              api_type: "anthropic-messages" as const,
-              models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+              defaultModel: "MiniMax-M2.5-highspeed",
+              baseUrl: "https://api.minimaxi.com/anthropic",
+              apiType: "anthropic-messages" as const,
+              modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
               models: [
-                { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", context_window: 200000, deprecated: false, thinking: false },
+                { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", contextWindow: 200000, deprecated: false, thinking: false },
               ],
             },
           },
         ],
-        system_prompt: { default: "You are a helpful assistant." },
+        systemPrompt: { default: "You are a helpful assistant." },
       },
     },
     setLastUsedWorkspaceId: vi.fn(),
     selectedWorkspaceId: vi.fn<() => string | null>(),
     set: vi.fn(),
     pickWorkspacePath: vi.fn(() => Effect.succeed<string | null>(null)),
-    addWorkspace: vi.fn((rootPath: string) => ({ id: "mock-id", label: rootPath, root_path: rootPath, enabled: true })),
+    addWorkspace: vi.fn((rootPath: string) => ({ id: "mock-id", label: rootPath, rootPath: rootPath, enabled: true })),
   },
 }));
 
 // ─── Mock chat.store ────────────────────────────────────────────────────
-const mockWorkspaces = vi.hoisted(() => [] as Array<{ id: string; label: string; root_path: string }>);
+const mockWorkspaces = vi.hoisted(() => [] as Array<{ id: string; label: string; rootPath: string }>);
 let mockSelectedWsId: string | null = null;
 
 vi.mock("../stores/chat.store", () => ({
   workspaces$: vi.fn(() => mockWorkspaces),
   selectedWorkspaceId$: vi.fn(() => mockSelectedWsId),
   setSelectedWorkspaceId: vi.fn((id: string) => { mockSelectedWsId = id; }),
-  addWorkspace: vi.fn(() => Effect.succeed({ id: "new-id", label: "New Workspace", root_path: "/new/path", created_at: Date.now() })),
+  addWorkspace: vi.fn(() => Effect.succeed({ id: "new-id", label: "New Workspace", rootPath: "/new/path", createdAt: Date.now() })),
   store: { byId: {} },
   activeId$: vi.fn<() => string | null>(),
   conversations$: vi.fn<() => never[]>(),
@@ -211,7 +211,7 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
   });
 
   it("T4.1.2: 1 workspace → input immediately enabled (draftWorkspaceId auto-set)", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", root_path: "C:\\a" });
+    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
     mockSelectedWsId = "ws-1";
 
     const { getByTestId } = render(() => <HomeAgentForm />);
@@ -224,8 +224,8 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
 
   it("T4.1.3: 2+ workspaces → input disabled until user picks", async () => {
     mockWorkspaces.push(
-      { id: "ws-1", label: "Project A", root_path: "C:\\a" },
-      { id: "ws-2", label: "Project B", root_path: "C:\\b" },
+      { id: "ws-1", label: "Project A", rootPath: "C:\\a" },
+      { id: "ws-2", label: "Project B", rootPath: "C:\\b" },
     );
     // mockSelectedWsId is already null from beforeEach
 
@@ -238,8 +238,8 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
 
   it("T4.1.4: 2+ workspaces → no pre-select; clicking workspace Select option enables input + calls setSelectedWorkspaceId", async () => {
     mockWorkspaces.push(
-      { id: "ws-1", label: "Project A", root_path: "C:\\a" },
-      { id: "ws-2", label: "Project B", root_path: "C:\\b" },
+      { id: "ws-1", label: "Project A", rootPath: "C:\\a" },
+      { id: "ws-2", label: "Project B", rootPath: "C:\\b" },
     );
     // mockSelectedWsId is null → no pre-select
 
@@ -265,7 +265,7 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
   });
 
   it("T4.1.5: Send button disabled when input is empty", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "My Project", root_path: "C:\\projects\\my-project" });
+    mockWorkspaces.push({ id: "ws-1", label: "My Project", rootPath: "C:\\projects\\my-project" });
     mockSelectedWsId = "ws-1";
 
     const { getByTestId } = render(() => <HomeAgentForm />);
@@ -283,7 +283,7 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
 
   it("T4.1.6: send button click triggers createConversation then sendMessage", async () => {
     const { appStore } = await import("../../../shared/stores/app.store");
-    mockWorkspaces.push({ id: "ws-1", label: "Frontend", root_path: "/p" });
+    mockWorkspaces.push({ id: "ws-1", label: "Frontend", rootPath: "/p" });
     mockSelectedWsId = "ws-1";
     mockDefaultLlmProvider.id = "minimax";
     appStore.state.value.providers = [
@@ -291,17 +291,17 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
         id: "minimax",
         label: "MiniMax",
         enabled: true,
-        api_key: "test-key",
+        apiKey: "test-key",
         llm: {
-          default_model: "m",
-          base_url: "https://api",
-          api_type: "anthropic-messages",
+          defaultModel: "m",
+          baseUrl: "https://api",
+          apiType: "anthropic-messages",
           models: [],
-          models_endpoint: "",
+          modelsEndpoint: "",
         },
       },
     ];
-    appStore.state.value.system_prompt = { default: "system msg here", user_can_edit: true };
+    appStore.state.value.systemPrompt = { default: "system msg here", userCanEdit: true };
 
     const { container } = render(() => <HomeAgentForm />);
 
@@ -327,7 +327,7 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
   });
 
   it("T4.1.7: send with empty input does not call createConversation or sendMessage", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Frontend", root_path: "/p" });
+    mockWorkspaces.push({ id: "ws-1", label: "Frontend", rootPath: "/p" });
     mockSelectedWsId = "ws-1";
 
     const { container } = render(() => <HomeAgentForm />);
@@ -343,8 +343,8 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
   it("T4.1.8: send with no workspace selected (2+ workspaces) does not call createConversation or sendMessage", async () => {
     // 2 workspaces, user hasn't picked yet
     mockWorkspaces.push(
-      { id: "ws-1", label: "A", root_path: "/a" },
-      { id: "ws-2", label: "B", root_path: "/b" },
+      { id: "ws-1", label: "A", rootPath: "/a" },
+      { id: "ws-2", label: "B", rootPath: "/b" },
     );
     // mockSelectedWsId is null → no selection
 
@@ -359,8 +359,8 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
 
   it("T4.1.9: workspace Select renders all workspaces as options", async () => {
     mockWorkspaces.push(
-      { id: "ws-1", label: "Alpha", root_path: "/a" },
-      { id: "ws-2", label: "Beta", root_path: "/b" },
+      { id: "ws-1", label: "Alpha", rootPath: "/a" },
+      { id: "ws-2", label: "Beta", rootPath: "/b" },
     );
     // mockSelectedWsId is null → no pre-select
 
@@ -399,15 +399,15 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
       {
         id: "minimax",
         label: "MiniMax",
-        api_key: "test-key",
+        apiKey: "test-key",
         enabled: true,
         llm: {
-          default_model: "MiniMax-M2.5-highspeed",
-          base_url: "https://api.minimaxi.com/anthropic",
-          api_type: "anthropic-messages" as const,
-          models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          defaultModel: "MiniMax-M2.5-highspeed",
+          baseUrl: "https://api.minimaxi.com/anthropic",
+          apiType: "anthropic-messages" as const,
+          modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           models: [
-            { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", context_window: 200000, deprecated: false, thinking: false },
+            { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", contextWindow: 200000, deprecated: false, thinking: false },
           ],
         },
       },
@@ -420,7 +420,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
 
   // T4.2.1
   it("T4.2.1: 新布局 — textarea 在 workspace picker 之前 (DOM 顺序)", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", root_path: "C:\\a" });
+    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
     // mockSelectedWsId = "ws-1" from beforeEach
 
     const { container } = render(() => <HomeAgentForm />);
@@ -442,7 +442,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
 
   // T4.2.2
   it("T4.2.2: workspace picker 200px 固定宽度", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", root_path: "C:\\a" });
+    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
     // mockSelectedWsId = "ws-1" from beforeEach
 
     const { container } = render(() => <HomeAgentForm />);
@@ -486,7 +486,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
 
   // T4.2.4
   it("T4.2.4: Action slot onClick 调 addWorkspace (chat.store)", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", root_path: "C:\\a" });
+    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
     // mockSelectedWsId = "ws-1" from beforeEach
 
     const { getByTestId } = render(() => <HomeAgentForm />);
@@ -505,11 +505,11 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
 
   // T4.2.5
   it("T4.2.5: Picker 返回 path → addWorkspace adds + sets draftWorkspaceId + textarea enabled", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", root_path: "C:\\a" });
+    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
     // Override addWorkspace mock to also update mockSelectedWsId (mimics production behavior)
     vi.mocked(addWorkspaceFromStore).mockImplementation(() => {
       mockSelectedWsId = "new-id";
-      return Effect.succeed({ id: "new-id", label: "New Workspace", root_path: "/new/path", created_at: Date.now() });
+      return Effect.succeed({ id: "new-id", label: "New Workspace", rootPath: "/new/path", createdAt: Date.now() });
     });
 
     const { getByTestId } = render(() => <HomeAgentForm />);
@@ -532,7 +532,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
 
   // T4.2.6
   it("T4.2.6: addWorkspace 返回 null 时 textarea 保持 disabled", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", root_path: "C:\\a" });
+    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
     // Override addWorkspace mock to return null (picker cancelled)
     vi.mocked(addWorkspaceFromStore).mockReturnValueOnce(Effect.succeed(null as unknown as any));
 
@@ -557,30 +557,30 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
       {
         id: "provider-1",
         label: "Provider One",
-        api_key: "key1",
+        apiKey: "key1",
         enabled: true,
         llm: {
-          default_model: "model-1",
-          base_url: "https://api.one.com",
-          api_type: "anthropic-messages" as const,
-          models_endpoint: "https://api.one.com/models",
+          defaultModel: "model-1",
+          baseUrl: "https://api.one.com",
+          apiType: "anthropic-messages" as const,
+          modelsEndpoint: "https://api.one.com/models",
           models: [
-            { id: "model-1", label: "Model One", context_window: 100000, deprecated: false, thinking: false },
+            { id: "model-1", label: "Model One", contextWindow: 100000, deprecated: false, thinking: false },
           ],
         },
       },
       {
         id: "provider-2",
         label: "Provider Two",
-        api_key: "key2",
+        apiKey: "key2",
         enabled: true,
         llm: {
-          default_model: "model-2",
-          base_url: "https://api.two.com",
-          api_type: "anthropic-messages" as const,
-          models_endpoint: "https://api.two.com/models",
+          defaultModel: "model-2",
+          baseUrl: "https://api.two.com",
+          apiType: "anthropic-messages" as const,
+          modelsEndpoint: "https://api.two.com/models",
           models: [
-            { id: "model-2", label: "Model Two", context_window: 200000, deprecated: false, thinking: false },
+            { id: "model-2", label: "Model Two", contextWindow: 200000, deprecated: false, thinking: false },
           ],
         },
       },
@@ -601,7 +601,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
   });
 
   // T4.2.8
-  it("T4.2.8: LLM picker 选中 → 写 default_llm_provider_id + scheduleSave", async () => {
+  it("T4.2.8: LLM picker 选中 → 写 defaultLlmProviderId + scheduleSave", async () => {
     const { appStore } = await import("../../../shared/stores/app.store");
     const { settingsSaver } = await import("../../settings/lib/settings-saver");
     // Workspace data comes from chat.store mock (already set by T4.2 beforeEach)
@@ -609,30 +609,30 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
       {
         id: "provider-1",
         label: "Provider One",
-        api_key: "key1",
+        apiKey: "key1",
         enabled: true,
         llm: {
-          default_model: "model-1",
-          base_url: "https://api.one.com",
-          api_type: "anthropic-messages" as const,
-          models_endpoint: "https://api.one.com/models",
+          defaultModel: "model-1",
+          baseUrl: "https://api.one.com",
+          apiType: "anthropic-messages" as const,
+          modelsEndpoint: "https://api.one.com/models",
           models: [
-            { id: "model-1", label: "Model One", context_window: 100000, deprecated: false, thinking: false },
+            { id: "model-1", label: "Model One", contextWindow: 100000, deprecated: false, thinking: false },
           ],
         },
       },
       {
         id: "provider-2",
         label: "Provider Two",
-        api_key: "key2",
+        apiKey: "key2",
         enabled: true,
         llm: {
-          default_model: "model-2",
-          base_url: "https://api.two.com",
-          api_type: "anthropic-messages" as const,
-          models_endpoint: "https://api.two.com/models",
+          defaultModel: "model-2",
+          baseUrl: "https://api.two.com",
+          apiType: "anthropic-messages" as const,
+          modelsEndpoint: "https://api.two.com/models",
           models: [
-            { id: "model-2", label: "Model Two", context_window: 200000, deprecated: false, thinking: false },
+            { id: "model-2", label: "Model Two", contextWindow: 200000, deprecated: false, thinking: false },
           ],
         },
       },
@@ -650,8 +650,8 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
     expect(model2Option).toBeTruthy();
     fireEvent.click(model2Option);
 
-    // Should set default_llm_provider_id to provider-2 (which has model-2)
-    expect(appStore.set).toHaveBeenCalledWith({ default_llm_provider_id: "provider-2" });
+    // Should set defaultLlmProviderId to provider-2 (which has model-2)
+    expect(appStore.set).toHaveBeenCalledWith({ defaultLlmProviderId: "provider-2" });
     expect(settingsSaver.scheduleSave).toHaveBeenCalledTimes(1);
   });
 
@@ -687,20 +687,20 @@ describe("HomeAgentForm — Ctrl+Enter / Cmd+Enter send shortcut (T4.3)", () => 
       {
         id: "minimax",
         label: "MiniMax",
-        api_key: "test-key",
+        apiKey: "test-key",
         enabled: true,
         llm: {
-          default_model: "MiniMax-M2.5-highspeed",
-          base_url: "https://api.minimaxi.com/anthropic",
-          api_type: "anthropic-messages" as const,
-          models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          defaultModel: "MiniMax-M2.5-highspeed",
+          baseUrl: "https://api.minimaxi.com/anthropic",
+          apiType: "anthropic-messages" as const,
+          modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           models: [
-            { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", context_window: 200000, deprecated: false, thinking: false },
+            { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", contextWindow: 200000, deprecated: false, thinking: false },
           ],
         },
       },
     ];
-    appStore.state.value.system_prompt = { default: "You are a helpful assistant.", user_can_edit: true };
+    appStore.state.value.systemPrompt = { default: "You are a helpful assistant.", userCanEdit: true };
     mockDefaultLlmProvider.id = "minimax";
   });
 
@@ -709,7 +709,7 @@ describe("HomeAgentForm — Ctrl+Enter / Cmd+Enter send shortcut (T4.3)", () => 
   });
 
   it("T4.3.1: Ctrl+Enter on textarea triggers form submit → createConversation + sendMessage called", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", root_path: "C:\\a" });
+    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
 
     const { container } = render(() => <HomeAgentForm />);
 
@@ -732,7 +732,7 @@ describe("HomeAgentForm — Ctrl+Enter / Cmd+Enter send shortcut (T4.3)", () => 
   });
 
   it("T4.3.2: Cmd+Enter on textarea (Mac) triggers form submit → createConversation + sendMessage called", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", root_path: "C:\\a" });
+    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
 
     const { container } = render(() => <HomeAgentForm />);
 
@@ -755,7 +755,7 @@ describe("HomeAgentForm — Ctrl+Enter / Cmd+Enter send shortcut (T4.3)", () => 
   });
 
   it("T4.3.3: Enter without modifier does NOT trigger send", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", root_path: "C:\\a" });
+    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
 
     const { container } = render(() => <HomeAgentForm />);
 
@@ -770,7 +770,7 @@ describe("HomeAgentForm — Ctrl+Enter / Cmd+Enter send shortcut (T4.3)", () => 
   });
 
   it("T4.3.4: Ctrl+Enter with empty input does not trigger send", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", root_path: "C:\\a" });
+    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
 
     const { container } = render(() => <HomeAgentForm />);
 

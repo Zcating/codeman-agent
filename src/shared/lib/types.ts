@@ -1,6 +1,7 @@
-//! Rust IPC 与 TS 之间的导线契约。镜像 src-tauri/src/types.rs。
-//! 所有字段 snake_case 以匹配 Rust serde。在此处添加新类型，绝不
-//! 直接从 Rust 导入。
+//! TS-side data structures. Field names use camelCase in TS; the IPC layer
+//! (`electron/main/ipc.ts`) translates to/from snake_case at the SQLite/Rust
+//! boundary so DB column names stay snake_case. New fields added here MUST
+//! use camelCase.
 
 // ============================================================================
 // V1.5 Unified Provider Schema (ADR-0012)
@@ -9,25 +10,25 @@
 export interface ModelMeta {
   id: string;
   label: string;
-  context_window?: number;
+  contextWindow?: number;
   deprecated: boolean;
   thinking: boolean;
 }
 
 export interface ProviderLlm {
-  default_model: string;
-  base_url: string;
+  defaultModel: string;
+  baseUrl: string;
   /** ADR-0011: V1 only supports anthropic-messages protocol */
-  api_type: "anthropic-messages";
+  apiType: "anthropic-messages";
   models: ModelMeta[];
-  models_endpoint: string;
+  modelsEndpoint: string;
 }
 
 export interface Provider {
   id: string;
   label: string;
   enabled: boolean;
-  api_key: string; // ADR-0015: plaintext in Settings JSON
+  apiKey: string; // ADR-0015: plaintext in Settings JSON
   llm: ProviderLlm;
 }
 
@@ -39,16 +40,16 @@ export interface Settings {
   /** V1.5: unified providers array. Optional for V1 backward-compat. */
   providers?: Provider[];
   /** V1.5: schema version marker. Optional for V1 backward-compat. */
-  schema_version?: "1.5";
-  default_llm_provider_id?: string;
-  user_language: "zh" | "en" | "auto";
+  schemaVersion?: "1.5";
+  defaultLlmProviderId?: string;
+  userLanguage: "zh" | "en" | "auto";
   theme: "light" | "dark" | "system";
-  start_at_login: boolean;
+  startAtLogin: boolean;
   window: WindowSettings;
-  system_prompt: SystemPromptSettings;
+  systemPrompt: SystemPromptSettings;
   conversations: ConversationSettings;
   /** @deprecated Use providers instead. Kept for V1 consumer backward-compatibility. */
-  llm_providers: LLMProvider[];
+  llmProviders: LLMProvider[];
 }
 
 // ============================================================================
@@ -64,10 +65,10 @@ export interface LLMProvider {
   id: string;
   label: string;
   enabled: boolean;
-  default_model?: string;
-  base_url?: string;
-  api_type: "anthropic-messages";
-  api_key_ref: string;
+  defaultModel?: string;
+  baseUrl?: string;
+  apiType: "anthropic-messages";
+  apiKeyRef: string;
 }
 
 // ============================================================================
@@ -75,18 +76,18 @@ export interface LLMProvider {
 // ============================================================================
 
 export interface WindowSettings {
-  remember_position: boolean;
-  remember_size: boolean;
-  default_size: { width: number; height: number };
-  min_size: { width: number; height: number };
+  rememberPosition: boolean;
+  rememberSize: boolean;
+  defaultSize: { width: number; height: number };
+  minSize: { width: number; height: number };
 }
 export interface SystemPromptSettings {
   default: string;
-  user_can_edit: boolean;
+  userCanEdit: boolean;
 }
 export interface ConversationSettings {
-  auto_archive_after_days: number; // default 30
-  max_history: number; // default 1000
+  autoArchiveAfterDays: number; // default 30
+  maxHistory: number; // default 1000
 }
 
 // ============================================================================
@@ -96,15 +97,15 @@ export interface ConversationSettings {
 export interface Workspace {
   id: string;
   label: string;
-  root_path: string; // PathBuf in Rust, string in TS
-  created_at: number;
+  rootPath: string; // PathBuf in Rust, string in TS
+  createdAt: number;
 }
 
 /** Mirror of Rust `FileMatch` struct from T9 */
 export interface FileMatch {
   path: string;
-  line_number: number | null;
-  line_content: string | null;
+  lineNumber: number | null;
+  lineContent: string | null;
 }
 
 // ============================================================================
@@ -115,27 +116,27 @@ export type Role = "user" | "assistant" | "tool" | "system";
 export interface Conversation {
   id: string;
   title: string;
-  system_prompt: string | null;
+  systemPrompt: string | null;
   /** V2.1: per-Conv workspace binding. '' 表示 'Needs workspace' (V1.x 旧 conv 灰标). */
-  workspace_id: string;
-  created_at: number;
-  updated_at: number;
-  archived_at: number | null;
+  workspaceId: string;
+  createdAt: number;
+  updatedAt: number;
+  archivedAt: number | null;
 }
 export interface Message {
   id: string;
-  conversation_id: string;
+  conversationId: string;
   role: Role;
   /** 助手正文（Markdown 渲染）。thinking 不在此处。 */
   content: string;
   /** 助手思考过程（来自 Anthropic thinking_delta）。仅 assistant role；user/tool/system 一律 null。 */
   thinking: string | null;
-  tool_calls: ToolCall[] | null;
-  tool_results: ToolResult[] | null;
+  toolCalls: ToolCall[] | null;
+  toolResults: ToolResult[] | null;
   model: string | null;
-  input_tokens: number | null;
-  output_tokens: number | null;
-  created_at: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  createdAt: number;
 }
 export interface ToolCall {
   id: string;
@@ -143,7 +144,7 @@ export interface ToolCall {
   args: Record<string, unknown>;
 }
 export interface ToolResult {
-  tool_call_id: string;
+  toolCallId: string;
   result: unknown;
   error: string | null;
 }

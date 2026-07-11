@@ -157,8 +157,8 @@ export function SettingsPage() {
             <label class="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
               <input
                 type="checkbox"
-                checked={appStore.state.value.start_at_login}
-                onChange={(e) => appStore.set({ start_at_login: e.currentTarget.checked })}
+                checked={appStore.state.value.startAtLogin}
+                onChange={(e) => appStore.set({ startAtLogin: e.currentTarget.checked })}
                 class="rounded text-primary-500 focus:ring-primary-500 w-4 h-4"
               />
               Start at login

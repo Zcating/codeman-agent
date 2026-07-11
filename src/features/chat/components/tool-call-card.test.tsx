@@ -34,7 +34,7 @@ describe("ToolCallCard", () => {
       args: { path: "/tmp/x.txt" },
     };
     const result: ToolResult = {
-      tool_call_id: "tc-2",
+      toolCallId: "tc-2",
       result: "file content here",
       error: null,
     };
@@ -56,7 +56,7 @@ describe("ToolCallCard", () => {
       args: { path: "/tmp/missing.txt" },
     };
     const result: ToolResult = {
-      tool_call_id: "tc-3",
+      toolCallId: "tc-3",
       result: null,
       error: "File not found",
     };

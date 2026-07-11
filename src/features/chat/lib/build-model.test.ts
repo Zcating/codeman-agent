@@ -17,28 +17,28 @@ const mockProvider: Provider = {
   id: "minimax",
   label: "MiniMax",
   enabled: true,
-  api_key: "test-api-key", // ADR-0015: top-level api_key
+  apiKey: "test-api-key", // ADR-0015: top-level api_key
   llm: {
-    default_model: "MiniMax-M2.5-highspeed",
-    base_url: "https://api.minimaxi.com/anthropic",
-    api_type: "anthropic-messages",
+    defaultModel: "MiniMax-M2.5-highspeed",
+    baseUrl: "https://api.minimaxi.com/anthropic",
+    apiType: "anthropic-messages",
     models: [
       {
         id: "MiniMax-M2.5-highspeed",
         label: "MiniMax-M2.5-highspeed",
-        context_window: 200000,
+        contextWindow: 200000,
         deprecated: false,
         thinking: false,
       },
       {
         id: "MiniMax-M2.1-highspeed",
         label: "MiniMax-M2.1-highspeed",
-        context_window: 128000,
+        contextWindow: 128000,
         deprecated: false,
         thinking: false,
       },
     ],
-    models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+    modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
   },
 };
 
@@ -86,7 +86,7 @@ describe("buildModel", () => {
           {
             id: "test-reasoning",
             label: "Test Reasoning",
-            context_window: 100000,
+            contextWindow: 100000,
             deprecated: false,
             thinking: true,
           },
@@ -117,7 +117,7 @@ describe("buildModel", () => {
   it("throws BuildModelError on missing api_key", () => {
     const noKeyProvider: Provider = {
       ...mockProvider,
-      api_key: "",
+      apiKey: "",
     };
 
     expect(() => buildModel(noKeyProvider, "MiniMax-M2.5-highspeed")).toThrow(BuildModelError);
@@ -126,7 +126,7 @@ describe("buildModel", () => {
   it("throws BuildModelError with provider id in message when key missing", () => {
     const noKeyProvider: Provider = {
       ...mockProvider,
-      api_key: "",
+      apiKey: "",
     };
 
     try {

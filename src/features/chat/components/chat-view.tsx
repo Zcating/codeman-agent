@@ -32,7 +32,7 @@ function ProviderSelect() {
 
   // Current selected provider's default model id
   const currentModelId = (): string | null => {
-    const providerId = appStore.state.value.default_llm_provider_id;
+    const providerId = appStore.state.value.defaultLlmProviderId;
     const provider = enabledProviders().find((p) => p.id === providerId);
     if (!provider) {
       return enabledProviders()[0]?.models[0]?.id ?? null;
@@ -49,7 +49,7 @@ function ProviderSelect() {
       p.models.some((m) => m.id === modelId)
     );
     if (provider) {
-      appStore.set({ default_llm_provider_id: provider.id });
+      appStore.set({ defaultLlmProviderId: provider.id });
       settingsSaver.scheduleSave();
     }
   };
@@ -144,13 +144,13 @@ export function ChatView(props: { convId?: string }) {
     }
     setInput("");
 
-    const providerId = appStore.state.value.default_llm_provider_id;
+    const providerId = appStore.state.value.defaultLlmProviderId;
     const providerConfig = appStore.state.value.providers?.find((p) => p.id === providerId);
     const provider: ProviderConfig = {
-      apiKey: providerConfig?.api_key ?? null,
-      baseUrl: providerConfig?.llm?.base_url ?? "",
-      defaultModel: providerConfig?.llm?.default_model ?? "auto",
-      systemPrompt: appStore.state.value.system_prompt?.default ?? "",
+      apiKey: providerConfig?.apiKey ?? null,
+      baseUrl: providerConfig?.llm?.baseUrl ?? "",
+      defaultModel: providerConfig?.llm?.defaultModel ?? "auto",
+      systemPrompt: appStore.state.value.systemPrompt?.default ?? "",
       tools: [],
     };
 

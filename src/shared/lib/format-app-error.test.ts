@@ -32,7 +32,7 @@ describe("formatAppError — Schema.TaggedError instances only (ADR-0025 PR 2)",
     expect(fmt(new InvalidConfig({ message: "bad", field: "base_url" }))).toBe("InvalidConfig: bad");
   });
   it("ToolCall instance → 'ToolCall: failed'", () => {
-    expect(fmt(new ToolCall({ tool_call_id: "call_1", message: "failed" }))).toBe("ToolCall: failed");
+    expect(fmt(new ToolCall({ toolCallId: "call_1", message: "failed" }))).toBe("ToolCall: failed");
   });
   it("multiple failures joined with '; '", () => {
     const c1 = Cause.fail<AppError>(new NetworkErr({ message: "first", cause: "timeout" }));
@@ -50,7 +50,7 @@ describe("formatAppError — Schema.TaggedError instances only (ADR-0025 PR 2)",
     expect(fmt(new Database({ message: "locked" }))).toBe("Database: locked");
   });
   it("SandboxViolation instance → 'SandboxViolation: outside'", () => {
-    expect(fmt(new SandboxViolation({ message: "outside", path: "/p", workspace_label: "w" }))).toBe(
+    expect(fmt(new SandboxViolation({ message: "outside", path: "/p", workspaceLabel: "w" }))).toBe(
       "SandboxViolation: outside",
     );
   });
@@ -82,16 +82,16 @@ describe("formatAppError — new Schema.TaggedError instances (ADR-0025 PR1)", (
     expect(fmt(new Database({ message: "locked" }))).toBe("Database: locked");
   });
   it("ToolCall instance → 'ToolCall: failed'", () => {
-    expect(fmt(new ToolCall({ tool_call_id: "call_1", message: "failed" }))).toBe("ToolCall: failed");
+    expect(fmt(new ToolCall({ toolCallId: "call_1", message: "failed" }))).toBe("ToolCall: failed");
   });
   it("SandboxViolation without message → 'SandboxViolation: (no message)'", () => {
     // message collides with Error.prototype.message → "" when omitted; formatter uses `||`.
-    expect(fmt(new SandboxViolation({ path: "/etc/passwd", workspace_label: "proj" }))).toBe(
+    expect(fmt(new SandboxViolation({ path: "/etc/passwd", workspaceLabel: "proj" }))).toBe(
       "SandboxViolation: (no message)",
     );
   });
   it("SandboxViolation with message → 'SandboxViolation: outside'", () => {
-    expect(fmt(new SandboxViolation({ message: "outside", path: "/p", workspace_label: "w" }))).toBe(
+    expect(fmt(new SandboxViolation({ message: "outside", path: "/p", workspaceLabel: "w" }))).toBe(
       "SandboxViolation: outside",
     );
   });

@@ -368,16 +368,16 @@ export const ProviderServiceLive = Layer.effect(
       fetchModels: (id) =>
         Effect.gen(function* () {
           const provider = yield* getProvider(id);
-          const { models_endpoint } = provider.llm;
-          if (!models_endpoint) {
+          const { modelsEndpoint } = provider.llm;
+          if (!modelsEndpoint) {
             return yield* Effect.fail(
-              TauriError.IPC(`No models_endpoint for provider: ${id}`),
+              TauriError.IPC(`No modelsEndpoint for provider: ${id}`),
             );
           }
-          const apiKey = provider.api_key;
+          const apiKey = provider.apiKey;
           const response = yield* Effect.tryPromise({
             try: async () => {
-              const res = await fetch(models_endpoint, {
+              const res = await fetch(modelsEndpoint, {
                 headers: {
                   Authorization: `Bearer ${apiKey}`,
                   "Content-Type": "application/json",
@@ -395,7 +395,7 @@ export const ProviderServiceLive = Layer.effect(
           return response.data.map((m) => ({
             id: m.id,
             label: m.name,
-            context_window: m.context_window,
+            contextWindow: m.context_window,
             deprecated: false,
             thinking: false,
           }));
@@ -418,7 +418,7 @@ export const SettingsServiceLive = Layer.succeed(SettingsService, {
   getActiveLlmProvider: () =>
     Effect.gen(function* () {
       const settings = yield* invoke<Settings>("get_settings");
-      const id = settings.default_llm_provider_id;
+      const id = settings.defaultLlmProviderId;
       if (!id) {
         return yield* Effect.succeed(null);
       }
@@ -432,10 +432,10 @@ export const SettingsServiceLive = Layer.succeed(SettingsService, {
             id: p.id,
             label: p.label,
             enabled: p.enabled,
-            default_model: p.llm.default_model,
-            base_url: p.llm.base_url,
-            api_type: p.llm.api_type,
-            api_key_ref: "",
+            defaultModel: p.llm.defaultModel,
+            baseUrl: p.llm.baseUrl,
+            apiType: p.llm.apiType,
+            apiKeyRef: "",
           };
           return v1;
         })(),
@@ -451,7 +451,7 @@ export const SettingsServiceImpl = {
   getActiveLlmProvider: () =>
     Effect.gen(function* () {
       const settings = yield* invoke<Settings>("get_settings");
-      const id = settings.default_llm_provider_id;
+      const id = settings.defaultLlmProviderId;
       if (!id) {
         return yield* Effect.succeed(null);
       }
@@ -465,10 +465,10 @@ export const SettingsServiceImpl = {
             id: p.id,
             label: p.label,
             enabled: p.enabled,
-            default_model: p.llm.default_model,
-            base_url: p.llm.base_url,
-            api_type: p.llm.api_type,
-            api_key_ref: "",
+            defaultModel: p.llm.defaultModel,
+            baseUrl: p.llm.baseUrl,
+            apiType: p.llm.apiType,
+            apiKeyRef: "",
           };
           return v1;
         })(),

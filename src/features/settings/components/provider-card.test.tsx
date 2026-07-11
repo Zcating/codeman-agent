@@ -51,11 +51,11 @@ const mockProvider = {
   id: "minimax",
   label: "MiniMax",
   enabled: true,
-  api_key: "test-key",
+  apiKey: "test-key",
   llm: {
-    default_model: "MiniMax-M2.5-highspeed",
-    base_url: "https://api.minimaxi.com/anthropic",
-    api_type: "anthropic-messages" as const,
+    defaultModel: "MiniMax-M2.5-highspeed",
+    baseUrl: "https://api.minimaxi.com/anthropic",
+    apiType: "anthropic-messages" as const,
     models: [
       {
         id: "MiniMax-M2.5-highspeed",
@@ -70,7 +70,7 @@ const mockProvider = {
         thinking: false,
       },
     ],
-    models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+    modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
   },
 };
 
@@ -78,13 +78,13 @@ const _mockProviderDisabled = {
   id: "deepseek",
   label: "DeepSeek",
   enabled: false,
-  api_key: "test-key",
+  apiKey: "test-key",
   llm: {
-    default_model: "deepseek-chat",
-    base_url: "https://api.deepseek.com/anthropic",
-    api_type: "anthropic-messages" as const,
+    defaultModel: "deepseek-chat",
+    baseUrl: "https://api.deepseek.com/anthropic",
+    apiType: "anthropic-messages" as const,
     models: [{ id: "deepseek-chat", label: "deepseek-chat", deprecated: false, thinking: false }],
-    models_endpoint: "https://api.deepseek.com/models",
+    modelsEndpoint: "https://api.deepseek.com/models",
   },
 };
 void _mockProviderDisabled;
@@ -154,7 +154,7 @@ describe("ProviderCard", () => {
       {
         id: "model-A",
         label: "Model A",
-        context_window: 100_000,
+        contextWindow: 100_000,
         deprecated: false,
         thinking: false,
       },
@@ -200,13 +200,13 @@ describe("ProviderCard", () => {
     const lastSet = getLastSetCall();
     expect(lastSet).toBeTruthy();
     const updatedProviders = lastSet.providers;
-    expect(updatedProviders.find((p: any) => p.id === "minimax")?.llm.default_model).toBe(
+    expect(updatedProviders.find((p: any) => p.id === "minimax")?.llm.defaultModel).toBe(
       "MiniMax-M2.1-highspeed",
     );
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "minimax",
-        llm: expect.objectContaining({ default_model: "MiniMax-M2.1-highspeed" }),
+        llm: expect.objectContaining({ defaultModel: "MiniMax-M2.1-highspeed" }),
       }),
     );
   });
@@ -253,9 +253,9 @@ describe("ProviderCard", () => {
     const lastSet = getLastSetCall();
     expect(lastSet).toBeTruthy();
     const updatedProviders = lastSet.providers;
-    expect(updatedProviders.find((p: any) => p.id === "minimax")?.api_key).toBe("new-secret-key");
+    expect(updatedProviders.find((p: any) => p.id === "minimax")?.apiKey).toBe("new-secret-key");
     expect(onUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "minimax", api_key: "new-secret-key" }),
+      expect.objectContaining({ id: "minimax", apiKey: "new-secret-key" }),
     );
   });
 
@@ -286,13 +286,13 @@ describe("ProviderCard", () => {
     const lastSet = getLastSetCall();
     expect(lastSet).toBeTruthy();
     const updatedProviders = lastSet.providers;
-    expect(updatedProviders.find((p: any) => p.id === "minimax")?.llm.base_url).toBe(
+    expect(updatedProviders.find((p: any) => p.id === "minimax")?.llm.baseUrl).toBe(
       "https://api.example.com/v1",
     );
     expect(onUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "minimax",
-        llm: expect.objectContaining({ base_url: "https://api.example.com/v1" }),
+        llm: expect.objectContaining({ baseUrl: "https://api.example.com/v1" }),
       }),
     );
   });
@@ -340,13 +340,13 @@ describe("ProviderCard", () => {
       id: "mock-test",
       label: "Mock Test",
       enabled: true,
-      api_key: "",
+      apiKey: "",
       llm: {
-        default_model: "mock-default",
-        base_url: "http://127.0.0.1:50000/mock/anthropic",
-        api_type: "anthropic-messages" as const,
+        defaultModel: "mock-default",
+        baseUrl: "http://127.0.0.1:50000/mock/anthropic",
+        apiType: "anthropic-messages" as const,
         models: [{ id: "mock-default", label: "Mock", deprecated: false, thinking: false }],
-        models_endpoint: "",
+        modelsEndpoint: "",
       },
     };
     render(() => <ProviderCard provider={devProvider} onUpdate={vi.fn()} onDelete={vi.fn()} />);

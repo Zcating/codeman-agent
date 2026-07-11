@@ -12,86 +12,86 @@ import { vi } from "vitest";
 export interface ModelMeta {
   id: string;
   label: string;
-  context_window?: number;
+  contextWindow?: number;
   deprecated?: boolean;
   thinking?: boolean;
 }
 
 export interface ProviderLlm {
-  default_model: string;
-  base_url: string;
-  api_type: "anthropic-messages";
+  defaultModel: string;
+  baseUrl: string;
+  apiType: "anthropic-messages";
   models: ModelMeta[];
-  models_endpoint: string;
+  modelsEndpoint: string;
 }
 
 export interface Provider {
   id: string;
   label: string;
   enabled: boolean;
-  api_key: string;
+  apiKey: string;
   llm: ProviderLlm;
 }
 
 // V1.5+ Settings shape
 export interface SettingsV15 {
   providers: Provider[];
-  schema_version: "1.5";
-  default_llm_provider_id?: string;
-  user_language: "zh" | "en" | "auto";
+  schemaVersion: "1.5";
+  defaultLlmProviderId?: string;
+  userLanguage: "zh" | "en" | "auto";
   theme: "light" | "dark" | "system";
-  start_at_login: boolean;
+  startAtLogin: boolean;
   window: {
-    remember_position: boolean;
-    remember_size: boolean;
-    default_size: { width: number; height: number };
-    min_size: { width: number; height: number };
+    rememberPosition: boolean;
+    rememberSize: boolean;
+    defaultSize: { width: number; height: number };
+    minSize: { width: number; height: number };
   };
-  system_prompt: { default: string; user_can_edit: boolean };
-  conversations: { auto_archive_after_days: number; max_history: number };
+  systemPrompt: { default: string; userCanEdit: boolean };
+  conversations: { autoArchiveAfterDays: number; maxHistory: number };
   // V0 legacy field (cleared after migration, mirrors Rust behavior)
-  llm_providers: Array<{
+  llmProviders: Array<{
     id: string;
     label: string;
     enabled: boolean;
-    default_model?: string;
-    base_url?: string;
-    api_type: "anthropic-messages";
-    api_key_ref: string;
+    defaultModel?: string;
+    baseUrl?: string;
+    apiType: "anthropic-messages";
+    apiKeyRef: string;
   }>;
   // V2: workspaces (added in ADR-0013)
   workspaces?: Array<{
     id: string;
     label: string;
-    root_path: string;
+    rootPath: string;
     enabled: boolean;
   }>;
 }
 
 // V0 Settings shape (for migration testing)
 export interface SettingsV0 {
-  schema_version?: string;
-  llm_providers: Array<{
+  schemaVersion?: string;
+  llmProviders: Array<{
     id: string;
     label: string;
     enabled: boolean;
-    default_model?: string;
-    base_url?: string;
-    api_type: "anthropic-messages";
-    api_key_ref: string;
+    defaultModel?: string;
+    baseUrl?: string;
+    apiType: "anthropic-messages";
+    apiKeyRef: string;
   }>;
-  default_llm_provider_id?: string;
-  user_language: "zh" | "en" | "auto";
+  defaultLlmProviderId?: string;
+  userLanguage: "zh" | "en" | "auto";
   theme: "light" | "dark" | "system";
-  start_at_login: boolean;
+  startAtLogin: boolean;
   window: {
-    remember_position: boolean;
-    remember_size: boolean;
-    default_size: { width: number; height: number };
-    min_size: { width: number; height: number };
+    rememberPosition: boolean;
+    rememberSize: boolean;
+    defaultSize: { width: number; height: number };
+    minSize: { width: number; height: number };
   };
-  system_prompt: { default: string; user_can_edit: boolean };
-  conversations: { auto_archive_after_days: number; max_history: number };
+  systemPrompt: { default: string; userCanEdit: boolean };
+  conversations: { autoArchiveAfterDays: number; maxHistory: number };
 }
 
 // ─── Mock Factory ───────────────────────────────────────────────
@@ -103,21 +103,21 @@ export const mockProvider = (
     id: overrides.id ?? "minimax",
     label: overrides.label ?? "MiniMax",
     enabled: overrides.enabled ?? true,
-    api_key: overrides.api_key ?? "",
+    apiKey: overrides.apiKey ?? "",
     llm: overrides.llm ?? {
-      default_model: "MiniMax-M2.5-highspeed",
-      base_url: "https://api.minimaxi.com/anthropic",
-      api_type: "anthropic-messages",
+      defaultModel: "MiniMax-M2.5-highspeed",
+      baseUrl: "https://api.minimaxi.com/anthropic",
+      apiType: "anthropic-messages",
       models: [
         {
           id: "MiniMax-M2.5-highspeed",
           label: "MiniMax-M2.5-highspeed",
-          context_window: 200000,
+          contextWindow: 200000,
           deprecated: false,
           thinking: false,
         },
       ],
-      models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+      modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
     },
   };
 };
@@ -125,47 +125,47 @@ export const mockProvider = (
 export const mockMinimaxProvider: Provider = mockProvider({
   id: "minimax",
   label: "MiniMax",
-  api_key: "",
+  apiKey: "",
 });
 
 export const mockDeepseekProvider: Provider = mockProvider({
   id: "deepseek",
   label: "DeepSeek",
-  api_key: "",
+  apiKey: "",
   llm: {
-    default_model: "deepseek-chat",
-    base_url: "https://api.deepseek.com/anthropic",
-    api_type: "anthropic-messages",
+    defaultModel: "deepseek-chat",
+    baseUrl: "https://api.deepseek.com/anthropic",
+    apiType: "anthropic-messages",
     models: [
       {
         id: "deepseek-chat",
         label: "deepseek-chat",
-        context_window: 64000,
+        contextWindow: 64000,
         deprecated: false,
         thinking: false,
       },
     ],
-    models_endpoint: "https://api.deepseek.com/models",
+    modelsEndpoint: "https://api.deepseek.com/models",
   },
 });
 
 const defaultSettingsV15: SettingsV15 = {
   providers: [mockMinimaxProvider],
-  schema_version: "1.5",
-  default_llm_provider_id: "minimax",
-  user_language: "en",
+  schemaVersion: "1.5",
+  defaultLlmProviderId: "minimax",
+  userLanguage: "en",
   theme: "system",
-  start_at_login: false,
+  startAtLogin: false,
   window: {
-    remember_position: false,
-    remember_size: false,
-    default_size: { width: 800, height: 600 },
-    min_size: { width: 400, height: 300 },
+    rememberPosition: false,
+    rememberSize: false,
+    defaultSize: { width: 800, height: 600 },
+    minSize: { width: 400, height: 300 },
   },
-  system_prompt: { default: "You are a helpful assistant.", user_can_edit: true },
-  conversations: { auto_archive_after_days: 30, max_history: 1000 },
+  systemPrompt: { default: "You are a helpful assistant.", userCanEdit: true },
+  conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
   // V0 legacy field (empty for V1.5 default)
-  llm_providers: [],
+  llmProviders: [],
 };
 
 // ─── Mock State ────────────────────────────────────────────────
@@ -203,72 +203,72 @@ const DEFAULT_MINIMAX_PROVIDER: Provider = {
   id: "minimax",
   label: "MiniMax",
   enabled: true,
-  api_key: "",
+  apiKey: "",
   llm: {
-    default_model: "MiniMax-M2.5-highspeed",
-    base_url: "https://api.minimaxi.com/anthropic",
-    api_type: "anthropic-messages",
+    defaultModel: "MiniMax-M2.5-highspeed",
+    baseUrl: "https://api.minimaxi.com/anthropic",
+    apiType: "anthropic-messages",
     models: [
       {
         id: "MiniMax-M2.5-highspeed",
         label: "MiniMax-M2.5-highspeed",
-        context_window: 200_000,
+        contextWindow: 200_000,
         deprecated: false,
         thinking: false,
       },
     ],
-    models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+    modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
   },
 };
 
 function migrateV0toV15(v0: SettingsV0): SettingsV15 {
   // V0.5 detection: empty llm_providers → fresh install, pre-fill MiniMax
-  if (v0.llm_providers.length === 0) {
+  if (v0.llmProviders.length === 0) {
     return {
       providers: [DEFAULT_MINIMAX_PROVIDER],
-      schema_version: "1.5",
-      default_llm_provider_id: "minimax",
-      user_language: v0.user_language,
+      schemaVersion: "1.5",
+      defaultLlmProviderId: "minimax",
+      userLanguage: v0.userLanguage,
       theme: v0.theme,
-      start_at_login: v0.start_at_login,
+      startAtLogin: v0.startAtLogin,
       window: v0.window,
-      system_prompt: v0.system_prompt,
+      systemPrompt: v0.systemPrompt,
       conversations: v0.conversations,
-      llm_providers: [],
+      llmProviders: [],
     };
   }
 
   const providers: Provider[] = [];
 
   // Migrate each LLM provider
-  for (const llm of v0.llm_providers) {
+  for (const llm of v0.llmProviders) {
     providers.push({
       id: llm.id,
       label: llm.label,
       enabled: llm.enabled,
-      api_key: llm.api_key_ref,
+      apiKey: llm.apiKeyRef,
       llm: {
-        default_model: llm.default_model ?? "auto",
-        base_url: llm.base_url ?? "",
-        api_type: "anthropic-messages",
+        defaultModel: llm.defaultModel ?? "auto",
+        baseUrl: llm.baseUrl ?? "",
+        apiType: "anthropic-messages",
         models: [],
-        models_endpoint: "",
+        modelsEndpoint: "",
       },
     });
   }
 
   return {
     providers,
-    schema_version: "1.5",
-    default_llm_provider_id: v0.default_llm_provider_id,
-    user_language: v0.user_language,
+    schemaVersion: "1.5",
+    defaultLlmProviderId: v0.defaultLlmProviderId,
+    userLanguage: v0.userLanguage,
     theme: v0.theme,
-    start_at_login: v0.start_at_login,
+    startAtLogin: v0.startAtLogin,
     window: v0.window,
-    system_prompt: v0.system_prompt,
+    systemPrompt: v0.systemPrompt,
     conversations: v0.conversations,
     // V0 legacy field cleared after migration (mirrors Rust behavior)
-    llm_providers: [],
+    llmProviders: [],
   };
 }
 
@@ -282,7 +282,7 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
     // If V0 fixture is active, migrate on read
     if (mockState.v0FixtureActive) {
       const v0Settings = mockState.resolved as SettingsV0 | undefined;
-      if (v0Settings && !v0Settings.schema_version) {
+      if (v0Settings && !v0Settings.schemaVersion) {
         mockState.settings = migrateV0toV15(v0Settings);
       }
     }
@@ -296,8 +296,8 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
       mockState.settings = {
         ...mockState.settings,
         ...newSettings,
-        // Always preserve schema_version
-        schema_version: "1.5",
+        // Always preserve schemaVersion
+        schemaVersion: "1.5",
       };
     }
     return { ...mockState.settings };
@@ -344,18 +344,18 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
   },
 
   get_conversation(args?: IPCArgs): unknown {
-    return mockState.resolved ?? { id: (args?.id as string) ?? "", title: "", system_prompt: null, workspace_id: "", created_at: 0, updated_at: 0, archived_at: null };
+    return mockState.resolved ?? { id: (args?.id as string) ?? "", title: "", systemPrompt: null, workspaceId: "", createdAt: 0, updatedAt: 0, archivedAt: null };
   },
 
   create_conversation(args?: IPCArgs): unknown {
     return mockState.resolved ?? {
       id: "new-conv-id",
       title: (args?.title as string) ?? "",
-      system_prompt: (args?.systemPrompt as string | null) ?? null,
-      workspace_id: (args?.workspaceId as string) ?? "",
-      created_at: Date.now(),
-      updated_at: Date.now(),
-      archived_at: null,
+      systemPrompt: (args?.systemPrompt as string | null) ?? null,
+      workspaceId: (args?.workspaceId as string) ?? "",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      archivedAt: null,
     };
   },
 
@@ -373,7 +373,7 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
   },
 
   append_message(args?: IPCArgs): unknown {
-    return mockState.resolved ?? { id: "new-msg-id", conversation_id: (args?.conversationId as string) ?? "", role: (args?.role as string) ?? "user", content: (args?.content as string) ?? "", tool_calls: null, tool_results: null, model: null, input_tokens: null, output_tokens: null, created_at: Date.now() };
+    return mockState.resolved ?? { id: "new-msg-id", conversationId: (args?.conversationId as string) ?? "", role: (args?.role as string) ?? "user", content: (args?.content as string) ?? "", toolCalls: null, toolResults: null, model: null, inputTokens: null, outputTokens: null, createdAt: Date.now() };
   },
 
   search_messages(_args?: IPCArgs): unknown {
@@ -462,7 +462,7 @@ function buildCodemanMock(): Record<string, unknown> {
     appendMessage: { cmd: "append_message", build: (a) => a as Record<string, unknown> },
     searchMessages: { cmd: "search_messages", build: (q, l) => ({ query: q, limit: l }) },
     listWorkspaces: { cmd: "list_workspaces", build: () => ({}) },
-    addWorkspace: { cmd: "add_workspace", build: (l, rp) => ({ label: l, root_path: rp }) },
+    addWorkspace: { cmd: "add_workspace", build: (l, rp) => ({ label: l, rootPath: rp }) },
     renameWorkspace: { cmd: "rename_workspace", build: (id, l) => ({ id, label: l }) },
     deleteWorkspace: { cmd: "delete_workspace", build: (id) => ({ id }) },
     pickWorkspacePath: { cmd: "pick_workspace_path", build: () => ({}) },

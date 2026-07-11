@@ -35,8 +35,8 @@ describe("decodeAppError — bridge from {kind, _tag} payloads to Schema.TaggedE
       { input: { _tag: "Network", message: "a", cause: "timeout" }, expectedTag: "Network" },
       { input: { _tag: "InvalidConfig", message: "a", field: "k" }, expectedTag: "InvalidConfig" },
       { input: { _tag: "Database", message: "a", cause: "io" }, expectedTag: "Database" },
-      { input: { _tag: "ToolCall", message: "a", tool_call_id: "t1" }, expectedTag: "ToolCall" },
-      { input: { _tag: "SandboxViolation", message: "a", path: "/x", workspace_label: "w" }, expectedTag: "SandboxViolation" },
+      { input: { _tag: "ToolCall", message: "a", toolCallId: "t1" }, expectedTag: "ToolCall" },
+      { input: { _tag: "SandboxViolation", message: "a", path: "/x", workspaceLabel: "w" }, expectedTag: "SandboxViolation" },
       { input: { _tag: "Unknown", message: "a" }, expectedTag: "Unknown" },
     ];
     for (const { input, expectedTag } of cases) {

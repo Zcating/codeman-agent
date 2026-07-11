@@ -37,16 +37,16 @@ vi.mock("./tool-call-card", () => ({
 function makeUserMsg(overrides: Partial<Message> = {}): Message {
   return {
     id: "msg-user",
-    conversation_id: "conv-1",
+    conversationId: "conv-1",
     role: "user",
     content: "hello",
     thinking: null,
-    tool_calls: null,
-    tool_results: null,
+    toolCalls: null,
+    toolResults: null,
     model: null,
-    input_tokens: null,
-    output_tokens: null,
-    created_at: 1,
+    inputTokens: null,
+    outputTokens: null,
+    createdAt: 1,
     ...overrides,
   };
 }
@@ -54,16 +54,16 @@ function makeUserMsg(overrides: Partial<Message> = {}): Message {
 function makeAssistantMsg(overrides: Partial<Message> = {}): Message {
   return {
     id: "msg-asst",
-    conversation_id: "conv-1",
+    conversationId: "conv-1",
     role: "assistant",
     content: "world",
     thinking: null,
-    tool_calls: null,
-    tool_results: null,
+    toolCalls: null,
+    toolResults: null,
     model: "gpt-4o",
-    input_tokens: null,
-    output_tokens: null,
-    created_at: 2,
+    inputTokens: null,
+    outputTokens: null,
+    createdAt: 2,
     ...overrides,
   };
 }
@@ -110,7 +110,7 @@ describe("MessageBubble", () => {
     ];
     const msg = makeAssistantMsg({
       content: "Let me check that.",
-      tool_calls: toolCalls,
+      toolCalls: toolCalls,
     });
     const { container } = render(() => <MessageBubble message={msg} />);
     const inline = container.querySelector('[data-testid="inline-tool-calls"]');
@@ -127,12 +127,12 @@ describe("MessageBubble", () => {
       { id: "tc-1", name: "read_file", args: { path: "/a" } },
     ];
     const toolResults: ToolResult[] = [
-      { tool_call_id: "tc-1", result: "ok", error: null },
+      { toolCallId: "tc-1", result: "ok", error: null },
     ];
     const msg = makeAssistantMsg({
       content: "done",
-      tool_calls: toolCalls,
-      tool_results: toolResults,
+      toolCalls: toolCalls,
+      toolResults: toolResults,
     });
     const { container } = render(() => <MessageBubble message={msg} />);
     const card = container.querySelector('[data-testid="inline-tool-card"]');
@@ -172,8 +172,8 @@ describe("MessageBubble", () => {
     const msg = makeAssistantMsg({
       content: "",
       thinking: null,
-      tool_calls: null,
-      tool_results: null,
+      toolCalls: null,
+      toolResults: null,
     });
     const { container } = render(() => <MessageBubble message={msg} />);
     expect(container.querySelector('[data-testid="agent-bubble"]')).toBeTruthy();
@@ -185,7 +185,7 @@ describe("MessageBubble", () => {
     const msg = makeAssistantMsg({
       content: "answer",
       thinking: "thinking text",
-      tool_calls: toolCalls,
+      toolCalls: toolCalls,
     });
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector('[data-testid="agent-bubble"]');
@@ -205,13 +205,13 @@ describe("MessageBubble", () => {
   // ─── tool 角色 (保留 V2 既有行为,这块无重构) ─────────────────────
 
   it("tool 角色：显示 Tool 结果摘要", () => {
-    const toolResults: ToolResult[] = [{ tool_call_id: "tc-1", result: { ok: true }, error: null }];
+    const toolResults: ToolResult[] = [{ toolCallId: "tc-1", result: { ok: true }, error: null }];
     const msg: Message = makeUserMsg({
       id: "msg-3",
       role: "tool",
       content: '{"status":"ok"}',
       thinking: null,
-      tool_results: toolResults,
+      toolResults: toolResults,
     });
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");
@@ -240,14 +240,14 @@ describe("MessageBubble", () => {
 
   it("tool_results[0].error 存在时用 text-destructive + ❌", () => {
     const toolResults: ToolResult[] = [
-      { tool_call_id: "tc-1", result: "ok", error: "boom" },
+      { toolCallId: "tc-1", result: "ok", error: "boom" },
     ];
     const msg: Message = makeUserMsg({
       id: "msg-6",
       role: "tool",
       content: "",
       thinking: null,
-      tool_results: toolResults,
+      toolResults: toolResults,
     });
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");
@@ -259,14 +259,14 @@ describe("MessageBubble", () => {
 
   it("tool_results[0].error = null 时用 text-success + ✓", () => {
     const toolResults: ToolResult[] = [
-      { tool_call_id: "tc-1", result: "ok", error: null },
+      { toolCallId: "tc-1", result: "ok", error: null },
     ];
     const msg: Message = makeUserMsg({
       id: "msg-7",
       role: "tool",
       content: "",
       thinking: null,
-      tool_results: toolResults,
+      toolResults: toolResults,
     });
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");
@@ -281,14 +281,14 @@ describe("MessageBubble", () => {
   it("tool result string.length > 200 渲染 details + 行数", () => {
     const longResult = "a".repeat(250);
     const toolResults: ToolResult[] = [
-      { tool_call_id: "tc-1", result: longResult, error: null },
+      { toolCallId: "tc-1", result: longResult, error: null },
     ];
     const msg: Message = makeUserMsg({
       id: "msg-8",
       role: "tool",
       content: "",
       thinking: null,
-      tool_results: toolResults,
+      toolResults: toolResults,
     });
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");
@@ -302,10 +302,10 @@ describe("MessageBubble", () => {
   it("tool result array (FileMatch[]) 渲染 match list", () => {
     const toolResults: ToolResult[] = [
       {
-        tool_call_id: "tc-search",
+        toolCallId: "tc-search",
         result: [
-          { path: "src/x.ts", line_number: 42, line_content: "const x = 1" },
-          { path: "src/y.ts", line_number: 100, line_content: "const y = 2" },
+          { path: "src/x.ts", lineNumber: 42, lineContent: "const x = 1" },
+          { path: "src/y.ts", lineNumber: 100, lineContent: "const y = 2" },
         ] as FileMatch[],
         error: null,
       },
@@ -315,7 +315,7 @@ describe("MessageBubble", () => {
       role: "tool",
       content: "",
       thinking: null,
-      tool_results: toolResults,
+      toolResults: toolResults,
     });
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");
@@ -334,7 +334,7 @@ describe("MessageBubble", () => {
       role: "tool",
       content: '{"x":1}',
       thinking: null,
-      tool_results: null,
+      toolResults: null,
     });
     const { container } = render(() => <MessageBubble message={msg} />);
     const bubble = container.querySelector(".justify-start");

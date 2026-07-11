@@ -63,19 +63,19 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     mockState.resolved = undefined;
     mockState.settings = {
       providers: [],
-      schema_version: "1.5",
-      user_language: "en",
+      schemaVersion: "1.5",
+      userLanguage: "en",
       theme: "dark",
-      start_at_login: false,
+      startAtLogin: false,
       window: {
-        remember_position: true,
-        remember_size: true,
-        default_size: { width: 800, height: 600 },
-        min_size: { width: 600, height: 400 },
+        rememberPosition: true,
+        rememberSize: true,
+        defaultSize: { width: 800, height: 600 },
+        minSize: { width: 600, height: 400 },
       },
-      system_prompt: { default: "", user_can_edit: true },
-      conversations: { auto_archive_after_days: 30, max_history: 1000 },
-      llm_providers: [],
+      systemPrompt: { default: "", userCanEdit: true },
+      conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
+      llmProviders: [],
     };
     await Effect.runPromise(appStore.refresh());
   });
@@ -114,13 +114,13 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
           id: "minimax",
           label: "MiniMax",
           enabled: true,
-          api_key: "",
+          apiKey: "",
           llm: {
-            default_model: "old-model",
-            base_url: "https://api.example.com/v1",
-            api_type: "anthropic-messages" as const,
+            defaultModel: "old-model",
+            baseUrl: "https://api.example.com/v1",
+            apiType: "anthropic-messages" as const,
             models: [{ id: "old-model", label: "Old", deprecated: false, thinking: false }],
-            models_endpoint: "https://api.example.com/v1/models",
+            modelsEndpoint: "https://api.example.com/v1/models",
           },
         },
       ],
@@ -149,7 +149,7 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     fetchSpy.mockRestore();
   });
 
-  it("refreshProviderModels: default_model 不在新列表时自动回退到第一个", async () => {
+  it("refreshProviderModels: defaultModel 不在新列表时自动回退到第一个", async () => {
     mockState.settings = {
       ...mockState.settings,
       providers: [
@@ -157,13 +157,13 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
           id: "minimax",
           label: "MiniMax",
           enabled: true,
-          api_key: "",
+          apiKey: "",
           llm: {
-            default_model: "old-model",
-            base_url: "https://api.example.com/v1",
-            api_type: "anthropic-messages" as const,
+            defaultModel: "old-model",
+            baseUrl: "https://api.example.com/v1",
+            apiType: "anthropic-messages" as const,
             models: [{ id: "old-model", label: "Old", deprecated: false, thinking: false }],
-            models_endpoint: "https://api.example.com/v1/models",
+            modelsEndpoint: "https://api.example.com/v1/models",
           },
         },
       ],
@@ -177,11 +177,11 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     );
     await Effect.runPromiseExit(appStore.refreshProviderModels("minimax"));
     const provider = (appStore.state.value as any).providers.find((p: any) => p.id === "minimax");
-    expect(provider.llm.default_model).toBe("new-model-X");
+    expect(provider.llm.defaultModel).toBe("new-model-X");
     fetchSpy.mockRestore();
   });
 
-  it("refreshProviderModels: default_model 已在新列表时保留", async () => {
+  it("refreshProviderModels: defaultModel 已在新列表时保留", async () => {
     mockState.settings = {
       ...mockState.settings,
       providers: [
@@ -189,13 +189,13 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
           id: "minimax",
           label: "MiniMax",
           enabled: true,
-          api_key: "",
+          apiKey: "",
           llm: {
-            default_model: "kept-model",
-            base_url: "https://api.example.com/v1",
-            api_type: "anthropic-messages" as const,
-            models: [{ id: "kept-model", label: "Kept", deprecated: false, thinking: false }],
-            models_endpoint: "https://api.example.com/v1/models",
+            defaultModel: "old-model",
+            baseUrl: "https://api.example.com/v1",
+            apiType: "anthropic-messages" as const,
+            models: [{ id: "old-model", label: "Old", deprecated: false, thinking: false }],
+            modelsEndpoint: "https://api.example.com/v1/models",
           },
         },
       ],
@@ -214,7 +214,7 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     );
     await Effect.runPromiseExit(appStore.refreshProviderModels("minimax"));
     const provider = (appStore.state.value as any).providers.find((p: any) => p.id === "minimax");
-    expect(provider.llm.default_model).toBe("kept-model");
+    expect(provider.llm.defaultModel).toBe("kept-model");
     fetchSpy.mockRestore();
   });
 
@@ -226,13 +226,13 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
           id: "minimax",
           label: "MiniMax",
           enabled: true,
-          api_key: "",
+          apiKey: "",
           llm: {
-            default_model: "x",
-            base_url: "https://api.example.com/v1",
-            api_type: "anthropic-messages" as const,
+            defaultModel: "x",
+            baseUrl: "https://api.example.com/v1",
+            apiType: "anthropic-messages" as const,
             models: [],
-            models_endpoint: "https://api.example.com/v1/models",
+            modelsEndpoint: "https://api.example.com/v1/models",
           },
         },
       ],
@@ -284,8 +284,8 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     }
   });
 
-  // ─── J3: refreshProviderModels() with empty models → default_model = "" ───
-  it("refreshProviderModels 空 models 数组 → default_model = ''", async () => {
+  // ─── J3: refreshProviderModels() with empty models → defaultModel = "" ───
+  it("refreshProviderModels 空 models 数组 → defaultModel = ''", async () => {
     mockState.settings = {
       ...mockState.settings,
       providers: [
@@ -293,13 +293,13 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
           id: "minimax",
           label: "MiniMax",
           enabled: true,
-          api_key: "",
+          apiKey: "",
           llm: {
-            default_model: "some-model",
-            base_url: "https://api.example.com/v1",
-            api_type: "anthropic-messages" as const,
+            defaultModel: "some-model",
+            baseUrl: "https://api.example.com/v1",
+            apiType: "anthropic-messages" as const,
             models: [{ id: "some-model", label: "Some", deprecated: false, thinking: false }],
-            models_endpoint: "https://api.example.com/v1/models",
+            modelsEndpoint: "https://api.example.com/v1/models",
           },
         },
       ],
@@ -315,7 +315,7 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     const exit = await Effect.runPromiseExit(appStore.refreshProviderModels("minimax"));
     expect(exit._tag).toBe("Success");
     const provider = (appStore.state.value as any).providers.find((p: any) => p.id === "minimax");
-    expect(provider.llm.default_model).toBe("");
+    expect(provider.llm.defaultModel).toBe("");
     fetchSpy.mockRestore();
   });
 
@@ -359,26 +359,26 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
           id: "minimax",
           label: "MiniMax",
           enabled: true,
-          api_key: "",
+          apiKey: "",
           llm: {
-            default_model: "MiniMax-M2.5-highspeed",
-            base_url: "https://api.minimaxi.com/anthropic",
-            api_type: "anthropic-messages",
+            defaultModel: "MiniMax-M2.5-highspeed",
+            baseUrl: "https://api.minimaxi.com/anthropic",
+            apiType: "anthropic-messages",
             models: [],
-            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+            modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           },
         },
         {
           id: "deepseek",
           label: "DeepSeek",
           enabled: true,
-          api_key: "",
+          apiKey: "",
           llm: {
-            default_model: "deepseek-chat",
-            base_url: "https://api.deepseek.com/anthropic",
-            api_type: "anthropic-messages",
+            defaultModel: "deepseek-chat",
+            baseUrl: "https://api.deepseek.com/anthropic",
+            apiType: "anthropic-messages",
             models: [],
-            models_endpoint: "https://api.deepseek.com/models",
+            modelsEndpoint: "https://api.deepseek.com/models",
           },
         },
       ],
@@ -400,13 +400,13 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
           id: "deepseek",
           label: "DeepSeek",
           enabled: true,
-          api_key: "",
+          apiKey: "",
           llm: {
-            default_model: "deepseek-chat",
-            base_url: "https://api.deepseek.com/anthropic",
-            api_type: "anthropic-messages",
+            defaultModel: "deepseek-chat",
+            baseUrl: "https://api.deepseek.com/anthropic",
+            apiType: "anthropic-messages",
             models: [],
-            models_endpoint: "https://api.deepseek.com/models",
+            modelsEndpoint: "https://api.deepseek.com/models",
           },
         },
       ],
@@ -448,13 +448,13 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
           id: "minimax",
           label: "MiniMax",
           enabled: true,
-          api_key: "",
+          apiKey: "",
           llm: {
-            default_model: "MiniMax-M2.5-highspeed",
-            base_url: "https://api.minimaxi.com/anthropic",
-            api_type: "anthropic-messages",
+            defaultModel: "MiniMax-M2.5-highspeed",
+            baseUrl: "https://api.minimaxi.com/anthropic",
+            apiType: "anthropic-messages",
             models: [],
-            models_endpoint: "https://api.minimaxi.com/anthropic/v1/models",
+            modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           },
         },
       ],

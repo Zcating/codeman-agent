@@ -11,18 +11,18 @@ let mockTheme: Settings["theme"] = "dark";
 
 vi.mock("../lib/ipc", () => ({
   getSettingsBridge: async (): Promise<Settings> => ({
-    llm_providers: [],
-    user_language: "en",
+    llmProviders: [],
+    userLanguage: "en",
     theme: mockTheme,
-    start_at_login: false,
+    startAtLogin: false,
     window: {
-      remember_position: false,
-      remember_size: false,
-      default_size: { width: 800, height: 600 },
-      min_size: { width: 400, height: 300 },
+      rememberPosition: false,
+      rememberSize: false,
+      defaultSize: { width: 800, height: 600 },
+      minSize: { width: 400, height: 300 },
     },
-    system_prompt: { default: "", user_can_edit: true },
-    conversations: { auto_archive_after_days: 30, max_history: 1000 },
+    systemPrompt: { default: "", userCanEdit: true },
+    conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
   }),
 }));
 
