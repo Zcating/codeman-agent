@@ -43,6 +43,20 @@ describe("formatAppError — Schema.TaggedError instances only (ADR-0025 PR 2)",
     expect(out).toContain("Unauthorized: second");
     expect(out).toContain("; ");
   });
+  it("NotFound instance → 'NotFound: gone'", () => {
+    expect(fmt(new NotFound({ message: "gone" }))).toBe("NotFound: gone");
+  });
+  it("Database instance → 'Database: locked'", () => {
+    expect(fmt(new Database({ message: "locked" }))).toBe("Database: locked");
+  });
+  it("SandboxViolation instance → 'SandboxViolation: outside'", () => {
+    expect(fmt(new SandboxViolation({ message: "outside", path: "/p", workspace_label: "w" }))).toBe(
+      "SandboxViolation: outside",
+    );
+  });
+  it("Unknown instance → 'Unknown: ???'", () => {
+    expect(fmt(new UnknownErr({ message: "???" }))).toBe("Unknown: ???");
+  });
 });
 
 describe("formatAppError — new Schema.TaggedError instances (ADR-0025 PR1)", () => {
