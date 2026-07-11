@@ -49,6 +49,8 @@ Vite 单页应用，渲染到单个 Electron BrowserWindow。路由走 TanStack 
 - **测试用 vitest + jsdom。** `import.meta.vitest` 风格的 in-source test 暂不用，测试都走 `*.test.ts(x)` 旁挂。test 文件位于被测文件同目录。
 - **优先使用：** es-toolkit, ts-parttern, effect-ts 等工具，优先使用已存在的组件、工具函数等，目录在 `src/shared`
 - **业务函数（返回 `Effect` 的可复用 top-level 函数）默认用 `Effect.fn("name")` 包装。** 引用 `.agents/skills/effect-ts/references/guide-observability.md` 的 "Preferred Rule"。命名用 camelCase 业务 op 名（如 `refreshProviderModels`），**不**加 namespace 前缀。内联组合块（Service Live body / 嵌套 callback / 测试）保留 `Effect.gen` 不动。**不**引入 `Effect.annotateCurrentSpan` / `Effect.withSpan` / `Effect.log*` 替换（属后续 wave）。
+- **新错误必须用 `Schema.TaggedError`（共享于 `src/shared/lib/errors.ts`）。** 不允许新 `{ kind: "X", … }` 判别联合。8 个 variant 已落地（NotFound / Unauthorized / Network / InvalidConfig / Database / ToolCall / SandboxViolation / Unknown），新错误优先复用现有 variant；新 variant 走 `Schema.TaggedError<NewError>()("NewError", { ... })` 模式并扩展 `AppError` union。
+- **新 schema 必须用 `effect/Schema`（`Schema.Struct` / `Schema.brand` / `Schema.filter`）。** 不允许引入新 `@sinclair/typebox` `Type.Object({...})`。新 Branded ID 走 `Schema.String.pipe(Schema.brand("X"))`；新 domain schema 走 `Schema.Struct({...})`；新 Refinement 走 `Schema.filter`（不是 `Schema.refine`，后者已 deprecated）。
 
 ## Styling（Tailwind v4）
 
@@ -104,6 +106,7 @@ Vite 单页应用，渲染到单个 Electron BrowserWindow。路由走 TanStack 
 | 新增 Effect 桥接                  | `features/<feature>/stores/<domain>.ts`（Accessor 暴露 + Effect.gen 包 IPC）                                                       |
 | 新增 feature-level Effect service | `features/<feature>/lib/<name>.ts`（Context.Tag + Layer.effect）                                                                   |
 | 新增 LLM 工具                     | `features/file-tools/lib/<name>.ts`（Type.Object schema + execute handler）+ 同步 `features/chat/lib/runtime.ts` 的 `tools` 数组。**注意**：`features/billing/` 目录从未落地（ADR-0012 V2 反转时合并到 file-tools 工具 schema 模式）。 |
+| 新增 Branded ID / domain schema | 跨域 ID (WorkspaceId) 在 `shared/lib/`；feature 自治 ID (FilePath / ToolCallId / ConversationId) 在各 feature `lib/schemas.ts`；domain config (Provider / Settings) 在 `features/settings/lib/schemas.ts` |
 | 反应式异常                        | 先查 `features/<feature>/stores/*.ts` 监听器注册，再查组件                                                                         |
 | 改样式                            | 改 `@theme` token（`src/index.css`）；组件只写 utility class                                                                       |
 | 改主题行为                        | 改 `src/shared/stores/theme.ts`（Solid effect 监听 `prefers-color-scheme`）                                                        |
