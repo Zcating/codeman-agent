@@ -1,7 +1,8 @@
 import { Context, Effect, Layer } from "effect";
 import { invoke as ipcInvoke } from "./ipc";
 import { logger } from "./logger";
-import type { AppError, Workspace } from "./types";
+import type { AppError } from "./errors";
+import type { Workspace } from "./types";
 
 /**
  * V3 ADR-0023 D8-W: Workspace ownership moved from Settings to chat domain

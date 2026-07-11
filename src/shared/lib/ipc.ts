@@ -12,8 +12,8 @@
 
 import { Effect, Stream, Context, Layer } from "effect";
 import { logger } from "./logger";
+import { Unknown, type AppError } from "./errors";
 import type {
-  AppError,
   Conversation,
   Message,
   Settings,
@@ -159,7 +159,7 @@ async function dispatchInvoke<T>(
     case "delete_file":
       return (await a.deleteFile(arg("workspaceId") as string, arg("path") as string)) as T;
     default:
-      throw { kind: "Unknown" as const, message: `Unknown IPC: ${name}` };
+      throw new Unknown({ message: `Unknown IPC: ${name}` });
   }
 }
 
@@ -191,7 +191,7 @@ export const invoke = <T>(
             const candidate = msg.slice(braceStart);
             const parsed = JSON.parse(candidate) as Record<string, unknown>;
             if (parsed && typeof parsed === "object" && "kind" in parsed) {
-              return parsed as AppError;
+              return parsed as unknown as AppError;
             }
           } catch { /* not our JSON — fall through */ }
         }
@@ -199,15 +199,15 @@ export const invoke = <T>(
         try {
           const parsed = JSON.parse(msg) as Record<string, unknown>;
           if (parsed && typeof parsed === "object" && "kind" in parsed) {
-            return parsed as AppError;
+            return parsed as unknown as AppError;
           }
         } catch { /* nope */ }
       }
       if (e && typeof e === "object" && "kind" in e) {
-        return e as AppError;
+        return e as unknown as AppError;
       }
       logger.error("IPC 调用失败", name, e);
-      return { kind: "Unknown" as const, message: String(e) };
+      return new Unknown({ message: String(e) });
     },
   });
 

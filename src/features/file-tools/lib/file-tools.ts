@@ -7,7 +7,8 @@ import { Type, type Static } from "@sinclair/typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Effect, Exit } from "effect";
 import { FileService, FileServiceLive } from "../../../shared/lib/ipc";
-import type { AppError, FileMatch } from "../../../shared/lib/types";
+import { InvalidConfig, Unknown, type AppError } from "../../../shared/lib/errors";
+import type { FileMatch } from "../../../shared/lib/types";
 
 // ============================================================================
 // AgentToolResult type (pi-ai 0.9.4 doesn't export this type)
@@ -46,13 +47,12 @@ function requireWorkspaceId(args: Record<string, any>): Effect.Effect<string, Ap
   if (typeof ws === "string" && ws.length > 0) {
     return Effect.succeed(ws);
   }
-  return Effect.fail({
-    kind: "InvalidConfig",
+  return Effect.fail(new InvalidConfig({
     field: "workspace_id",
     message:
       "workspace_id is required. The runtime should inject it from the conversation context — " +
       "if you see this, the chat.runtime.run() call is missing ProviderConfig.workspaceId.",
-  });
+  }));
 }
 
 // ============================================================================
@@ -113,7 +113,7 @@ async function runFileEffect<T>(
     if (cause._tag === "Fail") {
       err = cause.error as AppError;
     } else {
-      err = { kind: "Unknown" as const, message: String(cause) };
+      err = new Unknown({ message: String(cause) });
     }
     return {
       content: [
@@ -121,7 +121,7 @@ async function runFileEffect<T>(
           type: "text",
           // 含 kind 标签:让 SandboxViolation / NotFound / Unknown 等错误种类在
           // text payload 里可见(tool 消费方通常只看 text 不看 details)。
-          text: `Error${"kind" in err ? ` (${(err as { kind: string }).kind})` : ""}: ${
+          text: `Error (${err._tag}): ${
             "message" in err ? err.message : JSON.stringify(err)
           }`,
         },

@@ -149,31 +149,8 @@ export interface ToolResult {
 }
 
 // ============================================================================
-// Error — LEGACY (ADR-0025 Phase 3: superseded by Schema.TaggedError in ./errors)
+// AppError moved to ./errors.ts (ADR-0025 PR 2)
 // ============================================================================
-
-/**
- * @deprecated ADR-0025 Phase 3. Legacy `{ kind }` discriminated union. New code
- * MUST use the `Schema.TaggedError` classes in `./errors` (discriminate via
- * `_tag` + `instanceof`). Removed in PR 2 once all consumers migrate.
- */
-export type LegacyAppErrorUnion =
-  | { kind: "NotFound"; message: string }
-  | { kind: "Unauthorized"; message: string }
-  | { kind: "Network"; message: string; cause?: string }
-  | { kind: "InvalidConfig"; message: string; field?: string }
-  | { kind: "Database"; message: string; cause?: string }
-  | { kind: "ToolCall"; tool_call_id: string; message: string }
-  | { kind: "SandboxViolation"; path: string; workspace_label: string }
-  | { kind: "Unknown"; message: string };
-
-/**
- * @deprecated ADR-0025 Phase 3. Back-compat alias so existing consumers keep
- * compiling during the PR1→PR2 window. In PR 2, switch imports to `AppError`
- * from `./errors` (Schema.TaggedError classes), then delete this alias and
- * `LegacyAppErrorUnion`.
- */
-export type AppError = LegacyAppErrorUnion;
 
 // ============================================================================
 // V2 Local Dev Mock LLM Pipeline (ADR-TBD)

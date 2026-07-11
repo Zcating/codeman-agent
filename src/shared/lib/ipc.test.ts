@@ -111,7 +111,7 @@ const _MockSettingsServiceLive = Layer.succeed(SettingsService, {
 });
 void _MockSettingsServiceLive;
 
-import type { AppError } from "./types";
+import type { AppError } from "./errors";
 
 beforeEach(() => {
   mockState.calls = [];
