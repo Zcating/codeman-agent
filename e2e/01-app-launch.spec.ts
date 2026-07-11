@@ -85,7 +85,7 @@ test.describe("01 — application launch", () => {
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
     const workspaces = await invoke<Workspace[]>(page, "list_workspaces");
     expect(Array.isArray(workspaces)).toBe(true);
-    await invoke(page, "add_workspace", { label: "Boot Test", rootPath: "/tmp/boot-test" });
+    await invoke(page, "add_workspace", { label: "Boot Test", rootPath: `/tmp/boot-test-${process.pid}-${Math.random().toString(36).slice(2, 8)}` });
     const after = await invoke<Workspace[]>(page, "list_workspaces");
     expect(after.some((w) => w.label === "Boot Test")).toBe(true);
   });

@@ -141,6 +141,59 @@ V3 决策：流式 chunk 走 **Main → Renderer 的 `webContents.send(channel, 
 
 **拒绝**：(a) 平行维护（Tauri + Electron 共存）——双倍维护负担；(b) Strangler（一个 IPC 一个 IPC 替换）——Tauri 与 Electron 的 main process 启动模型互斥，无法平滑过渡。
 
+### D10 — V3.1 amend: Settings JSON wire format snake_case → camelCase
+
+**Context.** V2 (Rust/Tauri) 时期 settings schema 沿用 Rust 习惯全 snake_case (`api_key`/`default_model`/`base_url`/`default_llm_provider_id` 等)。V3 迁移（D1-D9）把 schema 原样搬到 TypeScript `electron/main/settings-schema.ts::SettingsV15`,加 `:5` 注释「Snake_case field names preserved per ADR-0024; existing users' settings.json load transparently」—— 但 ADR-0024 正文实际**未**对 snake_case 作显式决策,该注释是对 V2 继承事实的描述,非决策。V0→V15 migration 是另独立 concern,不属本节。
+
+V3.1 期间 commit `b6ce135 refactor(types): snake_case → camelCase in shared types and consumers` 把 TS 域 (`src/shared/lib/types.ts`) 统一改为 camelCase,但**遗漏**了 `electron/main/settings-schema.ts::SettingsV15` —— 结果 TS 域 = camelCase,wire format `SettingsV15` (settings.json on disk + IPC payload) 仍 snake_case,**缺一个 snake↔camel bridge**,跟 DB row mappers (`toMessage`/`toConversation`/`toWorkspace`) 不对称。
+
+实测后果:11 个 e2e 在 `b6ce135` 后变红（7 个 A 类 mock LLM 不出文本 + 4 个 B 类 per-conv runtime `waitFor` 超时),根因是 renderer 端 `settings.defaultLlmProviderId`、`provider.apiKey`、`provider.llm.baseUrl` 全 undefined,`getActiveLlmProvider()` 返回 null,mock LLM 未生效,真 LLM（无 key / 429)顶上 → `agent_end: msgs.length=0`。
+
+**Decision.** Settings JSON wire format 改为 **camelCase**,与 TS 域统一。`migrateV15SnakeToCamel()` 一次性 load-time migration 保证 V3 既装（已写盘 snake）的用户自动升级;V3.1 起新写盘 / 新读盘全 camel。V0→V15 migration 不变（V0 是历史 snake,且已 deprecation 链路上游,与 V3.1 wire snake 是两个独立 concern）。
+
+字段映射表:
+
+| Wire (V3 snake, deprecated) | Wire (V3.1 camel, canonical) |
+|---|---|
+| `schema_version` | `schemaVersion` |
+| `default_llm_provider_id` | `defaultLlmProviderId` |
+| `user_language` | `userLanguage` |
+| `start_at_login` | `startAtLogin` |
+| `window.remember_position` | `window.rememberPosition` |
+| `window.remember_size` | `window.rememberSize` |
+| `window.default_size` | `window.defaultSize` |
+| `window.min_size` | `window.minSize` |
+| `system_prompt.user_can_edit` | `systemPrompt.userCanEdit` |
+| `conversations.auto_archive_after_days` | `conversations.autoArchiveAfterDays` |
+| `conversations.max_history` | `conversations.maxHistory` |
+| `providers[].api_key` | `providers[].apiKey` |
+| `providers[].llm.default_model` | `providers[].llm.defaultModel` |
+| `providers[].llm.base_url` | `providers[].llm.baseUrl` |
+| `providers[].llm.api_type` | `providers[].llm.apiType` |
+| `providers[].llm.models_endpoint` | `providers[].llm.modelsEndpoint` |
+| `providers[].llm.models[].context_window` | `providers[].llm.models[].contextWindow` |
+
+**Implementation notes.**
+
+- `electron/main/settings-schema.ts::migrateV15SnakeToCamel(raw: unknown): SettingsV15` 在 `loadSettings()` 入口自动调用,depth-traverse 写 camel keys;老 settings.json 一次升级,无 breaking UX。`SettingsV0 → SettingsV15` migration 在前（已存在）;`V15 snake → V15 camel` migration 在后（新增）。两端 pipeline: `migrationsV0ToV15 → migrateV15SnakeToCamel → sanitize → saveSettings`。
+- `update_settings` IPC handler 续用 `Partial<SettingsV15>` 作为 patch 类型 —— V3.1 起 `SettingsV15` 本身已经是 camel,类型层与 wire 层合一;amend 前存在的「TS 域 camel / wire snake / 类型 Partial<SettingsV15> snake」三层错位修复。
+- `e2e/mock-provider.ts` fixture 字段全部由 snake 改 camel,与 post-amend wire format 一致。
+- `electron/main/ipc.ts::toMessage`/`toConversation`/`toWorkspace` 等 DB row → TS 域 mappers **不变**（DB 层 snake,TS 域 camel,经由 mappers 翻译,职责未动）。
+- 添加 ADR 引用:本 D10 supersede `settings-schema.ts:5` 旧注释「Snake_case field names preserved per ADR-0024」—— `:5` 注释更新为「camelCase wire format per ADR-0024 D10」。
+
+**Negative.**
+
+- `settings-schema.ts:5` 旧注释 supersede;读老代码的开发者如果只读注释会困惑 —— 本 D10 是 authoritative。
+- 新增 `migrateV15SnakeToCamel()` 是新代码 surface,需独立 vitest 覆盖（`settings-schema.test.ts` 加 case）。
+- 已经 `b6ce135` 改完 camel 的 TS 消费者侧（`src/features/**` 32+ 文件）与本 amendment 同向;不引入 retro rename 工作量。
+- DB row mappers 与 settings wire format 是两套独立 concern,在 `electron/main/ipc.ts` 内并列,职责清晰但要求新读者区分（settings 一处走 schema-level migration,DB rows 走 row-level mappers）。
+
+**Rejected.**
+
+- (a) **保持 wire snake + IPC 层 bridge**（Path A）:被拒;多 ~35 行 diff,持久层 vs TS 域分两套 truth,违反「wire format 即 source of truth」「reducing duplication」。
+- (b) **回滚 `b6ce135` 整体翻 TS 域回 snake**（Path C）:被拒;b6ce135 已落定 32+ 文件,翻回去 ~30 minute 大量 diff 跟 ADR-0024 / ADR-0025 后续决策不一致。
+- (c) **双世界 + 详细 boundary ADR(新建 0026)**:被拒;boundary 在本 D10「Implementation notes」+ 表中已记录充分,不需要另起 ADR-0026 增加 file 数量。
+
 ## Consequences
 
 ### Positive
@@ -149,6 +202,7 @@ V3 决策：流式 chunk 走 **Main → Renderer 的 `webContents.send(channel, 
 - Chromium 升级与 Edge WebView2 runtime 解耦——V3 决定 Chromium 版本（锁 minor），不再受用户机器 Edge 版本影响。
 - Node 生态工具（dotenv、cosmiconfig、zod 等）可在 main process 直接使用，无需 Rust crate 等价物。
 - `electron-store` / `electron-log` / `electron-window-state` 等库比 Tauri 插件更成熟、社区更大。
+- **V3.1 amend (D10):** wire format 与 TS 域同形,降低认知负担;新增 settings 字段有「一处定义」原则;`update_settings` 类型 `Partial<SettingsV15>` 与 wire keys 对齐,无 shadow type 漂移;e2e + 单测 wire format 路径不再跨错。
 
 ### Negative
 
@@ -157,6 +211,7 @@ V3 决策：流式 chunk 走 **Main → Renderer 的 `webContents.send(channel, 
 - Rust 工具链移除：`cargo` 不再需要；CI 节省编译时间。**代价**：失去 Rust 静态分析 + 内存安全保证——Node main process 须靠 TypeScript strict mode + 测试覆盖保证正确性。
 - 25+ IPC 命令的 `ipcMain.handle` 重写 + preload `contextBridge` 暴露 + 50+ import 同步更新 = 一次性 ~300+ 文件改动（机械但量大）。
 - `tauri-plugin-store` 的 `Settings::sanitized()` 钳制逻辑需迁移为 TS `SettingsSchema.sanitize()`（语义不变；测试用例复用）。
+- **V3.1 amend (D10):** V3 既装用户的 `settings.json` 自动 `migrateV15SnakeToCamel()` 一次,失败回退默认值（per `sanitize()`);`settings-schema.ts:5` 旧注释 supersede 造成「注释 vs ADR」不一致,需新读者先看 D10 才能读懂 schema;DB row mappers（`toMessage` 等）与 settings wire format 是两套独立 concern,在 `electron/main/ipc.ts` 内并列,职责清晰但要求新读者区分。
 
 ### Cross-file impact
 
@@ -187,6 +242,12 @@ V3 决策：流式 chunk 走 **Main → Renderer 的 `webContents.send(channel, 
 | `e2e/09-per-conv-runtime.spec.ts` 等 | 不变（e2e 通过 UI 操作，不直接依赖 IPC 实现） |
 | `src-tauri/src/db/migrations/` | 删除；新 SQLite 迁移用 `better-sqlite3` + `electron/main/db/migrations/` |
 | `src/shared/lib/derive-label-from-path.ts` | 不变 |
+| **V3.1 amend (D10):** `electron/main/settings-schema.ts` | snake → camel 重命名（`SettingsV15` / `Provider` / `ProviderLlm` / `ModelMeta` 等 18 处);新增 `migrateV15SnakeToCamel()`;`:5` 注释更新;`migrationsV0ToV15` + `v0ProviderToV15` 不变（V0 是历史 wire 格式）|
+| **V3.1 amend (D10):** `electron/main/settings-schema.test.ts` | 同步 snake → camel rename;新增 `migrateV15SnakeToCamel` 测试 case |
+| **V3.1 amend (D10):** `e2e/mock-provider.ts` | fixture 字段 `api_key` / `default_model` / `base_url` / `api_type` / `models_endpoint` / `models[].context_window` 全 camel;`llm_api_key_ref` 删除（V1.5 Provider schema 不再支持）|
+| **V3.1 amend (D10):** `electron/main/ipc.ts` | `get_settings` / `update_settings` 内部使用的 `Partial<SettingsV15>` 类型不变,但字段 key 已 camel（amend 前存在「类型层 snake / wire snake / TS 域 camel」三层错位修复）;DB row mappers 不动 |
+| **V3.1 amend (D10):** `e2e/05-file-tools.spec.ts` beforeEach (C 类一并修) | add_workspace 改 `pid + Date.now()` 拼出 unique `rootPath`,per 6a7922c 模式,避免 4 worker 并行撞 UNIQUE constraint |
+| **V3.1 amend (D10):** 本 ADR | D10 + 上述 Positive/Negative/Cross-file impact 增补条目 |
 
 **估算**：~60 文件改动（删除 30+ / 新建 15+ / 修改 15+）；~10-15 atomic commits；~4-7 工作日（与 D9 的"一周冻结"一致）。
 

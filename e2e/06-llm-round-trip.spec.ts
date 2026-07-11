@@ -22,7 +22,7 @@ test.describe("06 — LLM round-trip (mock)", () => {
     // D8-W: provision workspace via direct IPC
     await invoke(page, "add_workspace", {
       label: "E2E Mock Test Workspace",
-      rootPath: path.join(os.tmpdir(), "codeman-e2e-mock-" + Date.now()),
+      rootPath: path.join(os.tmpdir(), `codeman-e2e-mock-${process.pid}-${Math.random().toString(36).slice(2, 8)}`),
     });
 
     // 切换到 mock provider — 不依赖 .env 里的真实 LLM key

@@ -22,7 +22,7 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     // D8-W: provision workspace
     await invoke(page, "add_workspace", {
       label: "E2E Mock Test Workspace",
-      rootPath: path.join(os.tmpdir(), "codeman-e2e-mock-" + Date.now()),
+      rootPath: path.join(os.tmpdir(), `codeman-e2e-mock-${process.pid}-${Math.random().toString(36).slice(2, 8)}`),
     });
 
     // 使用 mock provider，不依赖真实 API key

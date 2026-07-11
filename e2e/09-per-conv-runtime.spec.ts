@@ -44,7 +44,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     // D8-W: provision workspace directly via IPC. ChatLayout mount auto-loads workspaces.
     await invoke<{ id: string }>(page, "add_workspace", {
       label: "09 Test Workspace",
-      rootPath: path.join(os.tmpdir(), "codeman-09-" + Date.now()),
+      rootPath: path.join(os.tmpdir(), `codeman-09-${process.pid}-${Math.random().toString(36).slice(2, 8)}`),
     });
     // Navigate to / so ChatLayout mounts and loads workspaces
     await page.goto("/");
@@ -52,10 +52,10 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     // 切到 mock provider — 后续测试全靠 mock 队列,不需要 .env 里的真实 key
     await useMockProvider(page);
     // 验证 mock provider 已配置(避免前 spec 残留的真实 LLM provider 被优先使用)
-    const settings = await invoke<{ default_llm_provider_id?: string }>(page, "get_settings");
-    if (settings.default_llm_provider_id !== "mock") {
+    const settings = await invoke<{ defaultLlmProviderId?: string }>(page, "get_settings");
+    if (settings.defaultLlmProviderId !== "mock") {
       throw new Error(
-        "default_llm_provider_id 应为 mock,实际: " + (settings.default_llm_provider_id ?? "null"),
+        "defaultLlmProviderId 应为 mock,实际: " + (settings.defaultLlmProviderId ?? "null"),
       );
     }
   });

@@ -19,7 +19,7 @@ import * as path from "node:path";
 import * as os from "node:os";
 
 test.describe("08 — 文件工具 (mock LLM)", () => {
-  const e2eRoot = path.join(os.tmpdir(), "codeman-mock-e2e-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8));
+  const e2eRoot = path.join(os.tmpdir(), `codeman-mock-e2e-${process.pid}-${Math.random().toString(36).slice(2, 8)}`);
 
   let consoleErrors: string[] = [];
 
