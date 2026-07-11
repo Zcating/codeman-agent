@@ -113,17 +113,17 @@ function toAppError(e: unknown): AppError {
 // ("An object could not be cloned"). Shallow spread `{ ...settings.value }`
 // is NOT enough because nested arrays/objects remain Proxies. JSON
 // round-trip produces a fully plain object tree that structured-clones.
-const flushEffect: Effect.Effect<void, AppError> = Effect.gen(function* () {
+const flushEffect: Effect.Effect<void, AppError> = Effect.fn("flush")(function* () {
   yield* ipcInvoke("update_settings", {
     newSettings: JSON.parse(JSON.stringify(settings.value)),
   });
-});
+})();
 
-const refreshEffect: Effect.Effect<Settings, AppError> = Effect.gen(function* () {
+const refreshEffect: Effect.Effect<Settings, AppError> = Effect.fn("refresh")(function* () {
   const fresh = yield* ipcInvoke<Settings>("get_settings");
   setSettings("value", fresh);
   return fresh;
-});
+})();
 
 /**
  * V1.8+ ADR-0016 D1 + D2: 拉 models 列表 + 写 state + 强制执行 Default Model Invariant。
@@ -134,7 +134,7 @@ const refreshEffect: Effect.Effect<Settings, AppError> = Effect.gen(function* ()
  *  已经在数组里 → 不动
  */
 const refreshProviderModelsEffect = (id: string): Effect.Effect<ModelMeta[], AppError> =>
-  Effect.gen(function* () {
+  Effect.fn("refreshProviderModels")(function* () {
     const svc = yield* ProviderService;
     const models = yield* svc.fetchModels(id);
     setSettings("value", (prev) => {
@@ -153,36 +153,32 @@ const refreshProviderModelsEffect = (id: string): Effect.Effect<ModelMeta[], App
       return { ...prev, providers };
     });
     return models;
-  })
-    .pipe(Effect.provide(ProviderServiceLive))
-    .pipe(Effect.mapError((e: unknown) => toAppError(e)));
+  })().pipe(Effect.provide(ProviderServiceLive)).pipe(Effect.mapError((e: unknown) => toAppError(e)));
 
 /** V1.8+ ADR-0016 D4: 弹 OS folder picker，返回选中路径或 null。 */
-const pickWorkspacePathEffect = Effect.gen(function* () {
+const pickWorkspacePathEffect = Effect.fn("pickWorkspacePath")(function* () {
   const svc = yield* WorkspaceService;
   return yield* svc.pickPath();
-})
-  .pipe(Effect.provide(WorkspaceServiceLive))
-  .pipe(Effect.mapError((e: unknown) => toAppError(e)));
+})().pipe(Effect.provide(WorkspaceServiceLive)).pipe(Effect.mapError((e: unknown) => toAppError(e)));
 
 /** V1.8+ ADR-0016 D4: 从 providers[] 移除指定记录 + 触发后端 delete IPC (V0 占位)。 */
 const deleteProviderEffect = (id: string): Effect.Effect<void, AppError> =>
-  Effect.gen(function* () {
+  Effect.fn("deleteProvider")(function* () {
     // 1. client-side state mutation (实际删除)
     const providers = (settings.value.providers ?? []).filter((p) => p.id !== id);
     setSettings("value", (prev) => ({ ...prev, providers }));
     // 2. 后端 IPC (V0 占位, 失败不阻塞 — Rust 端无此命令但前端调用不 throw)
     const svc = yield* ProviderService;
     yield* svc.delete(id);
-  })
+  })()
     .pipe(Effect.provide(ProviderServiceLive))
     .pipe(Effect.mapError((e: unknown) => toAppError(e)));
 
 /** V1.8+ ADR-0016 D4 + D5: 清 SQLite conversation 表。 */
-const clearAllHistoryEffect: Effect.Effect<void, AppError> = Effect.gen(function* () {
+const clearAllHistoryEffect: Effect.Effect<void, AppError> = Effect.fn("clearAllHistory")(function* () {
   const svc = yield* SettingsService;
   yield* svc.clearAllHistory();
-})
+})()
   .pipe(Effect.provide(SettingsServiceLive))
   .pipe(Effect.mapError((e: unknown) => toAppError(e)));
 

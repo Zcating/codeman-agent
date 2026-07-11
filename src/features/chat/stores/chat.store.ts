@@ -111,7 +111,7 @@ export function sendMessage(
   content: string,
   provider: ProviderConfig,
 ): Effect.Effect<void, never, never> {
-  return Effect.gen(function* () {
+  return Effect.fn("sendMessage")(function* () {
     const cs = store.byId[convId];
     if (!cs) {
       return;
@@ -165,7 +165,7 @@ export function sendMessage(
     yield* Stream.runForEach(stream, (evt) =>
       Effect.sync(() => handleEvent(convId, evt)),
     ).pipe(Effect.scoped);
-  }).pipe(
+  })().pipe(
     Effect.catchAll((err) =>
       Effect.sync(() => {
         logger.error("[chat.store] sendMessage stream failure:", err);
@@ -347,31 +347,31 @@ export function cancel(convId: string): void {
 // ─── archiveConversation: cancel + 从 store 移除 + DB archive ──
 
 export function archiveConversation(convId: string): Effect.Effect<void, AppError, never> {
-  return Effect.gen(function* () {
+  return Effect.fn("archiveConversation")(function* () {
     cancel(convId);
     const svc = yield* ConversationService;
     yield* svc.archive(convId);
     setStore("byId", produce(prev => { delete prev[convId]; }));
     setConversationsSignal(Object.values(store.byId));
-  }).pipe(Effect.provide(ConversationServiceLive));
+  })().pipe(Effect.provide(ConversationServiceLive));
 }
 
 // ─── deleteConversation: cancel + 从 store 移除 + DB delete ───
 
 export function deleteConversation(convId: string): Effect.Effect<void, AppError, never> {
-  return Effect.gen(function* () {
+  return Effect.fn("deleteConversation")(function* () {
     cancel(convId);
     const svc = yield* ConversationService;
     yield* svc.delete(convId);
     setStore("byId", produce(prev => { delete prev[convId]; }));
     setConversationsSignal(Object.values(store.byId));
-  }).pipe(Effect.provide(ConversationServiceLive));
+  })().pipe(Effect.provide(ConversationServiceLive));
 }
 
 // ─── loadConversations: DB → byId ─────────────────────────────
 
 export function loadConversations(includeArchived = false): Effect.Effect<void, AppError, never> {
-  return Effect.gen(function* () {
+  return Effect.fn("loadConversations")(function* () {
     const svc = yield* ConversationService;
     const convs = yield* svc.list(includeArchived);
     for (const conv of convs) {
@@ -379,7 +379,7 @@ export function loadConversations(includeArchived = false): Effect.Effect<void, 
       const history = yield* msgSvc.list(conv.id);
       setupConvState(conv, history);
     }
-  }).pipe(
+  })().pipe(
     Effect.provide(ConversationServiceLive),
     Effect.provide(MessageServiceLive),
   );
@@ -400,12 +400,12 @@ export function createConversation(
   title: string,
   systemPrompt?: string,
 ): Effect.Effect<string, AppError, never> {
-  return Effect.gen(function* () {
+  return Effect.fn("createConversation")(function* () {
     const svc = yield* ConversationService;
     const conv = yield* svc.create(title, systemPrompt ?? null, workspaceId);
     setupConvState(conv, []);
     return conv.id;
-  }).pipe(Effect.provide(ConversationServiceLive));
+  })().pipe(Effect.provide(ConversationServiceLive));
 }
 
 // ─── createAndSendConversation: Home send flow ─────────────────
@@ -435,21 +435,21 @@ export function createAndSendConversation(
 // ─── Workspace CRUD (D8-W) ──────────────────────────────────────────
 
 export const pickWorkspacePath = (): Effect.Effect<string | null, AppError, never> =>
-  Effect.gen(function* () {
+  Effect.fn("pickWorkspacePath")(function* () {
     const svc = yield* WorkspaceService;
     return yield* svc.pickPath();
-  }).pipe(Effect.provide(WorkspaceServiceLive));
+  })().pipe(Effect.provide(WorkspaceServiceLive));
 
 export const loadWorkspaces = (): Effect.Effect<void, AppError, never> =>
-  Effect.gen(function* () {
+  Effect.fn("loadWorkspaces")(function* () {
     const svc = yield* WorkspaceService;
     const result = yield* svc.list();
     setStore("workspaces", result);
     setWorkspacesSignal(Object.values(store.workspaces));
-  }).pipe(Effect.provide(WorkspaceServiceLive));
+  })().pipe(Effect.provide(WorkspaceServiceLive));
 
 export const addWorkspace = (): Effect.Effect<Workspace | null, AppError, never> =>
-  Effect.gen(function* () {
+  Effect.fn("addWorkspace")(function* () {
     const rootPath = yield* pickWorkspacePath();
     if (rootPath === null) return null;
     const label = deriveLabelFromPath(rootPath);
@@ -459,22 +459,22 @@ export const addWorkspace = (): Effect.Effect<Workspace | null, AppError, never>
     setWorkspacesSignal(Object.values(store.workspaces));
     setSelectedWorkspaceIdSignal(result.id);
     return result;
-  }).pipe(Effect.provide(WorkspaceServiceLive));
+  })().pipe(Effect.provide(WorkspaceServiceLive));
 
 export const removeWorkspace = (id: string): Effect.Effect<void, AppError, never> =>
-  Effect.gen(function* () {
+  Effect.fn("removeWorkspace")(function* () {
     const svc = yield* WorkspaceService;
     yield* svc.remove(id);
     // CASCADE deletes conversations with this workspace_id in SQLite
     setStore("workspaces", (ws) => ws.filter((w) => w.id !== id));
     setWorkspacesSignal(Object.values(store.workspaces));
     if (selectedWorkspaceId() === id) setSelectedWorkspaceIdSignal(null);
-  }).pipe(Effect.provide(WorkspaceServiceLive));
+  })().pipe(Effect.provide(WorkspaceServiceLive));
 
 export const renameWorkspace = (id: string, label: string): Effect.Effect<void, AppError, never> =>
-  Effect.gen(function* () {
+  Effect.fn("renameWorkspace")(function* () {
     const svc = yield* WorkspaceService;
     yield* svc.rename(id, label);
     setStore("workspaces", (ws) => ws.map((w) => (w.id === id ? { ...w, label } : w)));
     setWorkspacesSignal(Object.values(store.workspaces));
-  }).pipe(Effect.provide(WorkspaceServiceLive));
+  })().pipe(Effect.provide(WorkspaceServiceLive));
