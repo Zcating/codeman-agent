@@ -24,16 +24,20 @@
 
 import { createStore } from "solid-js/store";
 import { Effect } from "effect";
-import type { Settings, Provider, ModelMeta, AppError } from "../lib/types";
-import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import type { Settings, Provider, ModelMeta, AppError, Workspace } from "../lib/types";
+import { logger } from "../lib/logger";
+// V3: route IPC through the V3 canonical (window.codeman dispatch) instead of
+// the V2 @tauri-apps/api/core which reads window.__TAURI_INTERNALS__ (missing
+// in V3 Electron).
+import { invoke as ipcInvoke } from "../lib/ipc";
 import {
   ProviderService,
   ProviderServiceLive,
-  WorkspaceService,
-  WorkspaceServiceLive,
   SettingsService,
   SettingsServiceLive,
-} from "../lib/tauri";
+} from "../lib/ipc";
+import { WorkspaceService, WorkspaceServiceLive } from "../lib/workspace-service";
+// Note: settingsSaver import removed - was used by deprecated addWorkspace method
 
 // ─── Default Settings (ADR-0015) ──────────────────────────────────────
 const DEFAULT_MINIMAX_PROVIDER: Provider = {
@@ -83,7 +87,6 @@ export const defaultSettings: Settings = {
     user_can_edit: true,
   },
   conversations: { auto_archive_after_days: 30, max_history: 1000 },
-  workspaces: [],
   llm_providers: [],
 };
 
@@ -102,21 +105,25 @@ function toAppError(e: unknown): AppError {
   return { kind: "Unknown", message: e instanceof Error ? e.message : String(e) };
 }
 
-const flushEffect: Effect.Effect<void, AppError> = Effect.tryPromise({
-  try: async () => {
-    await tauriInvoke("update_settings", { newSettings: settings.value });
-  },
-  catch: toAppError,
-});
+// V3: ipcInvoke returns Effect.Effect<T, AppError> (not Promise) — use
+// Effect.gen with yield* instead of tryPromise + await.
+// V3 e2e: deep-clone settings.value via JSON round-trip — Solid createStore
+// returns a Proxy (and nested values are also Proxies); ipcRenderer.invoke
+// uses the structured clone algorithm which cannot serialize Proxies
+// ("An object could not be cloned"). Shallow spread `{ ...settings.value }`
+// is NOT enough because nested arrays/objects remain Proxies. JSON
+// round-trip produces a fully plain object tree that structured-clones.
+const flushEffect: Effect.Effect<void, AppError> = Effect.fn("flush")(function* () {
+  yield* ipcInvoke("update_settings", {
+    newSettings: JSON.parse(JSON.stringify(settings.value)),
+  });
+})();
 
-const refreshEffect: Effect.Effect<Settings, AppError> = Effect.tryPromise({
-  try: async () => {
-    const fresh = await tauriInvoke<Settings>("get_settings");
-    setSettings("value", fresh);
-    return fresh;
-  },
-  catch: toAppError,
-});
+const refreshEffect: Effect.Effect<Settings, AppError> = Effect.fn("refresh")(function* () {
+  const fresh = yield* ipcInvoke<Settings>("get_settings");
+  setSettings("value", fresh);
+  return fresh;
+})();
 
 /**
  * V1.8+ ADR-0016 D1 + D2: 拉 models 列表 + 写 state + 强制执行 Default Model Invariant。
@@ -127,7 +134,7 @@ const refreshEffect: Effect.Effect<Settings, AppError> = Effect.tryPromise({
  *  已经在数组里 → 不动
  */
 const refreshProviderModelsEffect = (id: string): Effect.Effect<ModelMeta[], AppError> =>
-  Effect.gen(function* () {
+  Effect.fn("refreshProviderModels")(function* () {
     const svc = yield* ProviderService;
     const models = yield* svc.fetchModels(id);
     setSettings("value", (prev) => {
@@ -146,37 +153,32 @@ const refreshProviderModelsEffect = (id: string): Effect.Effect<ModelMeta[], App
       return { ...prev, providers };
     });
     return models;
-  })
-    .pipe(Effect.provide(ProviderServiceLive))
-    .pipe(Effect.mapError((e: unknown) => toAppError(e)));
+  })().pipe(Effect.provide(ProviderServiceLive)).pipe(Effect.mapError((e: unknown) => toAppError(e)));
 
 /** V1.8+ ADR-0016 D4: 弹 OS folder picker，返回选中路径或 null。 */
-const pickWorkspacePathEffect = Effect.gen(function* () {
+const pickWorkspacePathEffect = Effect.fn("pickWorkspacePath")(function* () {
   const svc = yield* WorkspaceService;
   return yield* svc.pickPath();
-})
-  .pipe(Effect.provide(WorkspaceServiceLive))
-  .pipe(Effect.provide(SettingsServiceLive))
-  .pipe(Effect.mapError((e: unknown) => toAppError(e)));
+})().pipe(Effect.provide(WorkspaceServiceLive)).pipe(Effect.mapError((e: unknown) => toAppError(e)));
 
 /** V1.8+ ADR-0016 D4: 从 providers[] 移除指定记录 + 触发后端 delete IPC (V0 占位)。 */
 const deleteProviderEffect = (id: string): Effect.Effect<void, AppError> =>
-  Effect.gen(function* () {
+  Effect.fn("deleteProvider")(function* () {
     // 1. client-side state mutation (实际删除)
     const providers = (settings.value.providers ?? []).filter((p) => p.id !== id);
     setSettings("value", (prev) => ({ ...prev, providers }));
     // 2. 后端 IPC (V0 占位, 失败不阻塞 — Rust 端无此命令但前端调用不 throw)
     const svc = yield* ProviderService;
     yield* svc.delete(id);
-  })
+  })()
     .pipe(Effect.provide(ProviderServiceLive))
     .pipe(Effect.mapError((e: unknown) => toAppError(e)));
 
 /** V1.8+ ADR-0016 D4 + D5: 清 SQLite conversation 表。 */
-const clearAllHistoryEffect: Effect.Effect<void, AppError> = Effect.gen(function* () {
+const clearAllHistoryEffect: Effect.Effect<void, AppError> = Effect.fn("clearAllHistory")(function* () {
   const svc = yield* SettingsService;
   yield* svc.clearAllHistory();
-})
+})()
   .pipe(Effect.provide(SettingsServiceLive))
   .pipe(Effect.mapError((e: unknown) => toAppError(e)));
 
@@ -229,6 +231,18 @@ export const appStore = {
   },
 
   /**
+   * @deprecated D8-W: Workspaces are now managed by WorkspaceService (Rust backend).
+   * This method is a stub - actual workspace creation goes through WorkspaceService.add().
+   * This method is kept for backward compatibility and will be removed in a future wave.
+   */
+  addWorkspace(_rootPath: string): Workspace | null {
+    // D8-W: Workspaces are now managed by Rust backend via WorkspaceService
+    // The UI should use WorkspaceService.pickPath() + WorkspaceService.add() instead
+    logger.warn("appStore.addWorkspace is deprecated - use WorkspaceService instead");
+    return null;
+  },
+
+  /**
    * V1.8+ ADR-0016 D4: 从 providers[] 移除 + 后端 delete IPC。
    * 组件用 `Effect.runPromiseExit(appStore.deleteProvider(id))` + Exit.match。
    */
@@ -242,6 +256,33 @@ export const appStore = {
    */
   clearAllHistory(): Effect.Effect<void, AppError> {
     return clearAllHistoryEffect;
+  },
+
+  /**
+   * @deprecated D8-W: last_used_workspace_id is removed from Settings.
+   * Workspace selection is now transient (in-memory only) in the chat domain.
+   */
+  setLastUsedWorkspaceId(_id: string | null): void {
+    // D8-W: last_used_workspace_id removed - workspace selection is now in-memory only
+  },
+
+  /**
+   * @deprecated D8-W: last_used_workspace_id is removed from Settings.
+   * Always returns null - workspace selection is now transient.
+   */
+  getLastUsedWorkspaceId(): string | null {
+    // D8-W: last_used_workspace_id removed
+    return null;
+  },
+
+  /**
+   * @deprecated D8-W: Workspaces are now managed by Rust backend.
+   * This method always returns null - workspace selection is now done via WorkspaceService.list().
+   */
+  selectedWorkspaceId(): string | null {
+    // D8-W: Workspaces are now managed by Rust backend via WorkspaceService
+    // Home should use WorkspaceService.list() and manage selection in-memory
+    return null;
   },
 };
 

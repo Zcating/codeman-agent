@@ -10,32 +10,28 @@
 //!
 //! 我们用假 key — 只测写入路径，不测真实 LLM 网络。
 
-import { test, expect } from "@playwright/test";
-import { assert, disposeTauriPage, getTauriPage, invoke } from "./helpers";
+import { test, expect, assert, invoke } from "./fixtures";
 import type { Settings } from "../src/shared/lib/types";
 
 const FAKE_KEY = "sk-e2e-fake-key-not-real-do-not-use-12345";
 
 test.describe("02 — 设置 LLM API key", () => {
-  test.beforeAll(async () => {
+  test.beforeAll(async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
     // 重置 settings 到默认状态(enabled=true, api_key="")。
     // 之前 test run 可能把 enabled 改成 false 或留下 FAKE_KEY,
     // 跨 test 共享 Rust 状态导致污染。
-    const defaults = await invoke<Settings>("get_settings");
+    const defaults = await invoke<Settings>(page, "get_settings");
     const reset = {
       ...defaults,
       providers: (defaults.providers ?? []).map((p) => ({ ...p, enabled: true, api_key: "" })),
       default_llm_provider_id: "minimax",
     };
-    await invoke("update_settings", { newSettings: reset });
+    await invoke(page, "update_settings", { newSettings: reset });
   });
 
-  test.afterAll(async () => {
-    await disposeTauriPage();
-  });
-
-  test("设置、持久化并重新加载 — key 被写入但永不反射", async () => {
-    const page = await getTauriPage();
+  test("设置、持久化并重新加载 — key 被写入但永不反射", async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
 
     // 0. 显式 navigate 到 / — 防止 disposeTauriPage 重新连 CDP 后 chat 路由
     //    还没 mount 时,getByRole("link", { name: /设置/i }) 拿不到 footer link。
@@ -71,6 +67,7 @@ test.describe("02 — 设置 LLM API key", () => {
     // 5. 通过 IPC `get_settings` 验证 key 实际在磁盘上。
     //    V1.5+ 使用 unified providers 数组；第一个 provider id 是 "minimax"。
     const settings = await invoke<{ providers?: Array<{ id: string; api_key: string }> }>(
+      page,
       "get_settings",
     );
     const minimaxProvider = settings.providers?.find((p) => p.id === "minimax");

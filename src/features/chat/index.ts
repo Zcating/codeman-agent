@@ -4,7 +4,6 @@
 //! 都可从这单一入口点访问。内部实现细节（如 Effect Context tags）**不**导出。
 
 export { ChatView } from "./components/chat-view";
-export { Sidebar } from "./components/sidebar";
 export { MessageBubble } from "./components/message-bubble";
 export { ToolCallCard } from "./components/tool-call-card";
 
@@ -16,6 +15,6 @@ export {
   type RunOptions,
 } from "./lib/runtime";
 
-export * as chatStore from "./stores/conversations.store";
+export * as chatStore from "./stores/chat.store";
 
 export type { Message, Conversation, Role, ToolCall, ToolResult } from "../../shared/lib/types";

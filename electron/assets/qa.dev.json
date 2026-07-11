@@ -1,0 +1,118 @@
+[
+  {
+    "question": "hello",
+    "turns": [
+      {
+        "text": "Hi! I'm a mock LLM. Ask me to read a file or list files."
+      }
+    ]
+  },
+  {
+    "question": "read",
+    "turns": [
+      {
+        "text": "(mock) I would call read_file on README.md here."
+      }
+    ]
+  },
+  {
+    "question": "list",
+    "turns": [
+      {
+        "text": "Here are 3 mock files: foo.ts, bar.ts, baz.ts"
+      }
+    ]
+  },
+  {
+    "question": "ping",
+    "turns": [
+      {
+        "text": "pong"
+      }
+    ]
+  },
+  {
+    "question": "think",
+    "turns": [
+      {
+        "text": "",
+        "thinking": "The user typed 'think'. Let me demonstrate the thinking block — this content is sent as a single thinking_delta + signature_delta pair, not per-character streamed. The chat UI should render this as a collapsible 'thinking' section."
+      }
+    ]
+  },
+  {
+    "question": "tool",
+    "turns": [
+      {
+        "text": "Reading the file now.",
+        "toolUses": [
+          {
+            "name": "read_file",
+            "input": {
+              "path": "README.md"
+            }
+          }
+        ],
+        "done": true
+      }
+    ]
+  },
+  {
+    "question": "three-blocks",
+    "turns": [
+      {
+        "text": "Let me search for TypeScript files.",
+        "thinking": "The user wants a file search. I'll use search_files with *.ts pattern. This demonstrates a full thinking + text + tool_use flow.",
+        "toolUses": [
+          {
+            "name": "search_files",
+            "input": {
+              "pattern": "*.ts"
+            }
+          }
+        ],
+        "done": true
+      }
+    ]
+  },
+  {
+    "question": "summarize",
+    "turns": [
+      {
+        "text": "Reading the file first.",
+        "toolUses": [
+          {
+            "name": "read_file",
+            "input": {
+              "path": "package.json"
+            }
+          }
+        ]
+      },
+      {
+        "text": "Searching for TypeScript files.",
+        "toolUses": [
+          {
+            "name": "search_files",
+            "input": {
+              "pattern": "*.ts"
+            }
+          }
+        ]
+      },
+      {
+        "thinking": "I have read package.json and listed the TypeScript files. Time to summarize.",
+        "text": "Summary complete: 1 file read, all TypeScript sources catalogued."
+      }
+    ]
+  },
+  {
+    "question": "*",
+    "turns": [
+      {
+        "text": "(mock) I don't know how to answer that. Try asking: hello, read, list, ping, think, tool, three-blocks"
+      }
+    ],
+    "default": true
+  }
+]

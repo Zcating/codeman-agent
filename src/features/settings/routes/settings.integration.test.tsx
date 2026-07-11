@@ -7,9 +7,25 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, screen, waitFor } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
+
+// Mock createProviderFormDialog — settings.tsx calls this imperative function.
+// Replaces v1.x's controlled AddProviderDialog Component import.
+// Migration: AddProviderDialog (受控 Component) → createProviderFormDialog() (命令式 via Dialog.show<Provider>)
+// Settings page calls createProviderFormDialog() — this mock intercepts so tests can assert wiring without Portal mount.
+// Tests control the resolved Provider or null via mockResolvedValue.
+vi.mock("../components/add-provider-dialog", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../components/add-provider-dialog")>();
+  return { ...actual, createProviderFormDialog: vi.fn(() => Promise.resolve(null)) };
+});
+
+// Static import mock function — must be after vi.mock so hoisting doesn't break
+import { createProviderFormDialog } from "../components/add-provider-dialog";
 import { SettingsPage } from "./settings";
-import { mockState, SettingsV15 } from "../../../__mocks__/@tauri-apps/api/core";
+import { mockState, SettingsV15 } from "../../../__mocks__/ipc-mock";
 import type { Provider } from "../../../shared/lib/types";
+
+// Typed reference to the mock for per-test .mockResolvedValue calls
+const mockFormDialog = createProviderFormDialog as ReturnType<typeof vi.fn>;
 
 // Mock solid-js/store — SettingsPage 导入 appStore, appStore 用 createStore。
 // 见 settings.test.tsx 同位置注释:不全局注册,本文件内联 28 行 mock 块。
@@ -140,18 +156,18 @@ describe("SettingsRoute integration — provider UX", () => {
     expect(screen.getByDisplayValue("MiniMax-M2.5-highspeed")).toBeInTheDocument();
   });
 
-  // ── Test 2: Click 'Add provider' shows placeholder alert ──
-  it("Click 'Add provider' shows future-work alert", async () => {
+  // ── Test 2: Click 'Add provider' calls createProviderFormDialog ──
+  it("Click 'Add provider' calls createProviderFormDialog", async () => {
+    mockFormDialog.mockResolvedValueOnce(null); // user closes dialog
     const user = userEvent.setup();
-    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
-
     render(() => <SettingsPage />);
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     const addBtn = screen.getByRole("button", { name: /add provider/i });
     await user.click(addBtn);
 
-    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("future work"));
+    // Dialog function was called (no DOM dialog under mock)
+    expect(mockFormDialog).toHaveBeenCalledTimes(1);
     // Provider still present (not added)
     expect(screen.getByText("MiniMax")).toBeInTheDocument();
   });
@@ -241,9 +257,55 @@ describe("SettingsRoute integration — provider UX", () => {
 
     fetchSpy.mockRestore();
   });
-});
 
-// ── SettingsRoute integration — tab switching & handlers ──
+  // ── S4: createProviderFormDialog wiring — Provider → appStore.set + scheduleSave ──
+  it("createProviderFormDialog resolves with Provider → appStore.set + settingsSaver.scheduleSave", async () => {
+    const newProvider: Provider = {
+      id: "provider-test01",
+      label: "Test Provider",
+      enabled: true,
+      api_key: "sk-test",
+      llm: {
+        default_model: "test-model",
+        base_url: "https://test.example.com",
+        api_type: "anthropic-messages",
+        models: [{ id: "test-model", label: "Test Model", deprecated: false, thinking: false }],
+        models_endpoint: "",
+      },
+    };
+    mockFormDialog.mockResolvedValueOnce(newProvider);
+
+    // Spy on appStore.set + settingsSaver.scheduleSave
+    const setSpy = vi.spyOn(appStore, "set");
+    const { settingsSaver } = await import("../lib/settings-saver");
+    const saveSpy = vi.spyOn(settingsSaver, "scheduleSave").mockImplementation(() => {});
+
+    const user = userEvent.setup();
+    render(() => <SettingsPage />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    await user.click(screen.getByRole("button", { name: /add provider/i }));
+
+    // createProviderFormDialog was called
+    expect(mockFormDialog).toHaveBeenCalledTimes(1);
+
+    // Drain microtasks so the async handler proceeds
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // appStore.set called with patch containing the new provider
+    expect(setSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        providers: expect.arrayContaining([expect.objectContaining({ id: "provider-test01" })]),
+      }),
+    );
+
+    // settingsSaver.scheduleSave called as well
+    expect(saveSpy).toHaveBeenCalled();
+
+    setSpy.mockRestore();
+    saveSpy.mockRestore();
+  });
+});
 
 describe("SettingsRoute integration — tab switching & handlers", () => {
   beforeEach(async () => {
@@ -336,7 +398,8 @@ describe("SettingsRoute integration — tab switching & handlers", () => {
 
     expect(screen.getByText(/Delete all conversations\? This cannot be undone\./i)).toBeInTheDocument();
     expect(screen.getByText(/Yes, delete all/i)).toBeInTheDocument();
-    expect(screen.getByText(/Cancel/i)).toBeInTheDocument();
+    // Use getAllByText since dialog from another flow may also render a Cancel button in DOM
+    expect(screen.getAllByText(/Cancel/i).length).toBeGreaterThanOrEqual(1);
   });
 
   it("confirm 状态点 Cancel 回到默认", async () => {
@@ -350,7 +413,7 @@ describe("SettingsRoute integration — tab switching & handlers", () => {
     await user.click(screen.getByText(/Clear all history/i));
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    await user.click(screen.getByText(/Cancel/i));
+    await user.click(screen.getAllByText(/Cancel/i)[0]);
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     // Back to initial state: Clear button visible again
@@ -423,91 +486,14 @@ describe("SettingsRoute integration — tab switching & handlers", () => {
     flushSpy.mockRestore();
   });
 
-  it("点击 'Add provider' 触发 alert 文案含 'future work'", async () => {
+  it("点击 'Add provider' 调用 createProviderFormDialog", async () => {
+    mockFormDialog.mockResolvedValueOnce(null);
     const user = userEvent.setup();
-    const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
-
     render(() => <SettingsPage />);
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     await user.click(screen.getByRole("button", { name: /add provider/i }));
 
-    expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining("future work"));
-
-    alertSpy.mockRestore();
-  });
-
-  it("onWorkspaceRemove confirm=true 删除 workspace", async () => {
-    const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-    mockState.settings.workspaces = [
-      { id: "ws-001", label: "Project A", root_path: "C:\\Projects\\A", enabled: true },
-    ];
-    const { Effect } = await import("effect");
-    await Effect.runPromise(appStore.refresh());
-    appStore.set({});
-
-    render(() => <SettingsPage />);
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    // Click Delete on the workspace card
-    await user.click(screen.getByText("Delete"));
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining("Delete this workspace?"));
-    // Workspace removed from appStore state
-    expect(appStore.state.value.workspaces!.length).toBe(0);
-
-    confirmSpy.mockRestore();
-  });
-
-  it("onWorkspaceRemove confirm=false 保留 workspace", async () => {
-    const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
-    mockState.settings.workspaces = [
-      { id: "ws-001", label: "Project A", root_path: "C:\\Projects\\A", enabled: true },
-    ];
-    const { Effect } = await import("effect");
-    await Effect.runPromise(appStore.refresh());
-    appStore.set({});
-
-    render(() => <SettingsPage />);
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    // Click Delete on the workspace card
-    await user.click(screen.getByText("Delete"));
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    expect(confirmSpy).toHaveBeenCalled();
-    // update_settings NOT called because confirm was false
-    const updateCalls = mockState.calls.filter((c) => c === "update_settings");
-    expect(updateCalls).toHaveLength(0);
-
-    confirmSpy.mockRestore();
-  });
-
-  it("点击 'Add workspace' 增加 1 个新 workspace", async () => {
-    const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
-    mockState.settings.workspaces = [
-      { id: "ws-001", label: "Project A", root_path: "C:\\Projects\\A", enabled: true },
-    ];
-    const { Effect } = await import("effect");
-    await Effect.runPromise(appStore.refresh());
-    appStore.set({});
-
-    render(() => <SettingsPage />);
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    const beforeCount = appStore.state.value.workspaces!.length;
-    await user.click(screen.getByText(/add workspace/i));
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    expect(appStore.state.value.workspaces!.length).toBe(beforeCount + 1);
-    expect(appStore.state.value.workspaces![appStore.state.value.workspaces!.length - 1].label).toBe(
-      "New Workspace",
-    );
-
-    confirmSpy.mockRestore();
+    expect(mockFormDialog).toHaveBeenCalledTimes(1);
   });
 });

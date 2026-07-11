@@ -9,7 +9,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Effect } from "effect";
-import { mockState } from "../../__mocks__/@tauri-apps/api/core";
+import { mockState } from "../../__mocks__/ipc-mock";
 
 // Mock solid-js/store（jsdom 没有 Solid reactive context）
 // 不在 vitest.setup.ts 全局注册:见 settings.test.tsx 同位置注释。
@@ -42,6 +42,17 @@ vi.mock("solid-js/store", () => {
   return { createStore: () => [storeProxy, setStore] };
 });
 
+// Mock settingsSaver BEFORE appStore import
+const { scheduleSaveMock } = vi.hoisted(() => ({
+  scheduleSaveMock: vi.fn(),
+}));
+
+vi.mock("../../features/settings/lib/settings-saver", () => ({
+  settingsSaver: {
+    scheduleSave: scheduleSaveMock,
+  },
+}));
+
 import { appStore, _resetAppStoreForTest } from "./app.store";
 
 describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
@@ -72,6 +83,7 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
   afterEach(() => {
     _resetAppStoreForTest();
     vi.clearAllMocks();
+    scheduleSaveMock.mockReset();
     mockState.rejected = undefined;
   });
 
@@ -458,4 +470,12 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     const providers = (appStore.state.value as any).providers;
     expect(providers.length).toBe(0); // client-side deletion already happened before IPC
   });
+
+  // ─── T1.6-T1.7: setLastUsedWorkspaceId / getLastUsedWorkspaceId / selectedWorkspaceId ───
+  // D8-W: These methods are deprecated — workspace management moved to chat.store.
+  // Tests removed accordingly.
+
+  // ─── J13-J18: addWorkspace ───
+  // D8-W: appStore.addWorkspace is deprecated — workspace CRUD moved to WorkspaceService/chat.store.
+  // Tests removed accordingly.
 });

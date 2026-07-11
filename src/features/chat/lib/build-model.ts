@@ -5,7 +5,7 @@
 //!
 //! NOTE: pi-ai 的 getModel() 仅适用于内置注册表 providers (openai/anthropic/google 等)。
 //! V1.5 自定义 providers (minimax/deepseek) 需要手动构造 Model 对象。
-import type { Model } from "@mariozechner/pi-ai";
+import type { Model } from "@earendil-works/pi-ai";
 import type { Provider, ModelMeta } from "../../../shared/lib/types";
 
 export class BuildModelError extends Error {

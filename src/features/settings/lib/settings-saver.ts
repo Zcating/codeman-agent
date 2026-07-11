@@ -3,7 +3,7 @@
 //! 架构约束：
 //! - debounce 逻辑从 app.store 移到这里（Settings feature 层）
 //! - 使用 es-toolkit 的 debounce, 500ms 闸
-//! - 模块级单例：所有 Settings UI 组件（ProviderCard / WorkspaceCard / SettingsPage）
+//! - 模块级单例：所有 Settings UI 组件（ProviderCard / SettingsPage）
 //!   共享同一个 debounce 实例。
 //!
 //! 用法：

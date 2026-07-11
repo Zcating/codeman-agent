@@ -9,22 +9,14 @@
 //!   - 05 是"user-input → bubble → DB"往返契约测试。
 //!   - 两者失败原因不同;两个都跑将回归隔离到正确层(UI 渲染 vs. 运行时 plumbing)。
 
-import { test, expect } from "@playwright/test";
-import {
-  assert,
-  cancelRunningAgent,
-  clearAllHistory,
-  clickNewConversationAndWait,
-  disposeTauriPage,
-  getTauriPage,
-  invoke,
-  resetChatState,
-  submitForm,
-} from "./helpers";
+import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, resetChatState, submitForm } from "./fixtures";
+import { useMockProvider } from "./mock-provider";
+import * as path from "node:path";
+import * as os from "node:os";
+import * as fs from "node:fs";
 
-// 有意独特的字符串,以便我们永远不会将其与其他测试数据行
-// 或默认 Sidebar "New conversation" 占位符混淆。
-const USER_INPUT = "测试气泡渲染为用户气泡";
+// Q→A question substring: 05b::user-bubble
+const USER_INPUT = "05b::user-bubble 测试气泡渲染为用户气泡";
 
 interface MessageRow {
   id: string;
@@ -40,28 +32,38 @@ interface MessageRow {
 }
 
 test.describe("05 — agent 页面输入 → 用户气泡", () => {
-  test.beforeEach(async () => {
-    // 彻底重置 chat 域 — cancelRunningAgent 单靠 click 取消 button 不一定
-    // 能清掉 running$ signal(取消 button handler 是 best-effort),硬 reload
-    // 才能保证下一个 spec 的 "新建会话" 之后 textarea 是 enabled 的。
-    await resetChatState();
-    // 清除会话使这个 spec 是密封的。我们还在下一次 "new" 点击时
-    //    重置 store 中的 active conversation 指针。
-    await clearAllHistory();
+  const e2eRoot = path.join(os.tmpdir(), "codeman-e2e-bubble-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8));
+
+  test.beforeAll(async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
+    fs.mkdirSync(e2eRoot, { recursive: true });
+
+    await page.goto("/");
+    await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
+
+    // D8-W: provision workspace so clickNewConversationAndWait works
+    await invoke(page, "add_workspace", {
+      label: "Bubble E2E Test Workspace",
+      rootPath: e2eRoot,
+    });
+
+    await useMockProvider(page);
   });
 
-  test.afterAll(async () => {
-    await disposeTauriPage();
+  test.beforeEach(async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
+    // 彻底重置 chat 域: cancel in-flight → 清 DB → navigate to /
+    await cancelRunningAgent(page);
+    await clearAllHistory(page);
+    await page.goto("/");
+    await assert.visible(page.locator('[data-testid="codex-input"]'), { timeout: 15_000 });
   });
 
-  test("输入内容产生可见用户气泡并持久化到 DB", async () => {
-    const page = await getTauriPage();
+  test("输入内容产生可见用户气泡并持久化到 DB", async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
 
-    // 诊断: 捕获所有 console + pageerror,这样 submit 时发生的 JS 错误
-    // 不会淹没在 log 里。run_in_background 的 cdp-driver 转发到 node 端
-    // 但没人听 — 我们用 console.log 显式输出。
+    // 诊断: 捕获所有 console + pageerror
     page.on("console", (msg) => {
-      // 过滤掉 vite hmr 噪声
       const t = msg.text;
       if (t.includes("[vite]") || t.includes("[HMR]") || t.includes("hmr update")) {
         return;
@@ -72,25 +74,22 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
       console.log(`[page pageerror] ${err.message}`);
     });
 
-    // 1. 到达聊天页面。Tauri dev URL 是 /;我们不需要
-    //    导航,但这样做使 spec 对未来默认路由变更更健壮。
-    await page.goto("/");
-    await assert.visible(page.locator('textarea[placeholder="发条消息\u2026"]'), {
-      timeout: 15_000,
-    });
+    // 1. 创建全新会话 via UI-driven flow. Q→A table handles responses:
+    // clickNewConversationAndWait title send → default entry (warning SSE).
+    const { convId } = await clickNewConversationAndWait(page);
 
-    // 2. 创建全新会话。ChatView 拒绝在没有 activeId 的情况下发送,
-    //    所以这是硬性前提,不是可选项。
-    const newConvButton = page.locator('button[title="新建会话"]');
-    await assert.visible(newConvButton);
-    await newConvButton.click();
-
-    // 3. 从 sidebar 的 active 列表项捕获 active conversation id —
-    //    我们需要它来进行 IPC `list_messages` 调用。
-    //    active 项是带 primary-500 背景的 <li>。
-    const activeItem = page.locator("aside li.bg-primary").first();
-    await assert.visible(activeItem, { timeout: 5_000 });
-    const activeTitle = await activeItem.locator("span").first().textContent();
+    // 3. Verify the conv element exists in the DOM (may be inside accordion).
+    //    `clickNewConversationAndWait` guarantees the conv was created and activated;
+    //    this just confirms the sidebar rendered with the new conv's data-conv-id.
+    await page.evaluate((id: string) => {
+      const deadline = Date.now() + 10_000;
+      while (Date.now() < deadline) {
+        if (document.querySelector(`[data-conv-id="${id}"]`)) return;
+      }
+      throw new Error(`[data-conv-id="${id}"] not found in DOM after 10s`);
+    }, convId);
+    const sidebarItem = page.locator(`[data-conv-id="${convId}"]`).first();
+    const activeTitle = await sidebarItem.locator("span").first().textContent();
     expect(activeTitle, "active conversation 应有一个标题").toBeTruthy();
 
     // 4. 输入到 textarea 并提交。我们先等待 textarea
@@ -159,33 +158,26 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
     //    指标坏了,即使 bubble 渲染了)。
     await assert.value(textarea, "");
 
-    // 7. 严格:同一消息持久化到 SQLite。我们通过 messages 列表
-    //    从 store 获取 active conversation 的第一条消息;
-    //    最稳定的方式是通过 IPC list_conversations 查找。
-    //
-    //    Title → ID 映射在 DOM 中没有直接暴露,
-    //    所以我们规避:用标题查找匹配 conversation。
-    const convos = await invoke<Array<{ id: string; title: string }>>("list_conversations", {
-      includeArchived: false,
-    });
-    const matching = convos.find((c) => c.title === (activeTitle ?? "").trim());
-    expect(matching, `找不到标题为 "${activeTitle}" 的会话`).toBeTruthy();
-    if (!matching) {
-      return;
-    } // 为 TS 缩小类型
-
-    const messages = await invoke<MessageRow[]>("list_messages", {
-      conversationId: matching.id,
+    // 7. 严格:同一消息持久化到 SQLite。直接用 clickNewConversationAndWait
+    //    返回的 convId 查询，跳过 DOM 依赖。
+    const messages = await invoke<MessageRow[]>(page, "list_messages", {
+      conversationId: convId,
     });
     const userRow = messages.find((m) => m.role === "user" && m.content === USER_INPUT);
     expect(
       userRow,
-      `content 为 "${USER_INPUT}" 的 user message 必须持久化在会话 ${matching.id} 中`,
+      `content 为 "${USER_INPUT}" 的 user message 必须持久化在会话 ${convId} 中`,
     ).toBeTruthy();
   });
 
-  test("多次发送产生多个气泡(无去重回归)", async () => {
-    const page = await getTauriPage();
+  test.afterAll(async () => {
+    try {
+      fs.rmSync(e2eRoot, { recursive: true, force: true });
+    } catch {}
+  });
+
+  test("多次发送产生多个气泡(无去重回归)", async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
     page.on("console", (msg) => {
       const t = msg.text;
       if (t.includes("[vite]") || t.includes("[HMR]")) {
@@ -197,16 +189,9 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
       console.log(`[page pageerror] ${err.message}`);
     });
     // 完整重置 — 前 spec LLM 完成/取消,DB 清空,页面 reload
-    await resetChatState();
+    await resetChatState(page);
 
-    // 验证 resetChatState 后 chat-view 真的 mounted 且 signals 干净
-    const postResetState = await page.evaluate(() => ({
-      taExists: !!document.querySelector('textarea[placeholder="发条消息\u2026"]'),
-      sidebarItems: document.querySelectorAll("aside li").length,
-      bubbles: document.querySelectorAll("div.justify-end").length,
-    }));
-    console.log(`[postReset] ${JSON.stringify(postResetState)}`);
-
+    // Q→A table: clickNewConversationAndWait title → default entry (warning SSE)
     await clickNewConversationAndWait(page);
 
     const textarea = page.locator('textarea[placeholder="发条消息\u2026"]');
@@ -215,14 +200,15 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
 
     // 顺序发送 3 条不同消息。每条必须产生自己的
     // bubble;如果 store 去重或覆盖,这个测试会捕获它。
-    const inputs = ["第一个气泡", "第二个气泡", "第三个气泡"];
+    // Q→A question substrings added to avoid first-wins collisions.
+    const inputs = ["05b::first-bubble 第一个气泡", "05b::second-bubble 第二个气泡", "05b::third-bubble 第三个气泡"];
 
     for (let i = 0; i < inputs.length; i++) {
       const text = inputs[i];
       // 前一次 submit 后 LLM 还在跑 → running=true → Send 被 取消 替换。
       // 先 取消 让 textarea 重新 enabled,Send 重新出现。
       if (i > 0) {
-        await cancelRunningAgent();
+        await cancelRunningAgent(page);
       }
       await textarea.fill(text);
       // 诊断: 检查当前 textarea 状态
@@ -269,7 +255,7 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
       }
     }
 
-    // 最后所有 3 个必须共存于列表中。
-    await assert.count(page.locator("div.justify-end > div.bg-primary.text-primary-foreground"), 3);
+    // 最后所有 4 个必须共存于列表中(1 个标题气泡 + 3 个发送气泡,无去重)。
+    await assert.count(page.locator("div.justify-end > div.bg-primary.text-primary-foreground"), 4);
   });
 });

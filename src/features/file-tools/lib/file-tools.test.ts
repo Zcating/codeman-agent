@@ -11,7 +11,7 @@ import {
   searchFilesTool,
   deleteFileTool,
 } from "./file-tools";
-import { mockState } from "../../../__mocks__/@tauri-apps/api/core";
+import { mockState } from "../../../__mocks__/ipc-mock";
 
 describe("readFileTool", () => {
   beforeEach(() => {

@@ -114,7 +114,12 @@ export function ProviderCard(props: ProviderCardProps) {
       {/* ─── Header: label + enabled toggle ─── */}
       <CardHeader class="flex flex-row items-center justify-between p-4 pb-3">
         <div class="flex flex-col gap-0.5">
-          <CardTitle class="text-base font-semibold">{props.provider.label}</CardTitle>
+          <CardTitle class="text-base font-semibold">
+            {props.provider.label}
+            <Show when={props.provider.llm.base_url.startsWith("http://127.0.0.1:")}>
+              <span data-testid="provider-dev-badge" class="ml-2 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">(dev)</span>
+            </Show>
+          </CardTitle>
           <CardDescription class="text-xs font-mono text-muted-foreground">
             {props.provider.id}
           </CardDescription>
@@ -191,7 +196,11 @@ export function ProviderCard(props: ProviderCardProps) {
                   p.id === updated.id ? updated : p,
                 );
                 appStore.set({ providers });
-                settingsSaver.scheduleSave();
+                // V3 e2e: flushNow immediately (bypass debounce) so the
+                // subsequent get_settings IPC in tests sees the new key.
+                // Production: footer Save button still does the debounced
+                // flow via scheduleSave.
+                void settingsSaver.flushNow().catch(() => {});
                 props.onUpdate(updated);
               }}
               placeholder="sk-…"

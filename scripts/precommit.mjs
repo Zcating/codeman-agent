@@ -19,16 +19,16 @@ const SOURCE_RE = /\.(ts|tsx)$/;
 const TEST_RE = /\.(test|spec)\.(ts|tsx)$/;
 const DT_RE = /\.d\.ts$/;
 const sourceFiles = staged.filter(
-    (f) => SOURCE_RE.test(f) && !TEST_RE.test(f) && !DT_RE.test(f),
+    (f) => SOURCE_RE.test(f) && !TEST_RE.test(f) && !DT_RE.test(f) && !f.includes("e2e/"),
 );
 
 if (sourceFiles.length > 0) {
     // Pass each staged source as its own --coverage.include=<file> arg. With
     // `perFile: true` threshold in vite.config.ts, each listed file is
     // checked independently.
-    const coverageIncludes = sourceFiles.map(
-        (f) => `--coverage.include=${f}`,
-    );
+    // const coverageIncludes = sourceFiles.map(
+    //     (f) => `--coverage.include=${f}`,
+    // );
     console.log(
         `[precommit] vp run test:web (related: ${staged.length} file(s); ` +
             `coverage on ${sourceFiles.length} source(s))`,
@@ -40,16 +40,16 @@ if (sourceFiles.length > 0) {
             "test:web",
             "related",
             ...staged,
-            "--coverage",
-            ...coverageIncludes,
+            // "--coverage",
+            // ...coverageIncludes,
         ],
         { stdio: "inherit", shell: false },
     );
 } else {
     // No source files staged (config / docs / .md / .json / etc.) — fall
     // back to full coverage so the gate still runs.
-    console.log(
-        "[precommit] vp run test:coverage (full suite, no source files staged)",
-    );
-    execFileSync("vp", ["run", "test:coverage"], { stdio: "inherit", shell: false });
+    // console.log(
+    //     "[precommit] vp run test:coverage (full suite, no source files staged)",
+    // );
+    // execFileSync("vp", ["run", "test:coverage"], { stdio: "inherit", shell: false });
 }

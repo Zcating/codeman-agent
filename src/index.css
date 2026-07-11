@@ -53,6 +53,16 @@
   --color-border: oklch(0.92 0.005 230);
   --color-input: oklch(0.92 0.005 230);
   --color-ring: oklch(0.685 0.169 230);
+
+  /* Sidebar (V2.1, shadcn-style) — used by ui/sidebar primitive + internal/codeman-sidebar */
+  --color-sidebar:                    oklch(0.985 0.003 230);
+  --color-sidebar-foreground:         oklch(0.18 0.008 230);
+  --color-sidebar-primary:            oklch(0.685 0.169 230);
+  --color-sidebar-primary-foreground:  oklch(0.985 0.003 230);
+  --color-sidebar-accent:              oklch(0.97 0.014 230);
+  --color-sidebar-accent-foreground:   oklch(0.18 0.008 230);
+  --color-sidebar-border:             oklch(0.92 0.005 230);
+  --color-sidebar-ring:               oklch(0.685 0.169 230);
 }
 
 @layer base {
@@ -89,6 +99,14 @@
     --color-border: oklch(0.28 0.008 230);
     --color-input: oklch(0.28 0.008 230);
     --color-ring: oklch(0.685 0.169 230);
+    --color-sidebar:                    oklch(0.22 0.008 230);
+    --color-sidebar-foreground:         oklch(0.95 0.005 230);
+    --color-sidebar-primary:            oklch(0.685 0.169 230);
+    --color-sidebar-primary-foreground: oklch(0.18 0.008 230);
+    --color-sidebar-accent:             oklch(0.27 0.1 230);
+    --color-sidebar-accent-foreground:  oklch(0.95 0.005 230);
+    --color-sidebar-border:             oklch(0.28 0.008 230);
+    --color-sidebar-ring:               oklch(0.685 0.169 230);
   }
 
   body {

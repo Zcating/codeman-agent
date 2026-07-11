@@ -1,654 +1,612 @@
-//! AnthropicTransport — 自定义 AgentTransport。
+//! anthropic-stream — 自定义 streamFn 适配 pi-agent-core 0.80.3。
 //!
-//! 为什么不用 pi-agent 的 ProviderTransport:
-//!   ProviderTransport 走 pi-ai 的 anthropic provider → Anthropic SDK → 发 `x-api-key` header。
-//!   `x-api-key` 不在 `api.minimaxi.com` 的 CORS preflight whitelist 里,
-//!   webview fetch 报 `TypeError: Failed to fetch`,LLM 不可达。
-//!   Authorization header 在 whitelist 里,所以我们走这条路径。
+//! 替代之前的 AnthropicTransport 类。pi-agent-core 0.80.3 重构后,
+//! Agent 不再接受 AgentTransport (自己跑 agent loop),改为接受 streamFn
+//! (只负责单次 LLM 调用,agent loop / 工具执行 / abort 都由 Agent 内部处理)。
 //!
-//! 这里实现一个最小 Anthropic streaming 客户端:
-//!   - fetch + `Authorization: Bearer ${apiKey}` header (CORS OK)
-//!   - 读 SSE 流,parse 成 pi-ai 0.9.4 格式的 AgentEvent
+//! 这里实现 streamFn:把 pi-ai 的 Context (model + messages + tools)
+//! 转成 Anthropic /v1/messages SSE 请求,parse SSE 流,emit
+//! AssistantMessageEvent 事件。最后 push 一个 `done` event 终结 stream,
+//! Agent 从 `result()` 拿到 final AssistantMessage。
 //!
-//! pi-ai 版本漂移:transport 类型来自 pi-ai@0.9.4,本地 import 是 pi-ai@0.73.1;
-//! 两版本的 AssistantMessage / AgentEvent 字段不完全一致,所以用 `any` cast 桥接。
+//! 重要 CORS 行为:
+//!   ProviderTransport 走 pi-ai 的 anthropic provider → Anthropic SDK → 发
+//!   `x-api-key` header,在 `api.minimaxi.com` CORS preflight whitelist 之外,
+//!   webview fetch 报 TypeError。Authorization header 在 whitelist 里,
+//!   所以这里走 `Authorization: Bearer` 路径。
 
-import type { Message } from "@mariozechner/pi-ai";
-import type { AgentRunConfig } from "@mariozechner/pi-agent";
+import {
+    createAssistantMessageEventStream,
+    type AssistantMessage,
+    type AssistantMessageEvent,
+    type AssistantMessageEventStream,
+    type Context,
+    type Message,
+    type Model,
+    type SimpleStreamOptions,
+    type StopReason,
+    type TextContent,
+    type ThinkingContent,
+    type Tool,
+    type ToolCall,
+    type Usage,
+} from "@earendil-works/pi-ai";
+import type { StreamFn } from "@earendil-works/pi-agent-core";
 import { logger } from "../../../shared/lib/logger";
 
 // ─── SSE 行解析 ─────────────────────────────────────────────────────
 
 export function parseSseLine(line: string): { event?: string; data?: string } {
-  const trimmed = line.trim();
-  if (trimmed.length === 0) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) {
+        return {};
+    }
+    const colonIdx = trimmed.indexOf(":");
+    if (colonIdx === -1) {
+        return {};
+    }
+    const field = trimmed.slice(0, colonIdx);
+    const value = trimmed.slice(colonIdx + 1).replace(/^ /, "");
+    if (field === "event") {
+        return { event: value };
+    }
+    if (field === "data") {
+        return { data: value };
+    }
     return {};
-  }
-  const colonIdx = trimmed.indexOf(":");
-  if (colonIdx === -1) {
-    return {};
-  }
-  const field = trimmed.slice(0, colonIdx);
-  const value = trimmed.slice(colonIdx + 1).replace(/^ /, "");
-  if (field === "event") {
-    return { event: value };
-  }
-  if (field === "data") {
-    return { data: value };
-  }
-  return {};
 }
 
 // ─── Anthropic request body 构造 ─────────────────────────────────────
 
 interface AnthropicMessageParam {
-  role: "user" | "assistant";
-  content:
-    | string
-    | Array<
-        | { type: "text"; text: string }
-        | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
-        | {
-            type: "tool_result";
-            tool_use_id: string;
-            content: string;
-            is_error?: boolean;
-          }
-      >;
+    role: "user" | "assistant";
+    content:
+        | string
+        | Array<
+              | { type: "text"; text: string }
+              | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
+              | {
+                    type: "tool_result";
+                    tool_use_id: string;
+                    content: string;
+                    is_error?: boolean;
+                }
+          >;
 }
 
 interface AnthropicRequestBody {
-  model: string;
-  max_tokens: number;
-  stream: true;
-  system?: string;
-  messages: AnthropicMessageParam[];
-  tools?: Array<{
-    name: string;
-    description: string;
-    input_schema: Record<string, unknown>;
-  }>;
-}
-
-export function buildRequestBody(
-  model: { id: string; maxTokens?: number },
-  systemPrompt: string,
-  messages: Message[],
-  tools: AgentRunConfig["tools"],
-): AnthropicRequestBody {
-  const anthropicMessages: AnthropicMessageParam[] = [];
-  for (const m of messages) {
-    if (m.role === "user") {
-      anthropicMessages.push({
-        role: "user",
-        content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-      });
-    } else if (m.role === "assistant") {
-      const blocks: Array<
-        | { type: "text"; text: string }
-        | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
-      > = [];
-      const assistantMsg = m as unknown as {
-        content: Array<{
-          type: string;
-          text?: string;
-          id?: string;
-          name?: string;
-          arguments?: Record<string, unknown>;
-        }>;
-      };
-      for (const block of assistantMsg.content) {
-        if (block.type === "text") {
-          blocks.push({ type: "text", text: block.text ?? "" });
-        } else if (block.type === "toolCall") {
-          blocks.push({
-            type: "tool_use",
-            id: block.id ?? "",
-            name: block.name ?? "",
-            input: (block.arguments ?? {}) as Record<string, unknown>,
-          });
-        }
-      }
-      if (blocks.length > 0) {
-        anthropicMessages.push({ role: "assistant", content: blocks });
-      }
-    } else if (m.role === "toolResult") {
-      const trMsg = m as unknown as {
-        toolCallId: string;
-        isError?: boolean;
-        content: Array<{ type: string; text?: string }>;
-      };
-      const content = trMsg.content.map((b) => (b.type === "text" ? b.text : "")).join("");
-      anthropicMessages.push({
-        role: "user",
-        content: [
-          {
-            type: "tool_result" as const,
-            tool_use_id: trMsg.toolCallId,
-            content,
-            is_error: trMsg.isError,
-          },
-        ],
-      });
-    }
-  }
-
-  const anthropicTools = tools?.map((t) => ({
-    name: t.name,
-    description: t.description,
-    input_schema: (t.parameters ?? {}) as Record<string, unknown>,
-  }));
-
-  return {
-    model: model.id,
-    max_tokens: model.maxTokens ?? 8192,
-    stream: true,
-    system: systemPrompt,
-    messages: anthropicMessages,
-    ...(anthropicTools && anthropicTools.length > 0 ? { tools: anthropicTools } : {}),
-  };
-}
-
-// // ─── Agent loop hard limit (prevent LLM infinite loop)
-const MAX_TURNS = 16;
-
-// ─── Transport 实现 ─────────────────────────────────────────────────
-
-export interface AnthropicTransportOptions {
-  getApiKey: () => Promise<string | undefined>;
-  /** 注入的 abort signal,优先级高于 pi-agent 内部 signal。ADR-0019 D2 cancel 用 AbortController。 */
-  signal?: AbortSignal;
-}
-
-interface AssistantMsgLike {
-  content: Array<
-    | { type: "text"; text: string }
-    | { type: "thinking"; thinking: string }
-    | {
-        type: "toolCall";
-        id: string;
+    model: string;
+    max_tokens: number;
+    stream: true;
+    system?: string;
+    messages: AnthropicMessageParam[];
+    tools?: Array<{
         name: string;
-        arguments: Record<string, unknown>;
-      }
-  >;
-  stopReason: string | null;
-  model: string;
+        description: string;
+        input_schema: Record<string, unknown>;
+    }>;
 }
 
-/**
- * 适配 anthropic-messages 协议的 AgentTransport。
- * 直接用 fetch + `Authorization: Bearer` 调 LLM,避开 CORS preflight 问题。
- *
- * pi-ai 版本漂移:本类不直接 implements AgentTransport(基类要求 pi-ai@0.9.4 的
- * Message[] 而本地 import 是 pi-ai@0.73.1,版本不兼容)。
- * runtime.ts 把实例 `as unknown as AgentTransport` 后传给 pi-agent.Agent,
- * 行为正确因为 runtime.ts 的 event handler 只读 evt.message.content[] 这种
- * 与版本无关的字段。
- */
-export class AnthropicTransport {
-  constructor(private readonly options: AnthropicTransportOptions) {}
-  private async *streamTurn(
-    apiKey: string,
-    baseUrl: string,
+export function buildAnthropicRequestBody(
     model: { id: string; maxTokens?: number },
     systemPrompt: string,
     messages: Message[],
-    tools: AgentRunConfig[`tools`],
-    signal: AbortSignal | undefined,
-  ): AsyncGenerator<unknown, AssistantMsgLike, unknown> {
-    const body = buildRequestBody(model, systemPrompt, messages, tools);
-    const url = `${baseUrl.replace(/\/$/, "")}/v1/messages`;
+    tools: Tool[] | undefined,
+): AnthropicRequestBody {
+    const anthropicMessages: AnthropicMessageParam[] = [];
+    for (const m of messages) {
+        if (m.role === "user") {
+            const content = m.content;
+            if (typeof content === "string") {
+                anthropicMessages.push({ role: "user", content });
+            } else {
+                // 把 TextContent[] 拼回纯文本(Anthropic API 也接受 array
+                // 形式,但 codeman-agent 的 user message 通常是纯文本)
+                const text = content
+                    .filter((b): b is TextContent => b.type === "text")
+                    .map((b) => b.text)
+                    .join("");
+                anthropicMessages.push({ role: "user", content: text });
+            }
+        } else if (m.role === "assistant") {
+            const blocks: Array<
+                | { type: "text"; text: string }
+                | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
+            > = [];
+            for (const block of m.content) {
+                if (block.type === "text") {
+                    blocks.push({ type: "text", text: block.text });
+                } else if (block.type === "toolCall") {
+                    blocks.push({
+                        type: "tool_use",
+                        id: block.id,
+                        name: block.name,
+                        input: block.arguments as Record<string, unknown>,
+                    });
+                }
+                // thinking blocks 不回传给 Anthropic(provider 自身不消费)
+            }
+            if (blocks.length > 0) {
+                anthropicMessages.push({ role: "assistant", content: blocks });
+            }
+        } else if (m.role === "toolResult") {
+            const trMsg = m;
+            const textContent = trMsg.content
+                .filter((b): b is TextContent => b.type === "text")
+                .map((b) => b.text)
+                .join("");
+            anthropicMessages.push({
+                role: "user",
+                content: [
+                    {
+                        type: "tool_result" as const,
+                        tool_use_id: trMsg.toolCallId,
+                        content: textContent,
+                        is_error: trMsg.isError,
+                    },
+                ],
+            });
+        }
+    }
 
-    const response = await fetch(url, {
-      method: "POST",
-      // 不发送 `anthropic-version` header — 不在 api.minimaxi.com 的 CORS
-      // preflight whitelist 里,会导致浏览器直接 block 请求。Anthropic SDK
-      // 默认带这个 header(2.x 版本要求),但 MiniMax 兼容端点不强校验,
-      // 省略反而能 work。`accept` 也不带(streaming SSE 一样能读)。
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-      signal,
+    const anthropicTools = tools?.map((t) => ({
+        name: t.name,
+        description: t.description,
+        input_schema: (t.parameters ?? {}) as Record<string, unknown>,
+    }));
+
+    return {
+        model: model.id,
+        max_tokens: model.maxTokens ?? 8192,
+        stream: true,
+        system: systemPrompt,
+        messages: anthropicMessages,
+        ...(anthropicTools && anthropicTools.length > 0 ? { tools: anthropicTools } : {}),
+    };
+}
+
+// ─── streamFn 实现 ─────────────────────────────────────────────────
+
+/**
+ * pi-agent-core 0.80.3 的 streamFn:把 pi-ai Context 转成 Anthropic SSE,
+ * emit AssistantMessageEvent。Agent 内部处理 abort / agent loop /
+ * 工具执行。
+ */
+export const anthropicStream: StreamFn = (model, context, options) => {
+    const stream = createAssistantMessageEventStream();
+    void runAnthropicStream(model, context, options ?? {}, stream);
+    return stream;
+};
+
+async function runAnthropicStream(
+    model: Model<string>,
+    context: Context,
+    options: SimpleStreamOptions,
+    stream: AssistantMessageEventStream,
+): Promise<void> {
+    const signal = options.signal;
+    const apiKey = options.apiKey;
+    if (!apiKey) {
+        logger.error("[anthropicStream] ! 缺 apiKey", { providerModel: model.id });
+        stream.push(makeErrorEvent(model, "anthropicStream: 缺 apiKey"));
+        return;
+    }
+
+    const body = buildAnthropicRequestBody(
+        { id: model.id, maxTokens: model.maxTokens },
+        context.systemPrompt ?? "",
+        context.messages,
+        context.tools,
+    );
+
+    const baseUrl =
+        (model.baseUrl ?? "").replace(/\/$/, "") || "https://api.minimaxi.com/anthropic";
+    const url = `${baseUrl}/v1/messages`;
+
+    logger.info("[anthropicStream] >> POST", {
+        url,
+        model: model.id,
+        msgCount: context.messages.length,
+        toolCount: context.tools?.length ?? 0,
+        maxTokens: body.max_tokens,
     });
+
+    let response: Response;
+    try {
+        response = await fetch(url, {
+            method: "POST",
+            // 不发送 `anthropic-version` header — 不在 api.minimaxi.com 的 CORS
+            // preflight whitelist 里,会导致浏览器直接 block 请求。Anthropic SDK
+            // 默认带这个 header(2.x 版本要求),但 MiniMax 兼容端点不强校验,
+            // 省略反而能 work。`accept` 也不带(streaming SSE 一样能读)。
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify(body),
+            signal,
+        });
+    } catch (e) {
+        handleFetchError(e, model, stream);
+        return;
+    }
 
     if (!response.ok || !response.body) {
-      const errText = await response.text().catch(() => "<no body>");
-      throw new Error(`Anthropic API ${response.status}: ${errText.slice(0, 500)}`);
+        const errText = await response.text().catch(() => "<no body>");
+        logger.error("[anthropicStream] ! HTTP error", {
+            url,
+            status: response.status,
+            body: errText.slice(0, 500),
+        });
+        stream.push(
+            makeErrorEvent(model, `Anthropic API ${response.status}: ${errText.slice(0, 500)}`),
+        );
+        return;
     }
 
-    const assistantMsg: AssistantMsgLike = {
-      content: [],
-      stopReason: null,
-      model: model.id,
-    };
+    logger.info("[anthropicStream] << response", {
+        status: response.status,
+        contentType: response.headers?.get("content-type") ?? undefined,
+    });
 
-    const reader = response.body.getReader();
+    try {
+        const finalMessage = await parseSseStream(response.body, model, signal, stream);
+        // success — push done event to terminate stream
+        const reason: Extract<StopReason, "stop" | "length" | "toolUse"> =
+            finalMessage.stopReason === "length"
+                ? "length"
+                : finalMessage.stopReason === "toolUse"
+                  ? "toolUse"
+                  : "stop";
+        stream.push({ type: "done", reason, message: finalMessage });
+    } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") {
+            logger.warn("[anthropicStream] aborted");
+            stream.push({ type: "error", reason: "aborted", error: makeAbortedMessage(model) });
+        } else {
+            logger.error("[anthropicStream] ! stream parse failed", { err: String(e) });
+            stream.push(makeErrorEvent(model, e instanceof Error ? e.message : String(e)));
+        }
+    }
+}
+
+function handleFetchError(
+    e: unknown,
+    model: Model<string>,
+    stream: AssistantMessageEventStream,
+): void {
+    if (e instanceof DOMException && e.name === "AbortError") {
+        logger.warn("[anthropicStream] fetch aborted");
+        stream.push({ type: "error", reason: "aborted", error: makeAbortedMessage(model) });
+        return;
+    }
+    logger.error("[anthropicStream] ! fetch failed", { err: String(e) });
+    stream.push(makeErrorEvent(model, e instanceof Error ? e.message : String(e)));
+}
+
+function emptyUsage(): Usage {
+    return {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    };
+}
+
+function makeErrorMessage(model: Model<string>, message: string): AssistantMessage {
+    return {
+        role: "assistant",
+        content: [{ type: "text", text: message }],
+        api: model.api,
+        provider: model.provider,
+        model: model.id,
+        usage: emptyUsage(),
+        stopReason: "error",
+        errorMessage: message,
+        timestamp: Date.now(),
+    };
+}
+
+function makeAbortedMessage(model: Model<string>): AssistantMessage {
+    return {
+        role: "assistant",
+        content: [],
+        api: model.api,
+        provider: model.provider,
+        model: model.id,
+        usage: emptyUsage(),
+        stopReason: "aborted",
+        errorMessage: "Aborted",
+        timestamp: Date.now(),
+    };
+}
+
+function makeErrorEvent(model: Model<string>, message: string): AssistantMessageEvent {
+    return { type: "error", reason: "error", error: makeErrorMessage(model, message) };
+}
+
+// Map Anthropic stop_reason values to pi-ai StopReason
+function mapStopReason(anthropicReason: string | undefined): StopReason {
+    switch (anthropicReason) {
+        case "end_turn":
+        case "stop_sequence":
+            return "stop";
+        case "max_tokens":
+            return "length";
+        case "tool_use":
+            return "toolUse";
+        case "refusal":
+            return "error";
+        default:
+            return "stop";
+    }
+}
+
+// ─── SSE 流解析 + AssistantMessage 累积 ────────────────────────────
+
+async function parseSseStream(
+    body: ReadableStream<Uint8Array>,
+    model: Model<string>,
+    signal: AbortSignal | undefined,
+    stream: AssistantMessageEventStream,
+): Promise<AssistantMessage> {
+    const reader = body.getReader();
     const decoder = new TextDecoder("utf-8");
+
+    // Mutable partial state for the assistant message being built.
+    const content: Array<TextContent | ThinkingContent | ToolCall> = [];
+    let stopReason: StopReason = "stop";
+
     let buffer = "";
     let sseDataBuf = "";
+    let sseRawBody = ""; // accumulated across all reader.read() chunks — dump target
     let currentBlockType: "text" | "thinking" | "tool_use" | null = null;
     let pendingToolCallJson = "";
+    let pendingToolCallId = "";
+    let pendingToolCallName = "";
 
-    yield { type: "message_start", message: assistantMsg };
-
-    try {
-      while (true) {
-        // 显式检查 abort signal — pi-agent 0.9.0 的 `agent.abort()` 不能可靠地
-        // 终止 SSE 循环(在 AnthropicTransport 的 fetch signal + reader.read()
-        // 链路上),这里强制检查让 cancel 路径在 ~1 reader.read() 周期内退出,
-        // stream 终止后 chat-view run() 的 finally 块 setRunning(false) 才跑。
-        if (signal?.aborted) {
-          throw new DOMException("Aborted", "AbortError");
-        }
-        const { value, done } = await reader.read();
-        if (done) {
-          break;
-        }
-        buffer += decoder.decode(value, { stream: true });
-        let lineEnd: number;
-        while ((lineEnd = buffer.indexOf("\n")) !== -1) {
-          const line = buffer.slice(0, lineEnd);
-          buffer = buffer.slice(lineEnd + 1);
-          if (line.trim() === "") {
-            if (!sseDataBuf) {
-              continue;
-            }
-            let data: Record<string, unknown>;
-            try {
-              data = JSON.parse(sseDataBuf) as Record<string, unknown>;
-            } catch {
-              sseDataBuf = "";
-              continue;
-            }
-            sseDataBuf = "";
-            const type = data.type as string;
-
-            if (type === "content_block_start") {
-              const idx = data.index as number;
-              const block = data.content_block as {
-                type: string;
-                id?: string;
-                name?: string;
-              };
-              if (block.type === "text") {
-                currentBlockType = "text";
-                assistantMsg.content[idx] = { type: "text", text: "" };
-              } else if (block.type === "thinking") {
-                currentBlockType = "thinking";
-                assistantMsg.content[idx] = {
-                  type: "thinking",
-                  thinking: "",
-                };
-              } else if (block.type === "tool_use") {
-                currentBlockType = "tool_use";
-                pendingToolCallJson = "";
-                assistantMsg.content[idx] = {
-                  type: "toolCall",
-                  id: block.id ?? "",
-                  name: block.name ?? "",
-                  arguments: {},
-                };
-              }
-              yield { type: "message_update", message: assistantMsg };
-            } else if (type === "content_block_delta") {
-              const idx = data.index as number;
-              const delta = data.delta as {
-                type: string;
-                text?: string;
-                thinking?: string;
-                partial_json?: string;
-              };
-              if (delta.type === "text_delta" && delta.text) {
-                const block = assistantMsg.content[idx] as { type: "text"; text: string };
-                block.text += delta.text;
-                yield { type: "message_update", message: assistantMsg };
-              } else if (delta.type === "thinking_delta" && delta.thinking) {
-                const block = assistantMsg.content[idx] as {
-                  type: "thinking";
-                  thinking: string;
-                };
-                block.thinking += delta.thinking;
-                yield { type: "message_update", message: assistantMsg };
-              } else if (delta.type === "input_json_delta" && delta.partial_json) {
-                pendingToolCallJson += delta.partial_json;
-              }
-            } else if (type === "content_block_stop") {
-              const idx = data.index as number;
-              if (currentBlockType === "tool_use") {
-                let parsedArgs: Record<string, unknown> = {};
-                try {
-                  parsedArgs = JSON.parse(pendingToolCallJson) as Record<string, unknown>;
-                } catch {
-                  parsedArgs = {};
-                }
-                (
-                  assistantMsg.content[idx] as {
-                    arguments: Record<string, unknown>;
-                  }
-                ).arguments = parsedArgs;
-              }
-              currentBlockType = null;
-              yield { type: "message_update", message: assistantMsg };
-            } else if (type === "message_delta") {
-              const delta = data.delta as { stop_reason?: string };
-              assistantMsg.stopReason = (delta.stop_reason ?? null) as string | null;
-            } else if (type === "message_stop") {
-              yield { type: "message_end", message: assistantMsg };
-            }
-          } else {
-            const parsed = parseSseLine(line);
-            if (parsed.data !== undefined) {
-              sseDataBuf += parsed.data;
-            }
-          }
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-
-    return assistantMsg;
-  } /**
-   * Mock stream turn — for e2e tests only.
-   *
-   * Reads canned responses from globalThis.__MOCK_LLM_QUEUE__ (a queue).
-   * Each turn is either text, toolCalls, or both. The mock simulates
-   * SSE streaming by yielding content_block_start / delta / stop events
-   * with optional delays between chunks.
-   *
-   * Activated when baseUrl starts with `mock://`. The transport
-   * dispatches to this method instead of making a real HTTP call.
-   *
-   * Queue shape:
-   *   globalThis.__MOCK_LLM_QUEUE__ = [
-   *     { text: `Hello!` },
-   *     { toolCalls: [{ name: `read_file`, input: {...} }] },
-   *     { text: `Done.` },
-   *   ]
-   *
-   * If the queue is empty, returns a default `no mock configured`
-   * text response and warns the developer.
-   */
-  private async *mockStreamTurn(
-    model: { id: string; maxTokens?: number },
-    _systemPrompt: string,
-    _messages: Message[],
-    _tools: AgentRunConfig[`tools`],
-    signal: AbortSignal | undefined,
-  ): AsyncGenerator<unknown, AssistantMsgLike, unknown> {
-    const assistantMsg: AssistantMsgLike = {
-      content: [],
-      stopReason: null,
-      model: model.id,
-    };
-
-    const w = globalThis as unknown as {
-      __MOCK_LLM_QUEUE__?: Array<{
-        text?: string;
-        toolCalls?: Array<{ name: string; input: Record<string, unknown> }>;
-        delayMs?: number;
-      }>;
-    };
-    const queue = w.__MOCK_LLM_QUEUE__ ?? [];
-    const turn = queue.shift();
-
-    yield { type: `message_start`, message: assistantMsg };
-
-    if (!turn) {
-      logger.warn(
-        `[AnthropicTransport mock] queue empty; use __MOCK_LLM_ENQUEUE__ before sending.`,
-      );
-      assistantMsg.content.push({ type: `text`, text: `[mock] no canned response queued` });
-      yield { type: `message_update`, message: assistantMsg };
-      assistantMsg.stopReason = `end_turn`;
-      yield { type: `message_end`, message: assistantMsg };
-      return assistantMsg;
-    }
-
-    if (turn.text) {
-      const textBlock = { type: `text` as const, text: `` };
-      assistantMsg.content.push(textBlock);
-      yield { type: `message_update`, message: assistantMsg };
-      const chunkSize = 4;
-      for (let i = 0; i < turn.text.length; i += chunkSize) {
-        if (signal?.aborted) {
-          throw new DOMException(`Aborted`, `AbortError`);
-        }
-        textBlock.text += turn.text.slice(i, i + chunkSize);
-        yield { type: `message_update`, message: assistantMsg };
-        await this.simulateChunkDelay(signal, turn.delayMs ?? 5);
-      }
-    }
-
-    if (turn.toolCalls && turn.toolCalls.length > 0) {
-      for (const tc of turn.toolCalls) {
-        if (signal?.aborted) {
-          throw new DOMException(`Aborted`, `AbortError`);
-        }
-        const id = `mock_tool_` + Math.random().toString(36).slice(2, 10);
-        const toolBlock = {
-          type: `toolCall` as const,
-          id,
-          name: tc.name,
-          arguments: tc.input as Record<string, unknown>,
-        };
-        assistantMsg.content.push(toolBlock);
-        yield { type: `message_update`, message: assistantMsg };
-        await this.simulateChunkDelay(signal, turn.delayMs ?? 5);
-      }
-    }
-
-    assistantMsg.stopReason = `end_turn`;
-    yield { type: `message_end`, message: assistantMsg };
-    return assistantMsg;
-  }
-
-  /** Small async delay to simulate network/streaming latency. */
-  private async simulateChunkDelay(signal: AbortSignal | undefined, ms: number): Promise<void> {
-    if (ms <= 0) {
-      return;
-    }
-    return new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        signal?.removeEventListener(`abort`, onAbort);
-        resolve();
-      }, ms);
-      const onAbort = () => {
-        clearTimeout(timer);
-        reject(new DOMException(`Aborted`, `AbortError`));
-      };
-      signal?.addEventListener(`abort`, onAbort, { once: true });
-    });
-  }
-  /**
-   * Public entry — implements pi-agent 的 AgentTransport contract。
-   * 负责 complete agent loop:yield agent_start → loop turn (LLM call + tool exec)
-   * → yield agent_end。
-   *
-   * Agent loop (V1.5+ tool calling fix):
-   *   旧 implementation only sent one LLM call then emit agent_end. tool_use was
-   *   never executed, LLM kept requesting the same tool, UI saw a 131-iteration
-   *   loop. New implementation: after each turn, if assistant content has
-   *   tool_use blocks, execute them (emit tool_execution_start/end events),
-   *   append the tool_result messages to currentMessages, then call LLM again.
-   *   Termination: no more tool calls / MAX_TURNS / abort signal.
-   *
-   * Mock mode: when baseUrl starts with `mock://`, the transport
-   * uses mockStreamTurn instead of real HTTP. The mock reads from a
-   * global queue (globalThis.__MOCK_LLM_QUEUE__) that the test sets up.
-   */
-  async *run(
-    messages: Message[],
-    _userMessage: Message,
-    config: AgentRunConfig,
-    piAgentSignal?: AbortSignal,
-  ): AsyncGenerator<unknown, void, unknown> {
-    // 优先使用注入的 signal(createAgentRuntime 的 abortController),fallback 到 pi-agent 内部 signal。
-    const signal = this.options.signal ?? piAgentSignal;
-    const msgs = messages as unknown as any[];
-    const cfg = config as unknown as any;
-    const apiKey = await this.options.getApiKey();
-    if (!apiKey) {
-      throw new Error(`AnthropicTransport: 缺 apiKey`);
-    }
-
-    const baseUrl = cfg.model.baseUrl ?? `https://api.minimaxi.com/anthropic`;
-    const systemPrompt = cfg.systemPrompt ?? ``;
-    const tools = cfg.tools;
-    const isMockMode = baseUrl.startsWith(`mock://`);
-
-    // Maintain growing messages list. Start with input; after each turn, append
-    // assistant + tool results. Next LLM call sees the full history.
-    const currentMessages: any[] = msgs.map((m) => ({ ...m }));
-
-    // Collect all messages generated during this prompt cycle (assistant + toolResult).
-    const generatedMessages: any[] = [];
-
-    yield { type: `agent_start` };
-
-    let turnIndex = 0;
-    try {
-      while (turnIndex < MAX_TURNS) {
-        if (signal?.aborted) {
-          throw new DOMException(`Aborted`, `AbortError`);
-        }
-
-        yield { type: `turn_start` };
-
-        // Single turn — either real HTTP or mock, based on baseUrl.
-        const turnGen = isMockMode
-          ? this.mockStreamTurn(cfg.model, systemPrompt, currentMessages, tools, signal)
-          : this.streamTurn(
-              apiKey,
-              baseUrl,
-              cfg.model,
-              systemPrompt,
-              currentMessages,
-              tools,
-              signal,
-            );
-        let assistantMsg: AssistantMsgLike | undefined;
-        while (true) {
-          const { value, done } = (await turnGen.next()) as IteratorResult<
-            unknown,
-            AssistantMsgLike
-          >;
-          if (done) {
-            assistantMsg = value;
-            break;
-          }
-          if (value !== undefined) {
-            yield value;
-          }
-        }
-        if (!assistantMsg) {
-          throw new Error(`AnthropicTransport: streamTurn ended without value`);
-        }
-
-        const toolCalls = assistantMsg.content.filter(
-          (
-            b,
-          ): b is {
-            type: `toolCall`;
-            id: string;
-            name: string;
-            arguments: Record<string, unknown>;
-          } => b.type === `toolCall` && (b as any).id !== undefined,
-        );
-
-        currentMessages.push({ role: `assistant`, content: assistantMsg.content });
-        generatedMessages.push({
-          role: `assistant`,
-          content: assistantMsg.content,
-          stopReason: assistantMsg.stopReason,
-          model: assistantMsg.model,
-        });
-
-        if (toolCalls.length === 0) {
-          yield {
-            type: `turn_end`,
-            message: generatedMessages[generatedMessages.length - 1],
-            toolResults: [],
-          };
-          break;
-        }
-
-        const toolResultMessages: any[] = [];
-        for (const tc of toolCalls) {
-          const tool = tools?.find((t: any) => t.name === tc.name) as
-            | {
-                name: string;
-                execute: (id: string, args: unknown, signal?: AbortSignal) => Promise<any>;
-              }
-            | undefined;
-
-          yield {
-            type: `tool_execution_start`,
-            toolCallId: tc.id,
-            toolName: tc.name,
-            args: tc.arguments,
-          };
-
-          let resultOrError: any;
-          let isError = false;
-          try {
-            if (!tool) {
-              throw new Error(`Tool ${tc.name} not found`);
-            }
-            resultOrError = await tool.execute(tc.id, tc.arguments, signal);
-          } catch (e) {
-            resultOrError = e instanceof Error ? e.message : String(e);
-            isError = true;
-          }
-
-          yield {
-            type: `tool_execution_end`,
-            toolCallId: tc.id,
-            toolName: tc.name,
-            result: resultOrError,
-            isError,
-          };
-
-          const resultContent: Array<{ type: `text`; text: string }> =
-            typeof resultOrError === `string`
-              ? [{ type: `text`, text: resultOrError }]
-              : Array.isArray(resultOrError?.content)
-                ? resultOrError.content
-                : [{ type: `text`, text: String(resultOrError) }];
-
-          const toolResultMessage = {
-            role: `toolResult`,
-            toolCallId: tc.id,
-            toolName: tc.name,
-            content: resultContent,
-            details: typeof resultOrError === `string` ? {} : (resultOrError?.details ?? {}),
-            isError,
+    function snapshot(): AssistantMessage {
+        return {
+            role: "assistant",
+            content: content.map((b) => ({ ...b })),
+            api: model.api,
+            provider: model.provider,
+            model: model.id,
+            usage: emptyUsage(),
+            stopReason,
             timestamp: Date.now(),
-          };
-
-          yield { type: `message_start`, message: toolResultMessage };
-          yield { type: `message_end`, message: toolResultMessage };
-
-          currentMessages.push(toolResultMessage);
-          toolResultMessages.push(toolResultMessage);
-        }
-
-        yield {
-          type: `turn_end`,
-          message: generatedMessages[generatedMessages.length - 1],
-          toolResults: toolResultMessages,
         };
-
-        turnIndex++;
-      }
-
-      if (turnIndex >= MAX_TURNS) {
-        logger.warn(`[AnthropicTransport] reached MAX_TURNS=${MAX_TURNS}, terminating agent loop`);
-      }
-    } finally {
-      yield { type: `agent_end`, messages: generatedMessages };
     }
-  }
+
+    stream.push({ type: "start", partial: snapshot() });
+
+    try {
+        while (true) {
+            // 显式检查 abort signal — 在 reader.read() 之前快速退出,避免无用的
+            // chunk 解析;Agent 的 abort() 会触发这里的 signal。
+            if (signal?.aborted) {
+                logger.warn("[anthropicStream] parseSseStream aborted", {
+                    currentBlockType,
+                    pendingToolBytes: pendingToolCallJson.length,
+                });
+                throw new DOMException("Aborted", "AbortError");
+            }
+            const { value, done } = await reader.read();
+            if (done) {
+                break;
+            }
+            const chunk = decoder.decode(value, { stream: true });
+            buffer += chunk;
+            sseRawBody += chunk; // capture raw wire bytes
+            logger.info("[anthropicStream]   sse_chunk_in", {
+                bytes: value.length,
+                textPreview: buffer.slice(-500),
+            });
+            let lineEnd: number;
+            while ((lineEnd = buffer.indexOf("\n")) !== -1) {
+                const line = buffer.slice(0, lineEnd);
+                buffer = buffer.slice(lineEnd + 1);
+                if (line.trim() === "") {
+                    if (!sseDataBuf) {
+                        continue;
+                    }
+                    let data: Record<string, unknown>;
+                    try {
+                        data = JSON.parse(sseDataBuf) as Record<string, unknown>;
+                    } catch {
+                        sseDataBuf = "";
+                        continue;
+                    }
+                    sseDataBuf = "";
+                    const type = data.type as string;
+                    logger.info("[anthropicStream]   sse_event", {
+                        type,
+                        payload: JSON.stringify(data).slice(0, 600),
+                    });
+
+                    if (type === "content_block_start") {
+                        const idx = data.index as number;
+                        const block = data.content_block as {
+                            type: string;
+                            id?: string;
+                            name?: string;
+                        };
+                        if (block.type === "text") {
+                            currentBlockType = "text";
+                            content[idx] = { type: "text", text: "" };
+                            stream.push({
+                                type: "text_start",
+                                contentIndex: idx,
+                                partial: snapshot(),
+                            });
+                        } else if (block.type === "thinking") {
+                            currentBlockType = "thinking";
+                            content[idx] = { type: "thinking", thinking: "" };
+                            stream.push({
+                                type: "thinking_start",
+                                contentIndex: idx,
+                                partial: snapshot(),
+                            });
+                        } else if (block.type === "tool_use") {
+                            currentBlockType = "tool_use";
+                            pendingToolCallJson = "";
+                            pendingToolCallId = block.id ?? "";
+                            pendingToolCallName = block.name ?? "";
+                            content[idx] = {
+                                type: "toolCall",
+                                id: pendingToolCallId,
+                                name: pendingToolCallName,
+                                arguments: {},
+                            };
+                            stream.push({
+                                type: "toolcall_start",
+                                contentIndex: idx,
+                                partial: snapshot(),
+                            });
+                        }
+                    } else if (type === "content_block_delta") {
+                        const idx = data.index as number;
+                        const delta = data.delta as {
+                            type: string;
+                            text?: string;
+                            thinking?: string;
+                            partial_json?: string;
+                        };
+                        if (delta.type === "text_delta" && delta.text) {
+                            // LENIENT: real Anthropic emits content_block_start before the first
+                            // delta, but mock-server + some test fixtures skip it. Auto-init the
+                            // block so we do not TypeError on undefined access.
+                            if (!content[idx]) {
+                                content[idx] = { type: "text", text: "" };
+                                currentBlockType = "text";
+                                logger.info("[anthropicStream] lenient init text block", { idx });
+                            }
+                            const block = content[idx] as { type: "text"; text: string };
+                            block.text += delta.text;
+                            stream.push({
+                                type: "text_delta",
+                                contentIndex: idx,
+                                delta: delta.text,
+                                partial: snapshot(),
+                            });
+                        } else if (delta.type === "thinking_delta" && delta.thinking) {
+                            // LENIENT (mirror text branch).
+                            if (!content[idx]) {
+                                content[idx] = { type: "thinking", thinking: "" };
+                                currentBlockType = "thinking";
+                            }
+                            const block = content[idx] as {
+                                type: "thinking";
+                                thinking: string;
+                            };
+                            block.thinking += delta.thinking;
+                            stream.push({
+                                type: "thinking_delta",
+                                contentIndex: idx,
+                                delta: delta.thinking,
+                                partial: snapshot(),
+                            });
+                        } else if (delta.type === "input_json_delta" && delta.partial_json) {
+                            pendingToolCallJson += delta.partial_json;
+                        }
+                    } else if (type === "content_block_stop") {
+                        const idx = data.index as number;
+                        if (currentBlockType === "tool_use") {
+                            let parsedArgs: Record<string, unknown> = {};
+                            try {
+                                parsedArgs = JSON.parse(pendingToolCallJson) as Record<
+                                    string,
+                                    unknown
+                                >;
+                            } catch {
+                                parsedArgs = {};
+                            }
+                            const toolCall: ToolCall = {
+                                type: "toolCall",
+                                id: pendingToolCallId,
+                                name: pendingToolCallName,
+                                arguments: parsedArgs,
+                            };
+                            content[idx] = toolCall;
+                            stream.push({
+                                type: "toolcall_end",
+                                contentIndex: idx,
+                                toolCall,
+                                partial: snapshot(),
+                            });
+                        } else if (currentBlockType === "text") {
+                            const block = content[idx] as
+                                | { type: "text"; text: string }
+                                | undefined;
+                            if (block) {
+                                stream.push({
+                                    type: "text_end",
+                                    contentIndex: idx,
+                                    content: block.text,
+                                    partial: snapshot(),
+                                });
+                            }
+                        } else if (currentBlockType === "thinking") {
+                            const block = content[idx] as
+                                | { type: "thinking"; thinking: string }
+                                | undefined;
+                            if (block) {
+                                stream.push({
+                                    type: "thinking_end",
+                                    contentIndex: idx,
+                                    content: block.thinking,
+                                    partial: snapshot(),
+                                });
+                            }
+                        }
+                        currentBlockType = null;
+                    } else if (type === "message_delta") {
+                        const delta = data.delta as { stop_reason?: string };
+                        if (delta.stop_reason) {
+                            stopReason = mapStopReason(delta.stop_reason);
+                        }
+                    }
+                    // message_start and message_stop 不需要额外处理
+                    // (initial partial 已在 start 事件发过,final end 由调用方 push done)
+                } else {
+                    const parsed = parseSseLine(line);
+                    if (parsed.event !== undefined || parsed.data !== undefined) {
+                        logger.info("[anthropicStream]   sse_line", {
+                            event: parsed.event,
+                            data: parsed.data !== undefined ? parsed.data.slice(0, 2000) : undefined,
+                        });
+                    }
+                    if (parsed.data !== undefined) {
+                        sseDataBuf += parsed.data;
+                    }
+                }
+            }
+        }
+    } finally {
+        reader.releaseLock();
+    }
+
+    logger.info("[anthropicStream]   sse_complete_body", {
+        totalChars: sseRawBody.length,
+        raw: sseRawBody.slice(0, 5000),
+        rawTruncated: sseRawBody.length > 5000,
+    });
+
+    // Aborted 优先于 stopReason — reader loop 退出时若 signal 已被 abort,
+    // 返回 aborted message 而非不完整的 stop
+    if (signal?.aborted) {
+        return makeAbortedMessage(model);
+    }
+    return {
+        role: "assistant",
+        content: content.map((b) => ({ ...b })),
+        api: model.api,
+        provider: model.provider,
+        model: model.id,
+        usage: emptyUsage(),
+        stopReason,
+        timestamp: Date.now(),
+    };
 }

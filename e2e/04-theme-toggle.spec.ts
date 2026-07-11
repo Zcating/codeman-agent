@@ -11,8 +11,7 @@
 //! `@custom-variant dark (&:is(.dark *))`,所以 .dark 类是我们
 //! 断言的对象 — 其余样式从这里级联。
 
-import { test, expect } from "@playwright/test";
-import { assert, disposeTauriPage, getTauriPage, invoke } from "./helpers";
+import { test, expect, assert, invoke, clickNewConversationAndWait, type TauriPage } from "./fixtures";
 
 interface Settings {
   theme: "light" | "dark" | "system";
@@ -20,12 +19,12 @@ interface Settings {
 }
 
 async function setTheme(
-  page: Awaited<ReturnType<typeof getTauriPage>>,
+  page: TauriPage,
   theme: "light" | "dark" | "system",
 ) {
-  const current = await invoke<Settings>("get_settings");
+  const current = await invoke<Settings>(page, "get_settings");
   const next: Settings = { ...current, theme };
-  await invoke<Settings>("update_settings", { newSettings: next });
+  await invoke<Settings>(page, "update_settings", { newSettings: next });
 
   // store 每 5s 轮询 Settings;给它 7s 应用。
   // 我们在紧密循环中重新读取 html class,因为轮询是
@@ -67,18 +66,29 @@ async function setTheme(
 }
 
 test.describe("04 — 主题", () => {
-  test.afterAll(async () => {
-    await disposeTauriPage();
-  });
-
-  test("light → dark → light 通过 update_settings", async () => {
-    const page = await getTauriPage();
+  test("light → dark → light 通过 update_settings", async ({ tauriEnv }) => {
+    const { page } = tauriEnv;
 
     // 健全性:应用已启动且 html 元素可查询。
     await assert.attached(page.locator("html"));
 
-    // 切到 / 让 ChatLayout 挂载 → startThemeSync() 启动 5s 轮询。
-    // 否则页面在 /settings,theme store 没 start,setTheme 后 html class 不会切。
+    // V2.1: startThemeSync() only runs inside ChatLayout. Without an active
+    // conv, the home page shows HomeAgentForm and theme sync never starts,
+    // so dark class changes never propagate to <html>. We create + activate
+    // a conv to mount ChatLayout, then proceed.
+    // D8-W: Use IPC bridge (avoid home form send which triggers LLM consumption).
+    // Clean old workspaces first so we have exactly 1 workspace.
+    try {
+      const old = await invoke<{ id: string }[]>(page, "list_workspaces");
+      for (const ws of old) await invoke(page, "delete_workspace", { id: ws.id });
+    } catch { /* best-effort */ }
+    const wsId = (await invoke<{ id: string }>(page, "add_workspace", {
+      label: "Theme Test Workspace",
+      rootPath: "C:\\Temp\\codeman-e2e-theme-" + Date.now(),
+    })).id;
+    await clickNewConversationAndWait(page, { workspaceId: wsId });
+
+    // 切到 / — 已经有 activeId 在 store 里,ChatLayout 仍渲染。
     await page.goto("/");
 
     // Light。

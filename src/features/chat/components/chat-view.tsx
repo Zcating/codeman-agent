@@ -1,38 +1,59 @@
 //! ChatView — 消息列表 + 输入框 + store 订阅 (V2 ADR-0019)。
 //!
-//! V2 后不再 import messages.store / agent.store,全部走 conversations.store
+//! V2 后不再 import messages.store / agent.store,全部走 chat.store
 //! 的 store / sendMessage / cancel。running 派生自 byId[activeId].streamingMessageId。
 
-import { createSignal, createEffect, For, Show, onMount } from "solid-js";
+import { createSignal, createEffect, createMemo, For, Show, onMount } from "solid-js";
+import { Effect } from "effect";
 import { X, Send } from "lucide-solid";
 import { MessageBubble } from "./message-bubble";
-import { store, activeId$, sendMessage, cancel } from "../stores/conversations.store";
+import { store, sendMessage, cancel } from "../stores/chat.store";
 import type { ProviderConfig } from "../lib/runtime";
 import { Button } from "../../../shared/components/ui/button";
 import { Textarea } from "../../../shared/components/ui/textarea";
 import { startThemeSync } from "../../../shared/stores/theme";
 import { appStore } from "../../../shared/stores/app.store";
 import { settingsSaver } from "../../settings/lib/settings-saver";
-import type { Provider } from "../../../shared/lib/types";
+import { buildEnabledProviders } from "../lib/build-enabled-providers";
+import { CodemanGroupSelect } from "../../../shared/components/ui/codeman-group-select";
 
 function ProviderSelect() {
-  const enabledProviders = (): Provider[] =>
-    (appStore.state.value.providers ?? []).filter((p) => p.enabled && p.llm);
-  const currentId = (): string => {
-    const id = appStore.state.value.default_llm_provider_id;
-    if (id && enabledProviders().some((p) => p.id === id)) {
-      return id;
+  const enabledProviders = createMemo(() =>
+    buildEnabledProviders(appStore.state.value.providers ?? [])
+  );
+
+  // Convert enabled providers to CodemanGroupSelect groups format
+  const groups = createMemo(() =>
+    enabledProviders().map((p) => ({
+      label: p.label,
+      options: p.models.map((m) => ({ label: m.label, value: m.id })),
+    }))
+  );
+
+  // Current selected provider's default model id
+  const currentModelId = (): string | null => {
+    const providerId = appStore.state.value.default_llm_provider_id;
+    const provider = enabledProviders().find((p) => p.id === providerId);
+    if (!provider) {
+      return enabledProviders()[0]?.models[0]?.id ?? null;
     }
-    return enabledProviders()[0]?.id ?? "";
+    return provider.models[0]?.id ?? null;
   };
-  const handleChange = (e: Event & { currentTarget: HTMLSelectElement }) => {
-    const next = e.currentTarget.value;
-    if (!next) {
+
+  const handleChange = (modelId: string) => {
+    if (!modelId) {
       return;
     }
-    appStore.set({ default_llm_provider_id: next });
-    settingsSaver.scheduleSave();
+    // Find provider that contains this model and update default_llm_provider_id
+    const provider = enabledProviders().find((p) =>
+      p.models.some((m) => m.id === modelId)
+    );
+    if (provider) {
+      appStore.set({ default_llm_provider_id: provider.id });
+      settingsSaver.scheduleSave();
+    }
   };
+
   return (
     <Show
       when={enabledProviders().length > 0}
@@ -46,32 +67,26 @@ function ProviderSelect() {
         </a>
       }
     >
-      <select
-        id="provider-select"
-        class="h-9 max-w-[14rem] truncate rounded-md border border-input bg-background px-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-        value={currentId()}
+      <CodemanGroupSelect
+        groups={groups()}
+        value={currentModelId()}
         onChange={handleChange}
+        placeholder="选择模型"
+        disabled={false}
         aria-label="选择 LLM provider"
         data-testid="provider-select"
-      >
-        <For each={enabledProviders()}>{(p) => <option value={p.id}>{p.label}</option>}</For>
-      </select>
+      />
     </Show>
   );
 }
 
-export function ChatView() {
+export function ChatView(props: { convId?: string }) {
   const [input, setInput] = createSignal("");
-  const [convId, setConvId] = createSignal<string | null>(null);
+  const convId = (): string | undefined => props.convId;
   let messagesEndRef: HTMLDivElement | undefined;
 
   onMount(() => {
     startThemeSync();
-  });
-
-  // 跟踪 active conv id (从 activeId$ signal)
-  createEffect(() => {
-    setConvId(activeId$());
   });
 
   // 派生 running 状态(per-conv streaming)
@@ -95,15 +110,25 @@ export function ChatView() {
     return store.byId[id]?.messages ?? [];
   };
 
+  // Bug B: 当前 conv 的 lastError，没就 null
+  const currentLastError = (): string | null => {
+    const id = convId();
+    if (!id) {
+      return null;
+    }
+    return store.byId[id]?.lastError ?? null;
+  };
+
   // 自动滚动到底部
   createEffect(() => {
-    currentMessages();
-    if (messagesEndRef) {
-      queueMicrotask(() => messagesEndRef!.scrollIntoView({ behavior: "smooth" }));
+    // currentMessages(); 
+    if (!messagesEndRef) {
+      return;
     }
+    queueMicrotask(() => messagesEndRef.scrollIntoView({ behavior: "smooth" }));
   });
 
-  const handleCancel = async () => {
+  const handleCancel = () => {
     const id = convId();
     if (!id) {
       return;
@@ -129,12 +154,26 @@ export function ChatView() {
       tools: [],
     };
 
-    await sendMessage(id, text, provider);
+    await Effect.runPromiseExit(sendMessage(id, text, provider));
   };
 
   return (
     <>
       <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+        <Show when={currentLastError()}>
+          <div
+            role="alert"
+            aria-label="运行时错误"
+            data-testid="chat-error-banner"
+            class="p-3 rounded-md border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-900 dark:text-red-200 text-sm flex items-start gap-2"
+          >
+            <X class="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
+            <div class="flex-1 min-w-0">
+              <div class="font-medium mb-1">运行时错误</div>
+              <div class="wrap-break-word">{currentLastError()}</div>
+            </div>
+          </div>
+        </Show>
         <For each={currentMessages()}>{(m) => <MessageBubble message={m} />}</For>
         <Show
           when={
@@ -144,11 +183,12 @@ export function ChatView() {
           }
         >
           <div
-            class="max-w-prose p-3 rounded-lg leading-relaxed bg-card text-muted-foreground border border-border italic flex items-center gap-2"
+            class="max-w-prose pl-3 border-l-2 border-primary bg-card text-muted-foreground italic flex items-center gap-2"
             role="status"
             aria-live="polite"
+            data-testid="thinking-indicator"
           >
-            <span aria-hidden="true">⏳</span>
+            <span class="text-primary font-medium" aria-hidden="true">●●●</span>
             <span>正在思考…</span>
           </div>
         </Show>
@@ -170,6 +210,12 @@ export function ChatView() {
           rows={3}
           value={input()}
           onInput={(e) => setInput(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+              e.preventDefault();
+              e.currentTarget.form?.requestSubmit();
+            }
+          }}
           placeholder="发条消息…"
           disabled={isRunning()}
         />

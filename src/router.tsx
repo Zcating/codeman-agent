@@ -1,24 +1,69 @@
-//! Router — TanStack Router 配置。
+//! Router — TanStack Router configuration (V2.2).
 //!
-//! 代码路由（无 Vite 插件）。两个路由：
-//! - /          → ChatLayout（Sidebar + ChatView + 底部 Settings 链接）
-//! - /settings  → SettingsPage（全页面设置，替换主内容）
+//! Code-based routing (no Vite plugin). Route structure:
+//! - /              → ChatLayout → HomeRoute (HomeAgentForm)
+//! - /conversation/$convId → ChatLayout → ConversationRoute (ChatView + back)
+//! - /settings      → SettingsPage
 //!
-//! 历史记录：`createBrowserHistory()` — Tauri 2 单窗口 + Vite
-//! SPA fallback 原生处理深度链接。
+//! V3 e2e patch: exposes `window.__router` so cdp-driver.ts::goto can call
+//! `router.navigate({ to: path })` directly (bypasses `history.pushState`
+//! which on file:// URLs can't update the absolute Windows path).
 
 import { createRouter, createRoute, createRootRoute, Outlet } from "@tanstack/solid-router";
-import { ChatLayout } from "./features/chat/routes/index";
+import { ChatLayout, HomeRoute, ConversationRoute } from "./features/chat/routes/index";
 import { SettingsPage } from "./features/settings/routes/settings";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
+  errorComponent: (err) => {
+    // Debug-friendly error UI. Production should be replaced with a proper
+    // error page; this surfaces stacktraces for e2e diagnostics.
+    const e = (err as { error?: unknown })?.error;
+    const msg =
+      e instanceof Error
+        ? e.message
+        : typeof e === "object" && e !== null
+          ? JSON.stringify(e)
+          : String(e ?? "(no error)");
+    const stack = e instanceof Error ? e.stack : "(no stack)";
+    return (
+      <div style={{ padding: "1rem", color: "red", "font-family": "monospace" }}>
+        <h2>Router error</h2>
+        <pre>{msg}</pre>
+        <pre>{stack}</pre>
+      </div>
+    );
+  },
 });
 
-const indexRoute = createRoute({
+const chatLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/",
+  id: "chat",
   component: ChatLayout,
+  errorComponent: (err) => {
+    const e = err.error;
+    const msg = e instanceof Error ? e.message : typeof e === "object" && e !== null ? JSON.stringify(e) : String(e);
+    const stack = e instanceof Error ? e.stack : "(no stack)";
+    return (
+      <div style={{ padding: "1rem", color: "orange", "font-family": "monospace" }}>
+        <h2>ChatLayout error</h2>
+        <pre>{msg}</pre>
+        <pre>{stack}</pre>
+      </div>
+    );
+  },
+});
+
+const homeRoute = createRoute({
+  getParentRoute: () => chatLayoutRoute,
+  path: "/",
+  component: HomeRoute,
+});
+
+const conversationRoute = createRoute({
+  getParentRoute: () => chatLayoutRoute,
+  path: "/conversation/$convId",
+  component: ConversationRoute,
 });
 
 const settingsRoute = createRoute({
@@ -27,12 +72,19 @@ const settingsRoute = createRoute({
   component: SettingsPage,
 });
 
-export const routeTree = rootRoute.addChildren([indexRoute, settingsRoute]);
+export const routeTree = rootRoute.addChildren([
+  chatLayoutRoute.addChildren([homeRoute, conversationRoute]),
+  settingsRoute,
+]);
 
 export const router = createRouter({
   routeTree,
   defaultPreload: "intent",
 });
+
+if (typeof window !== "undefined") {
+  (window as unknown as { __router?: typeof router }).__router = router;
+}
 
 declare module "@tanstack/solid-router" {
   interface Register {

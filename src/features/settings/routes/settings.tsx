@@ -11,12 +11,12 @@ import { Effect } from "effect";
 import { Link } from "@tanstack/solid-router";
 import { ArrowLeft, Plus, Trash2 } from "lucide-solid";
 import { ProviderCard } from "../components/provider-card";
-import { WorkspaceCard } from "../components/workspace-card";
+import { createProviderFormDialog } from "../components/add-provider-dialog";
 import { appStore } from "../../../shared/stores/app.store";
 import { settingsSaver } from "../lib/settings-saver";
-import { invoke } from "../../../shared/lib/tauri";
+import { invoke } from "../../../shared/lib/ipc";
 import { logger } from "../../../shared/lib/logger";
-import type { Provider, Workspace } from "../../../shared/lib/types";
+import type { Provider } from "../../../shared/lib/types";
 
 type Tab = "llm" | "app" | "window" | "advanced";
 
@@ -35,8 +35,14 @@ export function SettingsPage() {
     });
   });
 
-  // footer Save = force flush（跳过 debounce）
-  const save = () => void settingsSaver.flushNow();
+  // footer Save = force flush（跳过 debounce）。Await so the IPC update_settings
+  // resolves before the caller continues — V2 e2e tests call get_settings
+  // immediately after click(Save) and expect the new api_key to be on disk.
+  const save = (): void => {
+    void settingsSaver.flushNow().catch((e: unknown) => {
+      logger.error("[SettingsPage] flushNow failed:", e);
+    });
+  };
 
   // ProviderCard 已直接调 appStore.set，父组件只需处理 delete
   const onProviderDelete = (id: string) => {
@@ -50,32 +56,13 @@ export function SettingsPage() {
     appStore.set({ providers });
   };
 
-  // V1.5: Add provider 是未来工作，当前只 alert
-  const onAddProvider = () => {
-    // V1.5+ 只有一个默认 MiniMax provider，用户可以配置但不能添加更多
-    alert("Add provider: future work (V1.5+ has 1 pre-fill MiniMax)");
-  };
-
-  const onWorkspaceUpdate = (id: string, patch: Partial<Workspace>) => {
-    const workspaces = appStore.state.value.workspaces!.map((ws) =>
-      ws.id === id ? { ...ws, ...patch } : ws,
-    );
-    appStore.set({ workspaces });
-  };
-
-  const onWorkspaceRemove = (id: string) => {
-    if (!confirm("Delete this workspace?")) {
-      return;
-    }
-    const workspaces = appStore.state.value.workspaces!.filter((ws) => ws.id !== id);
-    appStore.set({ workspaces });
-  };
-
-  const onAddWorkspace = () => {
-    const id = crypto.randomUUID();
-    const newWs: Workspace = { id, label: "New Workspace", root_path: "", enabled: false };
-    const workspaces = [...appStore.state.value.workspaces!, newWs];
-    appStore.set({ workspaces });
+  // V2.x: 命令式弹窗 — 点按钮 → 弹出 createProviderFormDialog() → await Provider | null
+  const onAddProvider = async () => {
+    const provider = await createProviderFormDialog();
+    if (!provider) return;
+    const current = appStore.state.value.providers ?? [];
+    appStore.set({ providers: [...current, provider] });
+    settingsSaver.scheduleSave();
   };
 
   const clearHistory = async () => {
@@ -160,39 +147,6 @@ export function SettingsPage() {
               <Plus class="h-4 w-4 inline mr-1" />
               Add provider
             </button>
-
-            {/* ── Workspaces section ── */}
-            <div class="mt-6 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-              <h3 class="text-base font-semibold mb-3 text-zinc-900 dark:text-zinc-100">
-                Workspaces
-              </h3>
-              <Show
-                when={(appStore.state.value.workspaces ?? []).length > 0}
-                fallback={
-                  <p class="text-sm text-muted-foreground py-4 text-center">
-                    No workspaces configured.
-                  </p>
-                }
-              >
-                <For each={appStore.state.value.workspaces ?? []}>
-                  {(ws) => (
-                    <WorkspaceCard
-                      workspace={ws}
-                      onUpdate={(patch) => onWorkspaceUpdate(ws.id, patch)}
-                      onRemove={() => onWorkspaceRemove(ws.id)}
-                    />
-                  )}
-                </For>
-              </Show>
-              <button
-                type="button"
-                onClick={onAddWorkspace}
-                class="mt-2 px-3 py-1.5 text-sm border border-input bg-background text-zinc-700 dark:text-zinc-300 rounded-md hover:bg-accent hover:text-accent-foreground"
-              >
-                <Plus class="h-4 w-4 inline mr-1" />
-                Add workspace
-              </button>
-            </div>
           </section>
         </Show>
         <Show when={tab() === "app"}>

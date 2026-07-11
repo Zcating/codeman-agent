@@ -11,8 +11,7 @@ src/features/settings/
 │
 ├── components/
 │   ├── provider-card.tsx  # LLM provider 编辑卡片（用 Card 7 子件）
-│   ├── provider-card.test.tsx
-│   └── workspace-card.tsx # Workspace 管理卡片（workspace CRUD，V2 新增）
+│   └── provider-card.test.tsx
 │
 ├── lib/                   # Effect-TS 服务层（从旧 subsystems/ 合并；纯函数，不直接调 IPC）
 │   ├── llm-providers.ts   # LLMProviderService（CRUD + API key 管理）
@@ -101,7 +100,7 @@ it.effect("description", () =>
 
 `MockSettingsServiceLive = Layer.succeed(SettingsService, { getSettings, updateSettings, ... })`
 
-**注意**（ADR-0010 Q6）：`lib/*.test.ts` 中 `import { mockState } from "src/__mocks__/@tauri-apps/api/core"`——`mockState` 唯一源在`src/__mocks__/`，**不是** `@/shared/shared-mock-state`（该文件已删除）。
+**注意**（T5 迁移）：`lib/*.test.ts` 中 `import { mockState } from "src/__mocks__/ipc-mock"`——`mockState` 唯一源在 `src/__mocks__/ipc-mock.ts`，**不是** `@/shared/shared-mock-state`。
 
 ### 测试：UI 组件
 
@@ -117,7 +116,6 @@ it("renders all controls", () => {
 ## 与外层关系
 
 - **ProviderCard 被 settings/routes/settings.tsx 引用**（作为 `<ProviderCard />`）
-- **WorkspaceCard 被 settings/routes/settings.tsx 引用**（V2 新增，作为 `<WorkspaceCard />`）
 - **LLMProviderService / SystemPromptService 被 ProviderCard 调用**（via bridge 函数或直接 pipe provide）
 - **settings/routes/settings.tsx 使用 bridge functions**：`getSettingsBridge`, `updateSettingsBridge`, `clearAllHistoryBridge`
 - **Settings 类型**来自 `src/shared/lib/types.ts`（**路径从 `shared/types/` 改为 `shared/lib/types.ts`**——ADR-0010，类型镜像合并到 `lib/`）
