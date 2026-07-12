@@ -1,16 +1,20 @@
-// T4a — electron/main/settings-schema.ts: Settings schema + sanitize + V0→V1.5 migration.
+// T4a — electron/main/settings-schema.ts: Settings schema + sanitize + V0→V15
+// migration + V15-snake→V15-camel migration.
 //
 // Ports src-tauri/src/settings.rs to TypeScript. Settings persist via
-// electron-store (T3 wires readSettings/writeSettings to IPC). Snake_case
-// field names preserved per ADR-0024 (no V2→V3 schema change for settings
-// JSON; existing users' settings.json load transparently).
+// electron-store (T3 wires readSettings/writeSettings to IPC). Per
+// ADR-0024 D10 (V3.1 amend): V15 fields use camelCase on disk and in IPC
+// payload; legacy V3 users' snake_case settings.json are auto-upgraded by
+// `migrateV15SnakeToCamel()` at load time. V0 historical snake fields are
+// consumed upstream by `migrationsV0ToV15()` and not touched by the V15
+// rename pass.
 
-// ─── Types ────────────────────────────────────────────────────────
+// ─── Types (V0 historical snake; V15 canonical camel) ────────────
 
 export interface ModelMeta {
   id: string;
   label: string;
-  context_window?: number;
+  contextWindow?: number;
   deprecated?: boolean;
   thinking?: boolean;
 }
@@ -20,39 +24,43 @@ export interface ProviderBilling {
 }
 
 export interface ProviderLlm {
-  default_model: string;
-  base_url: string;
-  api_type: "anthropic-messages";
+  defaultModel: string;
+  baseUrl: string;
+  /** ADR-0011: V1 only supports anthropic-messages protocol */
+  apiType: "anthropic-messages";
   models: ModelMeta[];
-  models_endpoint: string;
+  modelsEndpoint: string;
 }
 
 export interface Provider {
   id: string;
   label: string;
   enabled: boolean;
-  api_key: string;
+  /** ADR-0015: plaintext in Settings JSON */
+  apiKey: string;
   llm: ProviderLlm;
   billing?: ProviderBilling;
 }
 
 export interface SettingsV15 {
-  schema_version: "1.5";
+  schemaVersion: "1.5";
   providers: Provider[];
-  default_llm_provider_id?: string;
-  user_language: "zh" | "en" | "auto";
+  defaultLlmProviderId?: string;
+  userLanguage: "zh" | "en" | "auto";
   theme: "light" | "dark" | "system";
-  start_at_login: boolean;
+  startAtLogin: boolean;
   window: {
-    remember_position: boolean;
-    remember_size: boolean;
-    default_size: { width: number; height: number };
-    min_size: { width: number; height: number };
+    rememberPosition: boolean;
+    rememberSize: boolean;
+    defaultSize: { width: number; height: number };
+    minSize: { width: number; height: number };
   };
-  system_prompt: { default: string; user_can_edit: boolean };
-  conversations: { auto_archive_after_days: number; max_history: number };
+  systemPrompt: { default: string; userCanEdit: boolean };
+  conversations: { autoArchiveAfterDays: number; maxHistory: number };
 }
 
+// V0 (historical pre-ADR-0023) — kept snake for back-compat reasons
+// (deprecation chain upstream of V1.5 / V15).
 export interface SettingsV0Provider {
   id: string;
   label: string;
@@ -101,61 +109,62 @@ const KNOWN_V0_DEFAULT_MODELS: Record<string, string> = {
 };
 
 export const DEFAULT_SETTINGS: SettingsV15 = {
-  schema_version: "1.5",
+  schemaVersion: "1.5",
   providers: [
     {
       id: "minimax",
       label: "MiniMax",
       enabled: true,
-      api_key: "",
+      apiKey: "",
       llm: {
-        default_model: MINIMAX_DEFAULT_MODEL,
-        base_url: MINIMAX_BASE_URL,
-        api_type: "anthropic-messages",
+        defaultModel: MINIMAX_DEFAULT_MODEL,
+        baseUrl: MINIMAX_BASE_URL,
+        apiType: "anthropic-messages",
         // Pre-populate with the default model so the LLM picker has at least
         // one option out of the box (matches app.store.ts default).
         models: [
           {
             id: MINIMAX_DEFAULT_MODEL,
             label: MINIMAX_DEFAULT_MODEL,
-            context_window: 200_000,
+            contextWindow: 200_000,
             deprecated: false,
             thinking: false,
           },
         ],
-        models_endpoint: MINIMAX_MODELS_ENDPOINT,
+        modelsEndpoint: MINIMAX_MODELS_ENDPOINT,
       },
       billing: { kind: "plan_quota" },
     },
   ],
-  default_llm_provider_id: "minimax",
-  user_language: "auto",
+  defaultLlmProviderId: "minimax",
+  userLanguage: "auto",
   theme: "system",
-  start_at_login: false,
+  startAtLogin: false,
   window: {
-    remember_position: true,
-    remember_size: true,
-    default_size: { width: 800, height: 600 },
-    min_size: { width: 600, height: 400 },
+    rememberPosition: true,
+    rememberSize: true,
+    defaultSize: { width: 800, height: 600 },
+    minSize: { width: 600, height: 400 },
   },
-  system_prompt: { default: "", user_can_edit: true },
-  conversations: { auto_archive_after_days: 30, max_history: 1000 },
+  systemPrompt: { default: "", userCanEdit: true },
+  conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
 };
 
 // ─── sanitize() ──────────────────────────────────────────────────
 
 /**
  * Clamp settings to documented invariants. Per ADR-0024 amendment: this
- * matches the Rust Settings::sanitized() logic 1:1.
+ * matches the Rust Settings::sanitized() logic 1:1, with V3.1 (D10) field
+ * names in camelCase.
  */
 export function sanitize(input: Partial<SettingsV15>): SettingsV15 {
   const merged: SettingsV15 = {
     ...DEFAULT_SETTINGS,
     ...input,
     window: { ...DEFAULT_SETTINGS.window, ...(input.window ?? {}) },
-    system_prompt: {
-      ...DEFAULT_SETTINGS.system_prompt,
-      ...(input.system_prompt ?? {}),
+    systemPrompt: {
+      ...DEFAULT_SETTINGS.systemPrompt,
+      ...(input.systemPrompt ?? {}),
     },
     conversations: {
       ...DEFAULT_SETTINGS.conversations,
@@ -164,30 +173,83 @@ export function sanitize(input: Partial<SettingsV15>): SettingsV15 {
     providers: input.providers?.length ? input.providers : DEFAULT_SETTINGS.providers,
   };
 
-  merged.conversations.auto_archive_after_days = Math.max(
+  merged.conversations.autoArchiveAfterDays = Math.max(
     MIN_AUTO_ARCHIVE_DAYS,
-    merged.conversations.auto_archive_after_days | 0,
+    merged.conversations.autoArchiveAfterDays | 0,
   );
-  merged.conversations.max_history = Math.max(
+  merged.conversations.maxHistory = Math.max(
     MIN_MAX_HISTORY,
-    merged.conversations.max_history | 0,
+    merged.conversations.maxHistory | 0,
   );
 
-  merged.window.min_size.width = Math.max(MIN_SIZE_WIDTH, merged.window.min_size.width | 0);
-  merged.window.min_size.height = Math.max(MIN_SIZE_HEIGHT, merged.window.min_size.height | 0);
+  merged.window.minSize.width = Math.max(MIN_SIZE_WIDTH, merged.window.minSize.width | 0);
+  merged.window.minSize.height = Math.max(MIN_SIZE_HEIGHT, merged.window.minSize.height | 0);
 
-  merged.window.default_size.width = Math.max(
-    merged.window.min_size.width,
-    merged.window.default_size.width | 0,
+  merged.window.defaultSize.width = Math.max(
+    merged.window.minSize.width,
+    merged.window.defaultSize.width | 0,
   );
-  merged.window.default_size.height = Math.max(
-    merged.window.min_size.height,
-    merged.window.default_size.height | 0,
+  merged.window.defaultSize.height = Math.max(
+    merged.window.minSize.height,
+    merged.window.defaultSize.height | 0,
   );
 
-  merged.schema_version = "1.5";
+  merged.schemaVersion = "1.5";
 
   return merged;
+}
+
+// ─── V15 snake → V15 camel migration (ADR-0024 D10) ──────────────
+
+/**
+ * Specific V15 snake→camel key renames. NOT a generic regex — V0 keys
+ * (default_provider_id, billing_kind, etc.) are intentionally left
+ * untouched so migrationsV0ToV15() can consume them upstream.
+ */
+const V15_SNAKE_TO_CAMEL: Record<string, string> = {
+  schema_version: "schemaVersion",
+  default_llm_provider_id: "defaultLlmProviderId",
+  user_language: "userLanguage",
+  start_at_login: "startAtLogin",
+  system_prompt: "systemPrompt",
+  user_can_edit: "userCanEdit",
+  remember_position: "rememberPosition",
+  remember_size: "rememberSize",
+  default_size: "defaultSize",
+  min_size: "minSize",
+  auto_archive_after_days: "autoArchiveAfterDays",
+  max_history: "maxHistory",
+  api_key: "apiKey",
+  default_model: "defaultModel",
+  base_url: "baseUrl",
+  api_type: "apiType",
+  models_endpoint: "modelsEndpoint",
+  context_window: "contextWindow",
+};
+
+function renameKeysDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(renameKeysDeep);
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      const camelKey = V15_SNAKE_TO_CAMEL[k] ?? k;
+      out[camelKey] = renameKeysDeep(v);
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
+ * ADR-0024 D10: Migrate V15 settings.json on-disk format from V3 pre-D10
+ * snake_case to V3.1 canonical camelCase. Idempotent on already-camel input.
+ * V0 legacy keys (e.g. default_provider_id) are NOT renamed — they are
+ * consumed upstream by `migrationsV0ToV15()`.
+ *
+ * Called from `loadSettings()` in ipc.ts BEFORE migrationsV0ToV15().
+ */
+export function migrateV15SnakeToCamel(raw: unknown): unknown {
+  return renameKeysDeep(raw);
 }
 
 // ─── V0 → V1.5 migration ─────────────────────────────────────────
@@ -212,13 +274,13 @@ function v0ProviderToV15(v0: SettingsV0Provider): Provider {
     id: v0.id,
     label: v0.label,
     enabled: true,
-    api_key: v0.api_key,
+    apiKey: v0.api_key,
     llm: {
-      default_model: defaultModel,
-      base_url: baseUrl,
-      api_type: "anthropic-messages",
+      defaultModel,
+      baseUrl,
+      apiType: "anthropic-messages",
       models,
-      models_endpoint: modelsEndpoint,
+      modelsEndpoint,
     },
     billing,
   };
@@ -226,11 +288,14 @@ function v0ProviderToV15(v0: SettingsV0Provider): Provider {
 
 /**
  * Migrate V0 (pre-ADR-0023) settings.json to V1.5. Idempotent: if input
- * already has schema_version 1.5, returns sanitized passthrough.
+ * already has schemaVersion "1.5" (canonical post-D10), returns sanitized
+ * passthrough. Caller is expected to run migrateV15SnakeToCamel() FIRST so
+ * V3-pre-D10 snake inputs are normalized to canonical camel before this
+ * passthrough check.
  */
 export function migrationsV0ToV15(input: SettingsV0 | SettingsV15): SettingsV15 {
   // V1.5 passthrough (idempotent).
-  if ((input as SettingsV15).schema_version === "1.5") {
+  if ((input as SettingsV15).schemaVersion === "1.5") {
     return sanitize(input as SettingsV15);
   }
 
@@ -240,7 +305,7 @@ export function migrationsV0ToV15(input: SettingsV0 | SettingsV15): SettingsV15 
   return sanitize({
     ...DEFAULT_SETTINGS,
     providers: providers.length ? providers : DEFAULT_SETTINGS.providers,
-    default_llm_provider_id: v0.default_provider_id,
-    user_language: v0.user_language ?? DEFAULT_SETTINGS.user_language,
+    defaultLlmProviderId: v0.default_provider_id,
+    userLanguage: v0.user_language ?? DEFAULT_SETTINGS.userLanguage,
   });
 }

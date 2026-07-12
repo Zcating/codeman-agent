@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { initDatabase, getDatabase } from "./db/mod";
 // QA 路由由 electron/main/mock-server.ts 负责(POST /mock/anthropic/v1/messages
 // 经 qa-loader.ts 读 Q→A 文件);不再走 IPC。
-import { sanitize, migrationsV0ToV15, type SettingsV15 } from "./settings-schema";
+import { sanitize, migrationsV0ToV15, migrateV15SnakeToCamel, type SettingsV15 } from "./settings-schema";
 import {
   validatePathInWorkspace,
   readFileInWorkspace,
@@ -41,7 +41,10 @@ function loadSettings(): SettingsV15 {
       raw = {};
     }
   }
-  const migrated = migrationsV0ToV15(raw as Parameters<typeof migrationsV0ToV15>[0]);
+  // ADR-0024 D10: convert legacy V3 snake_case settings.json to canonical
+  // camelCase BEFORE V0→V15 migration check. Idempotent on already-camel input.
+  const camelRaw = migrateV15SnakeToCamel(raw);
+  const migrated = migrationsV0ToV15(camelRaw as Parameters<typeof migrationsV0ToV15>[0]);
   settingsCache = sanitize(migrated);
   saveSettings();
   return settingsCache;
