@@ -206,10 +206,15 @@ export const test = base.extend<{}, { tauriEnv: ElectronEnv; electronEnv: Electr
         // 3. Wait for CDP endpoint.
         await waitForUrl(`${cdpUrl}/json/version`, 60_000);
 
-        // 4. Connect via CDP. V3 loads bundled renderer via file://.
+// 4. Connect via CDP. V3 Electron loads renderer via custom `app://` protocol
+        //    (registered in main process) — DevTools target sits alongside as `devtools://`.
+        //    Earlier pattern `/file:\/\/.*index\.html|.*index\.html$/` matched neither,
+        //    so cdp-driver fell back to the DevTools target and `goto()` failed because
+        //    that page has no `__router` / `window.codeman` preload bridge.
+        //    Permissive `app://.*|file:\/\/.*index\.html` picks the real renderer first.
         const page = await connectElectron({
-          cdpUrl,
-          pageUrlPattern: /file:\/\/.*index\.html|.*index\.html$/,
+            cdpUrl,
+            pageUrlPattern: /app:\/\/.*|file:\/\/.*index\.html/,
         });
 
         // 4a. Inject __mockBaseUrl into every newly-loaded document so
