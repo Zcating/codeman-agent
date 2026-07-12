@@ -32,6 +32,11 @@ import {
 import type { ProviderConfig } from "../lib/runtime";
 import { buildEnabledProviders } from "../lib/build-enabled-providers";
 import { settingsSaver } from "../../settings/lib/settings-saver";
+import {
+  handleArrowUp,
+  handleArrowDown,
+  recordInputEntry,
+} from "../stores/input-history.store";
 
 // ─── LlmPicker (D6-H5) ─────────────────────────────────────────────────────────
 
@@ -138,8 +143,9 @@ export function HomeAgentForm(): JSX.Element {
     if (Exit.isFailure(exit)) return;
     const convId = exit.value;
 
-    // Step 2: Clear input + navigate to the new conversation route
+    // Step 2: Clear input + record history entry + navigate to the new conversation route
     setInput("");
+    recordInputEntry(text);
     navigate({ to: "/conversation/$convId", params: { convId } });
 
     // Step 3: Start streaming (fire-and-forget)
@@ -171,6 +177,19 @@ export function HomeAgentForm(): JSX.Element {
               if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
                 e.preventDefault();
                 e.currentTarget.form?.requestSubmit();
+                return;
+              }
+              if (e.key === "ArrowUp") {
+                if (handleArrowUp(input, setInput)) {
+                  e.preventDefault();
+                }
+                return;
+              }
+              if (e.key === "ArrowDown") {
+                if (handleArrowDown(setInput)) {
+                  e.preventDefault();
+                }
+                return;
               }
             }}
             disabled={isInputDisabled()}
