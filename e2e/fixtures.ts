@@ -44,6 +44,23 @@ import { tmpdir, homedir } from "node:os";
 import { connectElectron, type ElectronPage } from "./cdp-driver";
 import { BASE_PORTS } from "../playwright.config";
 
+// V3 mock-server per-worker base port (1 base port per parallel worker so
+// 4 workers can each bind without EADDRINUSE). mock-server reads
+// `CODEMAN_MOCK_PORT` (electron/main/config-service.ts:109). The matching
+// renderer-side URL is injected into `window.__mockBaseUrl` via
+// `Page.addScriptToEvaluateOnNewDocument` so `useMockProvider` can read it.
+const BASE_MOCK_PORT = 50000;
+export const MOCK_BASE_URL_FOR_WORKER = (idx: number): string =>
+  `http://127.0.0.1:${BASE_MOCK_PORT + idx}/mock/anthropic`;
+
+// CDP init script registered once per worker (Page.addScriptToEvaluateOnNewDocument
+// — see cdp-driver.ts:187 reinjectCdp). Each worker's mock provider base URL is
+// unique (port 50000 + parallelIndex), so the test MUST know which port to fetch
+// from. This script sets the global on every newly-loaded document so it
+// survives navigation/reload.
+const MOCK_BASE_URL_INJECT = (baseUrl: string) =>
+  `window.__mockBaseUrl = ${JSON.stringify(baseUrl)};`;
+
 /** Per-worker environment passed to specs via the `tauriEnv` fixture.
  *  Renamed to `electronEnv` in V3 — both names exported as the same type. */
 export type ElectronEnv = {
@@ -151,15 +168,22 @@ export const test = base.extend<{}, { tauriEnv: ElectronEnv; electronEnv: Electr
           env: {
             ...process.env,
             CODEMAN_TEST_WORKER: `w${idx}`,
-            // Per-worker Q→A fixture (per CONTEXT.md 「Per-Worker Q→A Isolation」):
-            // mock-server (electron/main/mock-server.ts) 读 CODEMAN_TEST_QA_TABLE
-            // env var 定位 Q→A JSON 文件。每个 worker 一份独立的 qa-w{N}.json。
-            CODEMAN_TEST_QA_TABLE: resolve(
-              process.cwd(),
-              "e2e",
-              "fixtures",
-              `qa-w${idx}.json`,
-            ),
+            // Per ADR-0026: e2e tests share the dev Q→A seed
+            // (`electron/assets/qa.dev.json`) — single source of truth for
+            // canned mock responses across dev and e2e modes. mock-server
+            // (electron/main/mock-server.ts) loads the dev seed via its
+            // isDev fallback path (qa-loader.ts) since this env var is not
+            // set. Substring first-wins match means the per-spec `XX::`
+            // entries (positioned before generic dev keys) take precedence
+            // over dev keys like "hello"/"read" if a test message overlaps.
+            // Per-worker mock-server port (BASE_MOCK_PORT + idx) so 4 workers
+            // can each bind without EADDRINUSE on 50000. Renderer is told the
+            // matching URL via window.__mockBaseUrl (MOCK_BASE_URL_INJECT below).
+            CODEMAN_MOCK_PORT: String(BASE_MOCK_PORT + idx),
+            // Tests set per-spec expectations on delay rather than overriding the
+            // global — .env's 200ms/event gives ~2.5s stream for 17-char text
+            // (matches 09 D5's polling window) and ~12s for 60-char sandbox text
+            // (within the 30s deadline). Don't override here unless tests need it.
             ELECTRON_DISABLE_GPU: "1",
             ELECTRON_NO_ATTACH_CONSOLE: "1",
           },
@@ -187,6 +211,31 @@ export const test = base.extend<{}, { tauriEnv: ElectronEnv; electronEnv: Electr
           cdpUrl,
           pageUrlPattern: /file:\/\/.*index\.html|.*index\.html$/,
         });
+
+        // 4a. Inject __mockBaseUrl into every newly-loaded document so
+        //     `useMockProvider` (e2e/mock-provider.ts) can read the per-worker
+        //     mock-server URL. Without this, mock-provider's hardcoded
+        //     `127.0.0.1:50000` only matches worker idx=0's port and the other
+        //     3 workers' LLM fetches fall through to EADDRINUSED/no-server paths.
+        const mockBaseUrl = MOCK_BASE_URL_FOR_WORKER(idx);
+        const injectScript = MOCK_BASE_URL_INJECT(mockBaseUrl);
+        // Current page (immediately effective).
+        await page.conn.send(
+          "Runtime.evaluate",
+          {
+            expression: injectScript,
+            returnByValue: true,
+            awaitPromise: false,
+          },
+          page.sessionId,
+        );
+        // Future pages — persists across navigation/reload (same primitive as
+        // reinjectCdp in cdp-driver.ts:209 — Page.addScriptToEvaluateOnNewDocument).
+        await page.conn.send(
+          "Page.addScriptToEvaluateOnNewDocument",
+          { source: injectScript },
+          page.sessionId,
+        );
 
         // Diagnostic probe — log so we can debug multi-worker setup.
         try {
