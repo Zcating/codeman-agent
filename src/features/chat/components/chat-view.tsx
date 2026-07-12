@@ -17,6 +17,11 @@ import { appStore } from "../../../shared/stores/app.store";
 import { settingsSaver } from "../../settings/lib/settings-saver";
 import { buildEnabledProviders } from "../lib/build-enabled-providers";
 import { CodemanGroupSelect } from "../../../shared/components/ui/codeman-group-select";
+import {
+  handleArrowUp,
+  handleArrowDown,
+  recordInputEntry,
+} from "../stores/input-history.store";
 
 function ProviderSelect() {
   const enabledProviders = createMemo(() =>
@@ -176,6 +181,7 @@ export function ChatView(props: { convId?: string }) {
       return;
     }
     setInput("");
+    recordInputEntry(text);
 
     const providerId = appStore.state.value.defaultLlmProviderId;
     const providerConfig = appStore.state.value.providers?.find((p) => p.id === providerId);
@@ -258,6 +264,19 @@ export function ChatView(props: { convId?: string }) {
             if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
               e.preventDefault();
               e.currentTarget.form?.requestSubmit();
+              return;
+            }
+            if (e.key === "ArrowUp") {
+              if (handleArrowUp(input, setInput)) {
+                e.preventDefault();
+              }
+              return;
+            }
+            if (e.key === "ArrowDown") {
+              if (handleArrowDown(setInput)) {
+                e.preventDefault();
+              }
+              return;
             }
           }}
           placeholder="发条消息…"
