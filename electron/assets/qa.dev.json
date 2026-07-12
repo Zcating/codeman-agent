@@ -191,10 +191,28 @@
     ]
   },
   {
+    "question": "11::msgs",
+    "turns": [
+      {
+        "thinking": "The user typed '11::msgs'. This is the e2e 11 test entry — it should produce a thinking block followed by text. The chat UI must render the thinking section both during streaming and after stream end.",
+        "text": "Here is the answer text after the thinking block."
+      }
+    ]
+  },
+  {
+    "question": "11::pure",
+    "turns": [
+      {
+        "text": "",
+        "thinking": "Pure thinking entry — no text block. Verifies thinking renders standalone when text is empty. Reasoning content: the user asked for thinking-only display, so we emit only a thinking block and skip the text content_block."
+      }
+    ]
+  },
+  {
     "question": "*",
     "turns": [
       {
-        "text": "(mock) I don't know how to answer that. Try asking: hello, read, list, ping, think, tool, three-blocks"
+        "text": "(mock) I don't know how to answer that. Try asking: hello, read, list, ping, think, tool, three-blocks, 11::msgs, 11::pure"
       }
     ],
     "default": true
