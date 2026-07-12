@@ -97,17 +97,33 @@ export const Dialog = {
       const [open, setOpen] = createSignal(true);
       let wasOpened = false;
 
+      // setTimeout cleanup callback: defensive against external DOM mutation
+      // (test teardown may remove container before 300ms elapses). Wrap dispose
+      // in try/catch (Solid unmount may throw on detached subtrees) and check
+      // parentNode before container.remove() (Node.removeChild throws
+      // NOT_FOUND_ERR on already-detached nodes).
+      const cleanupDialog = () => {
+        try {
+          dispose();
+        } catch {
+          /* already unmounted */
+        }
+        if (container.parentNode) {
+          container.remove();
+        }
+      };
+
       const handleClose = () => {
         if (!wasOpened) return;
         resolve(false);
         setOpen(false);
-        setTimeout(() => { dispose(); container.remove(); }, 300);
+        setTimeout(cleanupDialog, 300);
       };
 
       const handleConfirm = () => {
         resolve(true);
         setOpen(false);
-        setTimeout(() => { dispose(); container.remove(); }, 300);
+        setTimeout(cleanupDialog, 300);
       };
 
       const dispose = render(
@@ -157,17 +173,33 @@ export const Dialog = {
       const [open, setOpen] = createSignal(true);
       let wasOpened = false;
 
+      // setTimeout cleanup callback: defensive against external DOM mutation
+      // (test teardown may remove container before 300ms elapses). Wrap dispose
+      // in try/catch (Solid unmount may throw on detached subtrees) and check
+      // parentNode before container.remove() (Node.removeChild throws
+      // NOT_FOUND_ERR on already-detached nodes).
+      const cleanupDialog = () => {
+        try {
+          dispose();
+        } catch {
+          /* already unmounted */
+        }
+        if (container.parentNode) {
+          container.remove();
+        }
+      };
+
       const handleResolve = (value: T) => {
         resolve(value);
         setOpen(false);
-        setTimeout(() => { dispose(); container.remove(); }, 300);
+        setTimeout(cleanupDialog, 300);
       };
 
       const handleClose = () => {
         if (!wasOpened) return;
         resolve(null as unknown as T);
         setOpen(false);
-        setTimeout(() => { dispose(); container.remove(); }, 300);
+        setTimeout(cleanupDialog, 300);
       };
 
       const dispose = render(
