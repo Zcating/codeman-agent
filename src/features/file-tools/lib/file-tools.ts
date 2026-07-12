@@ -267,7 +267,7 @@ export const searchFilesTool: AgentTool<typeof searchParams, FileMatch[] | AppEr
         return "No matches found.";
       }
       const description = matches
-        .map((m) => `${m.path}${m.lineNumber ?? ""} - ${m.lineContent ?? ""}`)
+        .map((m) => `${m.path}:${m.lineNumber ?? "null"} - ${m.lineContent ?? "null"}`)
         .join("\n");
       return `Found ${matches.length} match(es):\n${description}`;
     });

@@ -229,7 +229,7 @@ describe("searchFilesTool", () => {
     });
     expect(result.content[0]).toMatchObject({
       type: "text",
-      text: expect.stringContaining("src/main.ts10 - TODO: fix"),
+      text: expect.stringContaining("src/main.ts:10 - TODO: fix"),
     });
     expect(mockState.invokeCalls.find((c) => c.name === "searchFiles")).toMatchObject({
       args: { workspaceId: "ws1", glob: "**/*.ts", contentPattern: "TODO" },
@@ -390,21 +390,21 @@ describe("fileTools / createFileTools array type (ADR-0025 review J2)", () => {
     type IsExactTSchema<T> = IsAny<T> extends true
       ? false
       : [T] extends [TSchema]
-        ? [TSchema] extends [T]
-          ? true
-          : false
-        : false;
+      ? [TSchema] extends [T]
+      ? true
+      : false
+      : false;
     type IsExactUnknown<T> = IsAny<T> extends true
       ? false
       : unknown extends T
-        ? [T] extends [unknown]
-          ? true
-          : false
-        : false;
+      ? [T] extends [unknown]
+      ? true
+      : false
+      : false;
     type IsExpectedToolArray<T> = T extends AgentTool<infer TParameters, infer TResult>[]
       ? IsExactTSchema<TParameters> extends true
-        ? IsExactUnknown<TResult>
-        : false
+      ? IsExactUnknown<TResult>
+      : false
       : false;
     type ExpectTrue<T extends true> = T;
     type FileToolsTypeCheck = ExpectTrue<IsExpectedToolArray<typeof fileTools>>;
