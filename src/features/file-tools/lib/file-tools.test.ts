@@ -34,7 +34,7 @@ describe("readFileTool", () => {
     mockState.resolved = "hello world";
 
     const result = await readFileTool.execute("c1", {
-      workspace_id: "ws1",
+      workspaceId: "ws1",
       path: "/tmp/x.txt",
     });
 
@@ -55,7 +55,7 @@ describe("readFileTool", () => {
     });
 
     const result = await readFileTool.execute("c1", {
-      workspace_id: "ws1",
+      workspaceId: "ws1",
       path: "/etc/x",
     });
 
@@ -71,7 +71,7 @@ describe("readFileTool", () => {
     });
 
     const result = await readFileTool.execute("c1", {
-      workspace_id: "ws1",
+      workspaceId: "ws1",
       path: "/tmp/nonexistent.txt",
     });
 
@@ -94,7 +94,7 @@ describe("writeFileTool", () => {
     mockState.resolved = undefined; // write_file returns ()
 
     const result = await writeFileTool.execute("c1", {
-      workspace_id: "ws1",
+      workspaceId: "ws1",
       path: "/tmp/new.txt",
       content: "file content here",
     });
@@ -115,7 +115,7 @@ describe("writeFileTool", () => {
     });
 
     const result = await writeFileTool.execute("c1", {
-      workspace_id: "ws1",
+      workspaceId: "ws1",
       path: "/etc/x",
       content: "bad",
     });
@@ -139,11 +139,11 @@ describe("editFileTool", () => {
     mockState.resolved = undefined;
 
     const result = await editFileTool.execute("c1", {
-      workspace_id: "ws1",
+      workspaceId: "ws1",
       path: "/tmp/x.txt",
-      old_text: "foo",
-      new_text: "bar",
-      replace_all: false,
+      oldText: "foo",
+      newText: "bar",
+      replaceAll: false,
     });
 
     expect(result.content[0]).toMatchObject({
@@ -161,15 +161,15 @@ describe("editFileTool", () => {
     });
   });
 
-  it("replace_all returns correct message", async () => {
+  it("replaceAll returns correct message", async () => {
     mockState.resolved = undefined;
 
     const result = await editFileTool.execute("c1", {
-      workspace_id: "ws1",
+      workspaceId: "ws1",
       path: "/tmp/x.txt",
-      old_text: "foo",
-      new_text: "bar",
-      replace_all: true,
+      oldText: "foo",
+      newText: "bar",
+      replaceAll: true,
     });
 
     expect(result.content[0]).toMatchObject({
@@ -178,17 +178,17 @@ describe("editFileTool", () => {
     });
   });
 
-  it("error path when old_text matches multiple times", async () => {
+  it("error path when oldText matches multiple times", async () => {
     mockState.rejected = new Unknown({
-      message: "old_text must match exactly once (got 2)",
+      message: "oldText must match exactly once (got 2)",
     });
 
     const result = await editFileTool.execute("c1", {
-      workspace_id: "ws1",
+      workspaceId: "ws1",
       path: "/tmp/x.txt",
-      old_text: "foo",
-      new_text: "bar",
-      replace_all: false,
+      oldText: "foo",
+      newText: "bar",
+      replaceAll: false,
     });
 
     expect(result.content[0]).toMatchObject({
@@ -217,9 +217,9 @@ describe("searchFilesTool", () => {
     ];
 
     const result = await searchFilesTool.execute("c1", {
-      workspace_id: "ws1",
+      workspaceId: "ws1",
       glob: "**/*.ts",
-      content_pattern: "TODO",
+      contentPattern: "TODO",
     });
 
     expect(result.details).toHaveLength(2);
@@ -236,11 +236,11 @@ describe("searchFilesTool", () => {
     });
   });
 
-  it("happy path with no content_pattern (glob only)", async () => {
+  it("happy path with no contentPattern (glob only)", async () => {
     mockState.resolved = [{ path: "src/main.ts", lineNumber: null, lineContent: null }];
 
     const result = await searchFilesTool.execute("c1", {
-      workspace_id: "ws1",
+      workspaceId: "ws1",
       glob: "**/*.ts",
     });
 
@@ -254,9 +254,9 @@ describe("searchFilesTool", () => {
     mockState.resolved = [];
 
     const result = await searchFilesTool.execute("c1", {
-      workspace_id: "ws1",
+      workspaceId: "ws1",
       glob: "**/*.ts",
-      content_pattern: "NOTFOUND",
+      contentPattern: "NOTFOUND",
     });
 
     expect(result.details).toEqual([]);
@@ -273,7 +273,7 @@ describe("searchFilesTool", () => {
     });
 
     const result = await searchFilesTool.execute("c1", {
-      workspace_id: "ws1",
+      workspaceId: "ws1",
       glob: "/etc/**/*.txt",
     });
 
@@ -296,7 +296,7 @@ describe("deleteFileTool", () => {
     mockState.resolved = undefined;
 
     const result = await deleteFileTool.execute("c1", {
-      workspace_id: "ws1",
+      workspaceId: "ws1",
       path: "/tmp/old.txt",
     });
 
@@ -316,7 +316,7 @@ describe("deleteFileTool", () => {
     });
 
     const result = await deleteFileTool.execute("c1", {
-      workspace_id: "ws1",
+      workspaceId: "ws1",
       path: "/etc/passwd",
     });
 
@@ -332,7 +332,7 @@ describe("deleteFileTool", () => {
     });
 
     const result = await deleteFileTool.execute("c1", {
-      workspace_id: "ws1",
+      workspaceId: "ws1",
       path: "malware.exe",
     });
 
@@ -343,23 +343,26 @@ describe("deleteFileTool", () => {
   });
 });
 
-// Task 4 (Phase-3 review Hard #1 + J3): single workspace_id field constant.
+// Task 4 (Phase-3 review Hard #1 + J3): single workspaceId field constant.
 // Proves the constant is exported and round-trips for both present and absent
 // values (i.e., is genuinely optional).
 //
 // Note: `Schema.optional(...)` returns a PropertySignature, which is only
 // decodable inside a `Schema.Struct({...})`. So each test wraps the field in
 // a one-key Struct to mirror how the 5 tool schemas consume it.
+//
+// ADR-0013.1: workspaceId is the camelCase single source of truth; the previous
+// `workspace_id` snake_case wrap is removed.
 import { Schema } from "effect";
 import { workspaceIdField } from "./file-tools";
 
-const wrap = Schema.Struct({ workspace_id: workspaceIdField });
+const wrap = Schema.Struct({ workspaceId: workspaceIdField });
 
-describe("workspaceIdField — single source of truth (Phase-3 review)", () => {
+describe("workspaceIdField — single source of truth (Phase-3 review + ADR-0013.1)", () => {
   it("decodeUnknown: present string value parses Right", () => {
-    const out = Schema.decodeUnknownEither(wrap)({ workspace_id: "ws-1" });
+    const out = Schema.decodeUnknownEither(wrap)({ workspaceId: "ws-1" });
     expect(out._tag).toBe("Right");
-    if (out._tag === "Right") expect(out.right.workspace_id).toBe("ws-1");
+    if (out._tag === "Right") expect(out.right.workspaceId).toBe("ws-1");
   });
 
   it("decodeUnknown: missing key parses Right (proves field is optional)", () => {
@@ -368,12 +371,12 @@ describe("workspaceIdField — single source of truth (Phase-3 review)", () => {
   });
 
   it("decodeUnknown: explicit undefined parses Right", () => {
-    const out = Schema.decodeUnknownEither(wrap)({ workspace_id: undefined });
+    const out = Schema.decodeUnknownEither(wrap)({ workspaceId: undefined });
     expect(out._tag).toBe("Right");
   });
 
-  it("decodeUnknown: numeric workspace_id parses Left (proves field is string)", () => {
-    const out = Schema.decodeUnknownEither(wrap)({ workspace_id: 42 });
+  it("decodeUnknown: numeric workspaceId parses Left (proves field is string)", () => {
+    const out = Schema.decodeUnknownEither(wrap)({ workspaceId: 42 });
     expect(out._tag).toBe("Left");
   });
 });

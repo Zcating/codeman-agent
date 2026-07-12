@@ -194,6 +194,10 @@ Rust 成为 agent runtime, webview 只渲染。
 - 本 ADR 在 V2 启动前是 "design accepted, implementation deferred" 状态
 - V1.5 期间若再有 file IO 需求讨论, 引本 ADR 作 design reference, 不重新打开架构讨论
 
+## Amendments
+
+- **Amended by [ADR-0013.1](./0013.1-file-tools-llm-wire-format-camelcase.md)**（2026-07-12）：上表（B. File Tool 族）字段名规则从 snake_case（`workspace_id` / `old_text` / `new_text` / `replace_all` / `content_pattern`）改为 camelCase（`workspaceId` / `oldText` / `newText` / `replaceAll` / `contentPattern`）。本 ADR 的 5-工具架构 / Hybrid 决策 / Workspace 沙箱 / Tauri command 签名（Rust 内部 snake_case 不变）等决策不受影响。Field 名变更同步到 file-tools 域（含 5 个 `Schema.Struct` field + 测试 fixture + `createFileTools` wrapper）。
+
 ## References
 
 - ADR-0002 (pi-mono agent runtime) — 锁定 webview, 避开 fs 代码路径

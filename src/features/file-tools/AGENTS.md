@@ -19,7 +19,7 @@ src/features/file-tools/
 - **Tool schemas**（`lib/file-tools.ts`）：5 个 pi-ai `AgentTool` 对象。
   - `readFileTool`：读取工作区文件（UTF-8，≤10MB）。
   - `writeFileTool`：写入文件到工作区（原子写，≤10MB）。
-  - `editFileTool`：替换文件中的文本（唯一匹配或 replace_all）。
+  - `editFileTool`：替换文件中的文本（唯一匹配或 replaceAll）。
   - `searchFilesTool`：按 glob 模式搜索文件，可选内容过滤（≤100 结果）。
   - `deleteFileTool`：移动文件到回收站（可恢复，非永久删除）。
 
@@ -28,7 +28,7 @@ src/features/file-tools/
 
 ## 工具约束（Rust 层强制）
 
-- **沙箱隔离**：所有工具仅限在 `workspace_id` 对应的 `root_path` 内操作。
+- **沙箱隔离**：所有工具仅限在 `workspaceId` 对应的 `root_path` 内操作。
   Rust `SandboxViolation` 错误会透传到 TS `AppError`。
 - **10 MB 大小上限**：Rust 层检查，超过返回 `AppError`。
 - **UTF-8 编码**：非 UTF-8 文件返回编码错误。
@@ -87,7 +87,7 @@ import type { FileMatch } from "@/features/file-tools";
 - 禁止在此添加 UI 组件——文件工具 UI（若有）属于 `src/features/chat/components/`。
 - 禁止在此创建 5 子目录白名单外的子目录（无 `components/` / `routes/` / `stores/` / `hooks/` 等）。
 - 禁止在 5 个子目录外添加文件——file-tools feature 根级只允许 `index.ts` + `AGENTS.md`。
-- 所有工具 `parameters` 必须以 `workspace_id: workspaceIdField` 开头（`workspaceIdField` 在 `lib/file-tools.ts` 导出，`Schema.optional(Schema.String)`）。Runtime 通过 `createFileTools(workspaceId)` wrapper 在 schema 校验前注入；LLM 也可以显式给（LLM 值优先）。
+- 所有工具 `parameters` 必须以 `workspaceId: workspaceIdField` 开头（`workspaceIdField` 在 `lib/file-tools.ts` 导出，`Schema.optional(Schema.String)`）。Runtime 通过 `createFileTools(workspaceId)` wrapper 在 schema 校验前注入；LLM 也可以显式给（LLM 值优先）。Field 名遵循 ADR-0013.1 camelCase wire-format（schema field = IPC arg key = chat 系统 prompt hint 单一真相源）。
 
 ## ADR 参考
 

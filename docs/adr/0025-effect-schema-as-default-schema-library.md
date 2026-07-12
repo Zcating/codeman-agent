@@ -73,7 +73,7 @@ PR 2 — 全栈 consumer 迁移 (kind → _tag + instanceof)
   └── 删除 LegacyAppErrorUnion
 
 PR 3 — file-tools typebox → Schema.Struct (5 schemas 改写)
-  ├── ReadFileSchema = Schema.Struct({ workspace_id: Schema.optional(Schema.String), path: Schema.String })
+  ├── ReadFileSchema = Schema.Struct({ workspaceId: Schema.optional(Schema.String), path: Schema.String })   (PR 5 后改 camelCase per ADR-0013.1)
   ├── WriteFileSchema = ...
   ├── EditFileSchema = ...
   ├── SearchFilesSchema = ...
@@ -317,11 +317,11 @@ export const readFileTool: AgentTool<TSchema, string | AppError> = {
 
 // 新
 const readParams = toToolParameters(ReadFileSchema);
-//    ^ 类型: Type.Object<{ workspace_id: Type.Optional<Type.String>, path: Type.String }>
+//    ^ 类型: Type.Object<{ workspaceId: Type.Optional<Type.String>, path: Type.String }>
 export const readFileTool: AgentTool<typeof readParams, string | AppError> = {
   parameters: readParams,
   execute: async (_, params) => {
-    // params: { workspace_id?: string; path: string }  ← Static<TParameters> 自动推导
+    // params: { workspaceId?: string; path: string }  ← Static<TParameters> 自动推导
   },
 };
 ```
@@ -430,7 +430,8 @@ feat(tool-schema): SchemaToTypeBox<S> type layer, remove as unknown as TSchema
   with as SchemaToTypeBox<S> (narrow type, no info loss)
 - 5 file-tool call sites now use AgentTool<typeof toToolParameters(...)>
   → Static<TParameters> correctly infers params type
-  → execute params: { workspace_id?: string; path: string } instead of unknown
+  → execute params: { workspaceId?: string; path: string } instead of unknown
+  (Note: PR 5 落地时 schema field 是 snake_case `workspace_id`; ADR-0013.1 在 PR 5 之后将 LLM wire-format 改 camelCase `workspaceId`,执行参数类型同步更新。)
 - file-tools.ts: remove 5 Schema.Schema.Type<typeof XxxSchema> manual aliases
   (auto-inferred via Static<typeof params>)
 

@@ -26,33 +26,32 @@ interface AgentToolResult<T> {
   details: T;
 }
 // ============================================================================
-// Args normalizer — LLM may use camelCase (workspaceId) even though schema
-// says snake_case (workspace_id). Normalize to snake_case for the IPC layer.
+// Args accessor — ADR-0013.1: schema field = IPC arg key = chat system prompt
+// hint, single camelCase truth source. Returns the property's type as declared
+// in `T`, so optional fields stay `T | undefined` and required fields stay `T`.
 // ============================================================================
-function pickArgs<T extends Record<string, any>>(args: T, snake: string, camel?: string): any {
-  if (args[snake] !== undefined) {
-    return args[snake];
-  }
-  if (camel && args[camel] !== undefined) {
-    return args[camel];
-  }
-  return undefined;
+function pickArgs<T extends Record<string, unknown>, K extends keyof T>(
+  args: T,
+  key: K,
+): T[K] {
+  return args[key];
 }
 
-/** T27: workspace_id may now be missing from LLM args (schema is Optional).
- *  Return an `Effect.fail(InvalidConfig)` when neither LLM nor the runtime
- *  wrapper provided one — bubbles up via the normal tool error path and
- *  renders cleanly in ToolCallCard. Using `Effect.fail` (not sync `throw`)
- *  so the cause reaches `runFileEffect` as `Cause.Fail`, not `Cause.Die`. */
+/** T27 + ADR-0013.1: workspaceId may now be missing from LLM args (schema is
+ *  Optional). Return an `Effect.fail(InvalidConfig)` when neither LLM nor the
+ *  runtime wrapper provided one — bubbles up via the normal tool error path
+ *  and renders cleanly in ToolCallCard. Using `Effect.fail` (not sync
+ *  `throw`) so the cause reaches `runFileEffect` as `Cause.Fail`, not
+ *  `Cause.Die`. */
 function requireWorkspaceId(args: Record<string, any>): Effect.Effect<string, AppError> {
-  const ws = pickArgs(args, "workspace_id", "workspaceId");
+  const ws = pickArgs(args, "workspaceId");
   if (typeof ws === "string" && ws.length > 0) {
     return Effect.succeed(ws);
   }
   return Effect.fail(new InvalidConfig({
-    field: "workspace_id",
+    field: "workspaceId",
     message:
-      "workspace_id is required. The runtime should inject it from the conversation context — " +
+      "workspaceId is required. The runtime should inject it from the conversation context — " +
       "if you see this, the chat.runtime.run() call is missing ProviderConfig.workspaceId.",
   }));
 }
@@ -62,10 +61,14 @@ function requireWorkspaceId(args: Record<string, any>): Effect.Effect<string, Ap
 // ============================================================================
 
 /**
- * T27 + ADR-0025 PR 3 + this PR (Task 4): workspace_id 是 optional.
+ * T27 + ADR-0025 PR 3 + ADR-0013.1 + this PR (Task 4): workspaceId 是 optional.
+ *
+ * ADR-0013.1 wire-format rename: schema field is camelCase to match the TS IPC
+ * layer (`window.codeman.readFile(workspaceId, path)`) and the chat system
+ * prompt hint (`chat.store.ts:194-195`). Single source of truth.
  *
  * Runtime injection: `createFileTools(workspaceId)` wraps every tool's `execute`
- * and injects `workspace_id` into args BEFORE schema validation (per
+ * and injects `workspaceId` into args BEFORE schema validation (per
  * `pickArgs` / `createFileTools` block below). LLM may also pass it explicitly
  * (explicit value wins).
  *
@@ -75,36 +78,36 @@ function requireWorkspaceId(args: Record<string, any>): Effect.Effect<string, Ap
  */
 export const workspaceIdField = Schema.optional(Schema.String);
 
-// T27: workspace_id 改为可选 — runtime (chat.store.sendMessage) 通过
+// T27 + ADR-0013.1: workspaceId 改为可选 — runtime (chat.store.sendMessage) 通过
 // `createFileTools(provider.workspaceId)` 自动注入,避免 LLM (或 mock JSON)
 // 不知道 UUID 时校验失败。LLM 也可以显式覆盖(优先用 LLM 传的)。
 const ReadFileSchema = Schema.Struct({
-  workspace_id: workspaceIdField,
+  workspaceId: workspaceIdField,
   path: Schema.String,
 });
 
 const WriteFileSchema = Schema.Struct({
-  workspace_id: workspaceIdField,
+  workspaceId: workspaceIdField,
   path: Schema.String,
   content: Schema.String,
 });
 
 const EditFileSchema = Schema.Struct({
-  workspace_id: workspaceIdField,
+  workspaceId: workspaceIdField,
   path: Schema.String,
-  old_text: Schema.String,
-  new_text: Schema.String,
-  replace_all: Schema.Boolean,
+  oldText: Schema.String,
+  newText: Schema.String,
+  replaceAll: Schema.Boolean,
 });
 
 const SearchFilesSchema = Schema.Struct({
-  workspace_id: workspaceIdField,
+  workspaceId: workspaceIdField,
   glob: Schema.String,
-  content_pattern: Schema.optional(Schema.String),
+  contentPattern: Schema.optional(Schema.String),
 });
 
 const DeleteFileSchema = Schema.Struct({
-  workspace_id: workspaceIdField,
+  workspaceId: workspaceIdField,
   path: Schema.String,
 });
 
@@ -210,9 +213,9 @@ const editFile = Effect.fnUntraced(
     return yield* svc.editFile(
       workspaceId,
       pickArgs(typedArgs, "path"),
-      pickArgs(typedArgs, "old_text", "oldText"),
-      pickArgs(typedArgs, "new_text", "newText"),
-      pickArgs(typedArgs, "replace_all", "replaceAll"),
+      pickArgs(typedArgs, "oldText"),
+      pickArgs(typedArgs, "newText"),
+      pickArgs(typedArgs, "replaceAll"),
     );
   },
   Effect.provide(FileServiceLive),
@@ -223,14 +226,14 @@ export const editFileTool: AgentTool<typeof editParams, void | AppError> = {
   label: "edit_file",
   name: "edit_file",
   description:
-    "Replace text in a file (unique match required unless replace_all=true). " +
-    "Use replace_all=false for single replacement. Returns error if old_text matches 0 or 2+ times (unless replace_all=true).",
+    "Replace text in a file (unique match required unless replaceAll=true). " +
+    "Use replaceAll=false for single replacement. Returns error if oldText matches 0 or 2+ times (unless replaceAll=true).",
   parameters: editParams,
   execute: async (_toolCallId, args) => {
     return runFileEffect(
       editFile(args as Static<typeof editParams>),
       () =>
-        (args as Static<typeof editParams>).replace_all
+        (args as Static<typeof editParams>).replaceAll
           ? "Done: all occurrences replaced."
           : "Done: text replaced.",
     );
@@ -244,7 +247,7 @@ const searchFiles = Effect.fnUntraced(
     return yield* svc.searchFiles(
       workspaceId,
       pickArgs(typedArgs, "glob"),
-      pickArgs(typedArgs, "content_pattern", "contentPattern") ?? null,
+      pickArgs(typedArgs, "contentPattern") ?? null,
     );
   },
   Effect.provide(FileServiceLive),
@@ -303,9 +306,9 @@ export const deleteFileTool: AgentTool<typeof deleteParams, void | AppError> = {
 /** 所有 file-tools 工具数组（向后兼容 — 调用方无 workspaceId 时仍可使用）。
  *
  *  绝大多数路径请用 `createFileTools(workspaceId)`,它会包装 execute 注入
- *  `workspace_id` 到 args(LLM 省略或 mock JSON 不带时)。`fileTools` 这个
+ *  `workspaceId` 到 args(LLM 省略或 mock JSON 不带时)。`fileTools` 这个
  *  直导数组保留,供测试或一次性脚本调用 — 调用方必须自己在 args 里提供
- *  `workspace_id`,否则工具返回 `InvalidConfig` 错误。 */
+ *  `workspaceId`,否则工具返回 `InvalidConfig` 错误。 */
 export const fileTools: AgentTool<TSchema, unknown>[] = [
   readFileTool,
   writeFileTool,
@@ -314,16 +317,16 @@ export const fileTools: AgentTool<TSchema, unknown>[] = [
   deleteFileTool,
 ];
 
-/** 创建带 `workspace_id` 自动注入的 file tools 列表(T27)。
+/** 创建带 `workspaceId` 自动注入的 file tools 列表(T27 + ADR-0013.1)。
  *
  *  pi-agent-core 的 schema 校验在 `execute` 之前运行,因此我们无法在收到
- *  args 后再补 `workspace_id` — 必须**在 schema 校验之前**把 field 填好。
+ *  args 后再补 `workspaceId` — 必须**在 schema 校验之前**把 field 填好。
  *  包装层在 Agent 校验后的 execute 调用里,把 `provider.workspaceId` 注入
  *  args(若 LLM 自己传了,以 LLM 为准,允许覆盖)。
  *
  *  @param workspaceId - 当前 conversation 绑定的 workspace UUID。
  *                       若省略 / 空字符串,等价于 `fileTools`(工具接收
- *                       不带 workspace_id 的 args 时返回 InvalidConfig)。
+ *                       不带 workspaceId 的 args 时返回 InvalidConfig)。
  */
 export function createFileTools(workspaceId?: string): AgentTool<TSchema, unknown>[] {
   const tools: AgentTool<TSchema, unknown>[] = [readFileTool, writeFileTool, editFileTool, searchFilesTool, deleteFileTool];
@@ -333,16 +336,17 @@ export function createFileTools(workspaceId?: string): AgentTool<TSchema, unknow
   return tools.map((tool) => ({
     ...tool,
     execute: async (toolCallId: string, params: unknown, signal?: AbortSignal) => {
-      // 若 LLM 已显式给 workspace_id / workspaceId,优先用 LLM 的(允许覆盖
-      // 默认值 — 比如未来多 workspace 场景)。否则注入 runtime 提供的值。
+      // 若 LLM 已显式给 workspaceId,优先用 LLM 的(允许覆盖默认值 — 比如
+      // 未来多 workspace 场景)。否则注入 runtime 提供的值。
+      // ADR-0013.1: schema field 唯一 = workspaceId,不需要 dual-form 桥。
       const args = (params && typeof params === "object"
         ? (params as Record<string, unknown>)
         : {}) as Record<string, unknown>;
-      const alreadyHas = pickArgs(args, "workspace_id", "workspaceId");
+      const alreadyHas = pickArgs(args, "workspaceId");
       const finalArgs =
         typeof alreadyHas === "string" && alreadyHas.length > 0
           ? args
-          : { ...args, workspace_id: workspaceId };
+          : { ...args, workspaceId };
       return tool.execute(toolCallId, finalArgs, signal);
     },
   }));
