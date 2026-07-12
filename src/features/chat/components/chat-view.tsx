@@ -7,6 +7,7 @@ import { createSignal, createEffect, createMemo, For, Show, onMount } from "soli
 import { Effect } from "effect";
 import { X, Send } from "lucide-solid";
 import { MessageBubble } from "./message-bubble";
+import { ThinkingPanel } from "./thinking-panel";
 import { store, sendMessage, cancel } from "../stores/chat.store";
 import type { ProviderConfig } from "../lib/runtime";
 import { Button } from "../../../shared/components/ui/button";
@@ -119,6 +120,38 @@ export function ChatView(props: { convId?: string }) {
     return store.byId[id]?.lastError ?? null;
   };
 
+  // 当前 stub / 最近一条 assistant 的 thinking 信息(用于 ThinkingPanel)。
+  // - streaming: 用 streamingMessageId 找到 stub,thinking 是 stub 累积内容
+  // - done (streamingMessageId=null): 退回到最后一条 assistant message 的 thinking,
+  //   以满足"即便是流结束后,也需要一直显出"
+  const stubThinkingInfo = ():
+    | { thinking: string; streaming: boolean; messageId: string }
+    | null => {
+    const id = convId();
+    if (!id) {
+      return null;
+    }
+    const cs = store.byId[id];
+    if (!cs) {
+      return null;
+    }
+    const streamingId = cs.streamingMessageId;
+    if (streamingId) {
+      const stub = cs.messages.find((m) => m.id === streamingId);
+      if (stub && stub.thinking) {
+        return { thinking: stub.thinking, streaming: true, messageId: stub.id };
+      }
+    }
+    // fallback: scan from end for any assistant message with non-empty thinking
+    for (let i = cs.messages.length - 1; i >= 0; i--) {
+      const m = cs.messages[i]!;
+      if (m.role === "assistant" && m.thinking) {
+        return { thinking: m.thinking, streaming: false, messageId: m.id };
+      }
+    }
+    return null;
+  };
+
   // 自动滚动到底部
   createEffect(() => {
     // currentMessages(); 
@@ -191,6 +224,17 @@ export function ChatView(props: { convId?: string }) {
             <span class="text-primary font-medium" aria-hidden="true">●●●</span>
             <span>正在思考…</span>
           </div>
+        </Show>
+        {/* ThinkingPanel — 专用块,展示 stub / 最近一条 assistant 的累积 thinking。
+            即使 stream 已 done 也持续显示(streaming=false 时折叠默认收起),用户可手动展开。 */}
+        <Show when={stubThinkingInfo()}>
+          {(info) => (
+            <ThinkingPanel
+              thinking={info().thinking}
+              streaming={info().streaming}
+              messageId={info().messageId}
+            />
+          )}
         </Show>
         <div ref={messagesEndRef} />
       </div>
