@@ -52,6 +52,17 @@ src/features/chat/
 > - 旧 `types/` 目录（空）已删除
 >
 > `hooks/` 目录 V1 暂无，未来首个 `use-` 钩子（候选：`useConversations` / `useDebouncedQuery`）落地时创建。
+>
+> **V2.4+ 新增 input-history**：
+> ```
+> src/features/chat/
+> ├── lib/
+> │   ├── input-history.ts          # 纯函数:localStorage load/save/recordEntry
+> │   └── input-history.test.ts
+> └── stores/
+>     ├── input-history.store.ts    # Solid signal + navigation cursor
+>     └── input-history.store.test.ts
+> ```
 
 ## 硬性规则
 
@@ -186,3 +197,67 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 - **Wave V2.1 polish**（2026-06-27，ADR-0023）：`agent-sidebar` → `codeman-sidebar` 原子重命名；`agent-sidebar` → `codeman-sidebar` 全部原子化（单 commit + 全部 consumer 同步）；home.tsx `WorkspaceCard` 卡片网格 → `codeman-select` 下拉（含 Action slot "+ Add new workspace…"）；chat-view.tsx `ProviderSelect` 本地 `<select>` → `codeman-group-select`（按 provider 分组）；`buildEnabledProviders` helper 抽取到 `src/features/chat/lib/build-enabled-providers.ts`；e2e spec 10 重写；CONTEXT.md 加 Codeman Component + UI Primitive 词条；src/shared/AGENTS.md 加 codeman-* 命名空间规则 + Naming convention for internal/ 段。
 - **Wave V2.2**（2026-06-28，ADR-0023 D8-W）：`conversations.store.ts` → `chat.store.ts` 重命名；Workspace 所有权从 appStore 迁入 chat domain（WorkspaceService Effect Context.Tag + Electron SQLite + IPC）；`Settings.workspaces[]` + `enabled` 字段删除；`WorkspaceCard` 删除；sidebar hover rename/delete dialog 落地；`shared/components/ui/dialog.tsx` + `internal/codeman-dialog.tsx` 新增。
 - **Wave V2.3**（2026-07-04）：Sidebar always-show — 删除 `chat-layout.tsx` 中 `<Show when={workspacesExist()}>` 包裹，sidebar 在 0 workspace 时也渲染（此前仅 workspace>0 时显示）。CodemanSidebar 自身处理 0 workspace 空态。
+- **Wave V2.4+ 输入历史**（2026-07-12，feature request）：新增输入历史栈（最多 100 条,localStorage 持久化）。两输入框 (Home + ChatView) 共享同一份；↑/↓ 在空 input 上做历史导航（与 bash readline 同语义）。新增 `lib/input-history.ts` + `stores/input-history.store.ts`，chat-view.tsx / home.tsx 各加 `recordInputEntry(text)` 入 handleSend + ↑/↓ 键处理器。`store.ts` 是 chat 域自治 store，与 chat.store 同模块级 singleton 设计；UI 组件只 import signal 访问器 + handler 辅助函数。
+
+## 输入历史 (Input History)
+
+> V2.4+ feature：用户在 chat 输入框中提交的消息被记录为历史栈；按 ↑ / ↓ 在空 input 上做历史导航。
+>
+> **设计原则**：参考 bash readline 行为；UX 简洁优先（无 dropdown 浮层、无位置指示）；存储轻量；跨 Home / ChatView 共享。
+
+### 存储
+
+- localStorage 键 `codeman.input-history.v1`，JSON 数组（newest-first）
+- 上限 100 条，FIFO 淘汰；连续相同内容去重；trim() 后空白不记
+- **不**走 SQLite / IPC——本项目其它持久化（settings / workspace / conversations）均在 SQLite，但 100 条 × 几 KB 的小规模 + 单进程单窗口假设不值得引 SQL migration + IPC channel
+- 持久化是 best effort：`localStorage.setItem` 抛 `QuotaExceededError` 时静默吞，不阻塞主 send 流程（设计裁决）
+
+### 信号 API (`stores/input-history.store.ts`)
+
+```ts
+// 公开 accessor
+export const inputHistory$: Accessor<string[]>;             // newest-first
+export const inputHistoryCursor$: Accessor<number>;          // -1 = 输入态；0..N-1 = 历史位置
+
+// 写入（在 handleSend 调）
+export function recordInputEntry(content: string): void;     // trim + dedup + cap + 持久化 + 重置 cursor
+
+// 推进（handler 内部用，但暴露供测试）
+export function navigateInputHistoryPrev(): NavResult | null;
+export function navigateInputHistoryNext(): NavResult | null;
+
+// UI 集成辅助（在 onKeyDown 调；返回是否 preventDefault）
+export function handleArrowUp(getInput, setInput): boolean;
+export function handleArrowDown(setInput): boolean;
+```
+
+### 键盘契约 (chat-view + home)
+
+| 键 | 触发条件 | 不触发时的行为 |
+|---|---|---|
+| `↑` | `input().trim() === ""` **且** `inputHistory$.length > 0`，或在历史导航态（cursor !== -1） | 让 textarea 原生 caret 接管（不 preventDefault） |
+| `↓` | `inputHistoryCursor$() !== -1` | 同上 |
+
+**边界行为**（与 bash readline 一致）：
+- 最老条目上再按 `↑`：no-op（stay）
+- 最新条目（cursor=0）上按 `↓`：input 清空、cursor=-1、退出历史态
+- 历史为空时按 `↑` / 空 input 上 `↓` (cursor=-1)：no-op
+- 在历史内编辑（仅改 input 不动 cursor）后再按 `↑`：`Q5c=I` 继续向旧翻（因为 cursor 仍在历史）
+
+### 提交触发
+
+`recordInputEntry(text)` 在 `setInput("")` **之后** 调用（chat-view.tsx 的 handleSend；home.tsx 的 Step 2）。`text` 已在 trim 校验后通过——`recordInputEntry` 内部仍做 trim + dedup + cap 三层保险。
+
+### 单测覆盖
+
+- `lib/input-history.test.ts`：12 个 it 覆盖 load / save / recordEntry 的 trim、dedup、cap、JSON 损坏、非 string 元素过滤
+- `stores/input-history.store.test.ts`：16+ 个 it 覆盖 cursor 状态机 + persistence + handler 辅助函数
+
+### 不变量
+
+- 两输入框共享**同一**份历史（Home 发完后 ChatView 按 ↑ 可见）
+- `recordInputEntry` 总是把 cursor 重置回 -1（无论是否真写了 history）
+- 持久化失败不抛错（best effort）
+- input 触发历史后用户**编辑该历史**保留 cursor（输入态仍处于历史）
+
+
