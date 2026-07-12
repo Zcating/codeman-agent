@@ -65,7 +65,10 @@ test.describe("02 — 设置 LLM API key", () => {
     await assert.value(passwordInput, FAKE_KEY, { timeout: 2_000 });
 
     // 5. 通过 IPC `get_settings` 验证 key 实际在磁盘上。
-    //    V1.5+ 使用 unified providers 数组(per ADR-0024 D10 camelCase);第一个 provider id 是 "minimax"。
+    //    V1.5+ 使用 unified providers 数组；第一个 provider id 是 "minimax"。
+    //    V15 (ADR-0024 D10): on-the-wire format is camelCase — `update_settings`
+    //    IPC normalizes snake_case patches to camelCase (ipc.ts) so reads are
+    //    uniform.
     const settings = await invoke<{ providers?: Array<{ id: string; apiKey: string }> }>(
       page,
       "get_settings",
