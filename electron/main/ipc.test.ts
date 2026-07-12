@@ -31,36 +31,36 @@ vi.mock("./db/mod", () => ({
 
 const EXPECTED_CHANNELS = [
   // Settings
-  "get_settings",
-  "update_settings",
-  "clear_all_history",
+  "getSettings",
+  "updateSettings",
+  "clearAllHistory",
   // Conversations
-  "list_conversations",
-  "get_conversation",
-  "create_conversation",
-  "archive_conversation",
-  "delete_conversation",
+  "listConversations",
+  "getConversation",
+  "createConversation",
+  "archiveConversation",
+  "deleteConversation",
   // Messages
-  "list_messages",
-  "append_message",
-  "search_messages",
+  "listMessages",
+  "appendMessage",
+  "searchMessages",
   // Workspaces
-  "list_workspaces",
-  "add_workspace",
-  "rename_workspace",
-  "delete_workspace",
-  "pick_workspace_path",
+  "listWorkspaces",
+  "addWorkspace",
+  "renameWorkspace",
+  "deleteWorkspace",
+  "pickWorkspacePath",
   // Filesystem
-  "read_file",
-  "write_file",
-  "edit_file",
-  "search_files",
-  "delete_file",
+  "readFile",
+  "writeFile",
+  "editFile",
+  "searchFiles",
+  "deleteFile",
   // Native shims
-  "set_login_item",
+  "setLoginItem",
   "notify",
-  "open_external",
-  "get_log_path",
+  "openExternal",
+  "getLogPath",
   // QA 表由 electron/main/mock-server.ts 直接经 qa-loader.ts 读,不暴露 IPC
 ];
 

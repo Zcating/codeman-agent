@@ -73,11 +73,11 @@ describe("settingsSaver (ADR-0015 V1.7+)", () => {
     settingsSaver.scheduleSave();
 
     // No flush yet
-    expect(mockState.calls.filter((c) => c === "update_settings")).toHaveLength(0);
+    expect(mockState.calls.filter((c) => c === "updateSettings")).toHaveLength(0);
 
     // After 600ms the debounced flush fires
     await new Promise((resolve) => setTimeout(resolve, 600));
-    expect(mockState.calls.filter((c) => c === "update_settings")).toHaveLength(1);
+    expect(mockState.calls.filter((c) => c === "updateSettings")).toHaveLength(1);
   });
 
   it("flushNow() triggers IPC immediately (skip debounce)", async () => {
@@ -85,7 +85,7 @@ describe("settingsSaver (ADR-0015 V1.7+)", () => {
     settingsSaver.scheduleSave();
     await settingsSaver.flushNow();
 
-    expect(mockState.calls.filter((c) => c === "update_settings")).toHaveLength(1);
+    expect(mockState.calls.filter((c) => c === "updateSettings")).toHaveLength(1);
   });
 
   it("cancelPending() cancels pending debounce", async () => {
@@ -94,7 +94,7 @@ describe("settingsSaver (ADR-0015 V1.7+)", () => {
     settingsSaver.cancelPending();
     await new Promise((resolve) => setTimeout(resolve, 600));
     // No IPC should have fired
-    expect(mockState.calls.filter((c) => c === "update_settings")).toHaveLength(0);
+    expect(mockState.calls.filter((c) => c === "updateSettings")).toHaveLength(0);
   });
 
   it("scheduleSave() 触发 flush 失败时 logger.error 被调", async () => {

@@ -278,7 +278,7 @@ type IPCCommand = string;
 type IPCArgs = Record<string, unknown> | undefined;
 
 const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
-  get_settings(): unknown {
+  getSettings(): unknown {
     // If V0 fixture is active, migrate on read
     if (mockState.v0FixtureActive) {
       const v0Settings = mockState.resolved as SettingsV0 | undefined;
@@ -289,8 +289,8 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
     return { ...mockState.settings };
   },
 
-  update_settings(args?: IPCArgs): unknown {
-    const newSettings = (args?.newSettings ?? args?.new_settings) as Partial<SettingsV15> | undefined;
+  updateSettings(args?: IPCArgs): unknown {
+    const newSettings = args?.newSettings as Partial<SettingsV15> | undefined;
     if (newSettings) {
       // Merge with existing settings
       mockState.settings = {
@@ -303,11 +303,11 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
     return { ...mockState.settings };
   },
 
-  clear_all_history(): void {
+  clearAllHistory(): void {
     // No-op in mock
   },
 
-  fetch_models(args?: IPCArgs): unknown {
+  fetchModels(args?: IPCArgs): unknown {
     // Returns current models from settings for the given provider
     const providerId = args?.providerId as string;
     const provider = mockState.settings.providers.find((p) => p.id === providerId);
@@ -317,37 +317,37 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
   // ─── V2 File IO (ADR-0013) ───────────────────────────────────
   // Mock handlers for file_tools service; tests set mockState.resolved
   // to control return value, or mockState.rejected to simulate errors.
-  read_file(): unknown {
+  readFile(): unknown {
     return mockState.resolved;
   },
 
-  write_file(): unknown {
+  writeFile(): unknown {
     return mockState.resolved;
   },
 
-  edit_file(): unknown {
+  editFile(): unknown {
     return mockState.resolved;
   },
 
-  search_files(): unknown {
+  searchFiles(): unknown {
     return mockState.resolved;
   },
 
-  delete_file(): unknown {
+  deleteFile(): unknown {
     return mockState.resolved;
   },
 
   // ─── Conversation IPC (ADR-0013) ─────────────────────────────────
-  list_conversations(_args?: IPCArgs): unknown {
+  listConversations(_args?: IPCArgs): unknown {
     // Return empty array by default; tests can override via mockState.resolved
     return mockState.resolved ?? [];
   },
 
-  get_conversation(args?: IPCArgs): unknown {
+  getConversation(args?: IPCArgs): unknown {
     return mockState.resolved ?? { id: (args?.id as string) ?? "", title: "", systemPrompt: null, workspaceId: "", createdAt: 0, updatedAt: 0, archivedAt: null };
   },
 
-  create_conversation(args?: IPCArgs): unknown {
+  createConversation(args?: IPCArgs): unknown {
     return mockState.resolved ?? {
       id: "new-conv-id",
       title: (args?.title as string) ?? "",
@@ -359,34 +359,34 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
     };
   },
 
-  archive_conversation(): unknown {
+  archiveConversation(): unknown {
     return mockState.resolved ?? undefined;
   },
 
-  delete_conversation(): unknown {
+  deleteConversation(): unknown {
     return mockState.resolved ?? undefined;
   },
 
   // ─── Message IPC (ADR-0013) ─────────────────────────────────────
-  list_messages(_args?: IPCArgs): unknown {
+  listMessages(_args?: IPCArgs): unknown {
     return mockState.resolved ?? [];
   },
 
-  append_message(args?: IPCArgs): unknown {
+  appendMessage(args?: IPCArgs): unknown {
     return mockState.resolved ?? { id: "new-msg-id", conversationId: (args?.conversationId as string) ?? "", role: (args?.role as string) ?? "user", content: (args?.content as string) ?? "", toolCalls: null, toolResults: null, model: null, inputTokens: null, outputTokens: null, createdAt: Date.now() };
   },
 
-  search_messages(_args?: IPCArgs): unknown {
+  searchMessages(_args?: IPCArgs): unknown {
     return mockState.resolved ?? [];
   },
 
   // ─── Workspace IPC ──────────────────────────────────────────────
-  pick_workspace_path(): unknown {
+  pickWorkspacePath(): unknown {
     return mockState.resolved ?? null;
   },
 
   // ─── QA Table IPC ───────────────────────────────────────────────
-  qa_get_table(_args?: IPCArgs): unknown {
+  qaGetTable(_args?: IPCArgs): unknown {
     return mockState.qaTable ?? [];
   },
 };
@@ -450,27 +450,27 @@ function buildCodemanMock(): Record<string, unknown> {
   //
   // Method → (cmd, arg-builder from positional args):
   const methodToCmd: Record<string, { cmd: string; build: (...a: unknown[]) => Record<string, unknown> }> = {
-    getSettings: { cmd: "get_settings", build: () => ({}) },
-    updateSettings: { cmd: "update_settings", build: (ns) => ({ newSettings: ns }) },
-    clearAllHistory: { cmd: "clear_all_history", build: () => ({}) },
-    listConversations: { cmd: "list_conversations", build: (ia) => ({ includeArchived: ia }) },
-    getConversation: { cmd: "get_conversation", build: (id) => ({ id }) },
-    createConversation: { cmd: "create_conversation", build: (a) => a as Record<string, unknown> },
-    archiveConversation: { cmd: "archive_conversation", build: (id) => ({ id }) },
-    deleteConversation: { cmd: "delete_conversation", build: (id) => ({ id }) },
-    listMessages: { cmd: "list_messages", build: (cid) => ({ conversationId: cid }) },
-    appendMessage: { cmd: "append_message", build: (a) => a as Record<string, unknown> },
-    searchMessages: { cmd: "search_messages", build: (q, l) => ({ query: q, limit: l }) },
-    listWorkspaces: { cmd: "list_workspaces", build: () => ({}) },
-    addWorkspace: { cmd: "add_workspace", build: (l, rp) => ({ label: l, rootPath: rp }) },
-    renameWorkspace: { cmd: "rename_workspace", build: (id, l) => ({ id, label: l }) },
-    deleteWorkspace: { cmd: "delete_workspace", build: (id) => ({ id }) },
-    pickWorkspacePath: { cmd: "pick_workspace_path", build: () => ({}) },
-    readFile: { cmd: "read_file", build: (wid, p) => ({ workspaceId: wid, path: p }) },
-    writeFile: { cmd: "write_file", build: (wid, p, c) => ({ workspaceId: wid, path: p, content: c }) },
-    editFile: { cmd: "edit_file", build: (wid, p, ot, nt, ra) => ({ workspaceId: wid, path: p, oldText: ot, newText: nt, replaceAll: ra }) },
-    searchFiles: { cmd: "search_files", build: (wid, g, cp) => ({ workspaceId: wid, glob: g, contentPattern: cp }) },
-    deleteFile: { cmd: "delete_file", build: (wid, p) => ({ workspaceId: wid, path: p }) },
+    getSettings: { cmd: "getSettings", build: () => ({}) },
+    updateSettings: { cmd: "updateSettings", build: (ns) => ({ newSettings: ns }) },
+    clearAllHistory: { cmd: "clearAllHistory", build: () => ({}) },
+    listConversations: { cmd: "listConversations", build: (ia) => ({ includeArchived: ia }) },
+    getConversation: { cmd: "getConversation", build: (id) => ({ id }) },
+    createConversation: { cmd: "createConversation", build: (a) => a as Record<string, unknown> },
+    archiveConversation: { cmd: "archiveConversation", build: (id) => ({ id }) },
+    deleteConversation: { cmd: "deleteConversation", build: (id) => ({ id }) },
+    listMessages: { cmd: "listMessages", build: (cid) => ({ conversationId: cid }) },
+    appendMessage: { cmd: "appendMessage", build: (a) => a as Record<string, unknown> },
+    searchMessages: { cmd: "searchMessages", build: (q, l) => ({ query: q, limit: l }) },
+    listWorkspaces: { cmd: "listWorkspaces", build: () => ({}) },
+    addWorkspace: { cmd: "addWorkspace", build: (l, rp) => ({ label: l, rootPath: rp }) },
+    renameWorkspace: { cmd: "renameWorkspace", build: (id, l) => ({ id, label: l }) },
+    deleteWorkspace: { cmd: "deleteWorkspace", build: (id) => ({ id }) },
+    pickWorkspacePath: { cmd: "pickWorkspacePath", build: () => ({}) },
+    readFile: { cmd: "readFile", build: (wid, p) => ({ workspaceId: wid, path: p }) },
+    writeFile: { cmd: "writeFile", build: (wid, p, c) => ({ workspaceId: wid, path: p, content: c }) },
+    editFile: { cmd: "editFile", build: (wid, p, ot, nt, ra) => ({ workspaceId: wid, path: p, oldText: ot, newText: nt, replaceAll: ra }) },
+    searchFiles: { cmd: "searchFiles", build: (wid, g, cp) => ({ workspaceId: wid, glob: g, contentPattern: cp }) },
+    deleteFile: { cmd: "deleteFile", build: (wid, p) => ({ workspaceId: wid, path: p }) },
   };
 
   const codeman: Record<string, unknown> = {};

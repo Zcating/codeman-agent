@@ -11,29 +11,29 @@ import { contextBridge, ipcRenderer } from "electron";
 
 const codeman = {
   // Settings
-  getSettings: () => ipcRenderer.invoke("get_settings"),
+  getSettings: () => ipcRenderer.invoke("getSettings"),
   updateSettings: (newSettings: unknown) =>
-    ipcRenderer.invoke("update_settings", { newSettings }),
-  clearAllHistory: () => ipcRenderer.invoke("clear_all_history"),
+    ipcRenderer.invoke("updateSettings", { newSettings }),
+  clearAllHistory: () => ipcRenderer.invoke("clearAllHistory"),
 
   // Conversations
   listConversations: (includeArchived: boolean) =>
-    ipcRenderer.invoke("list_conversations", { includeArchived }),
+    ipcRenderer.invoke("listConversations", { includeArchived }),
   getConversation: (id: string) =>
-    ipcRenderer.invoke("get_conversation", { id }),
+    ipcRenderer.invoke("getConversation", { id }),
   createConversation: (args: {
     title: string;
     workspaceId: string;
     systemPrompt: string | null;
-  }) => ipcRenderer.invoke("create_conversation", args),
+  }) => ipcRenderer.invoke("createConversation", args),
   archiveConversation: (id: string) =>
-    ipcRenderer.invoke("archive_conversation", { id }),
+    ipcRenderer.invoke("archiveConversation", { id }),
   deleteConversation: (id: string) =>
-    ipcRenderer.invoke("delete_conversation", { id }),
+    ipcRenderer.invoke("deleteConversation", { id }),
 
   // Messages
   listMessages: (conversationId: string) =>
-    ipcRenderer.invoke("list_messages", { conversationId }),
+    ipcRenderer.invoke("listMessages", { conversationId }),
   appendMessage: (args: {
     conversationId: string;
     role: string;
@@ -43,31 +43,31 @@ const codeman = {
     model?: string;
     inputTokens?: number;
     outputTokens?: number;
-  }) => ipcRenderer.invoke("append_message", args),
+  }) => ipcRenderer.invoke("appendMessage", args),
   searchMessages: (query: string, limit: number) =>
-    ipcRenderer.invoke("search_messages", { query, limit }),
+    ipcRenderer.invoke("searchMessages", { query, limit }),
 
   // Workspaces
-  listWorkspaces: () => ipcRenderer.invoke("list_workspaces"),
+  listWorkspaces: () => ipcRenderer.invoke("listWorkspaces"),
   addWorkspace: (label: string, rootPath: string) =>
-    ipcRenderer.invoke("add_workspace", { label, root_path: rootPath }),
+    ipcRenderer.invoke("addWorkspace", { label, rootPath }),
   renameWorkspace: (id: string, label: string) =>
-    ipcRenderer.invoke("rename_workspace", { id, label }),
+    ipcRenderer.invoke("renameWorkspace", { id, label }),
   deleteWorkspace: (id: string) =>
-    ipcRenderer.invoke("delete_workspace", { id }),
-  pickWorkspacePath: () => ipcRenderer.invoke("pick_workspace_path"),
+    ipcRenderer.invoke("deleteWorkspace", { id }),
+  pickWorkspacePath: () => ipcRenderer.invoke("pickWorkspacePath"),
 
   // Provider CRUD (V3+ ADR-0023 D8-W). NOTE: Electron main process does NOT
-  // currently register a "delete_provider" handler — the IPC will surface a
+  // currently register a "deleteProvider" handler — the IPC will surface a
   // "no handler registered" error from main. Local appStore.deleteProvider()
   // already mutates client state; backend sync is a follow-up task.
-  deleteProvider: (id: string) => ipcRenderer.invoke("delete_provider", { id }),
+  deleteProvider: (id: string) => ipcRenderer.invoke("deleteProvider", { id }),
 
   // Filesystem
   readFile: (workspaceId: string, path: string) =>
-    ipcRenderer.invoke("read_file", { workspaceId, path }),
+    ipcRenderer.invoke("readFile", { workspaceId, path }),
   writeFile: (workspaceId: string, path: string, content: string) =>
-    ipcRenderer.invoke("write_file", { workspaceId, path, content }),
+    ipcRenderer.invoke("writeFile", { workspaceId, path, content }),
   editFile: (
     workspaceId: string,
     path: string,
@@ -75,7 +75,7 @@ const codeman = {
     newText: string,
     replaceAll: boolean,
   ) =>
-    ipcRenderer.invoke("edit_file", {
+    ipcRenderer.invoke("editFile", {
       workspaceId,
       path,
       oldText,
@@ -87,21 +87,21 @@ const codeman = {
     glob: string,
     contentPattern: string | null,
   ) =>
-    ipcRenderer.invoke("search_files", {
+    ipcRenderer.invoke("searchFiles", {
       workspaceId,
       glob,
       contentPattern,
     }),
   deleteFile: (workspaceId: string, path: string) =>
-    ipcRenderer.invoke("delete_file", { workspaceId, path }),
+    ipcRenderer.invoke("deleteFile", { workspaceId, path }),
 
   // Native shims
   notify: (title: string, body: string) =>
     ipcRenderer.invoke("notify", { title, body }),
-  openExternal: (url: string) => ipcRenderer.invoke("open_external", { url }),
+  openExternal: (url: string) => ipcRenderer.invoke("openExternal", { url }),
   setLoginItem: (enabled: boolean) =>
-    ipcRenderer.invoke("set_login_item", { enabled }),
-  getLogPath: () => ipcRenderer.invoke("get_log_path"),
+    ipcRenderer.invoke("setLoginItem", { enabled }),
+  getLogPath: () => ipcRenderer.invoke("getLogPath"),
 
   // Streaming: preload exposes a callback registration API; main calls
   // webContents.send('stream-chunk', evt). Renderer wraps onStreamChunk

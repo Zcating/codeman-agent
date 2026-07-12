@@ -173,7 +173,7 @@ describe("SettingsRoute integration — provider UX", () => {
   });
 
   // ── Test 3: Edit model dropdown calls update_settings ──
-  it("Edit model dropdown calls update_settings with new model", async () => {
+  it("Edit model dropdown calls updateSettings with new model", async () => {
     const user = userEvent.setup();
     render(() => <SettingsPage />);
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -185,13 +185,13 @@ describe("SettingsRoute integration — provider UX", () => {
     await user.selectOptions(select, "MiniMax-M2.1-highspeed");
 
     await waitFor(() => {
-      expect(mockState.calls).toContain("update_settings");
+      expect(mockState.calls).toContain("updateSettings");
     });
-    expect(mockState.calls.some((c) => c === "update_settings")).toBe(true);
+    expect(mockState.calls.some((c) => c === "updateSettings")).toBe(true);
   });
 
-  // ── Test 4: Toggle enabled calls update_settings ──
-  it("Toggle enabled checkbox calls update_settings", async () => {
+  // ── Test 4: Toggle enabled calls updateSettings ──
+  it("Toggle enabled checkbox calls updateSettings", async () => {
     const user = userEvent.setup();
     render(() => <SettingsPage />);
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -203,7 +203,7 @@ describe("SettingsRoute integration — provider UX", () => {
     await user.click(checkbox);
 
     await waitFor(() => {
-      expect(mockState.calls).toContain("update_settings");
+      expect(mockState.calls).toContain("updateSettings");
     });
   });
 
@@ -357,7 +357,7 @@ describe("SettingsRoute integration — tab switching & handlers", () => {
     await user.click(checkbox);
 
     await waitFor(() => {
-      expect(mockState.calls).toContain("update_settings");
+      expect(mockState.calls).toContain("updateSettings");
     });
   });
 
@@ -421,7 +421,7 @@ describe("SettingsRoute integration — tab switching & handlers", () => {
     expect(screen.queryByText(/Delete all conversations\?/i)).not.toBeInTheDocument();
   });
 
-  it("confirm 状态点 'Yes, delete all' 触发 invoke('clear_all_history')", async () => {
+  it("confirm 状态点 'Yes, delete all' 触发 invoke('clearAllHistory')", async () => {
     const user = userEvent.setup();
     render(() => <SettingsPage />);
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -435,10 +435,10 @@ describe("SettingsRoute integration — tab switching & handlers", () => {
     await user.click(screen.getByText(/Yes, delete all/i));
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    expect(mockState.calls).toContain("clear_all_history");
+    expect(mockState.calls).toContain("clearAllHistory");
   });
 
-  it("clear_all_history 抛错时 logger.error 被调 (不 crash)", async () => {
+  it("clearAllHistory 抛错时 logger.error 被调 (不 crash)", async () => {
     const user = userEvent.setup();
     mockState.rejected = new Error("boom");
 

@@ -105,45 +105,45 @@ async function dispatchInvoke<T>(
   const a = api();
   const arg = (k: string) => args?.[k];
   switch (name) {
-    case "get_settings":
+    case "getSettings":
       return (await a.getSettings()) as T;
-    case "update_settings":
-      return (await a.updateSettings(arg("newSettings") ?? arg("new_settings"))) as T;
-    case "clear_all_history":
+    case "updateSettings":
+      return (await a.updateSettings(arg("newSettings") as unknown)) as T;
+    case "clearAllHistory":
       return (await a.clearAllHistory()) as T;
-    case "list_conversations":
+    case "listConversations":
       return (await a.listConversations(!!arg("includeArchived"))) as T;
-    case "get_conversation":
+    case "getConversation":
       return (await a.getConversation(arg("id") as string)) as T;
-    case "create_conversation":
+    case "createConversation":
       return (await a.createConversation(args)) as T;
-    case "archive_conversation":
+    case "archiveConversation":
       return (await a.archiveConversation(arg("id") as string)) as T;
-    case "delete_conversation":
+    case "deleteConversation":
       return (await a.deleteConversation(arg("id") as string)) as T;
-    case "list_messages":
+    case "listMessages":
       return (await a.listMessages(arg("conversationId") as string)) as T;
-    case "append_message":
+    case "appendMessage":
       return (await a.appendMessage(args)) as T;
-    case "search_messages":
+    case "searchMessages":
       return (await a.searchMessages(arg("query") as string, arg("limit") as number)) as T;
-    case "list_workspaces":
+    case "listWorkspaces":
       return (await a.listWorkspaces()) as T;
-    case "add_workspace":
-      return (await a.addWorkspace(arg("label") as string, arg("root_path") as string)) as T;
-    case "rename_workspace":
+    case "addWorkspace":
+      return (await a.addWorkspace(arg("label") as string, arg("rootPath") as string)) as T;
+    case "renameWorkspace":
       return (await a.renameWorkspace(arg("id") as string, arg("label") as string)) as T;
-    case "delete_workspace":
+    case "deleteWorkspace":
       return (await a.deleteWorkspace(arg("id") as string)) as T;
-    case "pick_workspace_path":
+    case "pickWorkspacePath":
       return (await a.pickWorkspacePath()) as T;
-    case "delete_provider":
+    case "deleteProvider":
       return (await a.deleteProvider(arg("id") as string)) as T;
-    case "read_file":
+    case "readFile":
       return (await a.readFile(arg("workspaceId") as string, arg("path") as string)) as T;
-    case "write_file":
+    case "writeFile":
       return (await a.writeFile(arg("workspaceId") as string, arg("path") as string, arg("content") as string)) as T;
-    case "edit_file":
+    case "editFile":
       return (await a.editFile(
         arg("workspaceId") as string,
         arg("path") as string,
@@ -151,13 +151,13 @@ async function dispatchInvoke<T>(
         arg("newText") as string,
         !!arg("replaceAll"),
       )) as T;
-    case "search_files":
+    case "searchFiles":
       return (await a.searchFiles(
         arg("workspaceId") as string,
         arg("glob") as string,
         (arg("contentPattern") as string | null) ?? null,
       )) as T;
-    case "delete_file":
+    case "deleteFile":
       return (await a.deleteFile(arg("workspaceId") as string, arg("path") as string)) as T;
     default:
       throw new Unknown({ message: `Unknown IPC: ${name}` });
@@ -310,28 +310,28 @@ export class FileService extends Context.Tag("FileService")<
 // ─── Live layers (use the local invoke) ─────────────────────────
 
 export const ConversationServiceLive = Layer.succeed(ConversationService, {
-  list: (includeArchived) => invoke<Conversation[]>("list_conversations", { includeArchived }),
-  get: (id) => invoke<Conversation>("get_conversation", { id }),
+  list: (includeArchived) => invoke<Conversation[]>("listConversations", { includeArchived }),
+  get: (id) => invoke<Conversation>("getConversation", { id }),
   create: (title, systemPrompt, workspaceId) =>
-    invoke<Conversation>("create_conversation", { title, systemPrompt, workspaceId }),
-  archive: (id) => invoke<void>("archive_conversation", { id }),
-  delete: (id) => invoke<void>("delete_conversation", { id }),
+    invoke<Conversation>("createConversation", { title, systemPrompt, workspaceId }),
+  archive: (id) => invoke<void>("archiveConversation", { id }),
+  delete: (id) => invoke<void>("deleteConversation", { id }),
 });
 
 export const MessageServiceLive = Layer.succeed(MessageService, {
-  list: (conversationId) => invoke<Message[]>("list_messages", { conversationId }),
-  append: (args) => invoke<Message>("append_message", args),
-  search: (query, limit) => invoke<Message[]>("search_messages", { query, limit }),
+  list: (conversationId) => invoke<Message[]>("listMessages", { conversationId }),
+  append: (args) => invoke<Message>("appendMessage", args),
+  search: (query, limit) => invoke<Message[]>("searchMessages", { query, limit }),
 });
 
 // ProviderService uses settings.providers (V1.5 unified schema) — calls
-// get_settings via the codeman dispatch.
+// getSettings via the codeman dispatch.
 export const ProviderServiceLive = Layer.effect(
   ProviderService,
   Effect.gen(function* () {
     const getProviders = Effect.tryPromise({
       try: () =>
-        dispatchInvoke<{ providers: Provider[] }>("get_settings").then(
+        dispatchInvoke<{ providers: Provider[] }>("getSettings").then(
           (s) => s.providers ?? [],
         ),
       catch: (e) => TauriError.IPC(String(e)),
@@ -404,20 +404,20 @@ export const ProviderServiceLive = Layer.effect(
       delete: (id) =>
         Effect.tryPromise({
           try: () =>
-            dispatchInvoke<void>("delete_provider", { id }).catch(() => undefined),
-          catch: (e) => TauriError.IPC(`delete_provider failed: ${String(e)}`),
+            dispatchInvoke<void>("deleteProvider", { id }).catch(() => undefined),
+          catch: (e) => TauriError.IPC(`deleteProvider failed: ${String(e)}`),
         }),
     };
   }),
 );
 
 export const SettingsServiceLive = Layer.succeed(SettingsService, {
-  getSettings: () => invoke<Settings>("get_settings"),
-  updateSettings: (patch) => invoke<Settings>("update_settings", { newSettings: patch }),
-  clearAllHistory: () => invoke<void>("clear_all_history"),
+  getSettings: () => invoke<Settings>("getSettings"),
+  updateSettings: (patch) => invoke<Settings>("updateSettings", { newSettings: patch }),
+  clearAllHistory: () => invoke<void>("clearAllHistory"),
   getActiveLlmProvider: () =>
     Effect.gen(function* () {
-      const settings = yield* invoke<Settings>("get_settings");
+      const settings = yield* invoke<Settings>("getSettings");
       const id = settings.defaultLlmProviderId;
       if (!id) {
         return yield* Effect.succeed(null);
@@ -444,13 +444,13 @@ export const SettingsServiceLive = Layer.succeed(SettingsService, {
 });
 
 export const SettingsServiceImpl = {
-  getSettings: () => invoke<Settings>("get_settings"),
+  getSettings: () => invoke<Settings>("getSettings"),
   updateSettings: (patch: unknown) =>
-    invoke<Settings>("update_settings", { newSettings: patch }),
-  clearAllHistory: () => invoke<void>("clear_all_history"),
+    invoke<Settings>("updateSettings", { newSettings: patch }),
+  clearAllHistory: () => invoke<void>("clearAllHistory"),
   getActiveLlmProvider: () =>
     Effect.gen(function* () {
-      const settings = yield* invoke<Settings>("get_settings");
+      const settings = yield* invoke<Settings>("getSettings");
       const id = settings.defaultLlmProviderId;
       if (!id) {
         return yield* Effect.succeed(null);
@@ -478,10 +478,10 @@ export const SettingsServiceImpl = {
 
 export const FileServiceLive = Layer.succeed(FileService, {
   readFile: (workspaceId: string, path: string) =>
-    invoke<string>("read_file", { workspaceId, path }),
+    invoke<string>("readFile", { workspaceId, path }),
 
   writeFile: (workspaceId: string, path: string, content: string) =>
-    invoke<void>("write_file", { workspaceId, path, content }),
+    invoke<void>("writeFile", { workspaceId, path, content }),
 
   editFile: (
     workspaceId: string,
@@ -490,7 +490,7 @@ export const FileServiceLive = Layer.succeed(FileService, {
     newText: string,
     replaceAll: boolean,
   ) =>
-    invoke<void>("edit_file", {
+    invoke<void>("editFile", {
       workspaceId,
       path,
       oldText,
@@ -499,14 +499,14 @@ export const FileServiceLive = Layer.succeed(FileService, {
     }),
 
   searchFiles: (workspaceId: string, glob: string, contentPattern: string | null) =>
-    invoke<FileMatch[]>("search_files", {
+    invoke<FileMatch[]>("searchFiles", {
       workspaceId,
       glob,
       contentPattern,
     }),
 
   deleteFile: (workspaceId: string, path: string) =>
-    invoke<void>("delete_file", { workspaceId, path }),
+    invoke<void>("deleteFile", { workspaceId, path }),
 });
 
 // ─── Bridge functions (Promise-based, for Solid UI) ─────────────

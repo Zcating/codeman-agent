@@ -16,14 +16,14 @@
 
 ### Providers
 
-- **Provider (提供商)** — 公司维度的统一记录，承载一种或多种"对外能力"。一条记录 = 一家公司。shape: `{ id, label, enabled, api_key, llm: {...}, billing?: {...} }`。`api_key` 是该 provider 的对外调用凭据（明文存于 Settings JSON，见 ADR-0015）；`llm` 必选，`billing` 可选。_避免_：client、vendor、service。
-- **Provider.llm (LLM 能力)** — Provider 必选子对象。shape: `{ default_model, base_url, api_type, models, models_endpoint }`。`api_type` 锁 `"anthropic-messages"`；`models: ModelMeta[]` 用户在 Settings 中可编辑；`models_endpoint: string` provider 维度的模型列表拉取 URL。**不变量**：`default_model` 始终是 `models` 数组中某个元素的 `id` 或 `""`（见 Default Model Invariant，ADR-0016）。Agent 的"燃料"。pi-ai 调 LLM 时 `Authorization: Bearer <Provider.api_key>`。_避免_：model provider、API provider、AI provider。
-- **Provider.billing (计费能力)** — Provider 可选子对象。shape: `{ kind }`。`kind` = `"balance" | "plan_quota"`。Agent 的一级工具目标。billing adapter 调计费端点时复用 `Provider.api_key` 作 `Authorization: Bearer`。_避免_：billing source、计费源。
+- **Provider (提供商)** — 公司维度的统一记录，承载一种或多种"对外能力"。一条记录 = 一家公司。shape: `{ id, label, enabled, apiKey, llm: {...}, billing?: {...} }`。`apiKey` 是该 provider 的对外调用凭据（明文存于 Settings JSON，见 ADR-0015）；`llm` 必选，`billing` 可选。_避免_：client、vendor、service。
+- **Provider.llm (LLM 能力)** — Provider 必选子对象。shape: `{ defaultModel, baseUrl, apiType, models, modelsEndpoint }`。`apiType` 锁 `"anthropic-messages"`；`models: ModelMeta[]` 用户在 Settings 中可编辑；`modelsEndpoint: string` provider 维度的模型列表拉取 URL。**不变量**：`defaultModel` 始终是 `models` 数组中某个元素的 `id` 或 `""`（见 Default Model Invariant，ADR-0016）。Agent 的"燃料"。pi-ai 调 LLM 时 `Authorization: Bearer <Provider.apiKey>`。_避免_：model provider、API provider、AI provider。
+- **Provider.billing (计费能力)** — Provider 可选子对象。shape: `{ kind }`。`kind` = `"balance" | "plan_quota"`。Agent 的一级工具目标。billing adapter 调计费端点时复用 `Provider.apiKey` 作 `Authorization: Bearer`。_避免_：billing source、计费源。
 - **Protocol (协议)** — LLM 上游调用的 HTTP/SSE 形态。锁定 anthropic-messages（Anthropic Messages API 的请求/响应形状）；pi-ai 按 `api` 字段路由到对应 transport 实现。_避免_：API format、API type（实现细节）、wire format。
 - **Adapter (适配器)** — 每个计费提供方的 HTTP 客户端与响应解析器，将 API key 转换为 `Snapshot`。位于 TS 端 (`src/features/billing/lib/adapters/`)：deepseek 仅实现 `balance`，minimax 实现 `plan_quota`（balance 端点未公开验证）。_避免_：HTTP client（过载）。
-- **ModelMeta (模型元数据)** — `Provider.llm.models[]` 元素。shape: `{ id, label, context_window?, deprecated?, thinking? }`；用户在 Settings 中可增删编辑。`ProviderService.getModels(id)` 静态读出此列表（读 settings）；`ProviderService.fetchModels(id)` 调 `models_endpoint` 拉最新（OpenAI-compatible `/v1/models` 格式，`label` 默认 = `id`）。_避免_：model config、model info。
-- **Models Endpoint (模型列表端点)** — `Provider.llm.models_endpoint`。per-provider 可配置 URL，用于 `fetchModels()` 拉模型列表。
-- **Default Model Invariant (默认模型不变量)** — `Provider.llm.default_model` 始终是 `Provider.llm.models` 数组中某个元素的 `id`，或 `""`（models 为空时）。`appStore.refreshProviderModels` 在写 state 时强制执行：若 `default_model` 不在新数组中且数组非空，改成 `models[0].id`；若数组为空，改成 `""`（ADR-0016）。防止 UI dropdown 跳到默认第一项而 store 里 `default_model` 仍是无效值的"UI 看似 OK / store 不一致"的 bug。
+- **ModelMeta (模型元数据)** — `Provider.llm.models[]` 元素。shape: `{ id, label, contextWindow?, deprecated?, thinking? }`；用户在 Settings 中可增删编辑。`ProviderService.getModels(id)` 静态读出此列表（读 settings）；`ProviderService.fetchModels(id)` 调 `modelsEndpoint` 拉最新（OpenAI-compatible `/v1/models` 格式，`label` 默认 = `id`）。_避免_：model config、model info。
+- **Models Endpoint (模型列表端点)** — `Provider.llm.modelsEndpoint`。per-provider 可配置 URL，用于 `fetchModels()` 拉模型列表。
+- **Default Model Invariant (默认模型不变量)** — `Provider.llm.defaultModel` 始终是 `Provider.llm.models` 数组中某个元素的 `id`，或 `""`（models 为空时）。`appStore.refreshProviderModels` 在写 state 时强制执行：若 `defaultModel` 不在新数组中且数组非空，改成 `models[0].id`；若数组为空，改成 `""`（ADR-0016）。防止 UI dropdown 跳到默认第一项而 store 里 `defaultModel` 仍是无效值的"UI 看似 OK / store 不一致"的 bug。
 - **Balance (余额)** — 计费提供方持有的可充值信用池。时点状态，可充值。
 - **Plan Quota (用量)** — 套餐附带的固定、不可充值的配额。随使用减少，周期重置，不可充值。
 
@@ -33,7 +33,7 @@
 - **Workspace-Bound Conversation (绑定 workspace 的会话)** — 每个 Conversation 在创建时 (`createConversation(workspaceId, ...)`) 必须绑定 1 个 workspace (`workspace_id: string` 字段)，创建后不可更改。`workspace_id = ""` 表示 "needs workspace" (V1.x 迁移的旧 conv 状态，UI 灰标)。该绑定决定 file tool 沙箱边界；Home 上的 workspace 选择器决定新 conv 的绑定。_避免_: global workspace、workspace 切换 (per-Conv 锁定后不存在切换)。
 - **Add Workspace (添加 Workspace)** — 用户在 Home 的 workspace picker dropdown 中通过 "+ Add new workspace…" Action slot 触发；调 `chatStore.pickWorkspacePath()` 弹 OS 原生 folder picker；picker 关闭后若返回非 null 路径，调用 `chatStore.addWorkspace(rootPath)` → `WorkspaceService.add`（SQLite 持久化）+ 自动派生 label（`deriveLabelFromPath`）+ dedup（同 root_path 重复时静默忽略并自动选已有）+ 关闭 dropdown + focus textarea。Home **不**再跳 /settings。_避免_: Navigate-to-Settings（V2.1 polish 早期设计，已废止）。
 - **Workspace Label Derivation (workspace label 派生)** — 通过 OS folder picker 添加 workspace 时（`Add Workspace` 流程），`label` 从 `root_path` 自动派生：调用 `deriveLabelFromPath(rootPath)` (位于 `src/shared/lib/derive-label-from-path.ts`) 取路径最后非空段作为 label；空结果（`C:\`、`/`）fallback `"Untitled workspace"`。后续用户可通过 sidebar hover → Rename 按钮修改 label。_避免_: 强制用户在 picker 关闭后输入 label（增加 UI 阻塞；违反"calm/professional"原则）。
-- **File Tool (文件工具)** — pi-agent 工具族，内置 5 个: `read_file` (读全文) / `write_file` (覆盖写) / `edit_file` (替换文本，支持 `replace_all`) / `search_files` (glob + content 搜索) / `delete_file` (移至回收站)。所有工具通过 IPC 调 Electron Main process 的 `node:fs`，沙箱由 workspace 边界约束。_避免_: fs tool、file operation (过载)。
+- **File Tool (文件工具)** — pi-agent 工具族，内置 5 个: `read_file` (读全文) / `write_file` (覆盖写) / `edit_file` (替换文本，支持 `replaceAll`) / `search_files` (glob + content 搜索) / `delete_file` (移至回收站)。所有工具通过 IPC 调 Electron Main process 的 `node:fs`，沙箱由 workspace 边界约束。_避免_: fs tool、file operation (过载)。
 - **Sandbox Violation (越界错误)** — Electron Main process 在 `fs.realpath(path)` 后检测到 `path` 不在任何 workspace 目录下时返回的错误。Agent 收到后必须重新规划 (改路径 / 让用户加 workspace) 而非重试原路径。V3 起语义不变；实现从 Rust `std::fs::canonicalize` 改为 Node `fs.realpath.native` (per ADR-0024)。
 
 ### 架构
@@ -57,18 +57,18 @@
 
 ### 密钥
 
-- **API Key (API 密钥)** — Provider 的对外调用凭据，shape 为 `Provider.api_key: string`。**明文存于 Settings JSON**（`%LocalAppData%\codeman-agent\settings.json`，由 `app.setPath('userData', '%LocalAppData%\\codeman-agent')` 锁定，per ADR-0024），与 Settings 其它字段同档；不再分 LLM / Billing 二分（ADR-0015）。LLM 调用和计费工具调端点都复用同一 key。V1 单机单用户威胁模型下接受明文；如未来需 OS 级密钥管理（keytar / Windows Credential Manager / Electron `safeStorage`）需重做 ADR-0015。_避免_：把 key 单独走 OS keychain 再走 IPC（V1.7+ 前的设计，已废止）。
+- **API Key (API 密钥)** — Provider 的对外调用凭据，shape 为 `Provider.apiKey: string`。**明文存于 Settings JSON**（`%LocalAppData%\codeman-agent\settings.json`，由 `app.setPath('userData', '%LocalAppData%\\codeman-agent')` 锁定，per ADR-0024），与 Settings 其它字段同档；不再分 LLM / Billing 二分（ADR-0015）。LLM 调用和计费工具调端点都复用同一 key。V1 单机单用户威胁模型下接受明文；如未来需 OS 级密钥管理（keytar / Windows Credential Manager / Electron `safeStorage`）需重做 ADR-0015。_避免_：把 key 单独走 OS keychain 再走 IPC（V1.7+ 前的设计，已废止）。
 - **Secret** — Rust 端 `Secret<String>` newtype，`Debug` / `Display` 打印 `Secret(***)` / `***`。V1.7+ 后 Settings JSON 明文存 key，`Secret` 主要用于 pi-agent 运行时构造 header 时临时包裹。**调用方**：`logger.*` / `log::*!` 不得打印完整 secret 值（任一语言）；`Secret` 类型自动重载 `Debug` / `Display`，裸字符串变量需手动 redact 为 `***`。V1.10+ 起本规则从"强制 redact"降级为 developer 自觉——理由是 simple logger API 与自动 redaction 实现冲突，详见 ADR-0018 D6。_避免_：对任何凭据使用裸 `String`。
 
 ### Settings 与状态
 
-- **Settings (设置)** — 通过 `electron-store` 持久化的 JSON 文档，位于 `%LocalAppData%\codeman-agent\`（由 `app.setPath('userData', ...)` 显式锁定，与 V2 Tauri 路径对齐，per ADR-0024）。包含统一 `providers[]` 数组（每条 `Provider` 含 `api_key` 明文字段，见 ADR-0015），以及 window / theme / system_prompt / conversations / user_language / start_at_login 等字段。`workspaces` 已从 Settings 移出，改由 `WorkspaceService`（SQLite 持久化，per ADR-0023 D8-W）。**API 密钥现在直接落在 Settings JSON 内**（V1.7+ 之前的"分 store 命名空间"模型已废止）。
+- **Settings (设置)** — 通过 `electron-store` 持久化的 JSON 文档，位于 `%LocalAppData%\codeman-agent\`（由 `app.setPath('userData', ...)` 显式锁定，与 V2 Tauri 路径对齐，per ADR-0024）。包含统一 `providers[]` 数组（每条 `Provider` 含 `apiKey` 明文字段，见 ADR-0015），以及 window / theme / systemPrompt / conversations / userLanguage / startAtLogin 等字段。`workspaces` 已从 Settings 移出，改由 `WorkspaceService`（SQLite 持久化，per ADR-0023 D8-W）。**API 密钥现在直接落在 Settings JSON 内**（V1.7+ 之前的"分 store 命名空间"模型已废止）。
 - **App Store (全局应用状态)** — `src/shared/stores/app.store.ts` 提供的 Settings reactive 桥接层（ADR-0015 + ADR-0016）。`createStore` 包装 settings。公开 API（7 个）：
   - `appStore.state.value` — reactive 读
   - `appStore.set(patch)` — 写 state，**不**触发 IPC（debounce 由 `features/settings/lib/settings-saver` 触发）
   - `appStore.forceFlush()` — 跳过 debounce 立即 IPC（footer Save 调用）
   - `appStore.refresh()` — 从后端重载
-  - `appStore.refreshProviderModels(id)` — 调 `ProviderService.fetchModels` 拉新 models 列表并写 state（含 `default_model` 自动 fallback 不变量）
+  - `appStore.refreshProviderModels(id)` — 调 `ProviderService.fetchModels` 拉新 models 列表并写 state（含 `defaultModel` 自动 fallback 不变量）
   - `appStore.deleteProvider(id)` — 从 `providers[]` 移除指定记录
   - `appStore.clearAllHistory()` — 清 SQLite conversation 表（settings 路由 advanced tab 调用）
 
@@ -96,11 +96,11 @@
 
 ### 测试
 
-- **Fake LLM Provider (假 LLM Provider)** — 本地开发与 e2e 测试共用的 Provider 记录，`base_url` 指向 Electron Main 启动的本地 HTTP server（默认 `http://127.0.0.1:50000/mock/anthropic`，dev / e2e 共用）。shape 与真实 Provider (`minimax` / `deepseek`) 完全一致（同 `id` / `label` / `api_key` / `llm.{base_url, default_model, models, ...}` 字段），`AnthropicTransport` 不识别其性质 —— 一律走标准 `fetch()` 流程；data 来源是 `electron/main/mock-server.ts`（per "Mock Server"），POST `/mock/anthropic/v1/messages` 后读 Q→A Table 出 SSE 字符串，沿用 `parseSseLine` 解析路径。**唯一数据源路径**：**Q→A Table** —— `CODEMAN_TEST_QA_TABLE` env var → per-worker `e2e/fixtures/qa-w{N}.json`；未设且 dev 模式时 → `electron/assets/qa.dev.json`；再否则空表（miss 无 fallback 时返回 mock server 的 `[mock] no canned response queued` warning SSE 字符串，让 client 走通常渲染）。V2 起 `__MOCK_LLM_QUEUE__` window global + `mockStreamTurn` 已整体移除；不保留进程内 JS shim 路径。e2e / dev 注册均走 `update_settings` IPC 或 Settings UI（dev 在 Add Provider 弹窗里用 Mock 模版单选 prefill，per "Add Provider Dialog Mock Template"），路径与真实 Provider 注册一致（无 bypass 代码路径）。V3 起 IPC 实现从 Tauri command 变为 Electron `ipcMain.handle('update_settings', ...)`；fake-provider 识别点与 bypass 路径不变 (per ADR-0024)。_避免_：transport 层识别 mock（`isMockMode` / `mock://` prefix 跳过 fetch）——一切走真 fetch；为测试单写 Electron IPC handler；wiremock / 独立 HTTP server 进程；为 dev 新起 independent mock marker (`mock://`、`test://`、`qa://` 等) —— 任何在 transport 之外的 mock 识别都违反本条。
-- **Mock Server (本地 Q→A HTTP server)** — `electron/main/mock-server.ts` 启动的本地 HTTP 服务，监听 `127.0.0.1:50000`（`process.env["CODEMAN_MOCK_PORT"]` 可覆盖）。POST `/mock/anthropic/v1/messages` 处理：读 JSON body，提取 `messages` 中**末条 `role:"user"` message**（per `extractLastUserText`；v2026-07-07+ 改 last-user-msg lookup，提升续接会话 UX — 用户中途换 entry key 如 "three-blocks" 即可命中；v3.0.x 早期版本锁首条，弃用），substring match Q→A Table（per "Q→A Table"），命中后按 `entry.turns[N]` 合成标准 Anthropic SSE 流（per "Scripted Multi-Turn Entry"），其中 N = assistant 消息数；miss 无 `default` 时返回 `[mock] no canned response queued` SSE。生产构建（`NODE_ENV === "production"`）**不启 server**（除非 dev 用户主动创建 `http://127.0.0.1:50000/...` provider）。e2e / dev 共用同一 server。_避免_：server 内识别 mock provider 性质（user 配啥 base_url 都受理）；server 依赖 vite / 渲染层；让 server 写 settings / IPC —— 服务是 stateless HTTP responder。
-- **Q→A Table (Q→A 表)** — Fake LLM Provider 的 entry 数据源，可源自两类文件：e2e 路径下 `CODEMAN_TEST_QA_TABLE` 环境变量指向 per-worker 路径（典型 `e2e/fixtures/qa-w{N}.json`，N = `workerInfo.parallelIndex`）；dev 路径下 `electron/assets/qa.dev.json`（per "Dev Q→A File"）。Electron Main process 启动时**一次性加载到内存数组**，**不在运行时重读**（reload 不在 scope，避免文件 mtime race + 简化语义）。加载优先级：env var 胜出 → 未设且 dev 模式则加载 `qa.dev.json` → 否则空表。V3 起加载位置从 Rust `src-tauri/src/lib.rs` 启动钩子变为 Node `electron/main/index.ts` 启动钩子 (per ADR-0024)。Shape：顶层 `QaEntry[]` JSON 数组。
+- **Fake LLM Provider (假 LLM Provider)** — 本地开发与 e2e 测试共用的 Provider 记录，`baseUrl` 指向 Electron Main 启动的本地 HTTP server（默认 `http://127.0.0.1:50000/mock/anthropic`，dev / e2e 共用）。shape 与真实 Provider (`minimax` / `deepseek`) 完全一致（同 `id` / `label` / `apiKey` / `llm.{baseUrl, defaultModel, models, ...}` 字段），`AnthropicTransport` 不识别其性质 —— 一律走标准 `fetch()` 流程；data 来源是 `electron/main/mock-server.ts`（per "Mock Server"），POST `/mock/anthropic/v1/messages` 后读 Q→A Table 出 SSE 字符串，沿用 `parseSseLine` 解析路径。**唯一数据源路径**：**Q→A Table** —— `CODEMAN_TEST_QA_TABLE` env var → per-worker `e2e/fixtures/qa-w{N}.json`；未设且 dev 模式时 → `electron/assets/qa.dev.json`；再否则空表（miss 无 fallback 时返回 mock server 的 `[mock] no canned response queued` warning SSE 字符串，让 client 走通常渲染）。V2 起 `__MOCK_LLM_QUEUE__` window global + `mockStreamTurn` 已整体移除；不保留进程内 JS shim 路径。e2e / dev 注册均走 `updateSettings` IPC 或 Settings UI（dev 在 Add Provider 弹窗里用 Mock 模版单选 prefill，per "Add Provider Dialog Mock Template"），路径与真实 Provider 注册一致（无 bypass 代码路径）。V3 起 IPC 实现从 Tauri command 变为 Electron `ipcMain.handle('updateSettings', ...)`；fake-provider 识别点与 bypass 路径不变 (per ADR-0024)。_避免_：transport 层识别 mock（`isMockMode` / `mock://` prefix 跳过 fetch）——一切走真 fetch；为测试单写 Electron IPC handler；wiremock / 独立 HTTP server 进程；为 dev 新起 independent mock marker (`mock://`、`test://`、`qa://` 等) —— 任何在 transport 之外的 mock 识别都违反本条。
+- **Mock Server (本地 Q→A HTTP server)** — `electron/main/mock-server.ts` 启动的本地 HTTP 服务，监听 `127.0.0.1:50000`（`process.env["CODEMAN_MOCK_PORT"]` 可覆盖）。POST `/mock/anthropic/v1/messages` 处理：读 JSON body，提取 `messages` 中**末条 `role:"user"` message**（per `extractLastUserText`；v2026-07-07+ 改 last-user-msg lookup，提升续接会话 UX — 用户中途换 entry key 如 "three-blocks" 即可命中；v3.0.x 早期版本锁首条，弃用），substring match Q→A Table（per "Q→A Table"），命中后按 `entry.turns[N]` 合成标准 Anthropic SSE 流（per "Scripted Multi-Turn Entry"），其中 N = assistant 消息数；miss 无 `default` 时返回 `[mock] no canned response queued` SSE。生产构建（`NODE_ENV === "production"`）**不启 server**（除非 dev 用户主动创建 `http://127.0.0.1:50000/...` provider）。e2e / dev 共用同一 server。_避免_：server 内识别 mock provider 性质（user 配啥 baseUrl 都受理）；server 依赖 vite / 渲染层；让 server 写 settings / IPC —— 服务是 stateless HTTP responder。
+- **Q→A Table (Q→A 表)** — Fake LLM Provider 的 entry 数据源，可源自两类文件：e2e 路径下 `CODEMAN_TEST_QA_TABLE` 环境变量指向 per-worker 路径（典型 `e2e/fixtures/qa-w{N}.json`，N = `workerInfo.parallelIndex`）；dev 路径下 `electron/assets/qa.dev.json`（per "Dev Q→A File"）。Electron Main process 启动时**一次性加载到内存数组**，**不在运行时重读**（reload 不在 scope，避免文件 mtime race + 简化语义）。加载优先级：env var 胜出 → 未设且 dev 模式则加载 `qa.dev.json` → 否则空表。V3 起加载位置在 Node `electron/main/index.ts` 启动钩子 (per ADR-0024)。Shape：顶层 `QaEntry[]` JSON 数组。
 - **Dev Q→A File (qa.dev.json)** — 本地开发专用的 Q→A seed，路径 `electron/assets/qa.dev.json`。在 `CODEMAN_TEST_QA_TABLE` env var 未设且 dev 模式（`NODE_ENV !== "production"` 或 vite-dev server）时由 Main 启动钩子加载，作为开发期 mock-provider 的 entry 数据。Shape 与 e2e Q→A Entry 完全一致（`QaEntry[]`），含 `default?: true` fallback。开发期 substring miss + 无 default → mock server 走 `[mock] no canned response queued` SSE warning fallback（与 e2e 路径语义对齐，无 silent leak）。文件 ship 进 git — 不是 per-worker 隔离需求。_避免_：起 `.test.`/`.fixture.`/`.e2e.` 后缀以区分（QA 术语已明确覆盖两类来源）；运行时改 qa.dev.json（per "Q→A Table" immutable 约束）。
-- **Add Provider Dialog Mock Template (Add Provider 弹窗 Mock 模版)** — Settings → Providers 区 `+ Add provider` 弹窗实现为 **命令式函数** `createProviderFormDialog()`（`src/features/settings/components/add-provider-dialog.tsx`，基于 `codeman-dialog.show<Provider>`；dismiss 路径 resolve `null`）。弹窗顶部 type 单选 `[Real API] / [Mock (dev)]`。选 Mock 时仅作为字段预填 — 不锁字段、不隐藏字段：pre-fill 值为 `{ id: 'mock-N', label: 'Mock', api_key: '', llm: { default_model: 'mock-default', base_url: 'http://127.0.0.1:50000/mock/anthropic', api_type: 'anthropic-messages', models: [{ id: 'mock-default', label: 'Mock' }], models_endpoint: '' } }`（`base_url` 默认指向本地 mock server，per "Mock Server"）；用户可在保存前手改任意字段（包含 base_url 与 port）。提交后 dialog 构造完整 `Provider` resolve 给 caller，caller 走 `appStore.set({ providers: [...cur, p] })` + `settingsSaver.scheduleSave()`（Settings.tsx 行内 handler，无独立 store action / composable）。添加后 Provider 走既有 `update_settings` IPC + `buildEnabledProviders` 自动出现在 LLM selector（无新增过滤逻辑）。dev 启动不预填（无 settings.json 污染）；seed 数据从 "Dev Q→A File" 加载。_避免_：把 Mock 模版做成固定 entry 预填到 settings.json（与"manual add 哲学"冲突）；用新 schema 字段 `llm.kind` 区分（mock 性质已由 base_url 唯一识别 —— 而 base_url 即本地 mock server URL）；为 mock 单独写 IPC handler（违反 "Fake LLM Provider" 单一注册路径）；把 form 弹窗做成 settings.tsx 持久化的 `<Dialog>` 组件（违背 codeman-dialog 一致性，form-state 序列化反而绕路）。
+- **Add Provider Dialog Mock Template (Add Provider 弹窗 Mock 模版)** — Settings → Providers 区 `+ Add provider` 弹窗实现为 **命令式函数** `createProviderFormDialog()`（`src/features/settings/components/add-provider-dialog.tsx`，基于 `codeman-dialog.show<Provider>`；dismiss 路径 resolve `null`）。弹窗顶部 type 单选 `[Real API] / [Mock (dev)]`。选 Mock 时仅作为字段预填 — 不锁字段、不隐藏字段：pre-fill 值为 `{ id: 'mock-N', label: 'Mock', apiKey: '', llm: { defaultModel: 'mock-default', baseUrl: 'http://127.0.0.1:50000/mock/anthropic', apiType: 'anthropic-messages', models: [{ id: 'mock-default', label: 'Mock' }], modelsEndpoint: '' } }`（`baseUrl` 默认指向本地 mock server，per "Mock Server"）；用户可在保存前手改任意字段（包含 baseUrl 与 port）。提交后 dialog 构造完整 `Provider` resolve 给 caller，caller 走 `appStore.set({ providers: [...cur, p] })` + `settingsSaver.scheduleSave()`（Settings.tsx 行内 handler，无独立 store action / composable）。添加后 Provider 走既有 `updateSettings` IPC + `buildEnabledProviders` 自动出现在 LLM selector（无新增过滤逻辑）。dev 启动不预填（无 settings.json 污染）；seed 数据从 "Dev Q→A File" 加载。_避免_：把 Mock 模版做成固定 entry 预填到 settings.json（与"manual add 哲学"冲突）；用新 schema 字段 `llm.kind` 区分（mock 性质已由 baseUrl 唯一识别 —— 而 baseUrl 即本地 mock server URL）；为 mock 单独写 IPC handler（违反 "Fake LLM Provider" 单一注册路径）；把 form 弹窗做成 settings.tsx 持久化的 `<Dialog>` 组件（违背 codeman-dialog 一致性，form-state 序列化反而绕路）。
 - **Q→A Entry (Q→A 条目)** — Q→A Table 单条记录，shape: `{ question: string, turns: QaTurn[], default?: true }`（V3 起）。
   - `question` — 跟 user message content 做 **substring 匹配**（case-sensitive），first-wins 命中。
   - `turns` — script of agent-loop responses，由 mock-server 按 `entry.turns[N]` 顺序轮换。`N` = 请求中 `role: "assistant"` 的消息数（即上几轮已经发出去的 turn 数）；初始请求 N=0 → `turns[0]`；tool execution 后 follow-up 请求 N=1 → `turns[1]`，以此类推。N >= turns.length → 进入 **Script Exhausted Short-Circuit**（per "Scripted Multi-Turn Entry"）。
@@ -122,10 +122,10 @@
 ### Localization
 
 - **Developer Language (开发者语言)** — 标识符、注释、治理文档的语言。分层：identifier 保持英文（与 Electron / Solid / Effect-TS / pi-mono / Tailwind / Vite / Vitest / Playwright 生态对齐），prose 与注释走中文。Canonical 词汇表是 `CONTEXT.md`。_避免_：bilingual inline annotations、翻译 identifier。
-- **User Language (用户语言)** — UI 字符串（按钮 / 错误 / 提示）的语言。通过 `Settings.user_language: "zh" | "en" | "auto"` 配置。没有 i18n runtime；UI 字符串硬编码英文，与该设置解耦。_避免_：作为代码注释翻译的副作用改动 UI 字符串。
+- **User Language (用户语言)** — UI 字符串（按钮 / 错误 / 提示）的语言。通过 `Settings.userLanguage: "zh" | "en" | "auto"` 配置。没有 i18n runtime；UI 字符串硬编码英文，与该设置解耦。_避免_：作为代码注释翻译的副作用改动 UI 字符串。
 - **Test Description (测试描述)** — `it("xxx")` / `test("xxx")` 中描述测试目标的可读字符串。出现在测试报告中。约定：**中文**（例如 `it("可以保存 LLM API key")`）。_避免_：新测试使用英文 test description。
 - **Assertion (断言)** — 测试体内的 runtime 检查，例如 `expect(x).toBe(y)`。**锚定 UI 字符串时英文**（必须与 UI 完全一致），**fixture 数据时中文**（例如 `toHaveBeenCalledWith({ content: '你好' })`）。_避免_：当底层值是 UI 字符串时使用中文断言字符串（运行时会失败）。
-- **UI String (UI 字符串)** — 渲染 UI 中展示的文本（按钮标签、placeholder、错误信息、aria-label）。始终输出英文 UI 字符串，与 `user_language` 无关。注释翻译工作不动 UI 字符串；未来 i18n 工作独立追踪。
+- **UI String (UI 字符串)** — 渲染 UI 中展示的文本（按钮标签、placeholder、错误信息、aria-label）。始终输出英文 UI 字符串，与 `userLanguage` 无关。注释翻译工作不动 UI 字符串；未来 i18n 工作独立追踪。
 - **Developer String (开发者字符串)** — 写入日志、console、panic 消息或 `Result::Err` 变体（不向用户展示）的字符串字面量。约定：**中文**。_避免_：新代码使用英文 log message（破坏 grep 一致性）。
 - **Translation Rules (翻译规则)** — 操作手册，位于 `docs/translation-rules.md`。包含品牌名保留、术语映射表、标点规则、注释格式。翻译工作流以此文档为一致性约束。
 
@@ -138,11 +138,11 @@ Agent
   └── tools[]          (类型化函数；计费 + 文件工具)
         ├── get_balance(provider_id)             → Snapshot
         ├── get_plan_quota(provider_id)          → Snapshot
-        ├── read_file(workspace_id, path)        → string
-        ├── write_file(workspace_id, path, text) → void
-        ├── edit_file(workspace_id, path, old, new, replace_all) → void
-        ├── search_files(workspace_id, glob, pattern?) → FileMatch[]
-        └── delete_file(workspace_id, path)      → void
+        ├── read_file(workspaceId, path)        → string
+        ├── write_file(workspaceId, path, text) → void
+        ├── edit_file(workspaceId, path, old, new, replaceAll) → void
+        ├── search_files(workspaceId, glob, pattern?) → FileMatch[]
+        └── delete_file(workspaceId, path)      → void
 
 Conversation          (src/shared/lib/types.ts, DB-backed)
   ├── id, title, system_prompt?, created_at, updated_at, archived_at?
@@ -159,32 +159,32 @@ Conversation State    (src/features/chat/stores/chat.store.ts, V2 in-memory view
   ├── streamingMessageId       (当前 streaming 的 assistant msg id, 或 null)
   └── runtime                  (per-conv AgentRuntime 实例, createAgentRuntime() 产物)
 
-Provider              (Settings.providers[].api_key + llm 必选 + .billing 可选, ADR-0015)
+Provider              (Settings.providers[].apiKey + llm 必选 + .billing 可选, ADR-0015)
   ├── id, label, enabled
-  ├── api_key: string                    ← 明文, 单一字段, LLM + billing 共用
-  ├── llm: { default_model, base_url, api_type, models[], models_endpoint }
+  ├── apiKey: string                    ← 明文, 单一字段, LLM + billing 共用
+  ├── llm: { defaultModel, baseUrl, apiType, models[], modelsEndpoint }
   └── billing?: { kind: "balance" | "plan_quota" }
 ```
 
 ## Settings
 
-通过 `electron-store` 持久化（JSON 文件位于 `%LocalAppData%\codeman-agent\settings.json`，per ADR-0024）。完整 schema 位于 `electron/main/settings-schema.ts`（V3 起从 Rust `src-tauri/src/settings.rs` 迁移）；canonical TS 镜像位于 `src/shared/lib/types.ts`。`SettingsSchema.sanitize()` 钳制不变量（`auto_archive_after_days >= 1`、`max_history >= 10` 等）。
+通过 `electron-store` 持久化（JSON 文件位于 `%LocalAppData%\codeman-agent\settings.json`，per ADR-0024；V3.1+ schema 字段 camelCase，per ADR-0024 D10）。完整 schema 位于 `electron/main/settings-schema.ts`；canonical TS 镜像位于 `src/shared/lib/types.ts`。`SettingsSchema.sanitize()` 钳制不变量（`autoArchiveAfterDays >= 1`、`maxHistory >= 10` 等）。
 
 ```ts
 interface Settings {
-  // A. Providers (统一记录：llm 必选，billing 可选)
+  // A. Providers (统一记录:llm 必选,billing 可选)
   providers: Array<{
     id: string; // 预置 "minimax"
     label: string; // 人类可读名
     enabled: boolean;
-    api_key: string; // 明文；LLM + billing 共用 (ADR-0015)
+    apiKey: string; // 明文;LLM + billing 共用 (ADR-0015)
     llm: {
       // 必选
-      default_model: string;
-      base_url: string;
-      api_type: "anthropic-messages";
+      defaultModel: string;
+      baseUrl: string;
+      apiType: "anthropic-messages";
       models: ModelMeta[]; // 用户可编辑的模型列表
-      models_endpoint: string; // 拉取模型列表的 URL（per-provider 可配置）
+      modelsEndpoint: string; // 拉取模型列表的 URL(per-provider 可配置)
     };
     billing?: {
       // 可选
@@ -193,53 +193,53 @@ interface Settings {
   }>;
 
   // B. 默认行为
-  default_llm_provider_id?: string;
-  user_language: "zh" | "en" | "auto";
+  defaultLlmProviderId?: string;
+  userLanguage: "zh" | "en" | "auto";
   theme: "light" | "dark" | "system";
 
   // C. App
-  start_at_login: boolean;
+  startAtLogin: boolean;
 
   // D. Window
   window: {
-    remember_position: boolean;
-    remember_size: boolean;
-    default_size: { width: number; height: number };
-    min_size: { width: number; height: number };
+    rememberPosition: boolean;
+    rememberSize: boolean;
+    defaultSize: { width: number; height: number };
+    minSize: { width: number; height: number };
   };
 
   // E. System prompt
-  system_prompt: {
+  systemPrompt: {
     default: string; // 多行
-    user_can_edit: boolean;
+    userCanEdit: boolean;
   };
 
   // F. Conversations
   conversations: {
-    auto_archive_after_days: number; // 默认 30
-    max_history: number; // 默认 1000
+    autoArchiveAfterDays: number; // 默认 30
+    maxHistory: number; // 默认 1000
   };
 
-  // G. Deleted — workspaces 已移出 Settings，改由 WorkspaceService (SQLite) 管理 (ADR-0023 D8-W)
+  // G. Deleted — workspaces 已移出 Settings,改由 WorkspaceService (SQLite) 管理 (ADR-0023 D8-W)
 }
 
 interface ModelMeta {
   id: string; // "MiniMax-M2.5-highspeed" | ...
   label: string; // "M2.5 Highspeed" | ...
-  context_window?: number; // token 上限
+  contextWindow?: number; // token 上限
   deprecated?: boolean; // UI 标灰
   thinking?: boolean; // 是否支持 extended thinking
 }
 ```
 
-**API 密钥现在直接进 Settings JSON**（`Provider.api_key` 字段，明文存盘，见 ADR-0015）。**没有**单独的 store 命名空间或 OS keyring 隔离。V1.7+ 之前的 `llm_providers/<id>/api_key` 与 `billing/<id>/api_key` 两个 store 路径已删除。同一家公司 LLM 和 billing 调用复用**同一** key。
+**API 密钥现在直接进 Settings JSON**（`Provider.apiKey` 字段，明文存盘，见 ADR-0015）。**没有**单独的 store 命名空间或 OS keyring 隔离。V1.7+ 之前的 `llm_providers/<id>/api_key` 与 `billing/<id>/api_key` 两个 store 路径已删除。同一家公司 LLM 和 billing 调用复用**同一** key。
 
-**默认预填**：`Settings::Default` 编译时预置一条 LLM provider 记录（`id: "minimax"` / `default_model: "MiniMax-M2.5-highspeed"` / `base_url: "https://api.minimaxi.com/anthropic"` / `api_type: "anthropic-messages"`），并预填对应 billing 子对象（`kind: PlanQuota`）。首次启动即可用，用户只需在 Settings UI 填 MiniMax API key。
+**默认预填**：`Settings::Default` 编译时预置一条 LLM provider 记录（`id: "minimax"` / `defaultModel: "MiniMax-M2.5-highspeed"` / `baseUrl: "https://api.minimaxi.com/anthropic"` / `apiType: "anthropic-messages"`），并预填对应 billing 子对象（`kind: PlanQuota`）。首次启动即可用，用户只需在 Settings UI 填 MiniMax API key。
 
 ## 认证约定
 
-- **LLM providers** 通过 pi-mono 标准机制认证（因 provider 而异：OpenAI Bearer、Anthropic `x-api-key`、OpenAI 兼容自定义 header）。`pi-ai` 负责构造 header；密钥值来自 `Provider.api_key`（Settings JSON 字段，ADR-0015）。
-- **Billing providers** 使用 `Authorization: Bearer <Provider.api_key>`。header 在 TS adapter 内部构造；密钥值来自同一字段。密钥存 webview 进程内的 Settings JSON；前端可直接读取字符串值（V1.7+ 前的 `has_key: boolean` 探测已废止，因字段恒存在）。
+- **LLM providers** 通过 pi-mono 标准机制认证（因 provider 而异：OpenAI Bearer、Anthropic `x-api-key`、OpenAI 兼容自定义 header）。`pi-ai` 负责构造 header；密钥值来自 `Provider.apiKey`（Settings JSON 字段，ADR-0015）。
+- **Billing providers** 使用 `Authorization: Bearer <Provider.apiKey>`。header 在 TS adapter 内部构造；密钥值来自同一字段。密钥存 webview 进程内的 Settings JSON；前端可直接读取字符串值（V1.7+ 前的 `has_key: boolean` 探测已废止，因字段恒存在）。
 
 ## Non-goals
 

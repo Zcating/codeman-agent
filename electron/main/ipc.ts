@@ -229,36 +229,36 @@ export function registerIpcHandlers(_deps: {
   loadSettings();
 
   // Settings
-  ipcMain.handle("get_settings", () => loadSettings());
-  ipcMain.handle("update_settings", (_e, args) => {
+  ipcMain.handle("getSettings", () => loadSettings());
+  ipcMain.handle("updateSettings", (_e, args) => {
     // V2 spec convention: args may be { newSettings } OR just the patch object.
     const patch =
       (args && typeof args === "object" && ("newSettings" in args ? (args as { newSettings: unknown }).newSettings : args)) ?? {};
     return updateSettings(patch as Partial<SettingsV15>);
   });
-  ipcMain.handle("clear_all_history", () => {
+  ipcMain.handle("clearAllHistory", () => {
     dbInit();
     getDatabase().exec("DELETE FROM conversations");
   });
 
   // Conversations
-  ipcMain.handle("list_conversations", (_e, args) => {
+  ipcMain.handle("listConversations", (_e, args) => {
     const include = !!(args && typeof args === "object" && (args as { includeArchived?: boolean }).includeArchived);
     return getConv(include);
   });
-  ipcMain.handle("get_conversation", (_e, args: { id: string }) => {
+  ipcMain.handle("getConversation", (_e, args: { id: string }) => {
     dbInit();
     const row = getDatabase().prepare("SELECT * FROM conversations WHERE id = ?").get(args.id) as RawConvRow | undefined;
     if (!row) throw new Error(`Conversation not found: ${args.id}`);
     return toConversation(row);
   });
-  ipcMain.handle("create_conversation", (_e, args: { title?: string; workspaceId?: string; workspace_id?: string; systemPrompt?: string | null; system_prompt?: string | null }) => {
+  ipcMain.handle("createConversation", (_e, args: { title?: string; workspaceId?: string; systemPrompt?: string | null }) => {
     dbInit();
     const id = randomUUID();
     const now = Math.floor(Date.now() / 1000);
     const title = args.title ?? "";
-    const workspaceId = args.workspaceId ?? args.workspace_id ?? "";
-    const systemPrompt = args.systemPrompt ?? args.system_prompt ?? null;
+    const workspaceId = args.workspaceId ?? "";
+    const systemPrompt = args.systemPrompt ?? null;
     getDatabase()
       .prepare(
         "INSERT INTO conversations (id, title, system_prompt, created_at, updated_at, archived_at, workspace_id) VALUES (?, ?, ?, ?, ?, NULL, ?)",
@@ -274,47 +274,44 @@ export function registerIpcHandlers(_deps: {
       workspace_id: workspaceId,
     });
   });
-  ipcMain.handle("archive_conversation", (_e, args: { id: string }) => {
+  ipcMain.handle("archiveConversation", (_e, args: { id: string }) => {
     dbInit();
     getDatabase().prepare("UPDATE conversations SET archived_at = ? WHERE id = ?").run(
       Math.floor(Date.now() / 1000),
       args.id,
     );
   });
-  ipcMain.handle("delete_conversation", (_e, args: { id: string }) => {
+  ipcMain.handle("deleteConversation", (_e, args: { id: string }) => {
     dbInit();
     getDatabase().prepare("DELETE FROM conversations WHERE id = ?").run(args.id);
   });
 
   // Messages
-  ipcMain.handle("list_messages", (_e, args: { conversationId?: string; conversation_id?: string }) => {
+  ipcMain.handle("listMessages", (_e, args: { conversationId?: string }) => {
     dbInit();
-    const convId = args.conversationId ?? args.conversation_id;
+    const convId = args.conversationId;
     if (!convId) return [];
     const rows = getDatabase()
       .prepare("SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC")
       .all(convId) as RawMsgRow[];
     return rows.map(toMessage);
   });
-  ipcMain.handle("append_message", (_e, args: {
+  ipcMain.handle("appendMessage", (_e, args: {
     conversationId?: string;
-    conversation_id?: string;
     role: string;
     content: string;
     thinking?: string | null;
     toolCalls?: string;
-    tool_calls?: string;
     toolResults?: string;
-    tool_results?: string;
     model?: string | null;
   }) => {
     dbInit();
     const id = randomUUID();
     const now = Math.floor(Date.now() / 1000);
-    const convId = args.conversationId ?? args.conversation_id ?? "";
+    const convId = args.conversationId ?? "";
     const thinking = args.thinking ?? null;
-    const toolCalls = args.toolCalls ?? args.tool_calls ?? null;
-    const toolResults = args.toolResults ?? args.tool_results ?? null;
+    const toolCalls = args.toolCalls ?? null;
+    const toolResults = args.toolResults ?? null;
     getDatabase()
       .prepare(
         "INSERT INTO messages (id, conversation_id, role, content, thinking, tool_calls, tool_results, model, input_tokens, output_tokens, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)",
@@ -344,7 +341,7 @@ export function registerIpcHandlers(_deps: {
       created_at: now,
     });
   });
-  ipcMain.handle("search_messages", (_e, args: { query: string; limit?: number }) => {
+  ipcMain.handle("searchMessages", (_e, args: { query: string; limit?: number }) => {
     dbInit();
     const limit = args.limit ?? 20;
     try {
@@ -360,39 +357,39 @@ export function registerIpcHandlers(_deps: {
   });
 
   // Workspaces
-  ipcMain.handle("list_workspaces", () => {
+  ipcMain.handle("listWorkspaces", () => {
     dbInit();
     const rows = getDatabase()
       .prepare("SELECT * FROM workspaces ORDER BY created_at DESC")
       .all() as RawWorkspace[];
     return rows.map(toWorkspace);
   });
-  ipcMain.handle("add_workspace", (_e, args: { label?: string; rootPath?: string; root_path?: string }) => {
+  ipcMain.handle("addWorkspace", (_e, args: { label?: string; rootPath?: string }) => {
     dbInit();
     const id = randomUUID();
     const now = Math.floor(Date.now() / 1000);
     const label = args.label ?? "Workspace";
-    const rootPath = args.rootPath ?? args.root_path ?? "";
+    const rootPath = args.rootPath ?? "";
     try {
       getDatabase()
         .prepare("INSERT INTO workspaces (id, label, root_path, created_at) VALUES (?, ?, ?, ?)")
         .run(id, label, rootPath, now);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(`add_workspace failed: ${msg}`);
+      throw new Error(`addWorkspace failed: ${msg}`);
     }
     return toWorkspace({ id, label, root_path: rootPath, created_at: now });
   });
-  ipcMain.handle("rename_workspace", (_e, args: { id: string; label: string }) => {
+  ipcMain.handle("renameWorkspace", (_e, args: { id: string; label: string }) => {
     dbInit();
     getDatabase().prepare("UPDATE workspaces SET label = ? WHERE id = ?").run(args.label, args.id);
   });
-  ipcMain.handle("delete_workspace", (_e, args: { id: string }) => {
+  ipcMain.handle("deleteWorkspace", (_e, args: { id: string }) => {
     dbInit();
     // CASCADE: conversations in this workspace are deleted.
     getDatabase().prepare("DELETE FROM workspaces WHERE id = ?").run(args.id);
   });
-  ipcMain.handle("pick_workspace_path", async () => {
+  ipcMain.handle("pickWorkspacePath", async () => {
     const r = await dialog.showOpenDialog({ properties: ["openDirectory"] });
     return r.canceled ? null : r.filePaths[0] ?? null;
   });
@@ -420,21 +417,21 @@ export function registerIpcHandlers(_deps: {
     };
 
   // Filesystem
-  ipcMain.handle("read_file", sandboxHandler(async (_e, args: { workspaceId?: string; workspace_id?: string; path: string }) => {
+  ipcMain.handle("readFile", sandboxHandler(async (_e, args: { workspaceId?: string; path: string }) => {
     dbInit();
-    const wsId = args.workspaceId ?? args.workspace_id ?? "";
+    const wsId = args.workspaceId ?? "";
     const ws = await getWorkspaceById(wsId);
     return await readFileInWorkspace(ws.root_path, args.path);
   }));
-  ipcMain.handle("write_file", sandboxHandler(async (_e, args: { workspaceId?: string; workspace_id?: string; path: string; content: string }) => {
+  ipcMain.handle("writeFile", sandboxHandler(async (_e, args: { workspaceId?: string; path: string; content: string }) => {
     dbInit();
-    const wsId = args.workspaceId ?? args.workspace_id ?? "";
+    const wsId = args.workspaceId ?? "";
     const ws = await getWorkspaceById(wsId);
     await writeFileInWorkspace(ws.root_path, args.path, args.content);
   }));
-  ipcMain.handle("edit_file", sandboxHandler(async (_e, args: { workspaceId?: string; workspace_id?: string; path: string; oldText: string; newText: string; replaceAll?: boolean }) => {
+  ipcMain.handle("editFile", sandboxHandler(async (_e, args: { workspaceId?: string; path: string; oldText: string; newText: string; replaceAll?: boolean }) => {
     dbInit();
-    const wsId = args.workspaceId ?? args.workspace_id ?? "";
+    const wsId = args.workspaceId ?? "";
     const ws = await getWorkspaceById(wsId);
     const abs = await validatePathInWorkspace(args.path, ws.root_path);
     const content = await readFile(abs, "utf-8");
@@ -452,15 +449,15 @@ export function registerIpcHandlers(_deps: {
       : content.replace(args.oldText, args.newText);
     await writeFileInWorkspace(ws.root_path, args.path, newContent);
   }));
-  ipcMain.handle("search_files", async (_e, args: { workspaceId?: string; workspace_id?: string; glob: string; contentPattern?: string | null }) => {
+  ipcMain.handle("searchFiles", async (_e, args: { workspaceId?: string; glob: string; contentPattern?: string | null }) => {
     dbInit();
-    const wsId = args.workspaceId ?? args.workspace_id ?? "";
+    const wsId = args.workspaceId ?? "";
     const ws = await getWorkspaceById(wsId);
     return await searchFilesInWorkspace(ws.root_path, args.glob, args.contentPattern ?? null);
   });
-  ipcMain.handle("delete_file", sandboxHandler(async (_e, args: { workspaceId?: string; workspace_id?: string; path: string }) => {
+  ipcMain.handle("deleteFile", sandboxHandler(async (_e, args: { workspaceId?: string; path: string }) => {
     dbInit();
-    const wsId = args.workspaceId ?? args.workspace_id ?? "";
+    const wsId = args.workspaceId ?? "";
     const ws = await getWorkspaceById(wsId);
     const abs = await validatePathInWorkspace(args.path, ws.root_path);
     await unlink(abs);
@@ -470,7 +467,7 @@ export function registerIpcHandlers(_deps: {
   // 经 qa-loader.ts 读 Q→A 文件);不再走 IPC。
 
   // Native shims
-  ipcMain.handle("set_login_item", (_e, args) => {
+  ipcMain.handle("setLoginItem", (_e, args) => {
     app.setLoginItemSettings({ openAtLogin: !!(args && (args as { enabled?: boolean }).enabled) });
   });
   ipcMain.handle("notify", (_e, args) => {
@@ -478,11 +475,11 @@ export function registerIpcHandlers(_deps: {
     const body = (args && (args as { body?: string }).body) ?? "";
     new Notification({ title, body }).show();
   });
-  ipcMain.handle("open_external", (_e, args) => {
+  ipcMain.handle("openExternal", (_e, args) => {
     const url = (args && (args as { url?: string }).url) ?? "";
     return shell.openExternal(url);
   });
-  ipcMain.handle("get_log_path", async () => {
+  ipcMain.handle("getLogPath", async () => {
     const { default: log } = await import("electron-log");
     return log.transports.file.getFile()?.path ?? null;
   });

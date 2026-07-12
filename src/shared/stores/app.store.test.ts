@@ -101,7 +101,7 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     // State immediately reflects the change
     expect(appStore.state.value.theme).toBe("light");
     // No IPC fires (debounce is now in settings-saver, NOT in appStore)
-    expect(mockState.calls.filter((c) => c === "update_settings")).toHaveLength(0);
+    expect(mockState.calls.filter((c) => c === "updateSettings")).toHaveLength(0);
   });
 
   // ─── V1.8+ ADR-0016 D1 + D2: refreshProviderModels ───
@@ -246,7 +246,7 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     const effect = appStore.forceFlush();
     expect(effect).toBeDefined();
     await Effect.runPromise(effect);
-    expect(mockState.calls.filter((c) => c === "update_settings")).toHaveLength(1);
+    expect(mockState.calls.filter((c) => c === "updateSettings")).toHaveLength(1);
   });
 
   // ─── J1: forceFlush() failure → Effect.exit Failure with AppError ───
@@ -261,7 +261,7 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
 
   // ─── J2: refresh() failure → Effect.exit Failure with AppError ───
   it("refresh() invoke 拒绝时失败 → Effect.exit Failure with AppError", async () => {
-    mockState.rejected = new Error("get_settings IPC failed");
+    mockState.rejected = new Error("getSettings IPC failed");
     const exit = await Effect.runPromiseExit(appStore.refresh());
     expect(exit._tag).toBe("Failure");
     if (exit._tag === "Failure") {
@@ -327,7 +327,7 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     if (exit._tag === "Success") {
       expect(exit.value).toBe("/selected/workspace/path");
     }
-    expect(mockState.invokeCalls.some((c) => c.name === "pick_workspace_path")).toBe(true);
+    expect(mockState.invokeCalls.some((c) => c.name === "pickWorkspacePath")).toBe(true);
   });
 
   // ─── J5: pickWorkspacePath() returns null when user cancels ───
@@ -420,15 +420,15 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
   });
 
   // ─── J9: clearAllHistory() invokes clear_all_history IPC ───
-  it("clearAllHistory() 调用 clear_all_history IPC", async () => {
+  it("clearAllHistory() 调用 clearAllHistory IPC", async () => {
     const exit = await Effect.runPromiseExit(appStore.clearAllHistory());
     expect(exit._tag).toBe("Success");
-    expect(mockState.calls.some((c) => c === "clear_all_history")).toBe(true);
+    expect(mockState.calls.some((c) => c === "clearAllHistory")).toBe(true);
   });
 
   // ─── J10: clearAllHistory() fails when IPC rejects ───
   it("clearAllHistory() IPC 拒绝时失败 → Effect.exit Failure", async () => {
-    mockState.rejected = new Error("clear_all_history failed");
+    mockState.rejected = new Error("clearAllHistory failed");
     const exit = await Effect.runPromiseExit(appStore.clearAllHistory());
     expect(exit._tag).toBe("Failure");
     if (exit._tag === "Failure") {
