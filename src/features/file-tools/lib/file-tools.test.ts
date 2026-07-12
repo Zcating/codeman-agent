@@ -43,7 +43,7 @@ describe("readFileTool", () => {
       type: "text",
       text: expect.stringContaining("hello world"),
     });
-    expect(mockState.invokeCalls.find((c) => c.name === "read_file")).toMatchObject({
+    expect(mockState.invokeCalls.find((c) => c.name === "readFile")).toMatchObject({
       args: { workspaceId: "ws1", path: "/tmp/x.txt" },
     });
   });
@@ -103,7 +103,7 @@ describe("writeFileTool", () => {
       type: "text",
       text: expect.stringContaining("Done"),
     });
-    expect(mockState.invokeCalls.find((c) => c.name === "write_file")).toMatchObject({
+    expect(mockState.invokeCalls.find((c) => c.name === "writeFile")).toMatchObject({
       args: { workspaceId: "ws1", path: "/tmp/new.txt", content: "file content here" },
     });
   });
@@ -150,7 +150,7 @@ describe("editFileTool", () => {
       type: "text",
       text: expect.stringContaining("Done"),
     });
-    expect(mockState.invokeCalls.find((c) => c.name === "edit_file")).toMatchObject({
+    expect(mockState.invokeCalls.find((c) => c.name === "editFile")).toMatchObject({
       args: {
         workspaceId: "ws1",
         path: "/tmp/x.txt",
@@ -231,7 +231,7 @@ describe("searchFilesTool", () => {
       type: "text",
       text: expect.stringContaining("src/main.ts:10"),
     });
-    expect(mockState.invokeCalls.find((c) => c.name === "search_files")).toMatchObject({
+    expect(mockState.invokeCalls.find((c) => c.name === "searchFiles")).toMatchObject({
       args: { workspaceId: "ws1", glob: "**/*.ts", contentPattern: "TODO" },
     });
   });
@@ -245,7 +245,7 @@ describe("searchFilesTool", () => {
     });
 
     expect(result.details).toHaveLength(1);
-    expect(mockState.invokeCalls.find((c) => c.name === "search_files")).toMatchObject({
+    expect(mockState.invokeCalls.find((c) => c.name === "searchFiles")).toMatchObject({
       args: { workspaceId: "ws1", glob: "**/*.ts", contentPattern: null },
     });
   });
@@ -304,7 +304,7 @@ describe("deleteFileTool", () => {
       type: "text",
       text: expect.stringContaining("recycle bin"),
     });
-    expect(mockState.invokeCalls.find((c) => c.name === "delete_file")).toMatchObject({
+    expect(mockState.invokeCalls.find((c) => c.name === "deleteFile")).toMatchObject({
       args: { workspaceId: "ws1", path: "/tmp/old.txt" },
     });
   });

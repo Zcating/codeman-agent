@@ -30,9 +30,9 @@ describe("IPC Mock - V1.5+ Schema", () => {
     mockState.v0FixtureActive = false;
   });
 
-  describe("get_settings", () => {
+  describe("getSettings", () => {
     it("returns V1.5+ shape with providers array", async () => {
-      const settings = await invoke("get_settings");
+      const settings = await invoke("getSettings");
 
       expect(settings).toHaveProperty("providers");
       expect(settings).toHaveProperty("schemaVersion", "1.5");
@@ -40,14 +40,14 @@ describe("IPC Mock - V1.5+ Schema", () => {
     });
 
     it("returns minimax provider by default", async () => {
-      const settings = await invoke("get_settings");
+      const settings = await invoke("getSettings");
 
       expect((settings as any).providers).toHaveLength(1);
       expect((settings as any).providers[0].id).toBe("minimax");
     });
 
     it("returns preserved V1 fields (theme, userLanguage, etc.)", async () => {
-      const settings = await invoke("get_settings");
+      const settings = await invoke("getSettings");
 
       expect((settings as any).theme).toBe("system");
       expect((settings as any).userLanguage).toBe("en");
@@ -55,14 +55,14 @@ describe("IPC Mock - V1.5+ Schema", () => {
     });
   });
 
-  describe("update_settings", () => {
+  describe("updateSettings", () => {
     it("accepts V1.5+ shape and persists to mock store", async () => {
       const newSettings = {
         theme: "dark" as const,
         providers: [mockDeepseekProvider, mockMinimaxProvider],
       };
 
-      const result = await invoke("update_settings", { newSettings: newSettings });
+      const result = await invoke("updateSettings", { newSettings: newSettings });
 
       expect((result as any).theme).toBe("dark");
       expect((result as any).providers).toHaveLength(2);
@@ -72,7 +72,7 @@ describe("IPC Mock - V1.5+ Schema", () => {
     it("preserves existing settings when updating partial", async () => {
       const newSettings = { theme: "light" as const };
 
-      const result = await invoke("update_settings", { newSettings: newSettings });
+      const result = await invoke("updateSettings", { newSettings: newSettings });
 
       expect((result as any).theme).toBe("light");
       expect((result as any).userLanguage).toBe("en"); // preserved
@@ -80,7 +80,7 @@ describe("IPC Mock - V1.5+ Schema", () => {
     });
 
     it("always sets schemaVersion to 1.5", async () => {
-      const result = await invoke("update_settings", {
+      const result = await invoke("updateSettings", {
         newSettings: { schemaVersion: "1.0" as any },
       });
 
@@ -132,14 +132,14 @@ describe("IPC Mock - V1.5+ Schema", () => {
     });
   });
 
-  describe("clear_all_history", () => {
+  describe("clearAllHistory", () => {
     it("is a no-op and does not throw", async () => {
-      await expect(invoke("clear_all_history")).resolves.toBeUndefined();
+      await expect(invoke("clearAllHistory")).resolves.toBeUndefined();
     });
   });
 
   describe("V0 → V1.5 migration", () => {
-    it("migrates V0 fixture on get_settings when v0FixtureActive is true", async () => {
+    it("migrates V0 fixture on getSettings when v0FixtureActive is true", async () => {
       mockState.v0FixtureActive = true;
       mockState.resolved = {
         llmProviders: [
@@ -167,7 +167,7 @@ describe("IPC Mock - V1.5+ Schema", () => {
         conversations: { autoArchiveAfterDays: 60, maxHistory: 500 },
       };
 
-      const settings = await invoke("get_settings");
+      const settings = await invoke("getSettings");
 
       expect((settings as any).schemaVersion).toBe("1.5");
       expect((settings as any).providers).toHaveLength(1);
@@ -179,10 +179,10 @@ describe("IPC Mock - V1.5+ Schema", () => {
 
   describe("mockState.calls tracking", () => {
     it("records all IPC calls", async () => {
-      await invoke("get_settings");
-      await invoke("fetch_models", { providerId: "minimax" });
+      await invoke("getSettings");
+      await invoke("fetchModels", { providerId: "minimax" });
 
-      expect(mockState.calls).toEqual(["get_settings", "fetch_models"]);
+      expect(mockState.calls).toEqual(["getSettings", "fetchModels"]);
     });
   });
 });

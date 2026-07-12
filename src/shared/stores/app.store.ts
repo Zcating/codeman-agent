@@ -116,13 +116,13 @@ function toAppError(e: unknown): AppError {
 // is NOT enough because nested arrays/objects remain Proxies. JSON
 // round-trip produces a fully plain object tree that structured-clones.
 const flushImpl = Effect.fnUntraced(function* () {
-  yield* ipcInvoke("update_settings", {
+  yield* ipcInvoke("updateSettings", {
     newSettings: JSON.parse(JSON.stringify(settings.value)),
   });
 });
 
 const refreshImpl = Effect.fnUntraced(function* () {
-  const fresh = yield* ipcInvoke<Settings>("get_settings");
+  const fresh = yield* ipcInvoke<Settings>("getSettings");
   setSettings("value", fresh);
   return fresh;
 });

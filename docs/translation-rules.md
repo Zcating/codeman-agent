@@ -166,11 +166,11 @@ brand-spelling 一致的形式 → 保留。
 
 **正确**：
 
-> 设置 `llm_providers` 字段，调用 `update_settings` 命令。
+> 设置 `llm_providers` 字段，调用 `updateSettings` 命令。
 
 **错误**：
 
-> 设置 `llm_providers` 字段，調用 `update_settings` 命令。
+> 设置 `llm_providers` 字段，調用 `updateSettings` 命令。
 
 **正确**：
 
@@ -250,7 +250,7 @@ panic!("余额查询失败");
 | --------------------------------------------------------- | ---------------------------------------------------- |
 | 锚定 UI 字符串的 `expect().toBe('Settings')` runtime 断言 | runtime check 必须跟 UI 完全匹配，UI 英文 → 断言英文 |
 | Tauri store key / env var / IPC 命令名                    | 配置层 identifier，跨语言检索锚点                    |
-| `user_language: "zh" \| "en" \| "auto"` 字段值            | 字段值是 enum 标识符                                 |
+| `userLanguage: "zh" \| "en" \| "auto"` 字段值             | 字段值是 enum 标识符                                 |
 | `.agents/skills/*` 内部 prompt                            | AI agent skill 训练数据语言对齐                      |
 | commit message `type(scope):` 前缀                        | 机器可读 + 生态兼容                                  |
 | branch name                                               | git URL 编码 + 工具链兼容                            |

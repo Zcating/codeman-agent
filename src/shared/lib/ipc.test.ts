@@ -104,8 +104,8 @@ const MockProviderServiceLive = Layer.succeed(ProviderService, {
 });
 
 const _MockSettingsServiceLive = Layer.succeed(SettingsService, {
-  getSettings: () => invoke("get_settings") as Effect.Effect<any, AppError>,
-  updateSettings: (patch) => invoke("update_settings", { newSettings: patch }) as Effect.Effect<any, AppError>,
+  getSettings: () => invoke("getSettings") as Effect.Effect<any, AppError>,
+  updateSettings: (patch) => invoke("updateSettings", { newSettings: patch }) as Effect.Effect<any, AppError>,
   clearAllHistory: () => Effect.succeed(undefined),
   getActiveLlmProvider: () => Effect.succeed(null),
 });

@@ -68,7 +68,7 @@ export function SettingsPage() {
   const clearHistory = async () => {
     try {
       // SQLite 操作不走 Settings，走 IPC（clear_all_history 是 SQLite 操作，不是 Settings）
-      await Effect.runPromise(invoke<void>("clear_all_history"));
+      await Effect.runPromise(invoke<void>("clearAllHistory"));
       setConfirmClear(false);
     } catch (e) {
       logger.error("[SettingsPage] 清除失败：", e);
