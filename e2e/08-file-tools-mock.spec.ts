@@ -32,7 +32,7 @@ test.describe("08 — 文件工具 (mock LLM)", () => {
 
     // D8-W: workspace provisioned via WorkspaceService IPC (workspace not referenced
     // by name in tests; mock-server 不调真实 file tool — workspace 仅保证 chat-view 渲染)
-    await invoke<Workspace>(page, "add_workspace", {
+    await invoke<Workspace>(page, "addWorkspace", {
       label: "Mock E2E Test Workspace",
       rootPath: e2eRoot,
     });

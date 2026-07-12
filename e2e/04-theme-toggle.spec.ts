@@ -22,9 +22,9 @@ async function setTheme(
   page: TauriPage,
   theme: "light" | "dark" | "system",
 ) {
-  const current = await invoke<Settings>(page, "get_settings");
+  const current = await invoke<Settings>(page, "getSettings");
   const next: Settings = { ...current, theme };
-  await invoke<Settings>(page, "update_settings", { newSettings: next });
+  await invoke<Settings>(page, "updateSettings", { newSettings: next });
 
   // store 每 5s 轮询 Settings;给它 7s 应用。
   // 我们在紧密循环中重新读取 html class,因为轮询是
@@ -79,10 +79,10 @@ test.describe("04 — 主题", () => {
     // D8-W: Use IPC bridge (avoid home form send which triggers LLM consumption).
     // Clean old workspaces first so we have exactly 1 workspace.
     try {
-      const old = await invoke<{ id: string }[]>(page, "list_workspaces");
-      for (const ws of old) await invoke(page, "delete_workspace", { id: ws.id });
+      const old = await invoke<{ id: string }[]>(page, "listWorkspaces");
+      for (const ws of old) await invoke(page, "deleteWorkspace", { id: ws.id });
     } catch { /* best-effort */ }
-    const wsId = (await invoke<{ id: string }>(page, "add_workspace", {
+    const wsId = (await invoke<{ id: string }>(page, "addWorkspace", {
       label: "Theme Test Workspace",
       rootPath: `C:\\Temp\\codeman-e2e-theme-${process.pid}-${Math.random().toString(36).slice(2, 8)}`,
     })).id;

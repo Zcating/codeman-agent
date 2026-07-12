@@ -514,6 +514,92 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
       dispose();
     });
   });
+
+  // ─── Thinking 字段在 done event 中被保留（不是被 null 覆盖）────────────────
+  //
+  // 用户场景: stream 期间 runtime emit 多个 thinking event 累积到 stub.thinking,
+  // done event 应该把 stub 替换成 evt.message(包含 evt.message.thinking)。
+  // 这个路径若 done.message.thinking = null,UI 上 MessageBubble.ThinkingSection 就不渲染。
+  // runtime.test.ts 已经验证了 "done.message.thinking 由 runtime 正确聚合(非空 thinking 块 → 字符串)",
+  // 这里验证 store 层把 evt.message.thinking 直接传给最终 message(不做 null 覆盖)。
+
+  it("G26: thinking stream 累积 → done event 带非空 thinking → 最终 message.thinking = 该字符串", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, []);
+      const thinkingAccumulated = "Reasoning step 1. Reasoning step 2.";
+      const events: RuntimeEvent[] = [
+        // 模拟 runtime 累积: 多个 thinking events (pi-agent-core 的 message_update
+        // 携带累积内容,store 直接覆写,所以这里单次 thinking event 即可代表累积终态)
+        { type: "thinking", content: thinkingAccumulated },
+        { type: "token", content: "Final answer text." },
+        {
+          type: "done",
+          message: {
+            id: "final",
+            conversationId: "c1",
+            role: "assistant",
+            content: "Final answer text.",
+            thinking: thinkingAccumulated,
+            toolCalls: null,
+            toolResults: null,
+            model: "test-model",
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
+          },
+        },
+      ];
+      vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
+      await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
+
+      const msgs = store.byId["c1"]?.messages ?? [];
+      const finalMsg = msgs.find((m) => m.role === "assistant");
+      expect(finalMsg).toBeDefined();
+      // 关键断言: final message.thinking 必须是 done event 中的非空字符串,
+      // 不能是 null(否则 UI MessageBubble.ThinkingSection 不渲染)。
+      expect(finalMsg?.thinking).toBe(thinkingAccumulated);
+      expect(finalMsg?.content).toBe("Final answer text.");
+      dispose();
+    });
+  });
+
+  it("G27: stream 期间 stub.thinking 被覆写累积,后续 token 不会清掉 thinking", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, []);
+      // Mock `think` entry 场景: thinking 先到,text 后到(stub.lazy-init by thinking)
+      const events: RuntimeEvent[] = [
+        { type: "thinking", content: "Streaming thought chunk 1." },
+        { type: "thinking", content: "Streaming thought chunk 1. Streaming thought chunk 2." },
+        { type: "token", content: "answer text" },
+        {
+          type: "done",
+          message: {
+            id: "final",
+            conversationId: "c1",
+            role: "assistant",
+            content: "answer text",
+            thinking: "Streaming thought chunk 1. Streaming thought chunk 2.",
+            toolCalls: null,
+            toolResults: null,
+            model: null,
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
+          },
+        },
+      ];
+      vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
+      await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
+
+      const msgs = store.byId["c1"]?.messages ?? [];
+      const finalMsg = msgs.find((m) => m.role === "assistant");
+      expect(finalMsg?.thinking).toBe(
+        "Streaming thought chunk 1. Streaming thought chunk 2.",
+      );
+      expect(finalMsg?.content).toBe("answer text");
+      dispose();
+    });
+  });
 });
 
 describe("sendMessage — G10: 处理 error event → console.error", () => {

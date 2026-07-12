@@ -75,7 +75,7 @@ export async function submitForm(p: ElectronPage): Promise<void> {
 /** 重置对话 + 消息历史。Spec 间清理用，失败不抛。 */
 export async function clearAllHistory(page: ElectronPage): Promise<void> {
   try {
-    await invoke(page, "clear_all_history");
+    await invoke(page, "clearAllHistory");
   } catch {
     // best-effort
   }
@@ -121,7 +121,7 @@ export async function cancelRunningAgent(page: ElectronPage): Promise<void> {
 export async function resetChatState(page: TauriPage): Promise<void> {
   try {
     await cancelRunningAgent(page);
-    await invoke(page, "clear_all_history");
+    await invoke(page, "clearAllHistory");
   } catch { /* best-effort */ }
 
   await page.goto("/");
@@ -151,14 +151,14 @@ export async function setupWorkspaceAndCreateConvViaIpc(
 
   // Clean old workspaces
   try {
-    const oldWorkspaces = await invoke<{ id: string }[]>(p, "list_workspaces");
+    const oldWorkspaces = await invoke<{ id: string }[]>(p, "listWorkspaces");
     for (const ws of oldWorkspaces) {
-      await invoke(p, "delete_workspace", { id: ws.id });
+      await invoke(p, "deleteWorkspace", { id: ws.id });
     }
   } catch { /* best-effort */ }
 
   // Create workspace via IPC
-  const actualWsId = (await invoke<Workspace>(p, "add_workspace", { label, rootPath: root })).id;
+  const actualWsId = (await invoke<Workspace>(p, "addWorkspace", { label, rootPath: root })).id;
 
   // Navigate to / — chat-layout mount triggers loadWorkspaces
   await p.goto("/");
@@ -189,7 +189,7 @@ export async function submitHomeAgentForm(p: TauriPage, text: string): Promise<v
  * 7. Read convId from URL
  *
  * Caller MUST have:
- * - Workspace provisioned via invoke(page, "add_workspace", ...)
+ * - Workspace provisioned via invoke(page, "addWorkspace", ...)
  * - Mock provider active (useMockProvider) + enqueueMockResponse
  *
  * @returns the new conv's id (read from URL after navigation to /conversation/{convId})
@@ -303,11 +303,11 @@ export async function clickNewConversationAndWait(
 // ─── D7-CS Path-based Workspace Helpers ───────────────────────────────────────
 
 /**
- * 通过 root_path 创建/选中 workspace（D7-CS 1:1 语义）。
+ * 通过 rootPath 创建/选中 workspace（D7-CS 1:1 语义）。
  * 用 path 而非 id 作为 workspace 的语义 key。
  *
  * @param p  TauriPage
- * @param opts.rootPath  workspace root_path（语义 key）
+ * @param opts.rootPath  workspace rootPath（语义 key）
  * @param opts.label     可选 display label
  * @param opts.selectAsLastUsed  是否设为 last_used_workspace_id
  * @returns workspace id
@@ -316,14 +316,14 @@ export async function ensureWorkspaceByPath(
   p: TauriPage,
   opts: { rootPath: string; label?: string; selectAsLastUsed?: boolean },
 ): Promise<string> {
-  const workspaces = await invoke<{ id: string; root_path: string }[]>(p, "list_workspaces");
-  const existing = workspaces.find((ws) => ws.root_path === opts.rootPath);
+  const workspaces = await invoke<{ id: string; rootPath: string }[]>(p, "listWorkspaces");
+  const existing = workspaces.find((ws) => ws.rootPath === opts.rootPath);
   if (existing) {
     return existing.id;
   }
   // Create new workspace via IPC — id is generated on the Rust side
   const label = opts.label ?? opts.rootPath.split(/[/\\]/).pop() ?? "E2E WS";
-  const id = (await invoke<Workspace>(p, "add_workspace", { label, rootPath: opts.rootPath })).id;
+  const id = (await invoke<Workspace>(p, "addWorkspace", { label, rootPath: opts.rootPath })).id;
   return id;
 }
 
@@ -398,9 +398,9 @@ export async function nthConv(
 export async function resetSidebar(p: TauriPage): Promise<void> {
   await clearAllHistory(p);
   try {
-    const workspaces = await invoke<{ id: string }[]>(p, "list_workspaces");
+    const workspaces = await invoke<{ id: string }[]>(p, "listWorkspaces");
     for (const ws of workspaces) {
-      await invoke(p, "delete_workspace", { id: ws.id });
+      await invoke(p, "deleteWorkspace", { id: ws.id });
     }
   } catch {
     // best-effort

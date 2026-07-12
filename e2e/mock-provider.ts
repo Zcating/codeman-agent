@@ -47,7 +47,7 @@ const MOCK_MODEL = "mock-model";
  * the per-worker fixture) so it can fetch the worker-specific mock server.
  */
 export async function useMockProvider(page: TauriPage): Promise<void> {
-  const current = await invoke<any>(page, "get_settings");
+  const current = await invoke<any>(page, "getSettings");
   const mockBaseUrl: string = await page.evaluate(() => {
     const w = window as unknown as { __mockBaseUrl?: string };
     return w.__mockBaseUrl ?? MOCK_BASE_URL_FALLBACK;
@@ -81,8 +81,8 @@ export async function useMockProvider(page: TauriPage): Promise<void> {
     defaultLlmProviderId: MOCK_PROVIDER_ID,
   };
 
-  await invoke(page, "update_settings", { newSettings });
-  // 关键: update_settings 是 raw IPC,只更新后端。chat-view 的 handleSend 读
+  await invoke(page, "updateSettings", { newSettings });
+  // 关键: updateSettings 是 raw IPC,只更新后端。chat-view 的 handleSend 读
   // appStore.state.value(内存 Solid signal),这 signal 不会因为 IPC 而变。
   // 必须显式调 appStore.refreshAsync() 把后端新值拉回前端,否则 send 时还用旧 provider。
   // appStore 通过 window.__appStore 暴露(只在 webview dev 模式有效)。

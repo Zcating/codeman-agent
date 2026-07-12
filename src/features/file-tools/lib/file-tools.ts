@@ -266,14 +266,10 @@ export const searchFilesTool: AgentTool<typeof searchParams, FileMatch[] | AppEr
       if (matches.length === 0) {
         return "No matches found.";
       }
-      return `Found ${matches.length} match(es):\n${matches
-        .map(
-          (m) =>
-            `  ${m.path}${m.lineNumber != null ? `:${m.lineNumber}` : ""}${
-              m.lineContent != null ? ` — ${m.lineContent}` : ""
-            }`,
-        )
-        .join("\n")}`;
+      const description = matches
+        .map((m) => `${m.path}${m.lineNumber ?? ""} - ${m.lineContent ?? ""}`)
+        .join("\n");
+      return `Found ${matches.length} match(es):\n${description}`;
     });
   },
 };
@@ -308,7 +304,8 @@ export const deleteFileTool: AgentTool<typeof deleteParams, void | AppError> = {
  *  绝大多数路径请用 `createFileTools(workspaceId)`,它会包装 execute 注入
  *  `workspaceId` 到 args(LLM 省略或 mock JSON 不带时)。`fileTools` 这个
  *  直导数组保留,供测试或一次性脚本调用 — 调用方必须自己在 args 里提供
- *  `workspaceId`,否则工具返回 `InvalidConfig` 错误。 */
+ *  `workspaceId`,否则工具返回 `InvalidConfig` 错误。 
+ **/
 export const fileTools: AgentTool<TSchema, unknown>[] = [
   readFileTool,
   writeFileTool,

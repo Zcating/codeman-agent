@@ -140,7 +140,7 @@ test.describe("10 — HomeAgentForm Home", () => {
   test("1 workspace: auto-select triggers + input enabled immediately", async ({ tauriEnv }) => {
     const { page } = tauriEnv;
     // D8-W: provision workspace via WorkspaceService IPC
-    await invoke(page, "add_workspace", { label: "Solo WS", rootPath: "/tmp/solo-ws" });
+    await invoke(page, "addWorkspace", { label: "Solo WS", rootPath: "/tmp/solo-ws" });
     await reloadPageForSettings(page);
 
     // V2.1's HomeAgentForm initializes draftWorkspaceId at mount time, before
@@ -177,8 +177,8 @@ test.describe("10 — HomeAgentForm Home", () => {
   test("2+ workspaces: no pre-select; clicking option enables input", async ({ tauriEnv }) => {
     const { page } = tauriEnv;
     // D8-W: provision 2 workspaces via WorkspaceService IPC
-    await invoke(page, "add_workspace", { label: "Workspace A", rootPath: "/tmp/ws-a" });
-    await invoke(page, "add_workspace", { label: "Workspace B", rootPath: "/tmp/ws-b" });
+    await invoke(page, "addWorkspace", { label: "Workspace A", rootPath: "/tmp/ws-a" });
+    await invoke(page, "addWorkspace", { label: "Workspace B", rootPath: "/tmp/ws-b" });
     await reloadPageForSettings(page);
 
     // Input should be disabled initially (no workspace selected)
@@ -223,7 +223,7 @@ test.describe("10 — HomeAgentForm Home", () => {
   test("submit HomeAgentForm: creates conv + transitions to ChatView", async ({ tauriEnv }) => {
     const { page } = tauriEnv;
     // D8-W: provision workspace via WorkspaceService IPC
-    await invoke(page, "add_workspace", { label: "Submit Test", rootPath: "/tmp/submit" });
+    await invoke(page, "addWorkspace", { label: "Submit Test", rootPath: "/tmp/submit" });
     await reloadPageForSettings(page);
 
     // Drive the workspace select signal manually (V2.1 auto-select race).
@@ -266,7 +266,7 @@ test.describe("10 — HomeAgentForm Home", () => {
     test.setTimeout(60_000);
     const { page } = tauriEnv;
     // D8-W: provision workspace via WorkspaceService IPC
-    await invoke(page, "add_workspace", { label: "Layout Test", rootPath: "/tmp/layout-test" });
+    await invoke(page, "addWorkspace", { label: "Layout Test", rootPath: "/tmp/layout-test" });
     await reloadPageForSettings(page);
 
     // Drive workspace select manually (V2.1 auto-select race)
@@ -290,7 +290,7 @@ test.describe("10 — HomeAgentForm Home", () => {
     test.setTimeout(60_000);
     const { page } = tauriEnv;
     // D8-W: provision workspace via WorkspaceService IPC
-    await invoke(page, "add_workspace", { label: "LLM Picker Test", rootPath: "/tmp/llm-picker-test" });
+    await invoke(page, "addWorkspace", { label: "LLM Picker Test", rootPath: "/tmp/llm-picker-test" });
     await reloadPageForSettings(page);
 
     // Drive workspace select manually (V2.1 auto-select race)
@@ -321,7 +321,7 @@ test.describe("10 — HomeAgentForm Home", () => {
     test.setTimeout(60_000);
     const { page } = tauriEnv;
     // D8-W: provision workspace via WorkspaceService IPC
-    await invoke(page, "add_workspace", { label: "Action Slot Test", rootPath: "/tmp/action-slot-test" });
+    await invoke(page, "addWorkspace", { label: "Action Slot Test", rootPath: "/tmp/action-slot-test" });
     await reloadPageForSettings(page);
 
     // Open workspace select dropdown

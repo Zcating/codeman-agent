@@ -69,31 +69,31 @@ import {
  */
 type PrimitiveToTypeBox<V> = V extends string
   ? string extends V
-    ? TString
-    : V extends infer L
-      ? L extends string | number | boolean
-        ? TLiteral<L>
-        : never
-      : TString
+  ? TString
+  : V extends infer L
+  ? L extends string | number | boolean
+  ? TLiteral<L>
+  : never
+  : TString
   : V extends number
-    ? number extends V
-      ? TNumber
-      : V extends infer L
-        ? L extends number
-          ? TLiteral<L>
-          : never
-        : TNumber
-    : V extends boolean
-      ? boolean extends V
-        ? TBoolean
-        : V extends infer L
-          ? L extends boolean
-            ? TLiteral<L>
-            : never
-          : TBoolean
-      : V extends ReadonlyArray<string>
-        ? TArray<TString>
-        : never;
+  ? number extends V
+  ? TNumber
+  : V extends infer L
+  ? L extends number
+  ? TLiteral<L>
+  : never
+  : TNumber
+  : V extends boolean
+  ? boolean extends V
+  ? TBoolean
+  : V extends infer L
+  ? L extends boolean
+  ? TLiteral<L>
+  : never
+  : TBoolean
+  : V extends ReadonlyArray<string>
+  ? TArray<TString>
+  : never;
 
 /**
  * Split T into required and optional keys. `{} extends Pick<T, K>` is the
@@ -201,7 +201,7 @@ function walkAST(node: AST.AST): TSchema {
       if (typeof v === "bigint" || v === null) {
         throw new Error(
           `toToolParameters: AST Literal "${String(v)}" is not representable in ` +
-            `TypeBox (Type.Literal accepts only string|number|boolean).`,
+          `TypeBox (Type.Literal accepts only string|number|boolean).`,
         );
       }
       return Type.Literal(v);
@@ -251,8 +251,7 @@ function walkAST(node: AST.AST): TSchema {
     }
     default:
       throw new Error(
-        `toToolParameters: unsupported AST node "${(node as { _tag: string })._tag}". ` +
-          `See ADR-0025 D8-B for the supported node list, or extend the walker.`,
+        `toToolParameters: unsupported AST node "${node._tag}". See ADR-0025 D8-B for the supported node list, or extend the walker.`
       );
   }
 }

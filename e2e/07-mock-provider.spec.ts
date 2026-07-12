@@ -19,7 +19,7 @@ test.describe("07 — Mock LLM provider", () => {
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
     // D8-W: provision workspace via direct IPC (avoids setupWorkspaceAndCreateConvViaIpc's
     // home form send flow which triggers LLM streaming with whatever provider is active).
-    await invoke(page, "add_workspace", {
+    await invoke(page, "addWorkspace", {
       label: "Mock E2E Test Workspace",
       rootPath: path.join(os.tmpdir(), `codeman-e2e-mock-${process.pid}-${Math.random().toString(36).slice(2, 8)}`),
     });
@@ -28,7 +28,7 @@ test.describe("07 — Mock LLM provider", () => {
     // 验证 mock provider 已配置 (避免之前 test 残留的真实 LLM provider 被优先使用)
     // V15 (ADR-0024 D10): Settings JSON is camelCase on the wire. `update_settings`
     // normalizes snake_case patches to camelCase so `get_settings` returns camelCase.
-    const settings = await invoke<{ defaultLlmProviderId?: string }>(page, "get_settings");
+    const settings = await invoke<{ defaultLlmProviderId?: string }>(page, "getSettings");
     if (settings.defaultLlmProviderId !== "mock") {
       throw new Error(
         "defaultLlmProviderId 应为 mock,实际: " + (settings.defaultLlmProviderId ?? "null"),

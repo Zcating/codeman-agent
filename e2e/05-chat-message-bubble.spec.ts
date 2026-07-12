@@ -1,7 +1,7 @@
 ﻿//! 05 — Agent 页面:输入内容 → user message bubble 必须出现。
 //!
 //! 测试的契约:用户在聊天视图输入并发送消息后,消息作为 user-role bubble
-//! 渲染在列表中,相同消息持久化到 SQLite(可通过 `list_messages` IPC 命令验证)。
+//! 渲染在列表中,相同消息持久化到 SQLite(可通过 `listMessages` IPC 命令验证)。
 //! 这个 spec 严格:bubble 断言失败则测试失败,即使"聊天循环仍活着"。
 //!
 //! 为什么这是单独的 spec:
@@ -20,15 +20,15 @@ const USER_INPUT = "05b::user-bubble 测试气泡渲染为用户气泡";
 
 interface MessageRow {
   id: string;
-  conversation_id: string;
+  conversationId: string;
   role: "user" | "assistant" | "tool" | "system";
   content: string;
-  tool_calls: unknown[] | null;
-  tool_results: unknown[] | null;
+  toolCalls: unknown[] | null;
+  toolResults: unknown[] | null;
   model: string | null;
-  input_tokens: number | null;
-  output_tokens: number | null;
-  created_at: number;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  createdAt: number;
 }
 
 test.describe("05 — agent 页面输入 → 用户气泡", () => {
@@ -42,7 +42,7 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
 
     // D8-W: provision workspace so clickNewConversationAndWait works
-    await invoke(page, "add_workspace", {
+    await invoke(page, "addWorkspace", {
       label: "Bubble E2E Test Workspace",
       rootPath: e2eRoot,
     });
@@ -160,7 +160,7 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
 
     // 7. 严格:同一消息持久化到 SQLite。直接用 clickNewConversationAndWait
     //    返回的 convId 查询，跳过 DOM 依赖。
-    const messages = await invoke<MessageRow[]>(page, "list_messages", {
+    const messages = await invoke<MessageRow[]>(page, "listMessages", {
       conversationId: convId,
     });
     const userRow = messages.find((m) => m.role === "user" && m.content === USER_INPUT);
