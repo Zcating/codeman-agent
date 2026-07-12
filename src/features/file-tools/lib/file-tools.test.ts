@@ -229,7 +229,7 @@ describe("searchFilesTool", () => {
     });
     expect(result.content[0]).toMatchObject({
       type: "text",
-      text: expect.stringContaining("src/main.ts:10"),
+      text: expect.stringContaining("src/main.ts10 - TODO: fix"),
     });
     expect(mockState.invokeCalls.find((c) => c.name === "searchFiles")).toMatchObject({
       args: { workspaceId: "ws1", glob: "**/*.ts", contentPattern: "TODO" },
