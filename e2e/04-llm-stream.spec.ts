@@ -20,7 +20,7 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
 
     // D8-W: provision workspace
-    await invoke(page, "add_workspace", {
+    await invoke(page, "addWorkspace", {
       label: "E2E Mock Test Workspace",
       rootPath: path.join(os.tmpdir(), `codeman-e2e-mock-${process.pid}-${Math.random().toString(36).slice(2, 8)}`),
     });

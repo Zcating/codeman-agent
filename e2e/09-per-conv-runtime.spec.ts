@@ -42,7 +42,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
 
     // D8-W: provision workspace directly via IPC. ChatLayout mount auto-loads workspaces.
-    await invoke<{ id: string }>(page, "add_workspace", {
+    await invoke<{ id: string }>(page, "addWorkspace", {
       label: "09 Test Workspace",
       rootPath: path.join(os.tmpdir(), `codeman-09-${process.pid}-${Math.random().toString(36).slice(2, 8)}`),
     });
@@ -52,9 +52,9 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     // 切到 mock provider — 后续测试全靠 mock 队列,不需要 .env 里的真实 key
     await useMockProvider(page);
     // 验证 mock provider 已配置(避免前 spec 残留的真实 LLM provider 被优先使用)
-    // V15 (ADR-0024 D10): Settings JSON is camelCase on the wire. `update_settings`
-    // normalizes snake_case patches to camelCase so `get_settings` returns camelCase.
-    const settings = await invoke<{ defaultLlmProviderId?: string }>(page, "get_settings");
+    // V15 (ADR-0024 D10): Settings JSON is camelCase on the wire. `updateSettings`
+    // normalizes snake_case patches to camelCase so `getSettings` returns camelCase.
+    const settings = await invoke<{ defaultLlmProviderId?: string }>(page, "getSettings");
     if (settings.defaultLlmProviderId !== "mock") {
       throw new Error(
         "defaultLlmProviderId 应为 mock,实际: " + (settings.defaultLlmProviderId ?? "null"),
