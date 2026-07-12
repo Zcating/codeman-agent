@@ -26,6 +26,8 @@ test.describe("07 — Mock LLM provider", () => {
     // 切换到 mock provider — 不依赖 .env 里的真实 LLM key
     await useMockProvider(page);
     // 验证 mock provider 已配置 (避免之前 test 残留的真实 LLM provider 被优先使用)
+    // V15 (ADR-0024 D10): Settings JSON is camelCase on the wire. `update_settings`
+    // normalizes snake_case patches to camelCase so `get_settings` returns camelCase.
     const settings = await invoke<{ defaultLlmProviderId?: string }>(page, "get_settings");
     if (settings.defaultLlmProviderId !== "mock") {
       throw new Error(

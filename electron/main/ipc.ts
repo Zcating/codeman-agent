@@ -232,9 +232,15 @@ export function registerIpcHandlers(_deps: {
   ipcMain.handle("getSettings", () => loadSettings());
   ipcMain.handle("updateSettings", (_e, args) => {
     // V2 spec convention: args may be { newSettings } OR just the patch object.
-    const patch =
+    const rawPatch =
       (args && typeof args === "object" && ("newSettings" in args ? (args as { newSettings: unknown }).newSettings : args)) ?? {};
-    return updateSettings(patch as Partial<SettingsV15>);
+    // ADR-0024 D10: normalize incoming patches from legacy V3 snake_case to
+    // canonical V15 camelCase before merging into the in-memory cache.
+    // loadSettings() applies the same migration on file read — this keeps the
+    // cache uniform regardless of which form callers emit. Idempotent: a no-op
+    // on already-camel input.
+    const patch = migrateV15SnakeToCamel(rawPatch) as Partial<SettingsV15>;
+    return updateSettings(patch);
   });
   ipcMain.handle("clearAllHistory", () => {
     dbInit();
