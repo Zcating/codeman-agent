@@ -1,5 +1,89 @@
 [
   {
+    "question": "04::hello-intro",
+    "turns": [{ "text": "你好！我是一个 AI 助手，很高兴认识你。" }]
+  },
+  {
+    "question": "05b::user-bubble",
+    "turns": [{ "text": "收到你的消息。" }]
+  },
+  {
+    "question": "05b::first-bubble",
+    "turns": [{ "text": "第一条已记录。" }]
+  },
+  {
+    "question": "05b::second-bubble",
+    "turns": [{ "text": "第二条已记录。" }]
+  },
+  {
+    "question": "05b::third-bubble",
+    "turns": [{ "text": "第三条已记录。" }]
+  },
+  {
+    "question": "05f::ambiguous-edit",
+    "turns": [
+      {
+        "text": "Error: old_text must match exactly once. Multiple matches found, please provide a unique match."
+      }
+    ]
+  },
+  {
+    "question": "05f::plain-text",
+    "turns": [{ "text": "Hello from search_files diagnostic test!" }]
+  },
+  {
+    "question": "05f::search-todo",
+    "turns": [{ "text": "Found a.ts (line 1): TODO: refactor" }]
+  },
+  {
+    "question": "06::user-prompt",
+    "turns": [{ "text": "你好！这是 mock LLM 的回复。" }]
+  },
+  {
+    "question": "07::hi",
+    "turns": [{ "text": "07::hi Hello from mock LLM!" }]
+  },
+  {
+    "question": "08::write-read",
+    "turns": [{ "text": "written the file and read it back, content verified" }]
+  },
+  {
+    "question": "08::sandbox",
+    "turns": [
+      {
+        "text": "I cannot read that file because it is outside the workspace sandbox."
+      }
+    ]
+  },
+  {
+    "question": "09::msg-in-idx0",
+    "turns": [{ "text": "Hello from conv A" }]
+  },
+  {
+    "question": "09::msg-in-idx1",
+    "turns": [{ "text": "Hello from conv B" }]
+  },
+  {
+    "question": "09::msg-A",
+    "turns": [{ "text": "Hello from conv A" }]
+  },
+  {
+    "question": "09::msg-B",
+    "turns": [{ "text": "Hello from conv B" }]
+  },
+  {
+    "question": "09::first",
+    "turns": [{ "text": "Hello from conv A" }]
+  },
+  {
+    "question": "09::second",
+    "turns": [{ "text": "Second response after cancel" }]
+  },
+  {
+    "question": "09::msg",
+    "turns": [{ "text": "Hello from conv A" }]
+  },
+  {
     "question": "hello",
     "turns": [
       {
