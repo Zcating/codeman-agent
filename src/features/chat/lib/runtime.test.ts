@@ -448,7 +448,7 @@ describe("run() �� message_update �߽����", () => {
                             type: "toolCall",
                             id: "tc-1",
                             name: "read_file",
-                            arguments: { workspace_id: "main", path: "/tmp/x.txt" },
+                            arguments: { workspaceId: "main", path: "/tmp/x.txt" },
                         },
                     ],
                 },
@@ -464,8 +464,10 @@ describe("run() �� message_update �߽����", () => {
             expect(toolCallEvent).toBeDefined();
             expect(toolCallEvent.toolCall.id).toBe("tc-1");
             expect(toolCallEvent.toolCall.name).toBe("read_file");
+            // ADR-0013.1: LLM-facing tool_call args use camelCase (workspaceId)
+            // to match the schema field / IPC arg key / system prompt hint.
             expect(toolCallEvent.toolCall.args).toEqual({
-                workspace_id: "main",
+                workspaceId: "main",
                 path: "/tmp/x.txt",
             });
         } finally {
