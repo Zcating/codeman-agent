@@ -24,7 +24,6 @@ import { Agent, type AgentEvent } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai";
 import { createFileTools } from "../../file-tools/lib/file-tools";
 import {
-  isAssistantLikeMessage,
   isTextBlock,
   isThinkingBlock,
   isToolCallBlock,
@@ -85,40 +84,17 @@ export interface AgentRuntime {
   cancel(): void;
 }
 
-// ─── agent_end aggregation helper ──────────────────────────────────────────
-
-interface AssistantAggregate {
-  /** Text from the last assistant message (final answer) */
-  finalText: string;
-  /** All thinking blocks across assistant messages */
-  allThinking: string[];
-  /** All toolCall blocks across assistant messages */
-  allToolCalls: Array<{
-    id: string;
-    name: string;
-    arguments: Record<string, unknown>;
-  }>;
-}
-
-/**
- * Aggregate text/thinking/toolCalls across all assistant messages in an agent_end
- * event. ADR-0019 V3.1 fix: multi-turn agent loop produces multiple assistant
- * messages — last assistant message's text is the final answer, but thinking
- * and toolCall blocks may live in earlier turns (turn #1).
- */
-function aggregateAssistantMessages(messages: unknown[]): AssistantAggregate {
-  const assistantMsgs = messages.filter(isAssistantLikeMessage);
-  const finalAssistant = assistantMsgs[assistantMsgs.length - 1] ?? null;
-  const finalText = finalAssistant
-    ? contentOf(finalAssistant).filter(isTextBlock).map((b) => b.text).join("")
-    : "";
-  const allThinking = assistantMsgs
-    .flatMap((m) => contentOf(m).filter(isThinkingBlock).map((b) => b.thinking));
-  const allToolCalls = assistantMsgs.flatMap((m) =>
-    contentOf(m).filter(isToolCallBlock),
-  );
-  return { finalText, allThinking, allToolCalls };
-}
+// ─── Bubble Boundary helpers (ADR-0028) ───────────────────────────────────────
+//
+// V3.1 cross-turn aggregation REMOVED. Runtime now emits one `done` event per
+// turn (at `turn_end`), not one aggregated `done` at `agent_end`. Each turn's
+// done.message owns ONLY that turn's thinking / tool_calls / tool_results —
+// no cross-turn move of any content type.
+//
+// Old contract (V3.1, removed): agent_end.messages[] aggregated across all
+// turns → 1 final done with cross-turn thinking + tool_calls.
+// New contract (ADR-0028): turn_end.message (per turn) → 1 done per turn.
+// agent_end is now cleanup-only (emit.end() + unsubscribe).
 
 /** contentOf moved to runtime-type-guards.ts (typed signature, runtime-safe). */
 
@@ -204,48 +180,112 @@ function handleToolExecutionEnd(
   });
 }
 
-function handleAgentEnd(
-  evt: Extract<AgentEvent, { type: "agent_end" }>,
+/**
+ * turn_end handler (ADR-0028 Bubble Boundary): emits ONE `done` event for the
+ * turn that just ended. The done.message owns ONLY this turn's content blocks:
+ * text / thinking / toolCalls extracted from `evt.message`; toolResults from
+ * `evt.toolResults` (NOT cross-turn aggregated).
+ *
+ * Replaces V3.1's handleAgentEnd which aggregated across all turns at agent_end.
+ */
+function handleTurnEnd(
+  evt: Extract<AgentEvent, { type: "turn_end" }>,
   emit: RuntimeEmitter,
   defaultModel: string,
-  finalize: () => void,
 ): void {
-  const { messages } = evt;
-  // V2 ADR-0019 + V3.1 fix: 多轮时跨所有 assistant messages 聚合
-  // thinking + tool_calls; 取最后一条 assistant 的 text 作为 final answer
-  const { finalText, allThinking, allToolCalls } = aggregateAssistantMessages(messages);
-  const doneThinking = allThinking.length > 0 ? allThinking.join("") : null;
-  const doneToolCalls =
-    allToolCalls.length > 0
-      ? allToolCalls.map((b) => ({
+  const { message: turnMessage, toolResults: turnToolResults } = evt;
+  const blocks = contentOf(turnMessage);
+
+  const text = blocks
+    .filter(isTextBlock)
+    .map((b) => b.text)
+    .join("");
+  const thinkingJoined = blocks
+    .filter(isThinkingBlock)
+    .map((b) => b.thinking)
+    .join("");
+  const thinking = thinkingJoined.length > 0 ? thinkingJoined : null;
+  const toolCallBlocks = blocks.filter(isToolCallBlock);
+  const toolCalls =
+    toolCallBlocks.length > 0
+      ? toolCallBlocks.map((b) => ({
         id: b.id,
-        name: b.name,
+        name: b.name ?? "",
         args: b.arguments as Record<string, unknown>,
       }))
       : null;
-  logger.debug("[runtime/diag] agent_end", {
-    msgs: messages.length,
-    textLen: finalText.length,
-    thinkingLen: doneThinking?.length ?? 0,
-    toolBlocks: doneToolCalls?.length ?? 0,
-    lastMsg: messages[messages.length - 1],
+
+  // turn_end.toolResults is pi-ai's ToolResultMessage[]; we project to chat.store's
+  // ToolResult[] (toolCallId + result + error|null). content[] flattened for the
+  // single-text-result case (typical for file tools).
+  const toolResults =
+    turnToolResults && turnToolResults.length > 0
+      ? turnToolResults.map((tr) => ({
+        toolCallId: tr.toolCallId,
+        result: extractResultContent(tr.content),
+        error: tr.isError ? extractResultText(tr.content) : null,
+      }))
+      : null;
+
+  logger.debug("[runtime/diag] turn_end → done", {
+    textLen: text.length,
+    thinkingLen: thinking?.length ?? 0,
+    toolBlocks: toolCalls?.length ?? 0,
+    toolResultsCount: toolResults?.length ?? 0,
   });
+
   emit.single({
     type: "done",
     message: {
       id: crypto.randomUUID(),
       conversationId: "",
       role: "assistant",
-      content: finalText,
-      thinking: doneThinking,
-      toolCalls: doneToolCalls,
-      toolResults: null,
+      content: text,
+      thinking,
+      toolCalls,
+      toolResults,
       model: defaultModel || null,
       inputTokens: null,
       outputTokens: null,
       createdAt: Date.now(),
     },
   });
+}
+
+/** Flatten pi-ai ToolResultMessage.content (Content[]) to chat.store ToolResult.result.
+ *  Text-only results stay as string; mixed results JSON-stringify. */
+function extractResultContent(content: unknown): unknown {
+  if (!Array.isArray(content)) return content;
+  const textBlocks = content.filter(
+    (b): b is { type: "text"; text: string } =>
+      !!b && typeof b === "object" && (b as { type?: unknown }).type === "text",
+  );
+  if (textBlocks.length === content.length) {
+    return textBlocks.map((b) => b.text).join("");
+  }
+  return JSON.stringify(content);
+}
+
+/** Extract plain text from pi-ai Content[] for error message. */
+function extractResultText(content: unknown): string {
+  const extracted = extractResultContent(content);
+  return typeof extracted === "string" ? extracted : JSON.stringify(extracted);
+}
+
+/**
+ * agent_end handler (ADR-0028): CLEANUP-ONLY. Per-turn `done` events already
+ * fired via handleTurnEnd. agent_end only:
+ *   1. emit.end() the runtime EventStream
+ *   2. call finalize() (unsubscribe + clear currentAgent)
+ *
+ * Does NOT emit `done` (per ADR-0028: bubble boundary is per turn).
+ */
+function handleAgentEnd(
+  _evt: Extract<AgentEvent, { type: "agent_end" }>,
+  emit: RuntimeEmitter,
+  finalize: () => void,
+): void {
+  logger.info("[runtime/diag] agent_end cleanup (per-turn done events already emitted)");
   emit.end();
   finalize();
 }
@@ -318,10 +358,14 @@ export function createAgentRuntime(): AgentRuntime {
             match(evt)
               .with({ type: "message_update" }, (e) => handleMessageUpdate(e, emit))
               .with({ type: "tool_execution_end" }, (e) => handleToolExecutionEnd(e, emit))
+              .with({ type: "turn_end" }, (e) =>
+                // ADR-0028 Bubble Boundary: per-turn done (1 turn = 1 bubble)
+                handleTurnEnd(e, emit, provider.defaultModel))
               .with({ type: "agent_end" }, (e) =>
-                handleAgentEnd(e, emit, provider.defaultModel, unsubscribeAndClear))
+                // ADR-0028: cleanup-only (per-turn done already fired via turn_end)
+                handleAgentEnd(e, emit, unsubscribeAndClear))
               .otherwise(() => {
-                // agent_start / turn_start / turn_end / message_start / message_end /
+                // agent_start / turn_start / message_start / message_end /
                 // tool_execution_start / tool_execution_update: not mapped to RuntimeEvent
               });
           } catch (err) {
