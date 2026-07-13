@@ -670,6 +670,196 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
   });
 });
 
+// ─── G29: Bubble Boundary — 1 user input → N assistant bubbles (per agent turn) ───
+//
+// ADR-0028: 每个 agent turn = 1 assistant message = 1 bubble。Runtime 在每个 turn_end
+// emit 1 个 done (per-turn); 不再在 agent_end 跨 turn 聚合。Chat.store 接收 N 个 done
+// → 产生 N 个 assistant 消息 (1 per turn) + 1 user message。
+describe("sendMessage — G29: Bubble Boundary — 1 user input → N assistant bubbles (per agent turn)", () => {
+  it("G29a: 2 turn run (turn-1 tool_use + turn-2 text) → 1 user + 2 assistant bubbles, turn-1 owns toolCalls/toolResults", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, []);
+      const readFileToolCall = {
+        id: "tc-read-1",
+        name: "read_file",
+        args: { path: "README.md" },
+      };
+
+      // Per-turn done: turn-1 emit done with toolCalls+toolResults, turn-2 emit done with text only.
+      // (Replaces V3.1 aggregation: 1 final done with cross-turn aggregated content.)
+      const events: RuntimeEvent[] = [
+        // ── Turn 1: thinking + text + tool_use + tool_result ──
+        { type: "thinking", content: "Calling read_file." },
+        { type: "token", content: "Reading the file now." },
+        { type: "tool_call", toolCall: readFileToolCall },
+        {
+          type: "tool_result",
+          toolCallId: "tc-read-1",
+          result: "# Tauri + Solid",
+        },
+        {
+          type: "done",
+          message: {
+            id: "turn-1-msg",
+            conversationId: "c1",
+            role: "assistant",
+            content: "Reading the file now.",
+            thinking: "Calling read_file.",
+            toolCalls: [readFileToolCall],
+            toolResults: [
+              {
+                toolCallId: "tc-read-1",
+                result: "# Tauri + Solid",
+                error: null,
+              },
+            ],
+            model: "mock-default",
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
+          },
+        },
+        // ── Turn 2 (short-circuit): thinking + text only, no tool calls ──
+        { type: "thinking", content: "Done." },
+        { type: "token", content: "(mock) Script complete." },
+        {
+          type: "done",
+          message: {
+            id: "turn-2-msg",
+            conversationId: "c1",
+            role: "assistant",
+            content: "(mock) Script complete.",
+            thinking: "Done.",
+            toolCalls: null, // turn-2 didn't call any tool
+            toolResults: null,
+            model: "mock-default",
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
+          },
+        },
+      ];
+      vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
+      await Effect.runPromise(sendMessage("c1", "tool", defaultProvider));
+
+      const msgs = store.byId["c1"]?.messages ?? [];
+
+      // S2 contract: 1 user bubble + 2 assistant bubbles = 3 messages total
+      expect(msgs.length).toBe(3);
+
+      // msg[0] = user input
+      expect(msgs[0]?.role).toBe("user");
+      expect(msgs[0]?.content).toBe("tool");
+
+      // msg[1] = turn-1 assistant: owns toolCalls + toolResults
+      const turn1 = msgs[1];
+      expect(turn1?.role).toBe("assistant");
+      expect(turn1?.content).toBe("Reading the file now.");
+      expect(turn1?.thinking).toBe("Calling read_file.");
+      expect(turn1?.toolCalls?.length).toBe(1);
+      expect(turn1?.toolCalls?.[0]?.name).toBe("read_file");
+      expect(turn1?.toolResults?.length).toBe(1);
+      expect(turn1?.toolResults?.[0]?.result).toBe("# Tauri + Solid");
+
+      // msg[2] = turn-2 assistant: text + thinking only, NO tool calls (cross-turn
+      // aggregation REVERTED — turn-1's read_file is NOT in turn-2's bubble)
+      const turn2 = msgs[2];
+      expect(turn2?.role).toBe("assistant");
+      expect(turn2?.content).toBe("(mock) Script complete.");
+      expect(turn2?.thinking).toBe("Done.");
+      expect(turn2?.toolCalls).toBeNull();
+      expect(turn2?.toolResults).toBeNull();
+
+      // streamingMessageId cleared after final done
+      expect(store.byId["c1"]?.streamingMessageId).toBeNull();
+      dispose();
+    });
+  });
+
+  it("G29b: 3 turn run (turn-1 + turn-2 tool_use + turn-3 final) → 1 user + 3 assistant bubbles, each turn owns its own toolCalls", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, []);
+
+      const events: RuntimeEvent[] = [
+        // turn 1: read_file
+        { type: "thinking", content: "Reading." },
+        { type: "tool_call", toolCall: { id: "tc-1", name: "read_file", args: {} } },
+        { type: "tool_result", toolCallId: "tc-1", result: "data" },
+        {
+          type: "done",
+          message: {
+            id: "turn-1",
+            conversationId: "c1",
+            role: "assistant",
+            content: "Reading.",
+            thinking: "Reading.",
+            toolCalls: [{ id: "tc-1", name: "read_file", args: {} }],
+            toolResults: [{ toolCallId: "tc-1", result: "data", error: null }],
+            model: null,
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
+          },
+        },
+        // turn 2: search_files
+        { type: "thinking", content: "Searching." },
+        { type: "tool_call", toolCall: { id: "tc-2", name: "search_files", args: {} } },
+        { type: "tool_result", toolCallId: "tc-2", result: ["match"] },
+        {
+          type: "done",
+          message: {
+            id: "turn-2",
+            conversationId: "c1",
+            role: "assistant",
+            content: "Searching.",
+            thinking: "Searching.",
+            toolCalls: [{ id: "tc-2", name: "search_files", args: {} }],
+            toolResults: [{ toolCallId: "tc-2", result: ["match"], error: null }],
+            model: null,
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
+          },
+        },
+        // turn 3: final summary
+        { type: "thinking", content: "Summarizing." },
+        { type: "token", content: "Summary complete." },
+        {
+          type: "done",
+          message: {
+            id: "turn-3",
+            conversationId: "c1",
+            role: "assistant",
+            content: "Summary complete.",
+            thinking: "Summarizing.",
+            toolCalls: null,
+            toolResults: null,
+            model: null,
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
+          },
+        },
+      ];
+      vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
+      await Effect.runPromise(sendMessage("c1", "summarize", defaultProvider));
+
+      const msgs = store.byId["c1"]?.messages ?? [];
+
+      expect(msgs.length).toBe(4); // 1 user + 3 assistant
+      expect(msgs[0]?.role).toBe("user");
+      expect(msgs[1]?.role).toBe("assistant");
+      expect(msgs[1]?.toolCalls?.[0]?.name).toBe("read_file");
+      expect(msgs[2]?.role).toBe("assistant");
+      expect(msgs[2]?.toolCalls?.[0]?.name).toBe("search_files");
+      expect(msgs[3]?.role).toBe("assistant");
+      expect(msgs[3]?.content).toBe("Summary complete.");
+      expect(msgs[3]?.toolCalls).toBeNull();
+      dispose();
+    });
+  });
+});
+
 describe("sendMessage — G10: 处理 error event → console.error", () => {
   it("sendMessage() 在 error event 时调用 console.error", async () => {
     await createRoot(async (dispose) => {
