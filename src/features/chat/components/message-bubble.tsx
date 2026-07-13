@@ -60,7 +60,6 @@ export function MessageBubble(props: { message: Message }) {
   const hasTools = () => pairedTools().length > 0;
   const hasThinking = () => !!(props.message.thinking && props.message.thinking.length > 0);
   const hasContent = () => !!props.message.content && props.message.content.length > 0;
-
   return (
     <div class={`mb-3 flex w-full ${role() === "user" ? "justify-end" : "justify-start"}`}>
       <Show when={role() === "user"}>
