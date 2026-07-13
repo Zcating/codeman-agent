@@ -3,12 +3,11 @@ import { validateProvider } from "./runtime-validate-provider";
 import type { ProviderConfig } from "./runtime";
 
 const makeProvider = (overrides: Partial<ProviderConfig> = {}): ProviderConfig => ({
-  apiKey: null,
+  apiKey: "",
   baseUrl: "https://api.anthropic.com",
   defaultModel: "claude-sonnet-4-20250514",
   systemPrompt: "You are helpful.",
   tools: [],
-  workspaceId: undefined,
   ...overrides,
 });
 
@@ -53,7 +52,7 @@ describe("validateProvider", () => {
   });
 
   it("ignores other fields - apiKey does not affect result", () => {
-    const cfg = makeProvider({ apiKey: null });
+    const cfg = makeProvider({ apiKey: "" });
     expect(validateProvider(cfg).ok).toBe(true);
   });
 

@@ -129,7 +129,7 @@ export function HomeAgentForm(): JSX.Element {
     const providerId = appStore.state.value.defaultLlmProviderId;
     const providerConfig = appStore.state.value.providers?.find((p) => p.id === providerId);
     const provider: ProviderConfig = {
-      apiKey: providerConfig?.apiKey ?? null,
+      apiKey: providerConfig?.apiKey,
       baseUrl: providerConfig?.llm?.baseUrl ?? "",
       defaultModel: providerConfig?.llm?.defaultModel ?? "auto",
       systemPrompt: appStore.state.value.systemPrompt?.default ?? "",

@@ -53,7 +53,12 @@ interface RuntimeEmitter {
 // ─── Provider config (per-run, not closure) ─────────────────────
 
 export interface ProviderConfig {
-  apiKey: string | null;
+  /**
+   * Per-run API key for the LLM provider. Optional — omit when the caller
+   * hasn't configured auth yet; `Agent.getApiKey` falls through to `undefined`
+   * and the Anthropic SDK then resolves via env / no-auth path.
+   */
+  apiKey?: string;
   baseUrl: string;
   defaultModel: string;
   systemPrompt: string;

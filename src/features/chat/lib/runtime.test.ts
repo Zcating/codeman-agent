@@ -80,6 +80,20 @@ describe("createAgentRuntime()", () => {
         const stream = runtime.run({ context: mockContext, provider: mockProvider });
         expect(stream).toBeDefined();
     });
+
+    it("accepts ProviderConfig without apiKey (optional field)", () => {
+        // API key is optional — callers that haven't configured auth yet can omit it.
+        // Agent's getApiKey falls through to undefined → Anthropic SDK uses env / no auth.
+        const cfg: ProviderConfig = {
+            baseUrl: "https://mock.local",
+            defaultModel: "mock-model",
+            systemPrompt: "You are a helpful assistant.",
+            tools: [],
+            // apiKey intentionally omitted
+        };
+        const runtime = createAgentRuntime();
+        expect(() => runtime.run({ context: mockContext, provider: cfg })).not.toThrow();
+    });
 });
 
 describe("run() — event translation", () => {
