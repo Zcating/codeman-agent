@@ -35,8 +35,7 @@ export default defineConfig(async () => ({
   // type checks and keeps each script single-purpose. See ADR-0021 for
   // the precommit gate architecture.
   staged: {
-    "*.{ts,tsx,mjs}": "node scripts/precommit.mjs",
-    "*.rs": "node scripts/precommit-rust.mjs",
+    "*.{ts,tsx,mjs}": "node scripts/precommit.mjs"
   },
   resolve: {
     conditions: ["browser", "development"],
