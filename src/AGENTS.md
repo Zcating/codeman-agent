@@ -15,7 +15,6 @@ Vite 单页应用，渲染到单个 Electron BrowserWindow。路由走 TanStack 
 | `router.tsx`    | TanStack Router code-based 配置                                                    | 不用 `@tanstack/router-plugin`（ADR-0007）                          |
 | `vitest.setup.ts` | vitest setup（`import "./__mocks__/ipc-mock"` + `scrollIntoView` polyfill） | mockState 唯一源在 src/__mocks__/ipc-mock.ts |
 | `vite-env.d.ts` | Vite 类型                                                                          | 不可删                                                              |
-| `debug-bubble-harness.tsx` | dev-only Playwright harness for `MessageBubble` QA（never shipped to production） | ⚠️ 例外：根级白名单禁止新文件，此文件保留用于 Playwright 可视化验证 |
 | `__tests__/` | 迁移测试（`__tests__/*.test.ts` 风格的 in-source 测试临时代码） | ⚠️ 例外：根级白名单禁止新目录，`__tests__/` 仅用于测试基础设施迁移 |
 
 ## src/ 子目录（5+1 白名单）
