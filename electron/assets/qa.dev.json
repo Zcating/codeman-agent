@@ -128,6 +128,7 @@
     "question": "tool",
     "turns": [
       {
+        "thinking": "The user typed 'tool' — single tool_use flow. I'll call read_file on README.md first, then provide a brief summary after the tool result returns. The mock-server short-circuit on done:true will reuse this thinking for the end_turn response.",
         "text": "Reading the file now.",
         "toolUses": [
           {
