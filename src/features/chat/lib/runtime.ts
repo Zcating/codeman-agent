@@ -39,7 +39,7 @@ import { extractToolErrorText } from "./runtime-tool-error";
 export type RuntimeEvent =
   | { type: "token"; content: string }
   | { type: "thinking"; content: string }
-  | { type: "tool_call"; toolCall: { id: string; name: string; args: Record<string, any> } }
+  | { type: "tool_call"; toolCall: { id: string; name: string; args: Record<string, unknown> } }
   | { type: "tool_result"; toolCallId: string; result: unknown; error?: string }
   | { type: "done"; message: Message }
   | { type: "error"; error: { message: string } };
@@ -126,6 +126,37 @@ function contentOf(m: { content?: unknown }): unknown[] {
 // in the closure → 1-level dispatch). Each handler takes the dispatch input
 // + the emitter, plus any per-run values it needs (defaultModel, finalize).
 
+function handleAssistantMessageEvent(
+  evt: NonNullable<
+    Extract<AgentEvent, { type: "message_update" }>["assistantMessageEvent"]
+  >,
+  emit: RuntimeEmitter,
+): void {
+  match(evt)
+    .with({ type: "text_delta" }, ({ delta }) => {
+      emit.single({ type: "token", content: delta });
+    })
+    .with({ type: "thinking_delta" }, ({ delta }) => {
+      // pi-agent-core 的 message_update 携带的是累积内容（同 text branch），非 delta。
+      emit.single({ type: "thinking", content: delta });
+    })
+    .with({ type: "toolcall_end" }, ({ toolCall }) => {
+      emit.single({
+        type: "tool_call",
+        toolCall: {
+          id: toolCall.id,
+          name: toolCall.name,
+          // pi-ai's ToolCall.arguments is Record<string, any>; assignable to
+          // Record<string, unknown> without an explicit cast.
+          args: toolCall.arguments,
+        },
+      });
+    })
+    .otherwise(() => {
+      // text_start / thinking_start / toolcall_start / toolcall_delta / start: no-op
+    });
+}
+
 function handleMessageUpdate(
   evt: Extract<AgentEvent, { type: "message_update" }>,
   emit: RuntimeEmitter,
@@ -133,27 +164,7 @@ function handleMessageUpdate(
   const { assistantMessageEvent, message } = evt;
   if (assistantMessageEvent) {
     // NEW FORMAT (pi-agent-core 0.80.3): dispatch on assistantMessageEvent.type
-    match(assistantMessageEvent)
-      .with({ type: "text_delta" }, ({ delta }) => {
-        emit.single({ type: "token", content: delta });
-      })
-      .with({ type: "thinking_delta" }, ({ delta }) => {
-        // pi-agent-core 的 message_update 携带的是累积内容（同 text branch），非 delta。
-        emit.single({ type: "thinking", content: delta });
-      })
-      .with({ type: "toolcall_end" }, ({ toolCall }) => {
-        emit.single({
-          type: "tool_call",
-          toolCall: {
-            id: toolCall.id,
-            name: toolCall.name,
-            args: toolCall.arguments,
-          },
-        });
-      })
-      .otherwise(() => {
-        // text_start / thinking_start / toolcall_start / toolcall_delta / start: no-op
-      });
+    handleAssistantMessageEvent(assistantMessageEvent, emit);
     return;
   }
 
@@ -285,6 +296,15 @@ export function createAgentRuntime(): AgentRuntime {
         });
         currentAgent = agent;
 
+        /** Tear down subscription + clear `currentAgent` if still ours.
+         *  Shared by agent_end / prompt catch / Stream cleanup (3 sites). */
+        const unsubscribeAndClear = (): void => {
+          sub();
+          if (currentAgent === agent) {
+            currentAgent = null;
+          }
+        };
+
         const sub = agent.subscribe((evt: AgentEvent, _signal) => {
           try {
             match(evt)
@@ -303,15 +323,6 @@ export function createAgentRuntime(): AgentRuntime {
             });
           }
         });
-
-        /** Tear down subscription + clear `currentAgent` if still ours.
-         *  Shared by agent_end / prompt catch / Stream cleanup (3 sites). */
-        const unsubscribeAndClear = (): void => {
-          sub();
-          if (currentAgent === agent) {
-            currentAgent = null;
-          }
-        };
 
         const lastUser = [...context].reverse().find((m) => m.role === "user");
         const userContent = lastUser?.content ?? "";
