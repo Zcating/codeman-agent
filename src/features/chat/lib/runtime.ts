@@ -20,10 +20,7 @@ import type { Message } from "../../../shared/lib/types";
 import { logger } from "../../../shared/lib/logger";
 import { anthropicStream } from "./anthropic-transport";
 import { Agent, type AgentEvent } from "@earendil-works/pi-agent-core";
-import type {
-  Message as PiMessage,
-  Model,
-} from "@earendil-works/pi-ai";
+import type { Model } from "@earendil-works/pi-ai";
 import { createFileTools } from "../../file-tools/lib/file-tools";
 import {
   isAssistantLikeMessage,
@@ -33,6 +30,7 @@ import {
 } from "./runtime-type-guards";
 import { validateProvider } from "./runtime-validate-provider";
 import { extractToolErrorText } from "./runtime-tool-error";
+import { toPiMessages } from "./runtime-to-pi-messages";
 
 // ─── Runtime event types (6 variants,ADR-0017 + thinking) ──────────────────
 
@@ -286,10 +284,10 @@ export function createAgentRuntime(): AgentRuntime {
             model,
             thinkingLevel: "off",
             tools,
-            // ADR-0019 D2 + pi-ai version drift (per chat/AGENTS.md): our DB Message
-            // shape (snake_case) differs from pi-ai's Message shape (camelCase + Content).
-            // Bridge via 2-hop cast; proper mapper is a follow-up.
-            messages: context as unknown as PiMessage[],
+            // ADR-0019 D2 + bridge: our DB Message (snake_case, flat) → pi-ai Message
+            // (camelCase, content[] blocks). See runtime-to-pi-messages.ts for the
+            // mapping rules + edge cases (Usage synthesis, toolName lookup, etc.).
+            messages: toPiMessages(context, model),
           },
           streamFn: anthropicStream,
           getApiKey: async () => provider.apiKey ?? undefined,
