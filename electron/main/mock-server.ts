@@ -304,6 +304,66 @@ function countAssistantMessages(body: unknown): number {
   return n;
 }
 
+/** Count `role: "assistant"` messages that belong to the CURRENT agent run
+ *  (after the last plain user prompt), not the whole conversation history.
+ *
+ *  Pi-agent-core 0.80.3 的 Agent class 把整个 DB context 塞进 initialState.messages,
+ *  然后每次 LLM call 都把 currentContext.messages 整个发给 LLM。
+ *  resumed conversation (existingAssistantCount=20) 会让第一个 LLM call 的 request
+ *  body 里也有 20+ assistant messages — naive countAssistantMessages 把它们都算进
+ *  asstCount,触发 "isPastLastTurn=true" 短路,turn 0 的 tool_use 永远到不了 UI。
+ *
+ *  heuristic:
+ *  1. 从末尾往回扫,跳过 tool_result 容器 (role="user" 但 content 含 tool_result blocks),
+ *     找到最后一条 plain user prompt = current run 起点 index (lastPlainUserIdx)
+ *  2. 从 lastPlainUserIdx+1 数到末尾的 assistant 数量 = current run 的 assistant 数
+ *
+ *  边界:
+ *  — turn 1 LLM call:        body=[...history, userPrompt]
+ *    lastPlainUserIdx 指向 userPrompt;之后没 assistant → currentRunAsst=0
+ *  — turn 2 LLM call:        body=[...history, userPrompt, assistant_turn1, user(tool_result)]
+ *    lastPlainUserIdx 指向 userPrompt;之后 [assistant_turn1, user(tool_result)]
+ *    → 1 assistant → currentRunAsst=1
+ */
+function countCurrentRunAssistants(body: unknown): number {
+  if (!body || typeof body !== "object") return 0;
+  const b = body as AnthropicMessagesBody;
+  const msgs = b.messages;
+  if (!Array.isArray(msgs)) return 0;
+
+  // Step 1: 找最后一条 plain user prompt (current run 起点)
+  let lastPlainUserIdx = -1;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    if (!m || m.role !== "user") continue;
+    const c = m.content;
+    // Anthropic format: tool_result 容器是 user role 但 content 是 tool_result blocks
+    if (
+      Array.isArray(c) &&
+      c.some(
+        (block: unknown) =>
+          !!block &&
+          typeof block === "object" &&
+          (block as { type?: unknown }).type === "tool_result",
+      )
+    ) {
+      continue;
+    }
+    lastPlainUserIdx = i;
+    break;
+  }
+
+  if (lastPlainUserIdx < 0) return 0;
+
+  // Step 2: 数 lastPlainUserIdx 之后的 assistant 数
+  let n = 0;
+  for (let i = lastPlainUserIdx + 1; i < msgs.length; i++) {
+    const m = msgs[i];
+    if (m && m.role === "assistant") n++;
+  }
+  return n;
+}
+
 // ─── Streaming write helper ─────────────────────────────────────────────────
 
 /** Write events one at a time with optional delay between writes.
@@ -419,18 +479,32 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
       // T28 Stop operation: 显式 done:true 短路。
       // 单 toolUse entry 的 turns.length === 1,turnIdx 永远 = 0 — 工具执行后
       // agent 再调 LLM 时如果不做短路,会回到同 toolUse 死循环。
-      // 当 entry 最后一 turn 标了 done:true 且 asstCount 已越过该 turn,合成
-      // 一条 end_turn 完成响应("(mock) Script complete."),agent loop 自然终止。
+      //
+      // 重要:short-circuit 必须用 `currentRunAsstCount`(只数当前 agent run 的 assistant),
+      // 不能用 `asstCount`(数整个 conversation history)。
+      // Pi-agent-core 0.80.3 把整个 DB context 塞进 LLM request body,resumed conversation
+      // 第一个 LLM call 的 asstCount 就 >=20+ — naive 检查会立刻 short-circuit,turn 0
+      // 的 tool_use 永远到不了 UI。
+      // currentRunAsstCount 只数 current run 起点 user prompt 之后的 assistant:
+      //  — turn 1 LLM call:  currentRunAsstCount=0 → 不触发 short-circuit → serve turns[0]
+      //  — turn 2 LLM call:  currentRunAsstCount=1 → 触发 short-circuit → "(mock) Script complete."
+      // 保留 lastTurn.thinking(如有) — 否则后续短路响应丢失 reasoning,bubble
+      // 看不到思考过程,UI 不一致。
       const lastTurn = entry.turns[entry.turns.length - 1];
-      const isPastLastTurn = asstCount >= entry.turns.length;
+      const currentRunAsstCount = countCurrentRunAssistants(body);
+      const isPastLastTurn = currentRunAsstCount >= entry.turns.length;
       if (isPastLastTurn && lastTurn?.done === true) {
         const events = buildSseTurnEvents(
-          { text: SHORT_CIRCUIT_TEXT },
+          {
+            text: SHORT_CIRCUIT_TEXT,
+            ...(lastTurn.thinking ? { thinking: lastTurn.thinking } : {}),
+          },
           SHORT_CIRCUIT_TEXT.length,
         );
         logger.info(
           `[mock-server] done short-circuit "${entry.question}" ` +
-            `asstCount=${asstCount} turns.length=${entry.turns.length} ` +
+            `asstCount=${asstCount} currentRunAsstCount=${currentRunAsstCount} ` +
+            `turns.length=${entry.turns.length} ` +
             `lastTurn.done=true -> end_turn (${events.length} events)`,
         );
         writeHeadWithCors(res, 200, {

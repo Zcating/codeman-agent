@@ -785,8 +785,10 @@ describe("mock-server HTTP — POST /mock/anthropic/v1/messages", () => {
     resetQaLoaderForTest();
     loadQaTable();
 
-    // Body: [user:"tool", asst(tool_use), toolResult].
-    // asstCount=1 >= turns.length=1, lastTurn.done=true → synthesize end_turn.
+    // Body: [user:"tool", asst(tool_use), user(tool_result)] — Anthropic format.
+    // tool_result 容器在 anthropic-transport.ts 里以 user role + content:[{type:"tool_result",...}]
+    // 形式发送,这是 mock-server 实际看到的请求体结构。
+    // currentRunAsstCount=1 >= turns.length=1, lastTurn.done=true → synthesize end_turn.
     const res = await fetch(`${BASE_URL}/mock/anthropic/v1/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -795,7 +797,7 @@ describe("mock-server HTTP — POST /mock/anthropic/v1/messages", () => {
         messages: [
           { role: "user", content: "tool" },
           { role: "assistant", content: [{ type: "tool_use", name: "read_file", input: { path: "x" } }] },
-          { role: "toolResult", content: [{ type: "text", text: "result of read_file" }] },
+          { role: "user", content: [{ type: "tool_result", tool_use_id: "tc-1", content: "result of read_file" }] },
         ],
       }),
     });
@@ -808,6 +810,57 @@ describe("mock-server HTTP — POST /mock/anthropic/v1/messages", () => {
     expect(body).not.toContain('"type":"tool_use"');
     expect(body).not.toContain('"name":"read_file"');
     expect(body).toContain('"stop_reason":"end_turn"');
+  });
+
+  it("T28a-thinking: short-circuit 保留 lastTurn.thinking(让 UI 看到 thinking block,不丢 reasoning)", async () => {
+    // 回归测试:之前 short-circuit 硬编码 { text: SHORT_CIRCUIT_TEXT },丢掉了
+    // lastTurn.thinking,导致后续 end_turn bubble 看不到思考过程。
+    // 修复后,lastTurn.thinking(如有)被传到 buildSseTurnEvents,bubble 显示。
+    writeFileSync(
+      qaPath,
+      JSON.stringify([
+        {
+          question: "tool",
+          turns: [
+            {
+              thinking: "I called read_file on README.md. Now synthesizing final answer.",
+              text: "Reading the file now.",
+              toolUses: [{ name: "read_file", input: { path: "README.md" } }],
+              done: true,
+            },
+          ],
+        },
+      ]),
+    );
+    resetQaLoaderForTest();
+    loadQaTable();
+
+    const res = await fetch(`${BASE_URL}/mock/anthropic/v1/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "m",
+        messages: [
+          { role: "user", content: "tool" },
+          { role: "assistant", content: [{ type: "tool_use", name: "read_file", input: { path: "x" } }] },
+          { role: "user", content: [{ type: "tool_result", tool_use_id: "tc-1", content: "result of read_file" }] },
+        ],
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.text();
+    // short-circuit text 仍在
+    expect(body).toContain('"text":"(mock) Script complete."');
+    // 新行为:thinking block 也被合成
+    expect(body).toContain('"type":"thinking_delta"');
+    expect(body).toContain(
+      '"thinking":"I called read_file on README.md. Now synthesizing final answer."',
+    );
+    // 顺序仍按 Anthropic 约定:thinking 在 text 之前
+    const thinkingIdx = body.indexOf('"type":"thinking_delta"');
+    const textIdx = body.indexOf('"text":"(mock) Script complete."');
+    expect(thinkingIdx).toBeGreaterThan(-1);
+    expect(textIdx).toBeGreaterThan(thinkingIdx);
   });
 
   it("T28b: single-turn entry WITH done:true + asstCount=0 (initial request) → still serves turns[0] (短�� 不触发)", async () => {
