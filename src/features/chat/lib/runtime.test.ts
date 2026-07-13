@@ -27,10 +27,14 @@ vi.mock("@earendil-works/pi-agent-core", () => {
                             type: "message_end",
                             message: { content: [{ type: "text", text: "hello" }] },
                         });
+                        // ADR-0028: per-turn done. emit turn_end with the turn's
+                        // assistant message BEFORE agent_end cleanup.
                         handler({
-                            type: "agent_end",
-                            messages: [{ content: [{ type: "text", text: "hello" }] }],
+                            type: "turn_end",
+                            message: { content: [{ type: "text", text: "hello" }] },
+                            toolResults: [],
                         });
+                        handler({ type: "agent_end", messages: [] });
                     }
                 }),
                 abort: vi.fn(),
@@ -110,9 +114,9 @@ describe("run() — event translation", () => {
         expect(tokens[0]).toMatchObject({ type: "token", content: "hello" });
     });
 
-    // ─── V3.1: thinking 块从 agent_end 提取到 done.message.thinking ──────────────
+    // ─── ADR-0028: thinking 块从 turn_end.message 提取到 done.message.thinking ─────────
 
-    it("agent_end with thinking block in lastMsg.content → done.message.thinking is set (post-stream thinking preserved)", async () => {
+    it("turn_end with thinking block in message.content → done.message.thinking is set", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
         const originalImpl = mockedAgent.getMockImplementation();
@@ -140,20 +144,19 @@ describe("run() — event translation", () => {
 
             await new Promise((resolve) => setTimeout(resolve, 10));
 
-            // 模拟 mock-server 'think' entry 的最终状态: assistant 消息只有 thinking 块
+            // 模拟 mock-server 'think' entry: assistant 消息只有 thinking 块
             capturedCallback!({
-                type: "agent_end",
-                messages: [
-                    {
-                        content: [
-                            {
-                                type: "thinking",
-                                thinking:
-                                    "The user typed 'think'. This is the accumulated thinking block from the mock LLM.",
-                            },
-                        ],
-                    },
-                ],
+                type: "turn_end",
+                message: {
+                    content: [
+                        {
+                            type: "thinking",
+                            thinking:
+                                "The user typed 'think'. This is the accumulated thinking block from the mock LLM.",
+                        },
+                    ],
+                },
+                toolResults: [],
             });
 
             await new Promise((resolve) => setTimeout(resolve, 20));
@@ -172,7 +175,7 @@ describe("run() — event translation", () => {
         }
     });
 
-    it("agent_end with no thinking block → done.message.thinking is null (no spurious empty string)", async () => {
+    it("turn_end with no thinking block → done.message.thinking is null (no spurious empty string)", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
         const originalImpl = mockedAgent.getMockImplementation();
@@ -201,8 +204,9 @@ describe("run() — event translation", () => {
             await new Promise((resolve) => setTimeout(resolve, 10));
 
             capturedCallback!({
-                type: "agent_end",
-                messages: [{ content: [{ type: "text", text: "just text no thinking" }] }],
+                type: "turn_end",
+                message: { content: [{ type: "text", text: "just text no thinking" }] },
+                toolResults: [],
             });
 
             await new Promise((resolve) => setTimeout(resolve, 20));
@@ -580,8 +584,8 @@ describe("run() — message_update 边界情况", () => {
     });
 });
 
-describe("run() — agent_end 事件", () => {
-    it("agent_end 含 assistant 消息的 toolCall block 时 done 事件带 tool_calls", async () => {
+describe("run() — turn_end 事件 (per-turn done, ADR-0028)", () => {
+    it("turn_end 含 toolCall block 时 done 事件带 tool_calls (per-turn scope)", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
         const originalImpl = mockedAgent.getMockImplementation();
@@ -610,15 +614,14 @@ describe("run() — agent_end 事件", () => {
             await new Promise((resolve) => setTimeout(resolve, 10));
 
             capturedCallback!({
-                type: "agent_end",
-                messages: [
-                    {
-                        content: [
-                            { type: "text", text: "hi" },
-                            { type: "toolCall", id: "tc-1", name: "read_file", arguments: {} },
-                        ],
-                    },
-                ],
+                type: "turn_end",
+                message: {
+                    content: [
+                        { type: "text", text: "hi" },
+                        { type: "toolCall", id: "tc-1", name: "read_file", arguments: {} },
+                    ],
+                },
+                toolResults: [],
             });
 
             await new Promise((resolve) => setTimeout(resolve, 20));
@@ -635,55 +638,14 @@ describe("run() — agent_end 事件", () => {
         }
     });
 
-    it("agent_end 的 messages 为空数组时仍发送 done 事件（空内容）", async () => {
-        const { Agent } = await import("@earendil-works/pi-agent-core");
-        const mockedAgent = vi.mocked(Agent);
-        const originalImpl = mockedAgent.getMockImplementation();
+    // REMOVED (ADR-0028): "agent_end 的 messages 为空数组时仍发送 done 事件" no longer
+    // applies. agent_end is cleanup-only; done is emitted at turn_end (per turn).
+    // The empty-messages case is now equivalent to a run with zero turn_ends, which
+    // is a degenerate path. Coverage of "agent_end cleanup closes stream" is in
+    // G30c and other tests using `capturedCallback!({ type: "agent_end", messages: [] })`
+    // for stream-termination.
 
-        let capturedCallback: ((evt: unknown, signal?: AbortSignal) => void) | undefined;
-        try {
-            mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
-                return {
-                    subscribe: (h: (evt: unknown, signal?: AbortSignal) => void) => {
-                        capturedCallback = h;
-                        return () => {};
-                    },
-                    prompt: vi.fn().mockResolvedValue(undefined),
-                    abort: vi.fn(),
-                };
-            });
-
-            const runtime = createAgentRuntime();
-            const events: RuntimeEvent[] = [];
-            const program = Stream.runForEach(
-                runtime.run({ context: mockContext, provider: mockProvider }),
-                (e) => Effect.sync(() => events.push(e)),
-            );
-            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
-
-            await new Promise((resolve) => setTimeout(resolve, 10));
-
-            // ADR-0019: agent_end 始终 emit done 事件，即使 messages 为空
-            capturedCallback!({ type: "agent_end", messages: [] });
-
-            await new Promise((resolve) => setTimeout(resolve, 20));
-            const doneEvent = events.find((e) => e.type === "done") as
-                | { type: "done"; message: { content: string } }
-                | undefined;
-            // done event IS emitted with empty content
-            expect(doneEvent).toBeDefined();
-            expect(doneEvent!.message.content).toBe("");
-        } finally {
-            mockedAgent.mockImplementation(originalImpl as never);
-        }
-    });
-
-    // V3.1 multi-turn 修复: agent loop 多轮 (tool use + follow-up answer) 时,
-    // lastMsg 是 turn-2 的 text-only final answer,不再包含 turn-1 的
-    // thinking + toolCall blocks。Runtime 必须跨所有 assistant messages 聚合
-    // thinking + tool_calls 到 done.message,UI 才能看到 thinking section
-    // 和 inline ToolCallCard。
-    it("multi-turn agent_end: turn-2 text-only lastMsg → done.tool_calls + thinking preserved from turn-1", async () => {
+    it("multi-turn turn_end: 2 turns → 2 done events, turn-1 owns toolCalls+thinking, turn-2 owns text only (REGRESSION: V3.1 cross-turn aggregation removed)", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
         const originalImpl = mockedAgent.getMockImplementation();
@@ -716,44 +678,35 @@ describe("run() — agent_end 事件", () => {
             //   tool execute → tool_result
             //   turn 2: text only (final answer based on tool result)
             capturedCallback!({
-                type: "agent_end",
-                messages: [
-                    {
-                        role: "user",
-                        content: [{ type: "text", text: "three-blocks" }],
-                    },
-                    {
-                        role: "assistant",
-                        content: [
-                            {
-                                type: "thinking",
-                                thinking:
-                                    "user wants search files; calling search_files with *.ts",
-                            },
-                            { type: "text", text: "Let me search for TypeScript files." },
-                            {
-                                type: "toolCall",
-                                id: "toolu_turn1_search",
-                                name: "search_files",
-                                arguments: { pattern: "*.ts" },
-                            },
-                        ],
-                    },
-                    {
-                        role: "toolResult",
-                        toolCallId: "toolu_turn1_search",
-                        content: [{ type: "text", text: "Found 50 matches" }],
-                        isError: false,
-                    },
-                    {
-                        role: "assistant",
-                        content: [{ type: "text", text: "Done. Found 50 TypeScript files." }],
-                    },
-                ],
+                type: "turn_end",
+                message: {
+                    content: [
+                        {
+                            type: "thinking",
+                            thinking: "user wants search files; calling search_files with *.ts",
+                        },
+                        { type: "text", text: "Let me search for TypeScript files." },
+                        {
+                            type: "toolCall",
+                            id: "toolu_turn1_search",
+                            name: "search_files",
+                            arguments: { pattern: "*.ts" },
+                        },
+                    ],
+                },
+                toolResults: [{ toolCallId: "toolu_turn1_search", content: [{ type: "text", text: "Found 50 matches" }], isError: false }],
+            });
+
+            capturedCallback!({
+                type: "turn_end",
+                message: {
+                    content: [{ type: "text", text: "Done. Found 50 TypeScript files." }],
+                },
+                toolResults: [],
             });
 
             await new Promise((resolve) => setTimeout(resolve, 20));
-            const doneEvent = events.find((e) => e.type === "done") as {
+            const doneEvents = events.filter((e) => e.type === "done") as Array<{
                 type: "done";
                 message: {
                     content: string;
@@ -762,26 +715,84 @@ describe("run() — agent_end 事件", () => {
                         | Array<{ id: string; name: string; args: Record<string, unknown> }>
                         | null;
                 };
-            };
-            expect(doneEvent).toBeDefined();
-            // content 取 turn-2 的 final answer (last assistant msg)
-            expect(doneEvent!.message.content).toBe(
-                "Done. Found 50 TypeScript files.",
-            );
-            // thinking + tool_calls 必须从 turn-1 提取(不能是 null)
-            expect(doneEvent!.message.thinking).toBe(
+            }>;
+
+            // ADR-0028: 2 turns → 2 done events
+            expect(doneEvents).toHaveLength(2);
+
+            // done[0] = turn-1: text + thinking + toolCalls + toolResults
+            expect(doneEvents[0]!.message.content).toBe("Let me search for TypeScript files.");
+            expect(doneEvents[0]!.message.thinking).toBe(
                 "user wants search files; calling search_files with *.ts",
             );
-            expect(doneEvent!.message.toolCalls).not.toBeNull();
-            expect(doneEvent!.message.toolCalls).toHaveLength(1);
-            expect(doneEvent!.message.toolCalls![0]!.id).toBe("toolu_turn1_search");
-            expect(doneEvent!.message.toolCalls![0]!.name).toBe("search_files");
-            expect(doneEvent!.message.toolCalls![0]!.args).toEqual({ pattern: "*.ts" });
+            expect(doneEvents[0]!.message.toolCalls).not.toBeNull();
+            expect(doneEvents[0]!.message.toolCalls).toHaveLength(1);
+            expect(doneEvents[0]!.message.toolCalls![0]!.id).toBe("toolu_turn1_search");
+            expect(doneEvents[0]!.message.toolCalls![0]!.name).toBe("search_files");
+            expect(doneEvents[0]!.message.toolCalls![0]!.args).toEqual({ pattern: "*.ts" });
+
+            // done[1] = turn-2: text only, NO thinking/toolCalls from turn-1 (REGRESSION target)
+            expect(doneEvents[1]!.message.content).toBe(
+                "Done. Found 50 TypeScript files.",
+            );
+            expect(doneEvents[1]!.message.thinking).toBeNull();
+            expect(doneEvents[1]!.message.toolCalls).toBeNull();
         } finally {
             mockedAgent.mockImplementation(originalImpl as never);
         }
     });
 });
+
+describe("run() — agent_end typed aggregation (legacy path: cleanup-only, no done)", () => {
+    it("agent_end with AssistantMessage.text block → no done (cleanup-only path)", async () => {
+        const { Agent } = await import("@earendil-works/pi-agent-core");
+        const mockedAgent = vi.mocked(Agent);
+        const originalImpl = mockedAgent.getMockImplementation();
+
+        let capturedCallback: ((evt: unknown, signal?: AbortSignal) => void) | undefined;
+        try {
+            mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+                return {
+                    subscribe: (h: (evt: unknown, signal?: AbortSignal) => void) => {
+                        capturedCallback = h;
+                        return () => {};
+                    },
+                    prompt: vi.fn().mockResolvedValue(undefined),
+                    abort: vi.fn(),
+                };
+            });
+
+            const runtime = createAgentRuntime();
+            const events: RuntimeEvent[] = [];
+            const program = Stream.runForEach(
+                runtime.run({ context: mockContext, provider: mockProvider }),
+                (e) => Effect.sync(() => events.push(e)),
+            );
+            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            // ADR-0028: agent_end 不再 emit done; 仅 cleanup (emit.end() + finalize)。
+            // 验证: agent_end { messages: [assistant] } 触发后 doneEvents 为空。
+            capturedCallback!({
+                type: "agent_end",
+                messages: [{ role: "assistant", content: [{ type: "text", text: "x" }] }],
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            const doneEvents = events.filter((e) => e.type === "done");
+            expect(doneEvents).toHaveLength(0);
+        } finally {
+            mockedAgent.mockImplementation(originalImpl as never);
+        }
+    });
+});
+
+// REMOVED (ADR-0028): "multi-turn agent_end: turn-2 text-only lastMsg → done.tool_calls +
+// thinking preserved from turn-1" — V3.1 cross-turn aggregation is reverted.
+// Coverage moved to G30b ("multi-turn turn_end: 2 turns → 2 done events, turn-1 owns
+// toolCalls+thinking, turn-2 owns text only (REGRESSION: V3.1 cross-turn aggregation
+// removed)") which asserts the OPPOSITE contract (no cross-turn aggregation).
 
 describe("cancel() — agent abort", () => {
     it("cancel() 触发 currentAgent.abort()", async () => {
@@ -1173,10 +1184,14 @@ describe("run() — message_update non-delta assistantMessageEvent types", () =>
     });
 });
 
-// ─── Block F: agent_end with typed AssistantMessage ─────────────────────────
+// ─── Block F: turn_end with typed AssistantMessage (per-turn extraction, ADR-0028) ───
+//
+// V3.1 的 "agent_end typed aggregation" 改为 "turn_end typed extraction":
+// 每 turn 触发 1 个 done,提取 content / thinking / toolCalls / toolResults from turn_end.message
+// (NOT cross-turn aggregated from agent_end.messages[]).
 
-describe("run() — agent_end typed aggregation", () => {
-    it("agent_end with AssistantMessage.text block → done.content extracted", async () => {
+describe("run() — turn_end typed extraction (per-turn, ADR-0028)", () => {
+    it("turn_end with AssistantMessage.text block → done.content extracted", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
         const originalImpl = mockedAgent.getMockImplementation();
@@ -1205,19 +1220,18 @@ describe("run() — agent_end typed aggregation", () => {
             await new Promise((resolve) => setTimeout(resolve, 10));
 
             capturedCallback!({
-                type: "agent_end",
-                messages: [
-                    {
-                        role: "assistant",
-                        content: [{ type: "text", text: "hi" }],
-                        api: "anthropic-messages",
-                        provider: "anthropic",
-                        model: "x",
-                        usage: { inputTokens: 1, outputTokens: 1, cacheRead: 0, cacheWrite: 0 },
-                        stopReason: "stop",
-                        timestamp: 1,
-                    },
-                ],
+                type: "turn_end",
+                message: {
+                    role: "assistant",
+                    content: [{ type: "text", text: "hi" }],
+                    api: "anthropic-messages",
+                    provider: "anthropic",
+                    model: "x",
+                    usage: { inputTokens: 1, outputTokens: 1, cacheRead: 0, cacheWrite: 0 },
+                    stopReason: "stop",
+                    timestamp: 1,
+                },
+                toolResults: [],
             });
 
             await new Promise((resolve) => setTimeout(resolve, 20));
@@ -1232,7 +1246,7 @@ describe("run() — agent_end typed aggregation", () => {
         }
     });
 
-    it("agent_end with AssistantMessage empty content array → done.content empty", async () => {
+    it("turn_end with AssistantMessage empty content array → done.content empty", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
         const originalImpl = mockedAgent.getMockImplementation();
@@ -1261,19 +1275,18 @@ describe("run() — agent_end typed aggregation", () => {
             await new Promise((resolve) => setTimeout(resolve, 10));
 
             capturedCallback!({
-                type: "agent_end",
-                messages: [
-                    {
-                        role: "assistant",
-                        content: [],
-                        api: "anthropic-messages",
-                        provider: "anthropic",
-                        model: "x",
-                        usage: { inputTokens: 1, outputTokens: 1, cacheRead: 0, cacheWrite: 0 },
-                        stopReason: "stop",
-                        timestamp: 1,
-                    },
-                ],
+                type: "turn_end",
+                message: {
+                    role: "assistant",
+                    content: [],
+                    api: "anthropic-messages",
+                    provider: "anthropic",
+                    model: "x",
+                    usage: { inputTokens: 1, outputTokens: 1, cacheRead: 0, cacheWrite: 0 },
+                    stopReason: "stop",
+                    timestamp: 1,
+                },
+                toolResults: [],
             });
 
             await new Promise((resolve) => setTimeout(resolve, 20));
@@ -1288,7 +1301,7 @@ describe("run() — agent_end typed aggregation", () => {
         }
     });
 
-    it("agent_end with AssistantMessage.thinking block → done.thinking set", async () => {
+    it("turn_end with AssistantMessage.thinking block → done.thinking set", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
         const originalImpl = mockedAgent.getMockImplementation();
@@ -1317,19 +1330,18 @@ describe("run() — agent_end typed aggregation", () => {
             await new Promise((resolve) => setTimeout(resolve, 10));
 
             capturedCallback!({
-                type: "agent_end",
-                messages: [
-                    {
-                        role: "assistant",
-                        content: [{ type: "thinking", thinking: "reasoning" }],
-                        api: "anthropic-messages",
-                        provider: "anthropic",
-                        model: "x",
-                        usage: { inputTokens: 1, outputTokens: 1, cacheRead: 0, cacheWrite: 0 },
-                        stopReason: "stop",
-                        timestamp: 1,
-                    },
-                ],
+                type: "turn_end",
+                message: {
+                    role: "assistant",
+                    content: [{ type: "thinking", thinking: "reasoning" }],
+                    api: "anthropic-messages",
+                    provider: "anthropic",
+                    model: "x",
+                    usage: { inputTokens: 1, outputTokens: 1, cacheRead: 0, cacheWrite: 0 },
+                    stopReason: "stop",
+                    timestamp: 1,
+                },
+                toolResults: [],
             });
 
             await new Promise((resolve) => setTimeout(resolve, 20));
@@ -1344,7 +1356,7 @@ describe("run() — agent_end typed aggregation", () => {
         }
     });
 
-    it("agent_end with AssistantMessage.toolCall block → done.toolCalls populated", async () => {
+    it("turn_end with AssistantMessage.toolCall block → done.toolCalls populated", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
         const originalImpl = mockedAgent.getMockImplementation();
@@ -1373,19 +1385,18 @@ describe("run() — agent_end typed aggregation", () => {
             await new Promise((resolve) => setTimeout(resolve, 10));
 
             capturedCallback!({
-                type: "agent_end",
-                messages: [
-                    {
-                        role: "assistant",
-                        content: [{ type: "toolCall", id: "t1", name: "read_file", arguments: {} }],
-                        api: "anthropic-messages",
-                        provider: "anthropic",
-                        model: "x",
-                        usage: { inputTokens: 1, outputTokens: 1, cacheRead: 0, cacheWrite: 0 },
-                        stopReason: "stop",
-                        timestamp: 1,
-                    },
-                ],
+                type: "turn_end",
+                message: {
+                    role: "assistant",
+                    content: [{ type: "toolCall", id: "t1", name: "read_file", arguments: {} }],
+                    api: "anthropic-messages",
+                    provider: "anthropic",
+                    model: "x",
+                    usage: { inputTokens: 1, outputTokens: 1, cacheRead: 0, cacheWrite: 0 },
+                    stopReason: "stop",
+                    timestamp: 1,
+                },
+                toolResults: [],
             });
 
             await new Promise((resolve) => setTimeout(resolve, 20));
@@ -1446,6 +1457,234 @@ describe("run() — agent_end typed aggregation", () => {
             expect(cfg.initialState?.model?.reasoning).toBe(true);
             // 附带 sanity: provider 透传到 model.id
             expect(cfg.initialState?.model?.id).toBe(mockProvider.defaultModel);
+        } finally {
+            mockedAgent.mockImplementation(originalImpl as never);
+        }
+    });
+});
+
+// ─── G30: Bubble Boundary — per-turn done emission (ADR-0028) ────────────────
+//
+// 旧 contract: agent_end 时跨所有 assistant messages 聚合 thinking/tool_calls
+// → 1 final done (V3.1 fix)。
+//
+// 新 contract: 每个 turn_end emit 1 个 done (该 turn 的 assistant message)；
+// agent_end 只 cleanup (emit.end() + unsubscribe)，不再 emit done。
+//
+// 1 user input → N agent turns → N done events → N bubbles (per chat.store)。
+describe("run() — G30: per-turn done emission (Bubble Boundary, ADR-0028)", () => {
+    it("G30a: turn_end with single assistant message → 1 done event with extracted content/thinking/toolCalls", async () => {
+        const { Agent } = await import("@earendil-works/pi-agent-core");
+        const mockedAgent = vi.mocked(Agent);
+        const originalImpl = mockedAgent.getMockImplementation();
+        let capturedCallback: ((evt: unknown, signal?: AbortSignal) => void) | undefined;
+        try {
+            mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+                return {
+                    subscribe: (h: (evt: unknown, signal?: AbortSignal) => void) => {
+                        capturedCallback = h;
+                        return () => {};
+                    },
+                    prompt: vi.fn().mockResolvedValue(undefined),
+                    abort: vi.fn(),
+                };
+            });
+
+            const runtime = createAgentRuntime();
+            const events: RuntimeEvent[] = [];
+            const program = Stream.runForEach(
+                runtime.run({ context: mockContext, provider: mockProvider }),
+                (e) => Effect.sync(() => events.push(e)),
+            );
+            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            // 单 turn: thinking + text + toolCall + tool_result
+            capturedCallback!({
+                type: "message_update",
+                message: {
+                    content: [
+                        { type: "thinking", thinking: "Reasoning..." },
+                        { type: "text", text: "Hello!" },
+                        { type: "toolCall", id: "tc-1", name: "read_file", arguments: {} },
+                    ],
+                },
+            });
+            capturedCallback!({
+                type: "tool_execution_end",
+                toolCallId: "tc-1",
+                result: "data",
+                isError: false,
+            });
+            capturedCallback!({
+                type: "turn_end",
+                message: {
+                    role: "assistant",
+                    content: [
+                        { type: "thinking", thinking: "Reasoning..." },
+                        { type: "text", text: "Hello!" },
+                        { type: "toolCall", id: "tc-1", name: "read_file", arguments: {} },
+                    ],
+                },
+                toolResults: [{ toolCallId: "tc-1", content: [{ type: "text", text: "data" }], isError: false }],
+            });
+            capturedCallback!({ type: "agent_end", messages: [] });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            const doneEvents = events.filter((e) => e.type === "done") as Array<{
+                type: "done";
+                message: {
+                    content: string;
+                    thinking: string | null;
+                    toolCalls: Array<{ id: string; name: string; args: Record<string, unknown> }> | null;
+                    toolResults: Array<{ toolCallId: string; result: unknown; error: string | null }> | null;
+                };
+            }>;
+
+            expect(doneEvents).toHaveLength(1);
+            expect(doneEvents[0]!.message.content).toBe("Hello!");
+            expect(doneEvents[0]!.message.thinking).toBe("Reasoning...");
+            expect(doneEvents[0]!.message.toolCalls).toHaveLength(1);
+            expect(doneEvents[0]!.message.toolCalls![0]!.name).toBe("read_file");
+            // toolResults from turn_end.toolResults must be preserved (NOT null)
+            expect(doneEvents[0]!.message.toolResults).not.toBeNull();
+            expect(doneEvents[0]!.message.toolResults![0]!.toolCallId).toBe("tc-1");
+        } finally {
+            mockedAgent.mockImplementation(originalImpl as never);
+        }
+    });
+
+    it("G30b: 2 turn_ends → 2 done events, each with own turn's content (NO cross-turn aggregation)", async () => {
+        const { Agent } = await import("@earendil-works/pi-agent-core");
+        const mockedAgent = vi.mocked(Agent);
+        const originalImpl = mockedAgent.getMockImplementation();
+        let capturedCallback: ((evt: unknown, signal?: AbortSignal) => void) | undefined;
+        try {
+            mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+                return {
+                    subscribe: (h: (evt: unknown, signal?: AbortSignal) => void) => {
+                        capturedCallback = h;
+                        return () => {};
+                    },
+                    prompt: vi.fn().mockResolvedValue(undefined),
+                    abort: vi.fn(),
+                };
+            });
+
+            const runtime = createAgentRuntime();
+            const events: RuntimeEvent[] = [];
+            const program = Stream.runForEach(
+                runtime.run({ context: mockContext, provider: mockProvider }),
+                (e) => Effect.sync(() => events.push(e)),
+            );
+            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            // turn 1: thinking + text + toolCall
+            capturedCallback!({
+                type: "message_update",
+                message: {
+                    content: [
+                        { type: "thinking", thinking: "Searching files." },
+                        { type: "text", text: "Let me search." },
+                        { type: "toolCall", id: "tc-1", name: "search_files", arguments: { pattern: "*.ts" } },
+                    ],
+                },
+            });
+            capturedCallback!({
+                type: "turn_end",
+                message: {
+                    role: "assistant",
+                    content: [
+                        { type: "thinking", thinking: "Searching files." },
+                        { type: "text", text: "Let me search." },
+                        { type: "toolCall", id: "tc-1", name: "search_files", arguments: { pattern: "*.ts" } },
+                    ],
+                },
+                toolResults: [],
+            });
+
+            // turn 2: text only (final answer based on tool result)
+            capturedCallback!({
+                type: "message_update",
+                message: {
+                    content: [{ type: "text", text: "Found 50 files." }],
+                },
+            });
+            capturedCallback!({
+                type: "turn_end",
+                message: {
+                    role: "assistant",
+                    content: [{ type: "text", text: "Found 50 files." }],
+                },
+                toolResults: [],
+            });
+
+            capturedCallback!({ type: "agent_end", messages: [] });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            const doneEvents = events.filter((e) => e.type === "done") as Array<{
+                type: "done";
+                message: {
+                    content: string;
+                    thinking: string | null;
+                    toolCalls: Array<{ id: string; name: string; args: Record<string, unknown> }> | null;
+                };
+            }>;
+
+            // S2 contract: 2 turns → 2 done events
+            expect(doneEvents).toHaveLength(2);
+
+            // done[0] = turn-1: owns thinking + toolCalls
+            expect(doneEvents[0]!.message.content).toBe("Let me search.");
+            expect(doneEvents[0]!.message.thinking).toBe("Searching files.");
+            expect(doneEvents[0]!.message.toolCalls).not.toBeNull();
+            expect(doneEvents[0]!.message.toolCalls![0]!.name).toBe("search_files");
+
+            // done[1] = turn-2: text only, NO tool calls, NO cross-turn thinking aggregation
+            expect(doneEvents[1]!.message.content).toBe("Found 50 files.");
+            expect(doneEvents[1]!.message.thinking).toBeNull(); // turn-2 had no thinking block
+            expect(doneEvents[1]!.message.toolCalls).toBeNull(); // REGRESSION: not aggregated from turn-1
+        } finally {
+            mockedAgent.mockImplementation(originalImpl as never);
+        }
+    });
+
+    it("G30c: agent_end with messages (legacy path) does NOT emit done (cleanup-only)", async () => {
+        const { Agent } = await import("@earendil-works/pi-agent-core");
+        const mockedAgent = vi.mocked(Agent);
+        const originalImpl = mockedAgent.getMockImplementation();
+        let capturedCallback: ((evt: unknown, signal?: AbortSignal) => void) | undefined;
+        try {
+            mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+                return {
+                    subscribe: (h: (evt: unknown, signal?: AbortSignal) => void) => {
+                        capturedCallback = h;
+                        return () => {};
+                    },
+                    prompt: vi.fn().mockResolvedValue(undefined),
+                    abort: vi.fn(),
+                };
+            });
+
+            const runtime = createAgentRuntime();
+            const events: RuntimeEvent[] = [];
+            const program = Stream.runForEach(
+                runtime.run({ context: mockContext, provider: mockProvider }),
+                (e) => Effect.sync(() => events.push(e)),
+            );
+            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            // 只发 agent_end (没 turn_end) — cleanup 路径
+            capturedCallback!({
+                type: "agent_end",
+                messages: [{ content: [{ type: "text", text: "orphan" }] }],
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            const doneEvents = events.filter((e) => e.type === "done");
+            expect(doneEvents).toHaveLength(0); // agent_end 不再 emit done
         } finally {
             mockedAgent.mockImplementation(originalImpl as never);
         }
