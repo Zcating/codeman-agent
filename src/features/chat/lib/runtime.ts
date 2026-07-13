@@ -290,7 +290,7 @@ export function createAgentRuntime(): AgentRuntime {
             model,
             // 默认 medium:显示完整思考过程。reasoning:true 的模型产出 thinking_delta
             // → chat.store 累积到 stub.thinking → done 时合并到 final message.thinking
-            // → MessageBubble ThinkingSection + ChatView ThinkingPanel 都渲染。
+            // → MessageBubble ThinkingPanel 在 bubble 顶部渲染(streaming 时 open)。
             // 用户后续可在 settings 里加 provider-level thinkingLevel 配置来覆盖默认值。
             thinkingLevel: "medium",
             tools,

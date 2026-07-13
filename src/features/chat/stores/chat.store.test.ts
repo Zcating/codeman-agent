@@ -519,7 +519,7 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
   //
   // 用户场景: stream 期间 runtime emit 多个 thinking event 累积到 stub.thinking,
   // done event 应该把 stub 替换成 evt.message(包含 evt.message.thinking)。
-  // 这个路径若 done.message.thinking = null,UI 上 MessageBubble.ThinkingSection 就不渲染。
+  // 这个路径若 done.message.thinking = null,UI 上 MessageBubble.ThinkingPanel 就不渲染。
   // runtime.test.ts 已经验证了 "done.message.thinking 由 runtime 正确聚合(非空 thinking 块 → 字符串)",
   // 这里验证 store 层把 evt.message.thinking 直接传给最终 message(不做 null 覆盖)。
 
@@ -556,7 +556,7 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
       const finalMsg = msgs.find((m) => m.role === "assistant");
       expect(finalMsg).toBeDefined();
       // 关键断言: final message.thinking 必须是 done event 中的非空字符串,
-      // 不能是 null(否则 UI MessageBubble.ThinkingSection 不渲染)。
+      // 不能是 null(否则 UI MessageBubble.ThinkingPanel 不渲染)。
       expect(finalMsg?.thinking).toBe(thinkingAccumulated);
       expect(finalMsg?.content).toBe("Final answer text.");
       dispose();
@@ -597,6 +597,74 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
         "Streaming thought chunk 1. Streaming thought chunk 2.",
       );
       expect(finalMsg?.content).toBe("answer text");
+      dispose();
+    });
+  });
+
+  // ─── Multi-turn: tool entry 场景 — 第二个 assistant stub 接 done 时 toolCalls 应保留 ───
+  //
+  // 用户场景: 输入 "tool" → mock-server turn 0: thinking + text + toolUse(read_file) + done
+  // → tool 执行(read_file) → mock-server 短路: turn 1: thinking + text + end_turn
+  // → runtime 跨 turn 聚合 toolCalls(见 runtime.test.ts "multi-turn agent_end")→ done event
+  //   带 toolCalls = [read_file] 到达 store,store 必须把这条 toolCalls 写到 final assistant msg
+  // → UI bubble 2 (short-circuit "(mock) Script complete.") 必须渲染 inline-tool-calls
+  //   (read_file card),不渲染 = bug。
+  it("G28: multi-turn (turn-1 tool_use + turn-2 short-circuit) → final assistant msg.toolCalls preserved", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, []);
+      const readFileToolCall = {
+        id: "tc-read-1",
+        name: "read_file",
+        args: { path: "README.md" },
+      };
+      // 模拟 runtime 已聚合: done event 带 toolCalls = [read_file] (来自 turn-1)
+      const events: RuntimeEvent[] = [
+        // turn 1: thinking + text + tool_use
+        { type: "thinking", content: "calling read_file" },
+        { type: "token", content: "Reading the file now." },
+        { type: "tool_call", toolCall: readFileToolCall },
+        { type: "tool_result", toolCallId: "tc-read-1", result: "# Tauri + Solid" },
+        // turn 2 (short-circuit): thinking + text only
+        { type: "thinking", content: "calling read_file" }, // stub2 lazy-init
+        { type: "token", content: "(mock) Script complete." },
+        // done (aggregated toolCalls from turn-1)
+        {
+          type: "done",
+          message: {
+            id: "final",
+            conversationId: "c1",
+            role: "assistant",
+            content: "(mock) Script complete.",
+            thinking: "calling read_file",
+            toolCalls: [readFileToolCall], // ← 来自 turn-1 聚合
+            toolResults: [
+              {
+                toolCallId: "tc-read-1",
+                result: "# Tauri + Solid",
+                error: null,
+              },
+            ],
+            model: "mock-default",
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
+          },
+        },
+      ];
+      vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
+      await Effect.runPromise(sendMessage("c1", "tool", defaultProvider));
+
+      const msgs = store.byId["c1"]?.messages ?? [];
+      const finalAssistant = msgs.find(
+        (m) => m.role === "assistant" && m.content === "(mock) Script complete.",
+      );
+      expect(finalAssistant).toBeDefined();
+      // 关键断言: short-circuit bubble 的 toolCalls 必须保留 read_file
+      // (runtime 已聚合,store 不能 drop)
+      expect(finalAssistant?.toolCalls).not.toBeNull();
+      expect(finalAssistant?.toolCalls?.length).toBe(1);
+      expect(finalAssistant?.toolCalls?.[0]?.name).toBe("read_file");
+      expect(finalAssistant?.toolResults?.length).toBe(1);
       dispose();
     });
   });

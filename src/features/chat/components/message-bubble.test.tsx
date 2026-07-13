@@ -99,7 +99,7 @@ describe("MessageBubble", () => {
     const msg = makeAssistantMsg({ content: "just text" });
     const { container } = render(() => <MessageBubble message={msg} />);
     expect(container.querySelector('[data-testid="agent-bubble"]')).toBeTruthy();
-    expect(container.querySelector('[data-testid="thinking-section"]')).toBeNull();
+    expect(container.querySelector('[data-testid="thinking-panel"]')).toBeNull();
     expect(container.querySelector('[data-testid="inline-tool-calls"]')).toBeNull();
     expect(container.querySelector('[data-testid="agent-text-content"]')).toBeTruthy();
   });
@@ -139,33 +139,33 @@ describe("MessageBubble", () => {
     expect(card?.getAttribute("data-has-result")).toBe("true");
   });
 
-  it("assistant 角色：thinking 非空 → 渲染 ThinkingSection", () => {
+  it("assistant 角色：thinking 非空 → 渲染 ThinkingPanel", () => {
     const msg = makeAssistantMsg({
       content: "answer",
       thinking: "Let me think about this...",
     });
     const { container } = render(() => <MessageBubble message={msg} />);
-    const section = container.querySelector('[data-testid="thinking-section"]');
-    expect(section).toBeTruthy();
-    expect(section?.textContent).toContain("Let me think about this...");
+    const panel = container.querySelector('[data-testid="thinking-panel"]');
+    expect(panel).toBeTruthy();
+    expect(panel?.textContent).toContain("Let me think about this...");
   });
 
-  it("assistant 角色：thinking 为空字符串 → 不渲染 ThinkingSection", () => {
+  it("assistant 角色：thinking 为空字符串 → 不渲染 ThinkingPanel", () => {
     const msg = makeAssistantMsg({
       content: "answer",
       thinking: "",
     });
     const { container } = render(() => <MessageBubble message={msg} />);
-    expect(container.querySelector('[data-testid="thinking-section"]')).toBeNull();
+    expect(container.querySelector('[data-testid="thinking-panel"]')).toBeNull();
   });
 
-  it("assistant 角色：thinking null → 不渲染 ThinkingSection", () => {
+  it("assistant 角色：thinking null → 不渲染 ThinkingPanel", () => {
     const msg = makeAssistantMsg({
       content: "answer",
       thinking: null,
     });
     const { container } = render(() => <MessageBubble message={msg} />);
-    expect(container.querySelector('[data-testid="thinking-section"]')).toBeNull();
+    expect(container.querySelector('[data-testid="thinking-panel"]')).toBeNull();
   });
 
   it("assistant 三块全空 (abort 在第一个 token 之前) → 渲染占位文本", () => {
@@ -194,7 +194,7 @@ describe("MessageBubble", () => {
       (c) => c.getAttribute("data-testid") ?? c.tagName,
     );
     // 顺序:thinking → tool calls → text content
-    expect(children.indexOf("thinking-section")).toBeLessThan(
+    expect(children.indexOf("thinking-panel")).toBeLessThan(
       children.indexOf("inline-tool-calls"),
     );
     expect(children.indexOf("inline-tool-calls")).toBeLessThan(

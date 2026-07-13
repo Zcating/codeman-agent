@@ -239,6 +239,12 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
         };
         setStore("byId", convId, "messages", (msgs) => [...msgs, stub]);
         setStore("byId", convId, "streamingMessageId", stubId);
+        logger.debug(
+          "[chat.store/diag] stub created (token path): stubId=" +
+          stubId +
+          " existingAssistantCount=" +
+          (store.byId[convId]?.messages.filter((m) => m.role === "assistant").length ?? 0),
+        );
         // Notify sidebar re: streaming state change (triggers conversations$ update)
         setConversationsSignal(Object.values(store.byId));
       }
@@ -272,6 +278,12 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
         };
         setStore("byId", convId, "messages", (msgs) => [...msgs, stub]);
         setStore("byId", convId, "streamingMessageId", stubId);
+        logger.debug(
+          "[chat.store/diag] stub created (thinking path): stubId=" +
+          stubId +
+          " existingAssistantCount=" +
+          (store.byId[convId]?.messages.filter((m) => m.role === "assistant").length ?? 0),
+        );
         setConversationsSignal(Object.values(store.byId));
       }
       setStore("byId", convId, "messages", (msgs) =>
@@ -310,6 +322,8 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       logger.debug(
         "[chat.store/diag] done event: stubId=" +
         stubId +
+        " evtMsgId=" +
+        evt.message.id +
         " content.length=" +
         (evt.message.content ?? "").length +
         " content_preview=" +
@@ -317,14 +331,31 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
         " thinking.length=" +
         (evt.message.thinking?.length ?? 0) +
         " tool_calls=" +
-        JSON.stringify(evt.message.toolCalls),
+        JSON.stringify(evt.message.toolCalls) +
+        " tool_results_count=" +
+        (evt.message.toolResults?.length ?? 0),
       );
       if (stubId) {
         setStore("byId", convId, "messages", (msgs) =>
           msgs.map((m) => (m.id === stubId ? { ...evt.message, id: stubId } : m)),
         );
+        // V3.x debug: 替换后立即读回,确认 toolCalls 真的写进 store
+        const after = store.byId[convId]?.messages.find((m) => m.id === stubId);
+        logger.debug(
+          "[chat.store/diag] after replace: stubId=" +
+          stubId +
+          " content.length=" +
+          (after?.content?.length ?? 0) +
+          " tool_calls=" +
+          JSON.stringify(after?.toolCalls) +
+          " tool_results_count=" +
+          (after?.toolResults?.length ?? 0),
+        );
       } else {
         setStore("byId", convId, "messages", (msgs) => [...msgs, evt.message]);
+        logger.debug(
+          "[chat.store/diag] done append (no stubId): new msgId=" + evt.message.id,
+        );
       }
       setStore("byId", convId, "streamingMessageId", null);
       // Notify sidebar re: streaming ended (triggers conversations$ update → badge removal)

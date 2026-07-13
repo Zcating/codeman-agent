@@ -5,10 +5,10 @@
 //! 但没有 E2E 专门覆盖 thinking 渲染的完整生命周期。
 //!
 //! 本 spec 验证三个不变量:
-//!   1. thinking-section 在 streaming 期间出现,标签 "思考中…",包含完整 thinking 文本
-//!   2. stream 结束后,thinking-section 仍在 DOM,标签切换为 "已思考",文本不丢
-//!   3. thinking-panel (ChatView 外的 fallback panel) 在 stream 结束后存在,
-//!      折叠 (default-closed `<details>`),内容是最后一条 assistant 的 thinking
+//!   1. thinking-panel 在 streaming 期间出现,标签 "思考中…",包含完整 thinking 文本
+//!   2. stream 结束后,thinking-panel 仍在 DOM,标签切换为 "已思考",文本不丢
+//!   3. 每个 agent-bubble 的 thinking-panel 在 stream 结束后保留 thinking 文本
+//!      (数据持久化校验,验证 store.byId[conv].messages 里的 thinking 字段在 done 后非空)
 //!
 //! 用本地 mock provider (mock-server.ts) 跑确定性 canned response,
 //! 避免依赖外部 API / 冷启动延迟 / 真实 LLM thinking 行为差异。
@@ -71,9 +71,9 @@ test.describe("11 — Thinking display after stream ends", () => {
         await clickNewConversationAndWait(page);
     });
 
-    // ─── D1: thinking-section streaming 期间出现 + 含 thinking 文本 ─────────
+    // ─── D1: thinking-panel streaming 期间出现 + 含 thinking 文本 ─────────
 
-    test("D1: streaming 期间 thinking-section 出现,含完整 thinking 文本", async ({ tauriEnv }) => {
+    test("D1: streaming 期间 thinking-panel 出现,含完整 thinking 文本", async ({ tauriEnv }) => {
         test.setTimeout(30_000);
         const { page } = tauriEnv;
 
@@ -87,19 +87,19 @@ test.describe("11 — Thinking display after stream ends", () => {
         const assistantBubble = page.locator("div.justify-start > div[class*='bg-card']");
         await assert.visible(assistantBubble.first(), { timeout: 10_000 });
 
-        // 等 thinking-section 出现(maybe multiple in multi-turn; last 即可)
+        // 等 thinking-panel 出现(maybe multiple in multi-turn; last 即可)
         // streaming 期间 label 是 "思考中…",content 包含 thinking 文本
-        const thinkingSection = page.locator('[data-testid="thinking-section"]');
-        await assert.visible(thinkingSection.first(), { timeout: 10_000 });
+        const thinkingPanel = page.locator('[data-testid="thinking-panel"]');
+        await assert.visible(thinkingPanel.first(), { timeout: 10_000 });
 
         // 断言 streaming 期间 label 是 "思考中…"
-        const sectionText = await thinkingSection.first().textContent();
-        expect(sectionText ?? "", "streaming 期间 label 应是 '思考中…'").toContain("思考中");
+        const panelText = await thinkingPanel.first().textContent();
+        expect(panelText ?? "", "streaming 期间 label 应是 '思考中…'").toContain("思考中");
 
-        // 断言 thinking-section 的 `<pre>` 包含 thinking 文本的子串
-        const thinkingPre = thinkingSection.first().locator("pre").first();
+        // 断言 thinking-panel 的 `<pre>` 包含 thinking 文本的子串
+        const thinkingPre = thinkingPanel.first().locator("pre").first();
         const preText = await thinkingPre.textContent();
-        expect(preText ?? "", "thinking-section pre 应包含完整 thinking 文本").toContain(THINKING_SNIPPET);
+        expect(preText ?? "", "thinking-panel pre 应包含完整 thinking 文本").toContain(THINKING_SNIPPET);
 
         // 等流完(text 块到达)
         await assert.visible(
@@ -110,9 +110,9 @@ test.describe("11 — Thinking display after stream ends", () => {
         );
     });
 
-    // ─── D2: stream 结束后,thinking-section 仍可见,文本不丢,label 切换为 "已思考" ──
+    // ─── D2: stream 结束后,thinking-panel 仍可见,文本不丢,label 切换为 "已思考" ──
 
-    test("D2: stream 结束后 thinking-section 仍存在,文本不丢,label 切换为 '已思考'", async ({ tauriEnv }) => {
+    test("D2: stream 结束后 thinking-panel 仍存在,文本不丢,label 切换为 '已思考'", async ({ tauriEnv }) => {
         test.setTimeout(30_000);
         const { page } = tauriEnv;
 
@@ -132,23 +132,23 @@ test.describe("11 — Thinking display after stream ends", () => {
         // 给 done handler + finalize 一个 margin
         await new Promise((r) => setTimeout(r, 500));
 
-        // 关键断言 (本次 bug 核心): stream 结束后 thinking-section 必须还在 DOM
-        const thinkingSection = page.locator('[data-testid="thinking-section"]');
-        await assert.visible(thinkingSection.first(), { timeout: 5_000 });
+        // 关键断言 (本次 bug 核心): stream 结束后 thinking-panel 必须还在 DOM
+        const thinkingPanel = page.locator('[data-testid="thinking-panel"]');
+        await assert.visible(thinkingPanel.first(), { timeout: 5_000 });
 
-        // 关键断言: thinking-section label 切换为 "已思考"
-        const sectionText = await thinkingSection.first().textContent();
-        expect(sectionText ?? "", "stream 结束后 label 应是 '已思考'").toContain("已思考");
+        // 关键断言: thinking-panel label 切换为 "已思考"
+        const panelText = await thinkingPanel.first().textContent();
+        expect(panelText ?? "", "stream 结束后 label 应是 '已思考'").toContain("已思考");
 
-        // 关键断言: thinking-section 的 `<pre>` 仍包含完整 thinking 文本(没被丢掉)
-        const thinkingPre = thinkingSection.first().locator("pre").first();
+        // 关键断言: thinking-panel 的 `<pre>` 仍包含完整 thinking 文本(没被丢掉)
+        const thinkingPre = thinkingPanel.first().locator("pre").first();
         const preText = await thinkingPre.textContent();
-        expect(preText ?? "", "thinking-section pre 在 stream 结束后仍包含 thinking 文本").toContain(THINKING_SNIPPET);
+        expect(preText ?? "", "thinking-panel pre 在 stream 结束后仍包含 thinking 文本").toContain(THINKING_SNIPPET);
     });
 
     // ─── D3: thinking-panel fallback (ChatView 外) 在 stream 结束后存在 ──
 
-    test("D3: stream 结束后,最后一条 assistant bubble 的 ThinkingSection 含完整 thinking 文本(streaming→done 后数据持久化)", async ({ tauriEnv }) => {
+    test("D3: stream 结束后,最后一条 assistant bubble 的 ThinkingPanel 含完整 thinking 文本(streaming→done 后数据持久化)", async ({ tauriEnv }) => {
         test.setTimeout(30_000);
         const { page } = tauriEnv;
 
@@ -168,25 +168,25 @@ test.describe("11 — Thinking display after stream ends", () => {
         // 等 1s 让 done event 完全 settle
         await new Promise((r) => setTimeout(r, 1_000));
 
-        // 断言: 至少有一个 agent-bubble 内含 thinking-section(说明 store 里的 thinking 字段在 done 后非空)
+        // 断言: 至少有一个 agent-bubble 内含 thinking-panel(说明 store 里的 thinking 字段在 done 后非空)
         const bubblesWithThinking = await page.evaluate((snippet: string) => {
             const bubbles = document.querySelectorAll('[data-testid="agent-bubble"]');
-            const results: Array<{ sectionText: string | null; textPreview: string | null }> = [];
+            const results: Array<{ panelText: string | null; textPreview: string | null }> = [];
             for (const b of Array.from(bubbles)) {
-                const section = b.querySelector('[data-testid="thinking-section"]');
+                const panel = b.querySelector('[data-testid="thinking-panel"]');
                 const textContent = b.querySelector('[data-testid="agent-text-content"]');
-                if (section) {
+                if (panel) {
                     results.push({
-                        sectionText: section.querySelector("pre")?.textContent?.slice(0, 200) ?? null,
+                        panelText: panel.querySelector("pre")?.textContent?.slice(0, 200) ?? null,
                         textPreview: textContent?.textContent?.slice(0, 80) ?? null,
                     });
                 }
-                // 别忘了:即使 section 没有 textContent 也算(纯 thinking entry)
-                if (section) {
-                    const secText = section.querySelector("pre")?.textContent ?? "";
-                    if (secText.includes(snippet)) {
+                // 别忘了:即使 panel 没有 textContent 也算(纯 thinking entry)
+                if (panel) {
+                    const panelText = panel.querySelector("pre")?.textContent ?? "";
+                    if (panelText.includes(snippet)) {
                         results.push({
-                            sectionText: secText.slice(0, 200),
+                            panelText: panelText.slice(0, 200),
                             textPreview: textContent?.textContent?.slice(0, 80) ?? "(no text)",
                         });
                     }
@@ -197,19 +197,19 @@ test.describe("11 — Thinking display after stream ends", () => {
 
         expect(
             bubblesWithThinking.length,
-            "至少一个 agent-bubble 应含 thinking-section (stream end 后 thinking 字段仍非空)",
+            "至少一个 agent-bubble 应含 thinking-panel (stream end 后 thinking 字段仍非空)",
         ).toBeGreaterThan(0);
 
-        // 断言: 找到的 bubble 中至少有 thinking-section 含 THINKING_SNIPPET 文本
-        const matchingSection = bubblesWithThinking.find((b) =>
-            (b.sectionText ?? "").includes(THINKING_SNIPPET),
+        // 断言: 找到的 bubble 中至少有 thinking-panel 含 THINKING_SNIPPET 文本
+        const matchingPanel = bubblesWithThinking.find((b) =>
+            (b.panelText ?? "").includes(THINKING_SNIPPET),
         );
-        expect(matchingSection, `thinking-section 应含完整 thinking 文本 "${THINKING_SNIPPET}"`).toBeDefined();
+        expect(matchingPanel, `thinking-panel 应含完整 thinking 文本 "${THINKING_SNIPPET}"`).toBeDefined();
     });
 
-    // ─── D4: pure thinking (无 text 块) 也得显示 thinking-section ───────────
+    // ─── D4: pure thinking (无 text 块) 也得显示 thinking-panel ───────────
 
-    test("D4: pure thinking entry (无 text) 也显示 thinking-section", async ({ tauriEnv }) => {
+    test("D4: pure thinking entry (无 text) 也显示 thinking-panel", async ({ tauriEnv }) => {
         test.setTimeout(30_000);
         const { page } = tauriEnv;
 
@@ -226,13 +226,13 @@ test.describe("11 — Thinking display after stream ends", () => {
         // 给流一些时间
         await new Promise((r) => setTimeout(r, 1500));
 
-        // 断言: thinking-section 出现 (即使 text 是空)
-        const thinkingSection = page.locator('[data-testid="thinking-section"]');
-        await assert.visible(thinkingSection.first(), { timeout: 10_000 });
+        // 断言: thinking-panel 出现 (即使 text 是空)
+        const thinkingPanel = page.locator('[data-testid="thinking-panel"]');
+        await assert.visible(thinkingPanel.first(), { timeout: 10_000 });
 
-        // 断言: thinking-section pre 包含 thinking 文本
-        const thinkingPre = thinkingSection.first().locator("pre").first();
+        // 断言: thinking-panel pre 包含 thinking 文本
+        const thinkingPre = thinkingPanel.first().locator("pre").first();
         const preText = await thinkingPre.textContent();
-        expect(preText ?? "", "pure thinking entry 的 thinking-section pre 应包含 thinking 文本").toContain(THINKING_ONLY_SNIPPET);
+        expect(preText ?? "", "pure thinking entry 的 thinking-panel pre 应包含 thinking 文本").toContain(THINKING_ONLY_SNIPPET);
     });
 });

@@ -9,8 +9,9 @@
 
 import { Show, For, createMemo } from "solid-js";
 import { marked } from "marked";
-import { XCircle, CheckCircle2, Brain } from "lucide-solid";
-import { ToolCallCard } from "./tool-call-card";
+import { XCircle, CheckCircle2 } from "lucide-solid";
+import { ToolCallPanel } from "./tool-call-panel";
+import { ThinkingPanel } from "./thinking-panel";
 import type { Message, ToolResult, FileMatch, ToolCall } from "../../../shared/lib/types";
 import { store } from "../stores/chat.store";
 
@@ -27,34 +28,6 @@ function escapeHtml(s: string): string {
 /** 渲染 Markdown 为经清理的 HTML。用于 assistant 内容（可信）。 */
 function renderMarkdown(s: string): string {
   return marked.parse(s, { async: false }) as string;
-}
-
-/** 给定 assistant message 的 thinking 渲染常驻思考区。
- *
- *  - 永远展开,无折叠 (V3.1: 用户反馈"找不到展开入口" → 直接去掉 details/summary)
- *  - 思考文本用 mono font + 灰底,跟代码 / 工具参数视觉一致;不是给终端用户读的
- *  - 但 stream 期间 vs stream 后用不同 label ("思考中…" vs "已思考") 区分状态
- */
-function ThinkingSection(props: {
-  thinking: string;
-  streaming: boolean;
-  messageId: string;
-}) {
-  return (
-    <div
-      class="mb-2 border border-border/60 rounded-md bg-muted/40 overflow-hidden"
-      data-testid="thinking-section"
-      data-message-id={props.messageId}
-    >
-      <div class="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-muted-foreground">
-        <Brain class="h-3.5 w-3.5" aria-hidden="true" />
-        <span>{props.streaming ? "思考中…" : "已思考"}</span>
-      </div>
-      <pre class="px-3 py-2 text-xs font-mono leading-relaxed text-muted-foreground whitespace-pre-wrap border-t border-border/60 max-h-64 overflow-y-auto">
-        {props.thinking}
-      </pre>
-    </div>
-  );
 }
 
 /** 把 message 内的 tool_calls 与 tool_results 配对,产出 render-ready 列表。
@@ -77,7 +50,7 @@ function pairToolCalls(message: Message): Array<{ toolCall: ToolCall; result: To
 export function MessageBubble(props: { message: Message }) {
   const role = () => props.message.role;
 
-  // 该 message 是否还在 streaming (用于 ThinkingSection 默认展开 + 决定是否走 stream render)
+  // 该 message 是否还在 streaming (用于 ThinkingPanel 默认展开 + 决定是否走 stream render)
   const isStreaming = createMemo(() => {
     const cs = store.byId[props.message.conversationId];
     return cs?.streamingMessageId === props.message.id;
@@ -104,20 +77,28 @@ export function MessageBubble(props: { message: Message }) {
           class="max-w-prose p-3 rounded-lg leading-relaxed break-words bg-card text-card-foreground border border-border space-y-2"
           data-testid="agent-bubble"
         >
-          {/* 1. 思考过程 (仅 assistant + 非空) */}
+          {/* 1. 思考过程 (仅 assistant + 非空) — ThinkingPanel 是可折叠 details,
+              done 后默认收起(streaming=false),用户可点 summary 手动展开 */}
           <Show when={hasThinking()}>
-            <ThinkingSection
+            <ThinkingPanel
               thinking={props.message.thinking ?? ""}
               streaming={isStreaming()}
               messageId={props.message.id}
             />
           </Show>
 
-          {/* 2. 工具调用 (顺序:跟 LLM 决策顺序一致) */}
+          {/* 2. 工具调用 (顺序:跟 LLM 决策顺序一致) — ToolCallPanel 是 details 容器,
+              默认展开让用户看到 result,summary 行可点击收起 */}
           <Show when={hasTools()}>
             <div class="space-y-1.5" data-testid="inline-tool-calls">
               <For each={pairedTools()}>
-                {(it) => <ToolCallCard toolCall={it.toolCall} result={it.result} />}
+                {(it) => (
+                  <ToolCallPanel
+                    toolCall={it.toolCall}
+                    result={it.result}
+                    messageId={props.message.id}
+                  />
+                )}
               </For>
             </div>
           </Show>
