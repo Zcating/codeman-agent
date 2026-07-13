@@ -1404,7 +1404,7 @@ describe("run() — agent_end typed aggregation", () => {
     // ─── 推理配置 (regression: thinking 必须在 runtime 层开启,否则 LLM 不产出 thinking blocks) ──
     // 历史教训:thinkingLevel="off" + reasoning:false 时,agent-loop.js 把 reasoning 设为 undefined,
     // LLM 不产出 thinking_delta → store 不更新 stub.thinking → done.thinking=null →
-    // MessageBubble ThinkingSection + ChatView ThinkingPanel 都看不到 thinking。
+    // MessageBubble ThinkingPanel 看不到 thinking(没数据)。
     // 用户首屏反馈"bubble 仍然没有 THINKING",原因就是这一对值被写死成 off/false。
 
     it("run() builds Agent with model.reasoning=true + thinkingLevel='medium' (enables visible thinking)", async () => {
