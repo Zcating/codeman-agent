@@ -82,8 +82,8 @@ describe("createAgentRuntime()", () => {
     });
 });
 
-describe("run() �� event translation", () => {
-    it("translates message_update text �� token event", async () => {
+describe("run() — event translation", () => {
+    it("translates message_update text → token event", async () => {
         const runtime = createAgentRuntime();
         const events: RuntimeEvent[] = [];
         const program = Stream.runForEach(
@@ -300,8 +300,8 @@ describe("error handling", () => {
     });
 });
 
-describe("run() �� tool_execution_end �¼�", () => {
-    it("tool_execution_end �� isError=true ʱ������ error �� tool_result �¼�", async () => {
+describe("run() — tool_execution_end 事件", () => {
+    it("tool_execution_end — isError=true 时返回带 error 字段的 tool_result 事件", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
         const originalImpl = mockedAgent.getMockImplementation();
@@ -321,17 +321,17 @@ describe("run() �� tool_execution_end �¼�", () => {
 
             const runtime = createAgentRuntime();
             const events: RuntimeEvent[] = [];
-            // �� await����΢�������ܣ����� capturedCallback �ܱ�����
+            // 不 await，靠微任务转译，让 capturedCallback 能被设置
             const program = Stream.runForEach(
                 runtime.run({ context: mockContext, provider: mockProvider }),
                 (e) => Effect.sync(() => events.push(e)),
             );
             Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
 
-            // �ȴ�΢���������գ�ȷ�� subscribe �ѱ�����
+            // 等待微任务跑完，确保 subscribe 已被设置
             await new Promise((resolve) => setTimeout(resolve, 10));
 
-            // ���� tool_execution_end with isError=true
+            // 模拟 tool_execution_end with isError=true
             capturedCallback!({
                 type: "tool_execution_end",
                 toolCallId: "tc-1",
@@ -339,7 +339,7 @@ describe("run() �� tool_execution_end �¼�", () => {
                 isError: true,
             });
 
-            // �� agent_end �ر� stream
+            // 用 agent_end 关闭 stream
             capturedCallback!({ type: "agent_end", messages: [] });
 
             await new Promise((resolve) => setTimeout(resolve, 20));
@@ -357,7 +357,7 @@ describe("run() �� tool_execution_end �¼�", () => {
         }
     });
 
-    it("tool_execution_end �� isError=false ʱ�������� error �� tool_result �¼�", async () => {
+    it("tool_execution_end — isError=false 时返回不带 error 字段的 tool_result 事件", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
         const originalImpl = mockedAgent.getMockImplementation();
@@ -411,8 +411,8 @@ describe("run() �� tool_execution_end �¼�", () => {
     });
 });
 
-describe("run() �� message_update �߽����", () => {
-    it("message_update �� toolCall block ʱ���� tool_call �¼�", async () => {
+describe("run() — message_update 边界情况", () => {
+    it("message_update 有 toolCall block 时发送 tool_call 事件", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
         const originalImpl = mockedAgent.getMockImplementation();
@@ -475,7 +475,7 @@ describe("run() �� message_update �߽����", () => {
         }
     });
 
-    it("message_update �� content ������ʱ��ǰ���أ��������¼�", async () => {
+    it("message_update 的 content 是字符串（非法数组）时提前返回，不发事件", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
         const originalImpl = mockedAgent.getMockImplementation();
@@ -503,7 +503,7 @@ describe("run() �� message_update �߽����", () => {
 
             await new Promise((resolve) => setTimeout(resolve, 10));
 
-            // content Ϊ�ַ�����������
+            // content 为字符串（非法数组）
             capturedCallback!({
                 type: "message_update",
                 message: { content: "not-array" },
@@ -512,7 +512,7 @@ describe("run() �� message_update �߽����", () => {
             capturedCallback!({ type: "agent_end", messages: [] });
 
             await new Promise((resolve) => setTimeout(resolve, 20));
-            // û�з��� token �� tool_call �¼������ڷ��أ�
+            // 没有发送 token 或 tool_call 事件（提前返回）
             const tokenEvents = events.filter(
                 (e) => e.type === "token" || e.type === "tool_call",
             );
@@ -522,7 +522,7 @@ describe("run() �� message_update �߽����", () => {
         }
     });
 
-    it("message_update �� message �ֶ�ʱ��ǰ���أ��������¼�", async () => {
+    it("message_update 没 message 字段时提前返回，不发事件", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
         const originalImpl = mockedAgent.getMockImplementation();
@@ -550,7 +550,7 @@ describe("run() �� message_update �߽����", () => {
 
             await new Promise((resolve) => setTimeout(resolve, 10));
 
-            // �� message �ֶ�
+            // 无 message 字段
             capturedCallback!({ type: "message_update" });
 
             capturedCallback!({ type: "agent_end", messages: [] });
@@ -566,8 +566,8 @@ describe("run() �� message_update �߽����", () => {
     });
 });
 
-describe("run() �� agent_end �¼�", () => {
-    it("agent_end �� assistant ��Ϣ�� toolCall block ʱ done �¼����� tool_calls", async () => {
+describe("run() — agent_end 事件", () => {
+    it("agent_end 含 assistant 消息的 toolCall block 时 done 事件带 tool_calls", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
         const originalImpl = mockedAgent.getMockImplementation();
@@ -621,7 +621,7 @@ describe("run() �� agent_end �¼�", () => {
         }
     });
 
-    it("agent_end �� messages Ϊ������ʱ�Է��� done �¼��������ݣ�", async () => {
+    it("agent_end 的 messages 为空数组时仍发送 done 事件（空内容）", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
         const originalImpl = mockedAgent.getMockImplementation();
@@ -649,7 +649,7 @@ describe("run() �� agent_end �¼�", () => {
 
             await new Promise((resolve) => setTimeout(resolve, 10));
 
-            // ADR-0019: agent_end ������ emit done �� ��ʹ messages Ϊ��
+            // ADR-0019: agent_end 始终 emit done 事件，即使 messages 为空
             capturedCallback!({ type: "agent_end", messages: [] });
 
             await new Promise((resolve) => setTimeout(resolve, 20));
@@ -769,8 +769,8 @@ describe("run() �� agent_end �¼�", () => {
     });
 });
 
-describe("cancel() �� agent abort", () => {
-    it("cancel() ���� currentAgent.abort()", async () => {
+describe("cancel() — agent abort", () => {
+    it("cancel() 触发 currentAgent.abort()", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
         const originalImpl = mockedAgent.getMockImplementation();
@@ -795,7 +795,7 @@ describe("cancel() �� agent abort", () => {
 
             await new Promise((resolve) => setTimeout(resolve, 10));
 
-            // ���� cancel
+            // 调用 cancel
             runtime.cancel();
 
             expect(abortFn).toHaveBeenCalled();
@@ -1382,6 +1382,56 @@ describe("run() — agent_end typed aggregation", () => {
             expect(doneEvent).toBeDefined();
             expect(doneEvent!.message.toolCalls).not.toBeNull();
             expect(doneEvent!.message.toolCalls).toHaveLength(1);
+        } finally {
+            mockedAgent.mockImplementation(originalImpl as never);
+        }
+    });
+
+    // ─── 推理配置 (regression: thinking 必须在 runtime 层开启,否则 LLM 不产出 thinking blocks) ──
+    // 历史教训:thinkingLevel="off" + reasoning:false 时,agent-loop.js 把 reasoning 设为 undefined,
+    // LLM 不产出 thinking_delta → store 不更新 stub.thinking → done.thinking=null →
+    // MessageBubble ThinkingSection + ChatView ThinkingPanel 都看不到 thinking。
+    // 用户首屏反馈"bubble 仍然没有 THINKING",原因就是这一对值被写死成 off/false。
+
+    it("run() builds Agent with model.reasoning=true + thinkingLevel='medium' (enables visible thinking)", async () => {
+        const { Agent } = await import("@earendil-works/pi-agent-core");
+        const mockedAgent = vi.mocked(Agent);
+        const originalImpl = mockedAgent.getMockImplementation();
+
+        let capturedConfig: unknown = null;
+        try {
+            mockedAgent.mockImplementation(function _CapturingMockAgent(config: unknown) {
+                capturedConfig = config;
+                return {
+                    subscribe: vi.fn().mockReturnValue(() => {}),
+                    prompt: vi.fn().mockResolvedValue(undefined),
+                    abort: vi.fn(),
+                };
+            });
+
+            const runtime = createAgentRuntime();
+            const stream = runtime.run({ context: mockContext, provider: mockProvider });
+            // 跟其他 thinking 测试一致: 触发 stream subscription 但不 await(stream 不结束,mock 不发事件)
+            const program = Stream.runForEach(
+                stream,
+                () => Effect.succeed(undefined),
+            );
+            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+            // 等一个 tick 让 Stream.async 的 emit 同步执行 (Agent 在那同步 new 出来)
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            expect(capturedConfig).toBeDefined();
+            const cfg = capturedConfig as {
+                initialState?: {
+                    thinkingLevel?: string;
+                    model?: { reasoning?: boolean; id?: string };
+                };
+            };
+            // 关键断言 — 任一被改回 off/false 都视为 thinking 被关掉
+            expect(cfg.initialState?.thinkingLevel).toBe("medium");
+            expect(cfg.initialState?.model?.reasoning).toBe(true);
+            // 附带 sanity: provider 透传到 model.id
+            expect(cfg.initialState?.model?.id).toBe(mockProvider.defaultModel);
         } finally {
             mockedAgent.mockImplementation(originalImpl as never);
         }

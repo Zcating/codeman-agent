@@ -10,7 +10,8 @@
 //!
 //! 0.80.3 迁移要点 (vs 0.9.0):
 //!   - `transport: AgentTransport` (旧,自己跑 agent loop) → `streamFn: anthropicStream`
-//!   - `initialState.thinkingLevel` 必填,固定为 "off"
+//!   - `initialState.thinkingLevel` 必填,默认 "medium"(开 thinking,显示思考过程)
+//!   - `model.reasoning: true` (跟 thinkingLevel 联动,Claude 等推理模型才能产出 thinking blocks)
 //!   - `subscribe((evt) => ...)` → `subscribe((evt, signal) => ...)`
 //!   - 旧 anthropic-transport.ts 的 agent loop 全部删除(由 Agent 内部处理)
 
@@ -269,7 +270,9 @@ export function createAgentRuntime(): AgentRuntime {
           api: "anthropic-messages",
           provider: "anthropic",
           baseUrl: provider.baseUrl,
-          reasoning: false,
+          // 配合 initialState.thinkingLevel="medium",让 Claude 等推理模型产出 thinking blocks。
+          // 非推理模型 silently 忽略(per pi-ai 文档),所以默认全开对所有 provider 安全。
+          reasoning: true,
           input: ["text"],
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
           contextWindow: 128000,
@@ -282,7 +285,11 @@ export function createAgentRuntime(): AgentRuntime {
           initialState: {
             systemPrompt: provider.systemPrompt,
             model,
-            thinkingLevel: "off",
+            // 默认 medium:显示完整思考过程。reasoning:true 的模型产出 thinking_delta
+            // → chat.store 累积到 stub.thinking → done 时合并到 final message.thinking
+            // → MessageBubble ThinkingSection + ChatView ThinkingPanel 都渲染。
+            // 用户后续可在 settings 里加 provider-level thinkingLevel 配置来覆盖默认值。
+            thinkingLevel: "medium",
             tools,
             // ADR-0019 D2 + bridge: our DB Message (snake_case, flat) → pi-ai Message
             // (camelCase, content[] blocks). See runtime-to-pi-messages.ts for the
