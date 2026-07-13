@@ -55,7 +55,12 @@ export interface MockServerConfig {
   host: string;
   /** `CODEMAN_MOCK_STREAM_DELAY_MS` — SSE event 间延迟 (默认 1, 范围 0..10000)。 */
   streamDelayMs: number;
-  /** `CODEMAN_MOCK_DELTA_SIZE` — 每个 content_block_delta 的字符数 (默认 1, 范围 1..100)。 */
+  /** `CODEMAN_MOCK_DELTA_SIZE` — 每个 content_block_delta 的字符数 (默认 1, 范围 1..100)。
+   *  默认 1 char/event = real Anthropic API 的 per-token 粒度 (真实 LLM streaming
+   *  每次 SSE event 也是 1 token ≈ 1 char for 中文)。诊断 streaming 行为更细粒度,
+   *  但每次 Solid re-render 也是 1 char,如果 console 出现 per-char log spam 应该
+   *  直接删 log,不要把 deltaSize 调大 — 那是 brittle workaround,会破坏现有 SSE
+   *  event-shape 测试。 */
   deltaSize: number;
   /** `NODE_ENV === "production"`。 */
   isProduction: boolean;
