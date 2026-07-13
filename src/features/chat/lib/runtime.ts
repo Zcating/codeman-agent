@@ -28,6 +28,7 @@ import {
   isTextBlock,
   isThinkingBlock,
   isToolCallBlock,
+  contentOf,
 } from "./runtime-type-guards";
 import { validateProvider } from "./runtime-validate-provider";
 import { extractToolErrorText } from "./runtime-tool-error";
@@ -114,11 +115,7 @@ function aggregateAssistantMessages(messages: unknown[]): AssistantAggregate {
   return { finalText, allThinking, allToolCalls };
 }
 
-/** Cast AssistantMessage.content to unknown[] for downstream filter chains.
- *  Single source of truth — replaces 3 inline `m.content as unknown[]` casts. */
-function contentOf(m: { content?: unknown }): unknown[] {
-  return (m.content as unknown[]) ?? [];
-}
+/** contentOf moved to runtime-type-guards.ts (typed signature, runtime-safe). */
 
 // ─── Per-event handlers (file-level, closure-free) ──────────────
 // Extracted from the inner subscribe callback to reduce nesting (5-6 levels
@@ -167,9 +164,10 @@ function handleMessageUpdate(
     return;
   }
 
-  // OLD FORMAT fallback (backward compat): infer from message.content blocks
-  const msgContent = (message as unknown as { content?: unknown[] })?.content;
-  if (msgContent && Array.isArray(msgContent)) {
+  // OLD FORMAT fallback (backward compat): infer from message.content blocks.
+  // contentOf returns [] for missing/non-array content — no cast needed.
+  const msgContent = contentOf(message);
+  if (msgContent.length > 0) {
     for (const block of msgContent) {
       if (isTextBlock(block) && block.text !== undefined) {
         emit.single({ type: "token", content: block.text });

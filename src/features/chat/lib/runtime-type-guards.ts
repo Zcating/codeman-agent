@@ -51,3 +51,18 @@ export function isToolCallBlock(b: unknown): b is ToolCall {
     const block = b as { type?: unknown; id?: unknown };
     return block.type === "toolCall" && typeof block.id === "string";
 }
+
+/**
+ * Safely extract `.content` as an array of unknown blocks. Returns `[]` for
+ * non-objects, null/undefined, missing `content`, string `content` (UserMessage
+ * may carry string content), or any non-array `content`. Single source of
+ * truth — replaces 3+ inline `m.content as unknown[]` casts (and the OLD
+ * format fallback at runtime.ts that used `as unknown as { content?: ... }`).
+ */
+export function contentOf(m: unknown): unknown[] {
+    if (!m || typeof m !== "object") {
+        return [];
+    }
+    const c = (m as { content?: unknown }).content;
+    return Array.isArray(c) ? c : [];
+}

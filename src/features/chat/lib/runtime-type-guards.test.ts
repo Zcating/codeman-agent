@@ -5,6 +5,7 @@ import {
     isTextBlock,
     isThinkingBlock,
     isToolCallBlock,
+    contentOf,
 } from "./runtime-type-guards";
 
 describe("isAssistantMessage", () => {
@@ -142,5 +143,53 @@ describe("isToolCallBlock", () => {
     it("rejects toolCall with non-string id", () => {
         const block = { type: "toolCall" as const, id: 123, name: "y", arguments: {} };
         expect(isToolCallBlock(block)).toBe(false);
+    });
+});
+
+describe("contentOf", () => {
+    it("returns array when object has array content", () => {
+        const blocks = [{ type: "text", text: "x" }];
+        expect(contentOf({ content: blocks })).toBe(blocks);
+    });
+
+    it("returns empty array when object has empty array content", () => {
+        expect(contentOf({ content: [] })).toEqual([]);
+    });
+
+    it("returns empty array when object has no content field", () => {
+        expect(contentOf({})).toEqual([]);
+    });
+
+    it("returns empty array for null", () => {
+        expect(contentOf(null)).toEqual([]);
+    });
+
+    it("returns empty array for undefined", () => {
+        expect(contentOf(undefined)).toEqual([]);
+    });
+
+    it("returns empty array for string (non-object)", () => {
+        expect(contentOf("hello")).toEqual([]);
+    });
+
+    it("returns empty array for number (non-object)", () => {
+        expect(contentOf(42)).toEqual([]);
+    });
+
+    it("returns empty array for boolean (non-object)", () => {
+        expect(contentOf(true)).toEqual([]);
+    });
+
+    it("returns empty array when content is a string (not array)", () => {
+        // UserMessage.content can be string OR array — guard must only return array branch
+        expect(contentOf({ content: "hello" })).toEqual([]);
+    });
+
+    it("returns empty array when content is an object (not array)", () => {
+        expect(contentOf({ content: { foo: "bar" } })).toEqual([]);
+    });
+
+    it("returns empty array when content is null", () => {
+        expect(contentOf({ content: null })).toEqual([]);
     });
 });
