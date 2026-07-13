@@ -1386,5 +1386,55 @@ describe("run() — agent_end typed aggregation", () => {
             mockedAgent.mockImplementation(originalImpl as never);
         }
     });
+
+    // ─── 推理配置 (regression: thinking 必须在 runtime 层开启,否则 LLM 不产出 thinking blocks) ──
+    // 历史教训:thinkingLevel="off" + reasoning:false 时,agent-loop.js 把 reasoning 设为 undefined,
+    // LLM 不产出 thinking_delta → store 不更新 stub.thinking → done.thinking=null →
+    // MessageBubble ThinkingSection + ChatView ThinkingPanel 都看不到 thinking。
+    // 用户首屏反馈"bubble 仍然没有 THINKING",原因就是这一对值被写死成 off/false。
+
+    it("run() builds Agent with model.reasoning=true + thinkingLevel='medium' (enables visible thinking)", async () => {
+        const { Agent } = await import("@earendil-works/pi-agent-core");
+        const mockedAgent = vi.mocked(Agent);
+        const originalImpl = mockedAgent.getMockImplementation();
+
+        let capturedConfig: unknown = null;
+        try {
+            mockedAgent.mockImplementation(function _CapturingMockAgent(config: unknown) {
+                capturedConfig = config;
+                return {
+                    subscribe: vi.fn().mockReturnValue(() => {}),
+                    prompt: vi.fn().mockResolvedValue(undefined),
+                    abort: vi.fn(),
+                };
+            });
+
+            const runtime = createAgentRuntime();
+            const stream = runtime.run({ context: mockContext, provider: mockProvider });
+            // 跟其他 thinking 测试一致: 触发 stream subscription 但不 await(stream 不结束,mock 不发事件)
+            const program = Stream.runForEach(
+                stream,
+                () => Effect.succeed(undefined),
+            );
+            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+            // 等一个 tick 让 Stream.async 的 emit 同步执行 (Agent 在那同步 new 出来)
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            expect(capturedConfig).toBeDefined();
+            const cfg = capturedConfig as {
+                initialState?: {
+                    thinkingLevel?: string;
+                    model?: { reasoning?: boolean; id?: string };
+                };
+            };
+            // 关键断言 — 任一被改回 off/false 都视为 thinking 被关掉
+            expect(cfg.initialState?.thinkingLevel).toBe("medium");
+            expect(cfg.initialState?.model?.reasoning).toBe(true);
+            // 附带 sanity: provider 透传到 model.id
+            expect(cfg.initialState?.model?.id).toBe(mockProvider.defaultModel);
+        } finally {
+            mockedAgent.mockImplementation(originalImpl as never);
+        }
+    });
 });
 
