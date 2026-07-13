@@ -805,3 +805,586 @@ describe("cancel() �� agent abort", () => {
     });
 });
 
+// ─── Block A: defaultModel validation ─────────────────────────────────────────
+
+describe("run() — defaultModel validation (P0-2)", () => {
+    it("rejects empty defaultModel with error event", async () => {
+        const runtime = createAgentRuntime();
+        const events: RuntimeEvent[] = [];
+        const program = Stream.runForEach(
+            runtime.run({ context: mockContext, provider: { ...mockProvider, defaultModel: "" } }),
+            (e) => Effect.sync(() => events.push(e)),
+        );
+        await Effect.runPromise(program.pipe(Effect.scoped));
+        const errorEvent = events.find((e) => e.type === "error") as
+            | { type: "error"; error: { message: string } }
+            | undefined;
+        expect(errorEvent).toBeDefined();
+        expect(errorEvent!.error.message).toMatch(/defaultModel/i);
+    });
+
+    it("rejects whitespace-only defaultModel with error event", async () => {
+        const runtime = createAgentRuntime();
+        const events: RuntimeEvent[] = [];
+        const program = Stream.runForEach(
+            runtime.run({ context: mockContext, provider: { ...mockProvider, defaultModel: "   " } }),
+            (e) => Effect.sync(() => events.push(e)),
+        );
+        await Effect.runPromise(program.pipe(Effect.scoped));
+        const errorEvent = events.find((e) => e.type === "error");
+        expect(errorEvent).toBeDefined();
+    });
+
+    it("does NOT emit done event when defaultModel is invalid", async () => {
+        const runtime = createAgentRuntime();
+        const events: RuntimeEvent[] = [];
+        const program = Stream.runForEach(
+            runtime.run({ context: mockContext, provider: { ...mockProvider, defaultModel: "" } }),
+            (e) => Effect.sync(() => events.push(e)),
+        );
+        await Effect.runPromise(program.pipe(Effect.scoped));
+        expect(events.find((e) => e.type === "done")).toBeUndefined();
+    });
+
+    it("valid defaultModel proceeds without error", async () => {
+        const runtime = createAgentRuntime();
+        const events: RuntimeEvent[] = [];
+        const program = Stream.runForEach(
+            runtime.run({ context: mockContext, provider: { ...mockProvider, defaultModel: "claude-sonnet-4" } }),
+            (e) => Effect.sync(() => events.push(e)),
+        );
+        await Effect.runPromise(program.pipe(Effect.scoped));
+        expect(events.find((e) => e.type === "error")).toBeUndefined();
+    });
+});
+
+// ─── Block B: message_update dispatch on assistantMessageEvent (text_delta) ────
+
+describe("run() — message_update text_delta assistantMessageEvent", () => {
+    it("text_delta → emits token event with delta", async () => {
+        const { Agent } = await import("@earendil-works/pi-agent-core");
+        const mockedAgent = vi.mocked(Agent);
+        const originalImpl = mockedAgent.getMockImplementation();
+
+        let capturedCallback: ((evt: unknown, signal?: AbortSignal) => void) | undefined;
+        try {
+            mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+                return {
+                    subscribe: (h: (evt: unknown, signal?: AbortSignal) => void) => {
+                        capturedCallback = h;
+                        return () => {};
+                    },
+                    prompt: vi.fn().mockResolvedValue(undefined),
+                    abort: vi.fn(),
+                };
+            });
+
+            const runtime = createAgentRuntime();
+            const events: RuntimeEvent[] = [];
+            const program = Stream.runForEach(
+                runtime.run({ context: mockContext, provider: mockProvider }),
+                (e) => Effect.sync(() => events.push(e)),
+            );
+            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            // Send message_update with assistantMessageEvent: text_delta
+            capturedCallback!({
+                type: "message_update",
+                message: { role: "assistant", content: [] },
+                assistantMessageEvent: { type: "text_delta", delta: "hello world", contentIndex: 0 },
+            });
+
+            capturedCallback!({ type: "agent_end", messages: [] });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            const tokenEvent = events.find((e) => e.type === "token") as
+                | { type: "token"; content: string }
+                | undefined;
+            expect(tokenEvent).toBeDefined();
+            expect(tokenEvent!.content).toBe("hello world");
+        } finally {
+            mockedAgent.mockImplementation(originalImpl as never);
+        }
+    });
+});
+
+// ─── Block C: message_update dispatch on thinking_delta ───────────────────────
+
+describe("run() — message_update thinking_delta assistantMessageEvent", () => {
+    it("thinking_delta → emits thinking event with delta", async () => {
+        const { Agent } = await import("@earendil-works/pi-agent-core");
+        const mockedAgent = vi.mocked(Agent);
+        const originalImpl = mockedAgent.getMockImplementation();
+
+        let capturedCallback: ((evt: unknown, signal?: AbortSignal) => void) | undefined;
+        try {
+            mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+                return {
+                    subscribe: (h: (evt: unknown, signal?: AbortSignal) => void) => {
+                        capturedCallback = h;
+                        return () => {};
+                    },
+                    prompt: vi.fn().mockResolvedValue(undefined),
+                    abort: vi.fn(),
+                };
+            });
+
+            const runtime = createAgentRuntime();
+            const events: RuntimeEvent[] = [];
+            const program = Stream.runForEach(
+                runtime.run({ context: mockContext, provider: mockProvider }),
+                (e) => Effect.sync(() => events.push(e)),
+            );
+            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            capturedCallback!({
+                type: "message_update",
+                message: { role: "assistant", content: [] },
+                assistantMessageEvent: { type: "thinking_delta", delta: "first chunk", contentIndex: 0 },
+            });
+
+            capturedCallback!({ type: "agent_end", messages: [] });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            const thinkingEvent = events.find((e) => e.type === "thinking") as
+                | { type: "thinking"; content: string }
+                | undefined;
+            expect(thinkingEvent).toBeDefined();
+            expect(thinkingEvent!.content).toBe("first chunk");
+        } finally {
+            mockedAgent.mockImplementation(originalImpl as never);
+        }
+    });
+});
+
+// ─── Block D: message_update dispatch on toolcall_end ─────────────────────────
+
+describe("run() — message_update toolcall_end assistantMessageEvent", () => {
+    it("toolcall_end → emits tool_call event with toolCall from event", async () => {
+        const { Agent } = await import("@earendil-works/pi-agent-core");
+        const mockedAgent = vi.mocked(Agent);
+        const originalImpl = mockedAgent.getMockImplementation();
+
+        let capturedCallback: ((evt: unknown, signal?: AbortSignal) => void) | undefined;
+        try {
+            mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+                return {
+                    subscribe: (h: (evt: unknown, signal?: AbortSignal) => void) => {
+                        capturedCallback = h;
+                        return () => {};
+                    },
+                    prompt: vi.fn().mockResolvedValue(undefined),
+                    abort: vi.fn(),
+                };
+            });
+
+            const runtime = createAgentRuntime();
+            const events: RuntimeEvent[] = [];
+            const program = Stream.runForEach(
+                runtime.run({ context: mockContext, provider: mockProvider }),
+                (e) => Effect.sync(() => events.push(e)),
+            );
+            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            capturedCallback!({
+                type: "message_update",
+                message: { role: "assistant", content: [] },
+                assistantMessageEvent: {
+                    type: "toolcall_end",
+                    contentIndex: 0,
+                    toolCall: {
+                        id: "tc-1",
+                        name: "read_file",
+                        arguments: { path: "/x.txt" },
+                    },
+                },
+            });
+
+            capturedCallback!({ type: "agent_end", messages: [] });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            const toolCallEvent = events.find((e) => e.type === "tool_call") as {
+                type: "tool_call";
+                toolCall: { id: string; name: string; args: Record<string, unknown> };
+            } | undefined;
+            expect(toolCallEvent).toBeDefined();
+            expect(toolCallEvent!.toolCall.id).toBe("tc-1");
+            expect(toolCallEvent!.toolCall.name).toBe("read_file");
+            expect(toolCallEvent!.toolCall.args).toEqual({ path: "/x.txt" });
+        } finally {
+            mockedAgent.mockImplementation(originalImpl as never);
+        }
+    });
+});
+
+// ─── Block E: message_update non-delta events (no emit) ─────────────────────
+
+describe("run() — message_update non-delta assistantMessageEvent types", () => {
+    it("text_start does NOT emit token event", async () => {
+        const { Agent } = await import("@earendil-works/pi-agent-core");
+        const mockedAgent = vi.mocked(Agent);
+        const originalImpl = mockedAgent.getMockImplementation();
+
+        let capturedCallback: ((evt: unknown, signal?: AbortSignal) => void) | undefined;
+        try {
+            mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+                return {
+                    subscribe: (h: (evt: unknown, signal?: AbortSignal) => void) => {
+                        capturedCallback = h;
+                        return () => {};
+                    },
+                    prompt: vi.fn().mockResolvedValue(undefined),
+                    abort: vi.fn(),
+                };
+            });
+
+            const runtime = createAgentRuntime();
+            const events: RuntimeEvent[] = [];
+            const program = Stream.runForEach(
+                runtime.run({ context: mockContext, provider: mockProvider }),
+                (e) => Effect.sync(() => events.push(e)),
+            );
+            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            capturedCallback!({
+                type: "message_update",
+                message: { role: "assistant", content: [] },
+                assistantMessageEvent: { type: "text_start", contentIndex: 0, partial: {} },
+            });
+
+            capturedCallback!({ type: "agent_end", messages: [] });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            const tokenEvents = events.filter((e) => e.type === "token");
+            expect(tokenEvents).toHaveLength(0);
+        } finally {
+            mockedAgent.mockImplementation(originalImpl as never);
+        }
+    });
+
+    it("thinking_start does NOT emit thinking event", async () => {
+        const { Agent } = await import("@earendil-works/pi-agent-core");
+        const mockedAgent = vi.mocked(Agent);
+        const originalImpl = mockedAgent.getMockImplementation();
+
+        let capturedCallback: ((evt: unknown, signal?: AbortSignal) => void) | undefined;
+        try {
+            mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+                return {
+                    subscribe: (h: (evt: unknown, signal?: AbortSignal) => void) => {
+                        capturedCallback = h;
+                        return () => {};
+                    },
+                    prompt: vi.fn().mockResolvedValue(undefined),
+                    abort: vi.fn(),
+                };
+            });
+
+            const runtime = createAgentRuntime();
+            const events: RuntimeEvent[] = [];
+            const program = Stream.runForEach(
+                runtime.run({ context: mockContext, provider: mockProvider }),
+                (e) => Effect.sync(() => events.push(e)),
+            );
+            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            capturedCallback!({
+                type: "message_update",
+                message: { role: "assistant", content: [] },
+                assistantMessageEvent: { type: "thinking_start", contentIndex: 0, partial: {} },
+            });
+
+            capturedCallback!({ type: "agent_end", messages: [] });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            const thinkingEvents = events.filter((e) => e.type === "thinking");
+            expect(thinkingEvents).toHaveLength(0);
+        } finally {
+            mockedAgent.mockImplementation(originalImpl as never);
+        }
+    });
+
+    it("toolcall_start does NOT emit tool_call event", async () => {
+        const { Agent } = await import("@earendil-works/pi-agent-core");
+        const mockedAgent = vi.mocked(Agent);
+        const originalImpl = mockedAgent.getMockImplementation();
+
+        let capturedCallback: ((evt: unknown, signal?: AbortSignal) => void) | undefined;
+        try {
+            mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+                return {
+                    subscribe: (h: (evt: unknown, signal?: AbortSignal) => void) => {
+                        capturedCallback = h;
+                        return () => {};
+                    },
+                    prompt: vi.fn().mockResolvedValue(undefined),
+                    abort: vi.fn(),
+                };
+            });
+
+            const runtime = createAgentRuntime();
+            const events: RuntimeEvent[] = [];
+            const program = Stream.runForEach(
+                runtime.run({ context: mockContext, provider: mockProvider }),
+                (e) => Effect.sync(() => events.push(e)),
+            );
+            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            capturedCallback!({
+                type: "message_update",
+                message: { role: "assistant", content: [] },
+                assistantMessageEvent: { type: "toolcall_start", contentIndex: 0, partial: {} },
+            });
+
+            capturedCallback!({ type: "agent_end", messages: [] });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            const toolCallEvents = events.filter((e) => e.type === "tool_call");
+            expect(toolCallEvents).toHaveLength(0);
+        } finally {
+            mockedAgent.mockImplementation(originalImpl as never);
+        }
+    });
+});
+
+// ─── Block F: agent_end with typed AssistantMessage ─────────────────────────
+
+describe("run() — agent_end typed aggregation", () => {
+    it("agent_end with AssistantMessage.text block → done.content extracted", async () => {
+        const { Agent } = await import("@earendil-works/pi-agent-core");
+        const mockedAgent = vi.mocked(Agent);
+        const originalImpl = mockedAgent.getMockImplementation();
+
+        let capturedCallback: ((evt: unknown, signal?: AbortSignal) => void) | undefined;
+        try {
+            mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+                return {
+                    subscribe: (h: (evt: unknown, signal?: AbortSignal) => void) => {
+                        capturedCallback = h;
+                        return () => {};
+                    },
+                    prompt: vi.fn().mockResolvedValue(undefined),
+                    abort: vi.fn(),
+                };
+            });
+
+            const runtime = createAgentRuntime();
+            const events: RuntimeEvent[] = [];
+            const program = Stream.runForEach(
+                runtime.run({ context: mockContext, provider: mockProvider }),
+                (e) => Effect.sync(() => events.push(e)),
+            );
+            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            capturedCallback!({
+                type: "agent_end",
+                messages: [
+                    {
+                        role: "assistant",
+                        content: [{ type: "text", text: "hi" }],
+                        api: "anthropic-messages",
+                        provider: "anthropic",
+                        model: "x",
+                        usage: { inputTokens: 1, outputTokens: 1, cacheRead: 0, cacheWrite: 0 },
+                        stopReason: "stop",
+                        timestamp: 1,
+                    },
+                ],
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            const doneEvent = events.find((e) => e.type === "done") as {
+                type: "done";
+                message: { content: string };
+            } | undefined;
+            expect(doneEvent).toBeDefined();
+            expect(doneEvent!.message.content).toBe("hi");
+        } finally {
+            mockedAgent.mockImplementation(originalImpl as never);
+        }
+    });
+
+    it("agent_end with AssistantMessage empty content array → done.content empty", async () => {
+        const { Agent } = await import("@earendil-works/pi-agent-core");
+        const mockedAgent = vi.mocked(Agent);
+        const originalImpl = mockedAgent.getMockImplementation();
+
+        let capturedCallback: ((evt: unknown, signal?: AbortSignal) => void) | undefined;
+        try {
+            mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+                return {
+                    subscribe: (h: (evt: unknown, signal?: AbortSignal) => void) => {
+                        capturedCallback = h;
+                        return () => {};
+                    },
+                    prompt: vi.fn().mockResolvedValue(undefined),
+                    abort: vi.fn(),
+                };
+            });
+
+            const runtime = createAgentRuntime();
+            const events: RuntimeEvent[] = [];
+            const program = Stream.runForEach(
+                runtime.run({ context: mockContext, provider: mockProvider }),
+                (e) => Effect.sync(() => events.push(e)),
+            );
+            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            capturedCallback!({
+                type: "agent_end",
+                messages: [
+                    {
+                        role: "assistant",
+                        content: [],
+                        api: "anthropic-messages",
+                        provider: "anthropic",
+                        model: "x",
+                        usage: { inputTokens: 1, outputTokens: 1, cacheRead: 0, cacheWrite: 0 },
+                        stopReason: "stop",
+                        timestamp: 1,
+                    },
+                ],
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            const doneEvent = events.find((e) => e.type === "done") as {
+                type: "done";
+                message: { content: string };
+            } | undefined;
+            expect(doneEvent).toBeDefined();
+            expect(doneEvent!.message.content).toBe("");
+        } finally {
+            mockedAgent.mockImplementation(originalImpl as never);
+        }
+    });
+
+    it("agent_end with AssistantMessage.thinking block → done.thinking set", async () => {
+        const { Agent } = await import("@earendil-works/pi-agent-core");
+        const mockedAgent = vi.mocked(Agent);
+        const originalImpl = mockedAgent.getMockImplementation();
+
+        let capturedCallback: ((evt: unknown, signal?: AbortSignal) => void) | undefined;
+        try {
+            mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+                return {
+                    subscribe: (h: (evt: unknown, signal?: AbortSignal) => void) => {
+                        capturedCallback = h;
+                        return () => {};
+                    },
+                    prompt: vi.fn().mockResolvedValue(undefined),
+                    abort: vi.fn(),
+                };
+            });
+
+            const runtime = createAgentRuntime();
+            const events: RuntimeEvent[] = [];
+            const program = Stream.runForEach(
+                runtime.run({ context: mockContext, provider: mockProvider }),
+                (e) => Effect.sync(() => events.push(e)),
+            );
+            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            capturedCallback!({
+                type: "agent_end",
+                messages: [
+                    {
+                        role: "assistant",
+                        content: [{ type: "thinking", thinking: "reasoning" }],
+                        api: "anthropic-messages",
+                        provider: "anthropic",
+                        model: "x",
+                        usage: { inputTokens: 1, outputTokens: 1, cacheRead: 0, cacheWrite: 0 },
+                        stopReason: "stop",
+                        timestamp: 1,
+                    },
+                ],
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            const doneEvent = events.find((e) => e.type === "done") as {
+                type: "done";
+                message: { content: string; thinking: string | null };
+            } | undefined;
+            expect(doneEvent).toBeDefined();
+            expect(doneEvent!.message.thinking).toBe("reasoning");
+        } finally {
+            mockedAgent.mockImplementation(originalImpl as never);
+        }
+    });
+
+    it("agent_end with AssistantMessage.toolCall block → done.toolCalls populated", async () => {
+        const { Agent } = await import("@earendil-works/pi-agent-core");
+        const mockedAgent = vi.mocked(Agent);
+        const originalImpl = mockedAgent.getMockImplementation();
+
+        let capturedCallback: ((evt: unknown, signal?: AbortSignal) => void) | undefined;
+        try {
+            mockedAgent.mockImplementation(function _MockAgent(_config: unknown) {
+                return {
+                    subscribe: (h: (evt: unknown, signal?: AbortSignal) => void) => {
+                        capturedCallback = h;
+                        return () => {};
+                    },
+                    prompt: vi.fn().mockResolvedValue(undefined),
+                    abort: vi.fn(),
+                };
+            });
+
+            const runtime = createAgentRuntime();
+            const events: RuntimeEvent[] = [];
+            const program = Stream.runForEach(
+                runtime.run({ context: mockContext, provider: mockProvider }),
+                (e) => Effect.sync(() => events.push(e)),
+            );
+            Effect.runPromise(program.pipe(Effect.scoped)).catch(() => {});
+
+            await new Promise((resolve) => setTimeout(resolve, 10));
+
+            capturedCallback!({
+                type: "agent_end",
+                messages: [
+                    {
+                        role: "assistant",
+                        content: [{ type: "toolCall", id: "t1", name: "read_file", arguments: {} }],
+                        api: "anthropic-messages",
+                        provider: "anthropic",
+                        model: "x",
+                        usage: { inputTokens: 1, outputTokens: 1, cacheRead: 0, cacheWrite: 0 },
+                        stopReason: "stop",
+                        timestamp: 1,
+                    },
+                ],
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            const doneEvent = events.find((e) => e.type === "done") as {
+                type: "done";
+                message: { content: string; toolCalls: unknown[] | null };
+            } | undefined;
+            expect(doneEvent).toBeDefined();
+            expect(doneEvent!.message.toolCalls).not.toBeNull();
+            expect(doneEvent!.message.toolCalls).toHaveLength(1);
+        } finally {
+            mockedAgent.mockImplementation(originalImpl as never);
+        }
+    });
+});
+

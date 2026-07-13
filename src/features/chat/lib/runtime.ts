@@ -15,44 +15,24 @@
 //!   - 旧 anthropic-transport.ts 的 agent loop 全部删除(由 Agent 内部处理)
 
 import { Effect, Stream } from "effect";
+import { match } from "ts-pattern";
 import type { Message } from "../../../shared/lib/types";
 import { logger } from "../../../shared/lib/logger";
 import { anthropicStream } from "./anthropic-transport";
-import { Agent } from "@earendil-works/pi-agent-core";
-import type { Model, Message as PiMessage } from "@earendil-works/pi-ai";
+import { Agent, type AgentEvent } from "@earendil-works/pi-agent-core";
+import type {
+  Message as PiMessage,
+  Model,
+} from "@earendil-works/pi-ai";
 import { createFileTools } from "../../file-tools/lib/file-tools";
-
-// ─── Tool error extraction (T27 fix for [object Object] display) ────────────
-
-interface AgentToolResultShape {
-  content?: Array<{ type?: string; text?: unknown }>;
-  details?: unknown;
-}
-
-/** Extract human-readable error text from a tool result.
- *
- *  When pi-agent-core fails a tool call (validation, sandbox, runtime error) it
- *  wraps the failure in `AgentToolResult<{content:[{type:"text", text:"..."}], details:{}}>`
- *  with `isError: true`. Calling `String(result)` on that shape yields the
- *  unhelpful `"[object Object]"` which then leaks into the UI error banner.
- *
- *  This helper pulls the actual text out of `content[0].text`, falling back to
- *  `String(result)` for unexpected shapes.
- */
-export function extractToolErrorText(result: unknown): string {
-  if (result && typeof result === "object" && "content" in result) {
-    const r = result as AgentToolResultShape;
-    const first = Array.isArray(r.content) ? r.content[0] : undefined;
-    const text = first?.text;
-    if (typeof text === "string" && text.length > 0) {
-      return text;
-    }
-  }
-  if (result instanceof Error) {
-    return result.message;
-  }
-  return String(result);
-}
+import {
+  isAssistantLikeMessage,
+  isTextBlock,
+  isThinkingBlock,
+  isToolCallBlock,
+} from "./runtime-type-guards";
+import { validateProvider } from "./runtime-validate-provider";
+import { extractToolErrorText } from "./runtime-tool-error";
 
 // ─── Runtime event types (6 variants,ADR-0017 + thinking) ──────────────────
 
@@ -94,6 +74,47 @@ export interface AgentRuntime {
   cancel(): void;
 }
 
+// ─── agent_end aggregation helper ──────────────────────────────────────────
+
+interface AssistantAggregate {
+  /** Text from the last assistant message (final answer) */
+  finalText: string;
+  /** All thinking blocks across assistant messages */
+  allThinking: string[];
+  /** All toolCall blocks across assistant messages */
+  allToolCalls: Array<{
+    id: string;
+    name: string;
+    arguments: Record<string, unknown>;
+  }>;
+}
+
+/**
+ * Aggregate text/thinking/toolCalls across all assistant messages in an agent_end
+ * event. ADR-0019 V3.1 fix: multi-turn agent loop produces multiple assistant
+ * messages — last assistant message's text is the final answer, but thinking
+ * and toolCall blocks may live in earlier turns (turn #1).
+ */
+function aggregateAssistantMessages(messages: unknown[]): AssistantAggregate {
+  const assistantMsgs = messages.filter(isAssistantLikeMessage);
+  const finalAssistant = assistantMsgs[assistantMsgs.length - 1] ?? null;
+  const finalText = finalAssistant
+    ? contentOf(finalAssistant).filter(isTextBlock).map((b) => b.text).join("")
+    : "";
+  const allThinking = assistantMsgs
+    .flatMap((m) => contentOf(m).filter(isThinkingBlock).map((b) => b.thinking));
+  const allToolCalls = assistantMsgs.flatMap((m) =>
+    contentOf(m).filter(isToolCallBlock),
+  );
+  return { finalText, allThinking, allToolCalls };
+}
+
+/** Cast AssistantMessage.content to unknown[] for downstream filter chains.
+ *  Single source of truth — replaces 3 inline `m.content as unknown[]` casts. */
+function contentOf(m: { content?: unknown }): unknown[] {
+  return (m.content as unknown[]) ?? [];
+}
+
 // ─── Factory (closure-based, no class, no Context.Tag) ──────────
 
 export function createAgentRuntime(): AgentRuntime {
@@ -103,6 +124,14 @@ export function createAgentRuntime(): AgentRuntime {
   return {
     run({ context, provider }: RunOptions): Stream.Stream<RuntimeEvent, never, never> {
       return Stream.async<RuntimeEvent, never>((emit) => {
+        // ── Block A: defaultModel validation (P0-2) ──────────────────
+        const validation = validateProvider(provider);
+        if (!validation.ok) {
+          emit.single({ type: "error", error: { message: validation.reason } });
+          emit.end();
+          return Effect.sync(() => { });
+        }
+
         const model: Model<"anthropic-messages"> = {
           id: provider.defaultModel || "auto",
           name: provider.systemPrompt.slice(0, 20) || "agent",
@@ -134,192 +163,87 @@ export function createAgentRuntime(): AgentRuntime {
         });
         currentAgent = agent;
 
-        const sub = agent.subscribe((evt, _signal) => {
+        const sub = agent.subscribe((evt: AgentEvent, _signal) => {
           try {
-            const e = evt as {
-              type: string;
-              message?: { content?: unknown[] };
-              toolCallId?: string;
-              result?: unknown;
-              isError?: boolean;
-              messages?: Array<{
-                content?: Array<{
-                  type: string;
-                  text?: string;
-                  id?: string;
-                  name?: string;
-                  arguments?: Record<string, unknown>;
-                }>;
-              }>;
-            };
-            switch (e.type) {
-              case "message_update": {
-                const msg = e.message;
-                if (!msg?.content || !Array.isArray(msg.content)) {
+            match(evt)
+              .with({ type: "message_update" }, ({ message, assistantMessageEvent }) => {
+                // NEW FORMAT (pi-agent-core 0.80.3): dispatch on assistantMessageEvent.type
+                if (assistantMessageEvent) {
+                  match(assistantMessageEvent)
+                    .with({ type: "text_delta" }, ({ delta }) => {
+                      emit.single({ type: "token", content: delta });
+                    })
+                    .with({ type: "thinking_delta" }, ({ delta }) => {
+                      // pi-agent-core 的 message_update 携带的是累积内容（同 text branch），非 delta。
+                      emit.single({ type: "thinking", content: delta });
+                    })
+                    .with({ type: "toolcall_end" }, ({ toolCall }) => {
+                      emit.single({
+                        type: "tool_call",
+                        toolCall: {
+                          id: toolCall.id,
+                          name: toolCall.name,
+                          args: toolCall.arguments as Record<string, unknown>,
+                        },
+                      });
+                    })
+                    .otherwise(() => {
+                      // text_start / thinking_start / toolcall_start / toolcall_delta / start: no-op
+                    });
                   return;
                 }
-                for (const block of msg.content) {
-                  const b = block as {
-                    type: string;
-                    text?: string;
-                    thinking?: string;
-                    id?: string;
-                    name?: string;
-                    arguments?: Record<string, unknown>;
-                  };
-                  if (b.type === "text" && b.text !== undefined) {
-                    emit.single({ type: "token", content: b.text });
-                  } else if (b.type === "thinking" && b.thinking !== undefined) {
-                    // pi-agent-core 的 message_update 携带的是累积内容(同 text branch),
-                    // 非 delta。store 直接覆写 thinking 字段即可。
-                    emit.single({ type: "thinking", content: b.thinking });
-                  } else if (b.type === "toolCall" && b.id !== undefined) {
-                    emit.single({
-                      type: "tool_call",
-                      toolCall: {
-                        id: b.id,
-                        name: b.name ?? "",
-                        args: b.arguments ?? {},
-                      },
-                    });
+
+                // OLD FORMAT fallback (backward compat): infer from message.content blocks
+                const msgContent = (message as unknown as { content?: unknown[] })?.content;
+                if (msgContent && Array.isArray(msgContent)) {
+                  for (const block of msgContent) {
+                    if (isTextBlock(block) && block.text !== undefined) {
+                      emit.single({ type: "token", content: block.text });
+                    } else if (isThinkingBlock(block) && block.thinking !== undefined) {
+                      emit.single({ type: "thinking", content: block.thinking });
+                    } else if (isToolCallBlock(block)) {
+                      emit.single({
+                        type: "tool_call",
+                        toolCall: {
+                          id: block.id,
+                          name: block.name ?? "",
+                          args: block.arguments ?? {},
+                        },
+                      });
+                    }
                   }
                 }
-                break;
-              }
-              case "tool_execution_end": {
+              })
+              .with({ type: "tool_execution_end" }, ({ toolCallId, result, isError }) => {
                 emit.single({
                   type: "tool_result",
-                  toolCallId: e.toolCallId ?? "unknown",
-                  result: e.result,
-                  error: e.isError ? extractToolErrorText(e.result) : undefined,
+                  toolCallId,
+                  result,
+                  error: isError ? extractToolErrorText(result) : undefined,
                 });
-                break;
-              }
-              case "agent_end": {
-                // V2 ADR-0019: 必须无条件 emit done — 即使 msgs 为空 (例如 abort 在
-                // 第一个 token 到达前触发)。否则 conversations.store 的 streamingMessageId
-                // 卡在 set 状态,UI "Cancel" 按钮不消失,"Send" 按钮不恢复。
-                //   - msgs.length > 0: emit done with partial assistant text
-                //   - msgs.length === 0: emit done with empty text (UI 把 stub finalize 为空 assistant)
-                //
-                // V3.1 multi-turn 修正: agent loop 跑 N 轮 (tool use + follow-up),
-                // agent_end 的 msgs 数组 [user, asst#1 (thinking+text+toolCall),
-                // tool_result, asst#2 (text only)] — **最后的 asst#2 是 turn 2
-                // 的 final answer,只有 text,没有 thinking/toolCall**。如果只
-                // 抓 lastMsg,done.message.thinking + done.message.tool_calls
-                // 会变成 null,UI 看不到 thinking section 或 inline ToolCallCard。
-                //
-                // 修正策略:
-                //   - **content** 用最后一条 assistant message 的 text (final answer)
-                //   - **thinking** 用 **跨所有 assistant messages** 累加 (通常 in turn #1)
-                //   - **tool_calls** 用 **跨所有 assistant messages** 累加 (turn #1 的 tool_call)
-                //   - **tool_results** 用 **跨所有 assistant messages** 累加 (turn N 的 tool_result blocks 也是 agent message)
-                //
-                // 跨 message 累加是必要的,因为 agent 多轮时 lastMsg 不一定包含 thinking/toolCall。
-                const msgs = e.messages ?? [];
-                const lastMsg = msgs.length > 0 ? msgs[msgs.length - 1] : null;
-
-                // 判断是否 assistant-style message:
-                //   - role === "assistant" 显式
-                //   - role 缺失(测试 fixture 用裸对象) 但内容含 thinking/text/toolCall
-                //     blocks — 这种默认当 assistant 处理。
-                //   - role === "user" / "toolResult" 严格排除。
-                // 这样多轮场景也能聚合跨 message 的 thinking + toolCalls。
-                type AnyMsg = { role?: string; content?: unknown };
-                function isAssistantLike(m: AnyMsg | null | undefined): boolean {
-                  if (!m) return false;
-                  if (m.role === "assistant") return true;
-                  if (m.role === "user" || m.role === "toolResult") return false;
-                  // No role → look at content blocks
-                  if (!Array.isArray(m.content)) return false;
-                  return m.content.some((b: unknown) => {
-                    const block = b as { type?: string };
-                    return (
-                      block?.type === "thinking" ||
-                      block?.type === "toolCall" ||
-                      block?.type === "text"
-                    );
-                  });
-                }
-
-                // 取最后一条 assistant message 的 text — final answer
-                const finalAssistantMsg = [...msgs]
-                  .reverse()
-                  .find((m: AnyMsg) => isAssistantLike(m)) ?? null;
-                const text = finalAssistantMsg
-                  ? ((finalAssistantMsg.content as unknown[]) ?? [])
-                    .filter(
-                      (b: unknown) =>
-                        (b as { type?: string })?.type === "text",
-                    )
-                    .map((b: unknown) =>
-                      (b as { text?: string })?.text ?? "",
-                    )
-                    .join("")
-                  : lastMsg
-                    ? ((lastMsg.content as unknown[]) ?? [])
-                      .filter(
-                        (b: unknown) =>
-                          (b as { type?: string })?.type === "text",
-                      )
-                      .map((b: unknown) =>
-                        (b as { text?: string })?.text ?? "",
-                      )
-                      .join("")
-                    : "";
-
-                // 跨所有 assistant-like messages 累加 thinking + tool_calls
-                const allThinking = msgs
-                  .filter((m: AnyMsg) => isAssistantLike(m))
-                  .flatMap((m: AnyMsg) =>
-                    ((m.content as unknown[]) ?? []).filter(
-                      (b: unknown) =>
-                        (b as { type?: string })?.type === "thinking",
-                    ),
-                  ) as Array<{ type: string; thinking?: string }>;
-                const thinkingText = allThinking
-                  .map((b) => b.thinking ?? "")
-                  .join("");
-                const allToolCallBlocks = msgs
-                  .filter((m: AnyMsg) => isAssistantLike(m))
-                  .flatMap((m: AnyMsg) =>
-                    ((m.content as unknown[]) ?? []).filter(
-                      (b: unknown) =>
-                        (b as { type?: string; id?: string })?.type ===
-                        "toolCall" &&
-                        (b as { id?: string })?.id !== undefined,
-                    ),
-                  ) as Array<{
-                    id?: string;
-                    name?: string;
-                    arguments?: Record<string, unknown>;
-                  }>;
-                const doneContent = text;
-                const doneThinking = thinkingText || null;
+              })
+              .with({ type: "agent_end" }, ({ messages }) => {
+                // V2 ADR-0019 + V3.1 fix: 多轮时跨所有 assistant messages 聚合
+                // thinking + tool_calls; 取最后一条 assistant 的 text 作为 final answer
+                const aggregate = aggregateAssistantMessages(messages);
+                const { finalText, allThinking, allToolCalls } = aggregate;
+                const doneContent = finalText;
+                const doneThinking = allThinking.length > 0 ? allThinking.join("") : null;
                 const doneToolCalls =
-                  allToolCallBlocks.length > 0
-                    ? allToolCallBlocks.map((b) => ({
-                      id: b.id!,
-                      name: b.name ?? "",
-                      args: b.arguments ?? {},
+                  allToolCalls.length > 0
+                    ? allToolCalls.map((b) => ({
+                      id: b.id,
+                      name: b.name,
+                      args: b.arguments as Record<string, unknown>,
                     }))
                     : null;
-                logger.debug(
-                  "[runtime/diag] agent_end: msgs.length=" +
-                  msgs.length +
-                  " text.length=" +
-                  doneContent.length +
-                  " text_preview=" +
-                  doneContent.slice(0, 100) +
-                  " thinking.length=" +
-                  thinkingText.length +
-                  " toolBlocks=" +
-                  allToolCallBlocks.length +
-                  " lastMsg.role=" +
-                  (lastMsg as { role?: string } | null)?.role +
-                  " lastMsg.content=" +
-                  JSON.stringify(lastMsg?.content),
-                );
+                logger.debug("[runtime/diag] agent_end", {
+                  msgs: messages.length,
+                  textLen: doneContent.length,
+                  thinkingLen: doneThinking?.length ?? 0,
+                  toolBlocks: doneToolCalls?.length ?? 0,
+                  lastMsg: messages[messages.length - 1],
+                });
                 emit.single({
                   type: "done",
                   message: {
@@ -341,11 +265,16 @@ export function createAgentRuntime(): AgentRuntime {
                 if (currentAgent === agent) {
                   currentAgent = null;
                 }
-                break;
-              }
-            }
+              })
+              .otherwise(() => {
+                // agent_start / turn_start / turn_end / message_start / message_end /
+                // tool_execution_start / tool_execution_update: not mapped to RuntimeEvent
+              });
           } catch (err) {
-            emit.single({ type: "error", error: { message: String(err) } });
+            emit.single({
+              type: "error",
+              error: { message: err instanceof Error ? err.message : String(err) },
+            });
           }
         });
 
