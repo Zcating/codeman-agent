@@ -32,7 +32,7 @@ import { appStore } from "../../../shared/stores/app.store";
 import { settingsSaver } from "../lib/settings-saver";
 import {
   effectSchema,
-  type StandardSchemaV1Issue,
+  firstErrorMessage,
 } from "../../../shared/lib/effect-schema-adapter";
 import { formatAppError } from "../../../shared/lib/format-app-error";
 import type { Provider } from "../../../shared/lib/types";
@@ -47,39 +47,11 @@ import {
   CardContent,
   CardFooter,
 } from "../../../shared/components/ui/card";
-
-// ─── Per-field schemas (Standard Schema V1) ──────────────────────────────────
-// Schema.pipe(Schema.pattern/minLength, { message: "..." }) — `{ message: ... }` 在
-// Effect 里通过 `toASTAnnotations` 存到 `ast.annotations[MessageAnnotationId]`,
-// adapter 从这里读出来。
-
-const BaseUrlSchema = Schema.String.pipe(
-  Schema.pattern(/^https?:\/\/.+/, {
-    message: "Base URL must start with http:// or https://",
-  } as never),
-);
-
-const ModelSchema = Schema.String.pipe(
-  Schema.minLength(1, { message: "Model is required" } as never),
-);
-
-const ApiKeySchema = Schema.String; // 不强校验 (mock provider 可空)
-
-/**
- * Extract the first user-facing message from a `form.Field`'s error array.
- * TanStack Form stores errors as `unknown[]` (Standard Schema issue shape).
- * Our `effectSchema` adapter returns `{ message: string; path?: ... }` for each issue,
- * but unknown other validators (e.g. raw functions) might return anything.
- */
-function firstErrorMessage(errors: ReadonlyArray<unknown>): string | undefined {
-  const first = errors[0];
-  if (typeof first === "string") return first;
-  if (first && typeof first === "object" && "message" in first) {
-    const m = (first as StandardSchemaV1Issue).message;
-    if (typeof m === "string") return m;
-  }
-  return undefined;
-}
+import {
+  BaseUrlSchema,
+  ModelSchema,
+  ApiKeySchema,
+} from "../lib/schemas";
 
 export interface ProviderCardProps {
   provider: Provider;
