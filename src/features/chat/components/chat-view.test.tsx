@@ -605,8 +605,42 @@ describe("ChatView", () => {
     // Plain Enter should not trigger send (textarea just adds newline)
     expect((conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage).not.toHaveBeenCalled();
   });
+});
 
 // ─── ThinkingPanel 已从 ChatView 移除 — thinking 由各 MessageBubble 的
 // ThinkingPanel 在文本上方渲染(streaming 时 open,done 后折叠)。
 // ThinkingPanel 组件本身的契约测试保留在 thinking-panel.test.tsx。
+
+// ─── IME 兼容性 (Regression test: 中文输入法 composition 期间不应写 signal) ──────
+describe("ChatView IME 兼容性", () => {
+  afterEach(() => cleanup());
+
+  it("中文 IME composition 期间 onInput 不写 signal — send 按钮保持 disabled 直到字符 commit", () => {
+    const { container } = render(() => <ChatView convId="conv-1" />);
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    const submitBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
+
+    // 空 input → submit 禁用
+    expect(submitBtn).toBeDisabled();
+
+    // 模拟用户用拼音 IME 输入 "ni" → "你":keydown→compositionstart→多个 input→选字→compositionend。
+    // 这中间若干 onInput 事件都不应改写 signal (避免
+    // value={input()} 响应绑定重复 set el.value 中断 IME composition,
+    // 表现为"每输入一个字母后自动 blur")。
+    fireEvent(textarea, new Event("compositionstart", { bubbles: true }));
+    fireEvent.input(textarea, { target: { value: "n" } });
+    fireEvent.input(textarea, { target: { value: "ni" } });
+    fireEvent.input(textarea, { target: { value: "你" } });
+
+    // Composition 期间 signal 应仍为 ""; 即便 DOM 被 fireEvent 写成 "你",
+    // Solid 的 value={input()} 响应绑定不应被中途触发,send 按钮保持 disabled。
+    expect(submitBtn).toBeDisabled();
+
+    // Composition 结束 — signal 一次性写到最终 committed 值
+    fireEvent(textarea, new Event("compositionend", { bubbles: true }));
+    fireEvent.input(textarea, { target: { value: "你" } });
+
+    // 现在 send 按钮应启用
+    expect(submitBtn).not.toBeDisabled();
+  });
 });
