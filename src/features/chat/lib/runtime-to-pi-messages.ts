@@ -62,6 +62,19 @@ export function toPiMessages(
 
       case "assistant":
         result.push(mapAssistant(m, model));
+        // ADR-0028 Bubble Boundary: toolResults 现在挂在 assistant message 自身
+        // (per-turn done emission 把 turn 内的 toolResults 聚合到
+        // done.event.message.toolResults)。必须在 AssistantMessage 之后 emit 一一对应
+        // 的 ToolResultMessage,才能让 anthropic-transport 产出
+        // assistant(tool_use) → user(tool_result) 的合法顺序。否则 Anthropic API
+        // 报 400 "tool call result does not follow tool call (2013)"。
+        // toolName lookup 优先用本 assistant 的 toolCalls (per-turn ownership),
+        // 而不是上一个 assistant 的 (跨 turn lookup 会拿到错的 toolName)。
+        if (m.toolResults && m.toolResults.length > 0) {
+          for (const tr of m.toolResults) {
+            result.push(mapToolResult(m, tr, m.toolCalls ?? []));
+          }
+        }
         lastAssistantToolCalls = m.toolCalls ?? [];
         break;
 

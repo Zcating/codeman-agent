@@ -169,6 +169,40 @@ describe("buildAnthropicRequestBody -- Anthropic request body", () => {
         });
     });
 
+    // ─── G33: Multi tool_use → batch tool_results into ONE user message ────────
+    //
+    // Anthropic API 协议: assistant(tool_use A, tool_use B) 后,所有对应的
+    // tool_result 必须**全部**放在紧跟的**同一个** user message 里 (batch)。
+    // 拆成多个 user message 会让第二个 tool_result 的 tool_use 不在 immediate
+    // preceding assistant,API 400: "tool call result does not follow tool call
+    // (2013)"。
+    //
+    // 触发场景: pi-agent-core Agent 处理一个 turn 里 N 个并行 tool_use
+    // (例如 read_file + search_files 同时),handleTurnEnd 把所有 tool_results
+    // 聚到 assistant.toolResults。toPiMessages (G32 fix) 拆出 N 个
+    // ToolResultMessage,anthropic-transport 必须把它们 batch 进 1 个 user。
+    it("G33: 2 consecutive toolResult messages → batched into 1 user message with 2 tool_results", () => {
+        const model = { id: "test-model" };
+        const tr1 = makeMessage("toolResult", [
+            { type: "text", text: "r1" },
+        ]) as Message & { toolCallId: string };
+        tr1.toolCallId = "tc-1";
+        const tr2 = makeMessage("toolResult", [
+            { type: "text", text: "r2" },
+        ]) as Message & { toolCallId: string };
+        tr2.toolCallId = "tc-2";
+        const messages: Message[] = [tr1, tr2];
+        const result = buildAnthropicRequestBody(model, "system", messages, []);
+        expect(result.messages).toHaveLength(1);
+        expect(result.messages[0]).toMatchObject({
+            role: "user",
+            content: [
+                { type: "tool_result", tool_use_id: "tc-1", content: "r1" },
+                { type: "tool_result", tool_use_id: "tc-2", content: "r2" },
+            ],
+        });
+    });
+
     it("B7: tools = [{ name, description, parameters }] -> input_schema = parameters", () => {
         const model = { id: "test-model" };
         const tools: Tool[] = [

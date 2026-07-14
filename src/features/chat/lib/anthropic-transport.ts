@@ -135,17 +135,36 @@ export function buildAnthropicRequestBody(
                 .filter((b): b is TextContent => b.type === "text")
                 .map((b) => b.text)
                 .join("");
-            anthropicMessages.push({
-                role: "user",
-                content: [
-                    {
-                        type: "tool_result" as const,
-                        tool_use_id: trMsg.toolCallId,
-                        content: textContent,
-                        is_error: trMsg.isError,
-                    },
-                ],
-            });
+            const toolResultBlock = {
+                type: "tool_result" as const,
+                tool_use_id: trMsg.toolCallId,
+                content: textContent,
+                is_error: trMsg.isError,
+            };
+
+            // G33 fix: Anthropic API 协议要求 assistant(tool_use A, B, ...) 的
+            // 所有 tool_result 必须 batch 进紧跟的**同一个** user message。如果拆成
+            // 多个 user message,第二个 tool_result 的 tool_use 不在 immediate
+            // preceding assistant,API 400 "tool call result does not follow tool
+            // call (2013)"。
+            // 触发: 1 turn N 个并行 tool_use (e.g. read_file + search_files 并行)
+            // → handleTurnEnd 聚合到 assistant.toolResults → toPiMessages 拆 N 个
+            // ToolResultMessage → 这里必须 batch。
+            const lastMsg = anthropicMessages[anthropicMessages.length - 1];
+            if (
+                lastMsg &&
+                lastMsg.role === "user" &&
+                Array.isArray(lastMsg.content) &&
+                lastMsg.content.length > 0 &&
+                lastMsg.content.every((b) => typeof b === "object" && b !== null && (b as { type?: string }).type === "tool_result")
+            ) {
+                (lastMsg.content as Array<typeof toolResultBlock>).push(toolResultBlock);
+            } else {
+                anthropicMessages.push({
+                    role: "user",
+                    content: [toolResultBlock],
+                });
+            }
         }
     }
 
