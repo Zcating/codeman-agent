@@ -40,6 +40,7 @@
     "@effect/platform-browser": "^0.75.0",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/noto-sans-sc": "^5.2.9",
+    "@tanstack/solid-form": "^1.33.2",
     "@tanstack/solid-router": "^1.170.15",
     "better-sqlite3": "^12.11.1",
     "class-variance-authority": "^0.7.1",
