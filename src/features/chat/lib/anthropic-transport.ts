@@ -218,6 +218,44 @@ async function runAnthropicStream(
         context.tools,
     );
 
+    // G34: dump the actual Anthropic-format messages array on every request.
+    // 帮助 debug "tool call result does not follow tool call (2013)" — 直接看到
+    // 发到 API 的 messages 序列。Api key 不在这条 log (Authorization 在 header,
+    // 不在 body 里),只是 messages JSON。失败时 dump 出来给 Anthropic support
+    // ticket 也能用。
+    logger.info("[anthropicStream]   body_messages", {
+        msgCount: body.messages.length,
+        messages: body.messages.map((m) => {
+            if (m.role === "assistant") {
+                const c = m.content;
+                if (Array.isArray(c)) {
+                    return {
+                        role: "assistant",
+                        blockTypes: c.map((b) => (b as { type?: string }).type ?? "?"),
+                        blockIds: c
+                            .filter((b) => (b as { type?: string }).type === "tool_use")
+                            .map((b) => (b as { id?: string }).id),
+                    };
+                }
+                return { role: "assistant", contentShape: typeof c };
+            }
+            if (m.role === "user") {
+                const c = m.content;
+                if (Array.isArray(c)) {
+                    return {
+                        role: "user",
+                        blockTypes: c.map((b) => (b as { type?: string }).type ?? "?"),
+                        toolUseIds: c
+                            .filter((b) => (b as { type?: string }).type === "tool_result")
+                            .map((b) => (b as { tool_use_id?: string }).tool_use_id),
+                    };
+                }
+                return { role: "user", contentShape: typeof c };
+            }
+            return { role: m.role };
+        }),
+    });
+
     const baseUrl =
         (model.baseUrl ?? "").replace(/\/$/, "") || "https://api.minimaxi.com/anthropic";
     const url = `${baseUrl}/v1/messages`;
