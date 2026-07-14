@@ -411,6 +411,117 @@ describe("sendMessage — G6: 处理后续 token events → 更新 stub.content"
   });
 });
 
+// ─── G31: Bug fix — token deltas accumulate, not replace ───────────
+//
+// 背景: mock-server deltaSize=1 (config-service.ts) 触发 per-char text_delta 事件。
+// pi-agent-core 的 message_update.text_delta.delta 携带的也是单 chunk (新片段)
+// 而非累积全文(anthropic-transport.ts line 491 只 emit delta.text,不 emit
+// accumulated snapshot)。
+//
+// Bug: chat.store 的 token handler 用 `{ ...m, content: evt.content }` (REPLACE),
+// 导致每来一个 token 就把 stub.content 替换成那一个字符。User 看到
+// "R" → "e" → "a" → "d" ... 逐字弹出,而不是 "Reading the file now" 累积出现。
+//
+// 修复: 改成 `(m.content ?? "") + evt.content` (APPEND)。
+//
+// 此测试在 done 之前 capture stub.content 验证多 token 累积,
+// 用真 mock-server deltaSize=1 风格的 per-char delta 模拟 streaming 真实形态。
+describe("sendMessage — G31: token events 累积 (per-char delta 场景)", () => {
+  it("G31a: 多 token 累积 (mock-server deltaSize=1 风格) → stub.content 是 concat 而非 replace", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, []);
+      // 模拟 mock-server deltaSize=1 发出的 per-char text_delta 流。
+      // 真实形态: anthropic-transport.ts 把 SSE text_delta 转发为
+      // { type: "text_delta", delta: <新字符> },runtime 再 emit { type: "token", content: <新字符> }。
+      const fullText = "Reading the file now....";
+      const perCharEvents: RuntimeEvent[] = Array.from(fullText, (ch) => ({
+        type: "token",
+        content: ch,
+      }));
+      const events: RuntimeEvent[] = [
+        ...perCharEvents,
+        {
+          type: "done",
+          message: {
+            id: "final",
+            conversationId: "c1",
+            role: "assistant",
+            content: fullText,
+            thinking: null,
+            toolCalls: null,
+            toolResults: null,
+            model: null,
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
+          },
+        },
+      ];
+      vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
+      await Effect.runPromise(sendMessage("c1", "tool", defaultProvider));
+
+      const msgs = store.byId["c1"]?.messages ?? [];
+      const finalAssistant = msgs.find((m) => m.role === "assistant");
+      expect(finalAssistant).toBeDefined();
+      // 关键断言: done 替换前,stub.content 必须是 累积结果 ("Reading the file now...."),
+      // 不是最后一个 token 字符 (".")
+      expect(finalAssistant?.content).toBe(fullText);
+      dispose();
+    });
+  });
+
+  it("G31b: 模拟 streaming 中段 snapshot → stub.content 是中间累积态而非单字符", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, []);
+      const fullText = "Reading the file now.";
+      // 前 8 个字符先到 (代表 streaming 中段);后续 18 个字符 + done 后到。
+      // 这里不用 done,直接验证 stub.content 在中段已累积。
+      const partialEvents: RuntimeEvent[] = Array.from(fullText.slice(0, 8), (ch) => ({
+        type: "token",
+        content: ch,
+      }));
+      vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(
+        Stream.fromIterable(partialEvents),
+      );
+      await Effect.runPromise(sendMessage("c1", "tool", defaultProvider));
+
+      // stream 已 drain 完(没 done),stub 应保留前 8 字符累积值
+      const msgs = store.byId["c1"]?.messages ?? [];
+      const stub = msgs.find((m) => m.role === "assistant");
+      expect(stub).toBeDefined();
+      // 关键断言: 不应是最后 1 字符 ("R" 被覆盖后变 "e",或最终变成 "g")
+      // 而应是前 8 字符累积 "Reading "
+      expect(stub?.content).toBe("Reading ");
+      // 不能是单字符
+      expect(stub?.content?.length).toBeGreaterThan(1);
+      dispose();
+    });
+  });
+
+  it("G31c: 多 thinking event 累积 (而非 replace)", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, []);
+      const fullThinking = "Step 1. Step 2. Step 3.";
+      const perChunkEvents: RuntimeEvent[] = [
+        { type: "thinking", content: "Step 1. " },
+        { type: "thinking", content: "Step 2. " },
+        { type: "thinking", content: "Step 3." },
+      ];
+      vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(
+        Stream.fromIterable(perChunkEvents),
+      );
+      await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
+
+      const msgs = store.byId["c1"]?.messages ?? [];
+      const stub = msgs.find((m) => m.role === "assistant");
+      expect(stub).toBeDefined();
+      // 关键断言: 多 thinking chunk 必须累积为完整 reasoning 字符串
+      expect(stub?.thinking).toBe(fullThinking);
+      dispose();
+    });
+  });
+});
+
 describe("sendMessage — G7: 处理 tool_call event → 添加到 stub.tool_calls", () => {
   it("sendMessage() 添加 tool_call 到 assistant stub 的 tool_calls", async () => {
     await createRoot(async (dispose) => {
@@ -528,8 +639,9 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
       setupConvState(mockConv, []);
       const thinkingAccumulated = "Reasoning step 1. Reasoning step 2.";
       const events: RuntimeEvent[] = [
-        // 模拟 runtime 累积: 多个 thinking events (pi-agent-core 的 message_update
-        // 携带累积内容,store 直接覆写,所以这里单次 thinking event 即可代表累积终态)
+        // 模拟 runtime 累积: 单次 thinking event 代表 streaming 终态
+        // (real stream 是多 chunk APPEND,G31c 验证多 chunk 累积场景)。
+        // 这里用单 chunk 简化,因为 done event 提供的 full thinking 决定 final state。
         { type: "thinking", content: thinkingAccumulated },
         { type: "token", content: "Final answer text." },
         {

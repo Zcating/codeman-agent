@@ -111,10 +111,15 @@ function handleAssistantMessageEvent(
 ): void {
   match(evt)
     .with({ type: "text_delta" }, ({ delta }) => {
+      // pi-agent-core 0.80.3 message_update.text_delta.delta 是单 chunk（新片段）,
+      // 不是累积全文。anthropic-transport.ts line 491 emit 时也只 emit
+      // delta.text (新片段),snapshot.partial 才是累积态但这里没用。
+      // chat.store.ts token handler 用 `(m.content ?? "") + evt.content` APPEND
+      // 来累积 (G31 fix),所以这里不需要替消费方做"预累积"。
       emit.single({ type: "token", content: delta });
     })
     .with({ type: "thinking_delta" }, ({ delta }) => {
-      // pi-agent-core 的 message_update 携带的是累积内容（同 text branch），非 delta。
+      // 同 text_delta:delta 是单 chunk,chat.store thinking handler APPEND 累积。
       emit.single({ type: "thinking", content: delta });
     })
     .with({ type: "toolcall_end" }, ({ toolCall }) => {
