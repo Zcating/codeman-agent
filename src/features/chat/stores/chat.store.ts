@@ -249,7 +249,9 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
         setConversationsSignal(Object.values(store.byId));
       }
       setStore("byId", convId, "messages", (msgs) =>
-        msgs.map((m) => (m.id === stubId ? { ...m, content: evt.content } : m)),
+        msgs.map((m) =>
+          m.id === stubId ? { ...m, content: (m.content ?? "") + evt.content } : m,
+        ),
       );
       break;
     }
@@ -287,7 +289,9 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
         setConversationsSignal(Object.values(store.byId));
       }
       setStore("byId", convId, "messages", (msgs) =>
-        msgs.map((m) => (m.id === stubId ? { ...m, thinking: evt.content } : m)),
+        msgs.map((m) =>
+          m.id === stubId ? { ...m, thinking: (m.thinking ?? "") + evt.content } : m,
+        ),
       );
       break;
     }
