@@ -51,12 +51,7 @@ ProviderCard 用 [`@tanstack/solid-form`](https://tanstack.com/form/latest) 替�
 import { createForm } from "@tanstack/solid-form";
 import { Schema } from "effect";
 import { effectSchema } from "@/shared/lib/effect-schema-adapter";
-
-const BaseUrlSchema = Schema.String.pipe(
-  Schema.pattern(/^https?:\/\/.+/, {
-    message: "Base URL must start with http:// or https://",
-  } as never),
-);
+import { BaseUrlSchema } from "../lib/schemas";
 
 const form = createForm(() => ({
   defaultValues: {
@@ -193,3 +188,8 @@ it("renders all controls", () => {
 - **Wave 5**（2026-06-14）：lucide-solid 图标替换 4 处
 - **Wave V1.5**（2026-06-15，ADR-0010）：`subsystems/` 合并到 `lib/`；`llm_providers.ts` → `llm-providers.ts`（snake_case → kebab-case）；mockState 唯一源切到`src/__mocks__/`；types 镜像路径从 `shared/types/` 改为 `shared/lib/types.ts`
 - **Wave 2026-07 (Plan C)**：接 `@tanstack/solid-form` 替换 V1.8+ 的 "按键立即写 appStore" 反模式。ProviderCard 重写为 `createForm` + 4 `form.Field`,typing 不写 store (避免 `<For>` remount + DOM 替换 → focus 丢失), commit 在 onBlur / onChange。新增 `src/shared/lib/effect-schema-adapter.ts` (Effect Schema → Standard Schema V1, 5/5 tests)。修复 Base URL / API Key 输入框 typing 后丢失焦点的 bug。
+- **Wave 2026-07 Refactor (Plan C 后)**: provider-card.tsx 收尾
+  - `firstErrorMessage` 从 provider-card.tsx 提到 `src/shared/lib/effect-schema-adapter.ts` (single source of truth)
+  - `BaseUrlSchema` / `ModelSchema` / `ApiKeySchema` 从 provider-card.tsx 提到 `features/settings/lib/schemas.ts` (per src/AGENTS.md 查阅指南: domain config 放 features/settings/lib)
+  - 新增 `withMessage(schema, message)` helper 到 `features/settings/lib/schemas.ts` — 通过 `SchemaAST.MessageAnnotationId` Symbol 直接写 annotation, 消除 `{ message: "..." } as never` cast
+  - adapter 内部: `resolveMessage` 里 `(issue as unknown as { ast }).ast` 改成 `_tag` 判别 narrowing
