@@ -68,3 +68,36 @@ export const SettingsSchema = Schema.Struct({
 });
 
 export type Settings = Schema.Schema.Type<typeof SettingsSchema>;
+
+// ─── Per-field validation schemas (for ProviderCard's @tanstack/solid-form) ─────
+// Originally inline in provider-card.tsx:56-66. Moved here per src/AGENTS.md
+// "domain config (Provider / Settings) 在 features/settings/lib/schemas.ts".
+
+/**
+ * Attach a custom error message to any Schema via the standard message annotation.
+ *
+ * Uses the canonical `.annotations({ message: () => "..." })` method form — this is
+ * the typed-clean way to attach a custom error message to a refinement. Effect's
+ * TS signature requires a function `() => string`, which is also the runtime shape
+ * `SchemaAST.getMessageAnnotation(ast)` expects (per our adapter's `resolveMessage`
+ * which already handles both string and function forms at runtime).
+ *
+ * Replaces the prior `{ message: "..." } as never` cast that hid the type gap.
+ */
+export const withMessage = <A, I, R>(
+  schema: Schema.Schema<A, I, R>,
+  message: string,
+): Schema.Schema<A, I, R> =>
+  schema.annotations({ message: () => message });
+
+export const BaseUrlSchema = withMessage(
+  Schema.String.pipe(Schema.pattern(/^https?:\/\/.+/)),
+  "Base URL must start with http:// or https://",
+);
+
+export const ModelSchema = withMessage(
+  Schema.String.pipe(Schema.minLength(1)),
+  "Model is required",
+);
+
+export const ApiKeySchema = Schema.String; // 不强校验 (mock provider 可空)
