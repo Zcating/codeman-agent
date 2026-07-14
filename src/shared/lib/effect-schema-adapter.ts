@@ -138,35 +138,55 @@ export function firstErrorMessage(errors: ReadonlyArray<unknown>): string | unde
 // ─── Internal: flatten ParseIssue tree into flat StandardSchemaV1Issue[] ───
 
 /**
+ * Evaluate the message annotation result. Effect's runtime accepts both string
+ * and function annotations; the function may return a string or a { message } object.
+ * Returns undefined if the annotation shape is unrecognized.
+ */
+const evalAnnotation = (
+  annotation: unknown,
+  issue: ParseIssue,
+): string | undefined => {
+  if (typeof annotation === "string") return annotation;
+  if (typeof annotation !== "function") return undefined;
+  const result = annotation(issue);
+  if (typeof result === "string") return result;
+  if (typeof result === "object" && result !== null && "message" in result) {
+    const m = (result as { message: unknown }).message;
+    if (typeof m === "string") return m;
+  }
+  return undefined;
+};
+
+const fallbackMessage = (issue: ParseIssue): string =>
+  `Invalid value (${issue._tag})`;
+
+/**
  * Resolve the user-facing message for a ParseIssue.
  *
  * Priority:
  *   1. The AST's `MessageAnnotation` — what the user passed via `{ message: "..." }`
- *      on the schema. Note: the TypeScript type says this is `(issue) => string | ...`,
- *      but Effect's runtime also accepts a plain string and stores it directly under
- *      `ast.annotations[MessageAnnotationId]`. We handle both.
- *   2. The issue's own `message` field (for `Missing` / `Unexpected` / `Forbidden`
- *      nodes that have it directly).
+ *      on the schema. Only Type / Missing / Forbidden carry `.ast`; other leaf
+ *      variants (e.g. Unexpected) use their direct `.message` field instead.
+ *   2. The issue's own `message` field.
  *   3. Fallback: `"Invalid value (${_tag})"`.
  */
 function resolveMessage(issue: ParseIssue): string {
-  // 1. AST annotation (the `{ message: "..." }` users pass on Schema.X).
-  // `issue.ast` exists on every ParseIssue variant but the TS union narrows it away on
-  // Pointer; cast through `unknown` to recover the field.
-  const ast = (issue as unknown as { ast: SchemaAST.Annotated }).ast;
-  const annotation = Option.getOrUndefined(SchemaAST.getMessageAnnotation(ast));
-  if (annotation !== undefined) {
-    // Effect accepts both a function (per type) and a plain string (at runtime).
-    if (typeof annotation === "string") {
-      return annotation;
+  // 1. AST annotation (only for leaf variants that carry .ast).
+  const ast: SchemaAST.AST | undefined = (() => {
+    switch (issue._tag) {
+      case "Type":
+      case "Missing":
+      case "Forbidden":
+        return issue.ast as SchemaAST.AST;
+      default:
+        return undefined;
     }
-    if (typeof annotation === "function") {
-      const result = annotation(issue);
-      if (typeof result === "string") return result;
-      if (typeof result === "object" && result !== null && "message" in result) {
-        const m = (result as { message: unknown }).message;
-        if (typeof m === "string") return m;
-      }
+  })();
+  if (ast !== undefined) {
+    const annotation = Option.getOrUndefined(SchemaAST.getMessageAnnotation(ast));
+    if (annotation !== undefined) {
+      const evaluated = evalAnnotation(annotation, issue);
+      if (evaluated !== undefined) return evaluated;
     }
   }
   // 2. Issue's own message field
@@ -175,7 +195,7 @@ function resolveMessage(issue: ParseIssue): string {
     return direct;
   }
   // 3. Fallback
-  return `Invalid value (${issue._tag})`;
+  return fallbackMessage(issue);
 }
 
 /**
