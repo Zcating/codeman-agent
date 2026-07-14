@@ -107,6 +107,34 @@ export function effectSchema<A, I, R>(
   };
 }
 
+/**
+ * Extract the first user-facing message from a Standard Schema V1 issues array.
+ *
+ * TanStack Form stores field errors as `unknown[]` (the `state.meta.errors` slot).
+ * Our `effectSchema` adapter returns `StandardSchemaV1Issue` (`{ message: string; path? }`)
+ * objects, but raw custom validators may return strings or arbitrary shapes.
+ *
+ * Tolerates:
+ *   - `undefined` / empty array → returns `undefined`
+ *   - plain string error → returns it
+ *   - `{ message: string }` object → returns `.message`
+ *   - anything else (number, null, object without `message`) → returns `undefined`
+ *
+ * @example
+ *   firstErrorMessage([])                          // → undefined
+ *   firstErrorMessage(["too short"])              // → "too short"
+ *   firstErrorMessage([{ message: "bad url" }])   // → "bad url"
+ */
+export function firstErrorMessage(errors: ReadonlyArray<unknown>): string | undefined {
+  const first = errors[0];
+  if (typeof first === "string") return first;
+  if (first && typeof first === "object" && "message" in first) {
+    const m = (first as StandardSchemaV1Issue).message;
+    if (typeof m === "string") return m;
+  }
+  return undefined;
+}
+
 // ─── Internal: flatten ParseIssue tree into flat StandardSchemaV1Issue[] ───
 
 /**

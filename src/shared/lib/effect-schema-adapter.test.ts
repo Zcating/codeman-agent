@@ -1,7 +1,7 @@
 // Smoke test for effect-schema-adapter
 import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
-import { effectSchema } from "./effect-schema-adapter";
+import { effectSchema, firstErrorMessage } from "./effect-schema-adapter";
 
 describe("effectSchema adapter (Standard Schema V1)", () => {
   it("valid value passes", () => {
@@ -59,5 +59,23 @@ describe("effectSchema adapter (Standard Schema V1)", () => {
     expect(v["~standard"].version).toBe(1);
     expect(v["~standard"].vendor).toBe("effect");
     expect(typeof v["~standard"].validate).toBe("function");
+  });
+});
+
+describe("firstErrorMessage", () => {
+  it("returns undefined for empty array", () => {
+    expect(firstErrorMessage([])).toBeUndefined();
+  });
+
+  it("returns plain string error as-is", () => {
+    expect(firstErrorMessage(["too short"])).toBe("too short");
+  });
+
+  it("extracts .message from { message: string } object", () => {
+    expect(firstErrorMessage([{ message: "bad url" }])).toBe("bad url");
+  });
+
+  it("returns undefined for non-string, non-message-object shapes", () => {
+    expect(firstErrorMessage([42, null, { foo: "bar" }])).toBeUndefined();
   });
 });
