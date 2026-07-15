@@ -40,12 +40,21 @@ vi.mock("@ark-ui/solid", async () => {
         </span>
       ),
       Indicator: (props: any) => <span data-part="indicator">{props.children}</span>,
-      Positioner: (props: any) => <div data-part="positioner" style={{ display: mockIsOpen ? "block" : "none" }}>{props.children}</div>,
+      Positioner: (props: any) => (
+        <div
+          data-part="positioner"
+          class={props.class}
+          style={{ display: mockIsOpen ? "block" : "none" }}
+        >
+          {props.children}
+        </div>
+      ),
       Content: (props: any) => (
         <div
           data-testid={props["data-testid"]}
           data-part="content"
           data-state={mockIsOpen ? "open" : "closed"}
+          class={props.class}
         >
           {props.children}
         </div>
@@ -280,5 +289,32 @@ describe("CodemanSelect", () => {
     ));
     // Content exists in DOM (even if not visible due to mockIsOpen=false)
     expect(screen.getByTestId("my-select-content")).toBeInTheDocument();
+  });
+
+  // 11. regression: visual chrome (border / shadow / bg) must live on Content,
+  //     not Positioner. Otherwise Positioner's always-mounted div leaves a ghost
+  //     bordered box on the page when the select is closed.
+  it("places visual chrome on Content, not Positioner (no ghost border when closed)", () => {
+    render(() => (
+      <CodemanSelect
+        options={defaultOptions}
+        value={null}
+        onChange={vi.fn()}
+        placeholder="Select"
+        data-testid="test-select"
+      />
+    ));
+    const positioner = document.querySelector('[data-part="positioner"]') as HTMLElement;
+    const content = document.querySelector('[data-part="content"]') as HTMLElement;
+    expect(positioner).toBeInTheDocument();
+    expect(content).toBeInTheDocument();
+
+    // Positioner is always mounted — it must not carry visual chrome.
+    expect(positioner.className).not.toMatch(/\bborder\b/);
+    expect(positioner.className).not.toMatch(/\bshadow\b/);
+
+    // Content (the part that toggles data-state + hidden) owns the visible chrome.
+    expect(content.className).toMatch(/\bborder\b/);
+    expect(content.className).toMatch(/\bshadow\b/);
   });
 });

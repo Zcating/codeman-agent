@@ -94,10 +94,11 @@ export const CodemanGroupSelect: Component<CodemanGroupSelectProps> = (props) =>
           </Select.Indicator>
         </Select.Trigger>
 
-        <Select.Positioner
-          class="z-50 overflow-hidden rounded-md border border-input bg-background shadow-md"
-        >
-          <Select.Content data-testid={contentTestId} class="max-h-60 overflow-y-auto bg-background">
+        <Select.Positioner class="z-50">
+          <Select.Content
+            data-testid={contentTestId}
+            class="z-50 max-h-60 overflow-hidden overflow-y-auto rounded-md border border-input bg-background shadow-md"
+          >
             <Select.List class="p-1">
               <For each={props.groups}>
                 {(group) => (
