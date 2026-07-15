@@ -23,6 +23,11 @@ export function buildEnabledProviders(
     .map((p) => ({
       id: p.id,
       label: p.label,
-      models: p.llm!.models.map((m) => ({ id: m.id, label: m.label })),
+      models: p.llm!.models.map((m) => ({
+        id: m.id,
+        // Fallback to id when label is missing / empty / whitespace-only.
+        // Otherwise <Select.ItemText> renders an empty span in the dropdown.
+        label: m.label?.trim() || m.id,
+      })),
     }));
 }
