@@ -194,25 +194,9 @@ export function ChatView(props: { convId?: string }) {
           </div>
         </Show>
         <For each={currentMessages()}>{(m) => <MessageBubble message={m} />}</For>
-        <Show
-          when={
-            isRunning() &&
-            currentMessages().length > 0 &&
-            currentMessages()[currentMessages().length - 1]?.content === ""
-          }
-        >
-          <div
-            class="max-w-prose pl-3 border-l-2 border-primary bg-card text-muted-foreground italic flex items-center gap-2"
-            role="status"
-            aria-live="polite"
-            data-testid="thinking-indicator"
-          >
-            <span class="text-primary font-medium" aria-hidden="true">●●●</span>
-            <span>正在思考…</span>
-          </div>
-        </Show>
-        {/* ThinkingPanel 由各 MessageBubble 内的 ThinkingPanel 在文本上方渲染(streaming 时 open,done 后折叠),
-            不在消息列表下方再挂重复 panel。 */}
+        {/* W3.x 移除 thinking-indicator(底部"正在思考…"三点指示器)— WX-OPT-2026-07-16 页面优化。
+            进度反馈现在完全由 assistant bubble 内的正文 Markdown 流式输出承载;
+            ThinkingPanel / ToolCallPanel 默认折叠,仅在用户主动展开时显示。 */}
         <div ref={messagesEndRef} />
       </div>
       <form

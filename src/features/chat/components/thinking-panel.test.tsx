@@ -2,7 +2,7 @@
 //!
 //! 纯 UI,不依赖 chat.store (props 流式),所以无需 mock store。
 //! 契约:
-//!  - <details> 始终 open — thinking 是模型推理过程,常驻显示
+//!  - <details> 始终折叠(默认关闭)— 用户可点 summary 手动展开查看
 //!  - streaming=true → summary "思考中…"
 //!  - streaming=false → summary "已思考"
 //!  - data-testid="thinking-panel" + data-message-id 是稳定锚点
@@ -15,7 +15,7 @@ import { ThinkingPanel } from "./thinking-panel";
 describe("ThinkingPanel", () => {
 	afterEach(() => cleanup());
 
-	it("streaming=true → <details> 默认 open + summary '思考中…'", () => {
+	it("streaming=true → <details> 默认折叠(关闭)+ summary '思考中…'", () => {
 		const { container } = render(() => (
 			<ThinkingPanel
 				thinking="let me think..."
@@ -25,12 +25,12 @@ describe("ThinkingPanel", () => {
 		));
 		const details = container.querySelector("details");
 		expect(details).toBeTruthy();
-		expect(details?.hasAttribute("open")).toBe(true);
+		expect(details?.hasAttribute("open")).toBe(false);
 		const summary = details?.querySelector("summary");
 		expect(summary?.textContent).toContain("思考中…");
 	});
 
-	it("streaming=false → <details> 仍然 open(常驻显示)+ summary '已思考'", () => {
+	it("streaming=false → <details> 仍然折叠 + summary '已思考'", () => {
 		const { container } = render(() => (
 			<ThinkingPanel
 				thinking="decided."
@@ -40,8 +40,8 @@ describe("ThinkingPanel", () => {
 		));
 		const details = container.querySelector("details");
 		expect(details).toBeTruthy();
-		// V3.x 决策:thinking 始终展开,不因 stream 结束而折叠
-		expect(details?.hasAttribute("open")).toBe(true);
+		// 默认折叠:streaming 与否都不展开,用户可手动点开
+		expect(details?.hasAttribute("open")).toBe(false);
 		const summary = details?.querySelector("summary");
 		expect(summary?.textContent).toContain("已思考");
 	});
@@ -75,7 +75,7 @@ describe("ThinkingPanel", () => {
 		));
 		const details = container.querySelector('[data-testid="thinking-panel"]');
 		expect(details).toBeTruthy();
-		expect(details?.hasAttribute("open")).toBe(true);
+		expect(details?.hasAttribute("open")).toBe(false);
 		// 空字符串 <pre> 仍然在 DOM (用户可能后续 streaming 添加内容)
 		const pre = details?.querySelector('[data-testid="thinking-panel-content"]');
 		expect(pre).toBeTruthy();

@@ -493,24 +493,21 @@ describe("ChatView", () => {
     expect((conversationsStoreMock as unknown as { cancel: ReturnType<typeof vi.fn> }).cancel).toHaveBeenCalledWith("conv-1");
   });
 
-  // ─── thinking indicator 测试 ────────────────────────────────────────
-  it("thinking indicator 显示当 streaming + 最后消息 content=''", async () => {
+  // ─── thinking indicator 测试 (W3.x 已移除 — WX-OPT-2026-07-16 页面优化) ──────
+  it("thinking indicator 已移除 — streaming + 空内容场景不再渲染", async () => {
     const conversationsStoreMock = await import("../stores/chat.store");
     const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null; messages: Message[] }> } }).store;
     // Reset streaming state first, then set fresh
     mockStore.byId["conv-1"].streamingMessageId = null;
     mockStore.byId["conv-1"].streamingMessageId = "msg-streaming";
-    // Set last message content to empty string for thinking indicator condition
+    // Set last message content to empty string (原 thinking indicator 触发条件)
     mockStore.byId["conv-1"].messages[mockStore.byId["conv-1"].messages.length - 1].content = "";
     const { container } = render(() => <ChatView convId="conv-1" />);
     const indicator = container.querySelector('[data-testid="thinking-indicator"]');
-    expect(indicator).toBeTruthy();
-    expect(indicator?.getAttribute("role")).toBe("status");
-    expect(indicator?.getAttribute("aria-live")).toBe("polite");
-    expect(indicator?.textContent).toContain("正在思考…");
+    expect(indicator).toBeNull();
   });
 
-  it("thinking indicator 不显示 non-streaming", async () => {
+  it("thinking indicator 已移除 — non-streaming 也不渲染", async () => {
     const conversationsStoreMock = await import("../stores/chat.store");
     // Ensure store state is clean
     const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null }> } }).store;

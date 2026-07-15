@@ -6,6 +6,13 @@
 //! bubble div,而不是把 tool calls 委托给独立的 ToolCallsPanel 挂在下面。
 //! 这样 thinking 与 tool execution 的相对顺序在视觉上跟 LLM 输出顺序一致。
 //! Polish C2/C6: 走 shadcn 语义 token,system 消息改用 lab-warning。
+//!
+//! W3.x (WX-OPT-2026-07-16 页面优化):assistant bubble 走 `w-full`(去 `max-w-prose`
+//! 卡片宽度限制),去 `rounded-lg` / `bg-card` / `border border-border`(无卡片
+//! 背景)。assistant 视觉与右侧 user bubble 的 `bg-primary` 卡片形成 "流式文档 +
+//! 消息气泡" 的对照 user bubble 保持 V2 卡片样式不动(右侧 primary 色卡片),保留
+//! 对话方向感契约。bubble 内嵌 ThinkingPanel / ToolCallPanel 默认折叠(见各自
+//! module doc)。
 
 import { Show, For, createMemo } from "solid-js";
 import { marked } from "marked";
@@ -50,7 +57,7 @@ function pairToolCalls(message: Message): Array<{ toolCall: ToolCall; result: To
 export function MessageBubble(props: { message: Message }) {
   const role = () => props.message.role;
 
-  // 该 message 是否还在 streaming (用于 ThinkingPanel 默认展开 + 决定是否走 stream render)
+  // 该 message 是否还在 streaming (用于 ThinkingPanel summary 文案"思考中…"vs"已思考"区分)
   const isStreaming = createMemo(() => {
     const cs = store.byId[props.message.conversationId];
     return cs?.streamingMessageId === props.message.id;
@@ -71,13 +78,15 @@ export function MessageBubble(props: { message: Message }) {
       <Show when={role() === "assistant"}>
         {/* V3: 单个 bubble div 包住 thinking + tool calls + markdown。
             之前这里写的是 sibling div + ToolCallsPanel,在 flex 父容器里两个 flex item
-            会 side-by-side 排列 — 视觉 broken。 */}
+            会 side-by-side 排列 — 视觉 broken。
+            W3.x: w-full 去 max-w-prose 宽度限制 + 去 rounded-lg/bg-card/border 卡片样式,
+            左侧 assistant 流式全宽,见 module doc 顶部 W3.x 段。 */}
         <div
-          class="max-w-prose p-3 rounded-lg leading-relaxed break-words bg-card text-card-foreground border border-border space-y-2"
+          class="w-full p-3 leading-relaxed break-words text-foreground space-y-2"
           data-testid="agent-bubble"
         >
           {/* 1. 思考过程 (仅 assistant + 非空) — ThinkingPanel 是可折叠 details,
-              done 后默认收起(streaming=false),用户可点 summary 手动展开 */}
+              默认折叠(streaming 与否都收起),用户可点 summary 手动展开 */}
           <Show when={hasThinking()}>
             <ThinkingPanel
               thinking={props.message.thinking ?? ""}
@@ -87,7 +96,7 @@ export function MessageBubble(props: { message: Message }) {
           </Show>
 
           {/* 2. 工具调用 (顺序:跟 LLM 决策顺序一致) — ToolCallPanel 是 details 容器,
-              默认展开让用户看到 result,summary 行可点击收起 */}
+              默认折叠,summary 行携带工具名 + status,需要看 args/result 才点开 */}
           <Show when={hasTools()}>
             <div class="space-y-1.5" data-testid="inline-tool-calls">
               <For each={pairedTools()}>

@@ -1,13 +1,14 @@
-//! ToolCallPanel — assistant message 内 tool call 展示块(可折叠 details,默认展开)。
+//! ToolCallPanel — assistant message 内 tool call 展示块(可折叠 details,默认折叠)。
 //!
 //! V3.x 决策:tool call 渲染从 MessageBubble 内 inline ToolCallCard 抽出到独立
 //! ToolCallPanel 组件。理由跟 ThinkingPanel 平行:
-//!  - 长 args / result 文本可被折叠,默认展开方便扫读,用户可手动收起
+//!  - 长 args / result 文本可被折叠,需要时手动展开
 //!  - 独立组件便于 unit test,不被 message-bubble 的 render tree 污染
 //!  - summary 行携带工具名 + 状态(running / done / error),不用展开 details
 //!    也能识别是哪个工具
 //!
-//! 默认 `open=true`:tool call 的 result 是用户期待看到的核心内容,不该默认隐藏。
+//! 默认折叠(本页"页面优化"诉求 — WX-OPT-2026-07-16):tool call 默认收起,
+//! summary 行就足够扫读多轮调用的上下文;需要看具体 args/result 才点开。
 //! 由 MessageBubble 在 inline-tool-calls 容器内逐条渲染,data-tool-call-id 锚定。
 
 import { Wrench } from "lucide-solid";
@@ -38,7 +39,6 @@ export function ToolCallPanel(props: ToolCallPanelProps) {
 			data-testid="tool-call-panel"
 			data-message-id={props.messageId}
 			data-tool-call-id={props.toolCall.id}
-			open
 		>
 			<summary class="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground select-none">
 				<Wrench class="h-3.5 w-3.5" aria-hidden="true" />
