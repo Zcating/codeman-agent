@@ -42,19 +42,32 @@ function ProviderSelect() {
     if (!provider) {
       return enabledProviders()[0]?.models[0]?.id ?? null;
     }
-    return provider.models[0]?.id ?? null;
+    // Look up the raw provider to read llm.defaultModel (EnabledProvider has no llm field)
+    const rawProvider = (appStore.state.value.providers ?? []).find((p) => p.id === providerId);
+    const defaultModel = rawProvider?.llm?.defaultModel;
+    const modelValid = defaultModel && provider.models.some((m) => m.id === defaultModel);
+    return modelValid ? defaultModel : provider.models[0]?.id ?? null;
   };
 
   const handleChange = (modelId: string) => {
     if (!modelId) {
       return;
     }
-    // Find provider that contains this model and update default_llm_provider_id
+    // Find provider that contains this model
     const provider = enabledProviders().find((p) =>
       p.models.some((m) => m.id === modelId)
     );
     if (provider) {
-      appStore.set({ defaultLlmProviderId: provider.id });
+      // Update providers immutably: set this provider's llm.defaultModel to modelId
+      const updatedProviders = (appStore.state.value.providers ?? []).map((p) =>
+        p.id === provider.id
+          ? { ...p, llm: { ...p.llm, defaultModel: modelId } }
+          : p
+      );
+      appStore.set({
+        defaultLlmProviderId: provider.id,
+        providers: updatedProviders,
+      });
       settingsSaver.scheduleSave();
     }
   };
