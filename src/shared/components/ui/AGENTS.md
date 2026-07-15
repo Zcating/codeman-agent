@@ -13,6 +13,22 @@
 | Checkbox | `checkbox.tsx` | 受控勾选（native `<input type="checkbox">`） | cn（条件 class）           |
 | Card     | `card.tsx`     | 信息容器                                     | 7 静态子件（cn，不走 cva） |
 
+## 边界 — 为什么不放 codeman-* 在这里
+
+`ui/` 只放纯 design system atom（不引入 @ark-ui/solid、不组合其他 atom、可独立搬到其它项目）。
+需要引入 @ark-ui/solid 或组合 ui/ 多个 atom 的 wrapper（例如 CodemanInput / CodemanSelect）一律归 `internal/`。
+详见 `src/shared/AGENTS.md` 中 `components/ui/` vs `components/internal/` 章节 + ADR-0023 D4-N。
+
+## New `Input` / `Textarea` (low-level atom) 的正确使用
+
+`Input` / `Textarea` 是纯 cn (clsx + tailwind-merge) 排版包装,**不内置 IME 安全、label/error 语义**。
+绝大多数场景应改用 `internal/codeman-input.tsx` (`CodemanInput`) 或 `internal/codeman-textarea.tsx` (`CodemanTextarea`),
+那两者内部 USE 本 atom 但额外负责 IME-safe onChange + label/helperText/error 包装 + `aria-invalid`。
+
+> ⚠️ 直接用 `Input` / `Textarea` 写 `<Input value={x()} onInput={(e) => setX(e.currentTarget.value)} />`
+> 在中文/日文 IME 用户输入时会反复触发响应绑定把 `el.value` 重写,打断 IME 内部状态机,表现为"逐字母失焦"。
+> 受控模式 + 拼写/东亚语言 IME = 必须走 CodemanInput / CodemanTextarea。
+
 ## Button 变体表（cva）
 
 变体（variant）：

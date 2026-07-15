@@ -19,8 +19,9 @@ import { Effect, Exit } from "effect";
 import { useNavigate } from "@tanstack/solid-router";
 import { appStore } from "../../../shared/stores/app.store";
 import { Button } from "../../../shared/components/ui/button";
-import { CodemanSelect } from "../../../shared/components/ui/codeman-select";
-import { CodemanGroupSelect } from "../../../shared/components/ui/codeman-group-select";
+import { CodemanSelect } from "../../../shared/components/internal/codeman-select";
+import { CodemanGroupSelect } from "../../../shared/components/internal/codeman-group-select";
+import { CodemanTextarea } from "../../../shared/components/internal/codeman-textarea";
 import {
   workspaces$,
   selectedWorkspaceId$,
@@ -166,13 +167,14 @@ export function HomeAgentForm(): JSX.Element {
           <label for="codex-input" class="sr-only">
             发条消息
           </label>
-          <textarea
+          <CodemanTextarea
             ref={textareaRef}
             id="codex-input"
             data-testid="codex-input"
+            class="w-full"
             rows={3}
             value={input()}
-            onInput={(e) => setInput(e.currentTarget.value)}
+            onValueChange={setInput}
             onKeyDown={(e) => {
               if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
                 e.preventDefault();
@@ -200,7 +202,6 @@ export function HomeAgentForm(): JSX.Element {
                   ? "Select a workspace above"
                   : "发条消息…"
             }
-            class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
           />
 
           {/* Row: workspace picker + LLM picker (D6-H4) */}

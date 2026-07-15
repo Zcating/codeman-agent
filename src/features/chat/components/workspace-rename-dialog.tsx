@@ -5,6 +5,7 @@
 
 import { createSignal } from "solid-js";
 import { Dialog } from "../../../shared/components/internal/codeman-dialog";
+import { CodemanInput } from "../../../shared/components/internal/codeman-input";
 
 export function showRenameDialog(label: string): Promise<string | null> {
   return Dialog.show<string | null>((resolve) => {
@@ -12,11 +13,10 @@ export function showRenameDialog(label: string): Promise<string | null> {
 
     return (
       <div class="space-y-4 p-4" data-testid="rename-dialog">
-        <label class="text-sm font-medium">Workspace name</label>
-        <input
-          class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+        <CodemanInput
+          label="Workspace name"
           value={value()}
-          onInput={(e) => setValue(e.currentTarget.value)}
+          onValueChange={setValue}
           autofocus
           data-testid="rename-input"
         />

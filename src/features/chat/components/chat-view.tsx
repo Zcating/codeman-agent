@@ -10,12 +10,12 @@ import { MessageBubble } from "./message-bubble";
 import { store, sendMessage, cancel } from "../stores/chat.store";
 import type { ProviderConfig } from "../lib/runtime";
 import { Button } from "../../../shared/components/ui/button";
-import { Textarea } from "../../../shared/components/ui/textarea";
+import { CodemanTextarea } from "../../../shared/components/internal/codeman-textarea";
 import { startThemeSync } from "../../../shared/stores/theme";
 import { appStore } from "../../../shared/stores/app.store";
 import { settingsSaver } from "../../settings/lib/settings-saver";
 import { buildEnabledProviders } from "../lib/build-enabled-providers";
-import { CodemanGroupSelect } from "../../../shared/components/ui/codeman-group-select";
+import { CodemanGroupSelect } from "../../../shared/components/internal/codeman-group-select";
 import {
   handleArrowUp,
   handleArrowDown,
@@ -212,12 +212,12 @@ export function ChatView(props: { convId?: string }) {
         <label for="chat-input" class="sr-only">
           发条消息
         </label>
-        <Textarea
+        <CodemanTextarea
           id="chat-input"
           class="w-full"
           rows={3}
           value={input()}
-          onInput={(e) => setInput(e.currentTarget.value)}
+          onValueChange={setInput}
           onKeyDown={(e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
               e.preventDefault();

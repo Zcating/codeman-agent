@@ -94,6 +94,7 @@ import { ProviderCard } from "./provider-card";
 
 // We need to access the mock internals - import the module to get the exposed functions
 import * as appStoreMock from "../../../shared/stores/app.store";
+import { _resetSettingsSaverForTest } from "../lib/settings-saver";
 
 // 鈹€鈹€鈹€ Helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
@@ -116,6 +117,11 @@ describe("ProviderCard", () => {
 
   afterEach(() => {
     cleanup();
+    // 2026-07 form pattern: settingsSaver.flushNow() is async; cancel the pending
+    // debounce to prevent the timer from firing after test teardown (when the
+    // Effect runtime is already disposed → "Cannot read properties of undefined
+    // (reading '_op')" unhandled rejection).
+    _resetSettingsSaverForTest();
   });
 
   // 鈹€鈹€ Test 1: renders 1 card with provider label 鈹€鈹€
@@ -237,7 +243,7 @@ describe("ProviderCard", () => {
   });
 
   // 鈹€鈹€ Test 8: API Key input onInput calls appStore.set 鈹€鈹€
-  it("API Key input onInput calls appStore.set with updated api_key", async () => {
+  it("API Key input onBlur commits to appStore with updated api_key (2026-07 form pattern)", async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(() => <ProviderCard provider={mockProvider} onUpdate={onUpdate} onDelete={vi.fn()} />);
@@ -249,6 +255,8 @@ describe("ProviderCard", () => {
     const llmApiKeyInput = apiKeyInputs[0] as HTMLInputElement;
     await user.clear(llmApiKeyInput);
     await user.type(llmApiKeyInput, "new-secret-key");
+    // 2026-07 fix: typing 不再立即写 store;commit 在 onBlur 触发 form.handleSubmit()
+    await user.tab(); // 触发 blur
 
     const lastSet = getLastSetCall();
     expect(lastSet).toBeTruthy();
@@ -268,8 +276,8 @@ describe("ProviderCard", () => {
     expect(saveButtons.length).toBe(0);
   });
 
-  // ── Test 10: Base URL input triggers handleBaseUrlChange ──
-  it("Base URL input triggers handleBaseUrlChange and updates state", async () => {
+  // ── Test 10: Base URL input commits on blur (2026-07 form pattern) ──
+  it("Base URL input commits on blur and updates state (regression 2026-07: typing no longer writes store)", async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(() => <ProviderCard provider={mockProvider} onUpdate={onUpdate} onDelete={vi.fn()} />);
@@ -282,6 +290,8 @@ describe("ProviderCard", () => {
 
     await user.clear(baseUrlInput);
     await user.type(baseUrlInput, "https://api.example.com/v1");
+    // 2026-07 fix: typing 不再立即写 store;commit 在 onBlur 触发 form.handleSubmit()
+    await user.tab(); // 触发 blur
 
     const lastSet = getLastSetCall();
     expect(lastSet).toBeTruthy();
@@ -295,6 +305,49 @@ describe("ProviderCard", () => {
         llm: expect.objectContaining({ baseUrl: "https://api.example.com/v1" }),
       }),
     );
+  });
+
+  // ── Test 10b (regression 2026-07): typing in Base URL preserves focus + value ──
+  it("typing in Base URL input preserves focus (regression: <For> remount on each keystroke)", async () => {
+    const user = userEvent.setup();
+    render(() => <ProviderCard provider={mockProvider} onUpdate={vi.fn()} onDelete={vi.fn()} />);
+
+    const textInputs = document.querySelectorAll('input[type="text"]');
+    const baseUrlInput = textInputs[0] as HTMLInputElement;
+    expect(baseUrlInput).toBeTruthy();
+
+    // Focus + clear first (mockProvider.baseUrl is non-empty)
+    baseUrlInput.focus();
+    await user.clear(baseUrlInput);
+    expect(document.activeElement).toBe(baseUrlInput);
+
+    // Type multiple characters — pre-fix, the input element was replaced on each
+    // keystroke (Solid <For> + array.map() reference-equal unmount), causing focus loss.
+    await user.type(baseUrlInput, "abcdef");
+
+    // After typing 6 characters, input should still be focused AND have the typed value.
+    expect(document.activeElement).toBe(baseUrlInput);
+    expect(baseUrlInput.value).toBe("abcdef");
+  });
+
+  // ── Test 10c (regression 2026-07): Base URL pattern validation on blur ──
+  it("Base URL input shows validation error on blur when invalid (no http:// prefix)", async () => {
+    const user = userEvent.setup();
+    render(() => <ProviderCard provider={mockProvider} onUpdate={vi.fn()} onDelete={vi.fn()} />);
+
+    const textInputs = document.querySelectorAll('input[type="text"]');
+    const baseUrlInput = textInputs[0] as HTMLInputElement;
+
+    await user.clear(baseUrlInput);
+    await user.type(baseUrlInput, "not-a-url");
+    await user.tab(); // 触发 onBlur validator
+
+    // Validation error should be displayed
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Base URL must start with http/i),
+      ).toBeInTheDocument();
+    });
   });
 
   // ── Test 11: delete confirm=false 时不调 deleteProvider ──

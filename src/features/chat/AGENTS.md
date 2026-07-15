@@ -123,7 +123,7 @@ ChatView 顶部 "← 返回首页" 按钮调 `navigate({ to: "/" })` 并清空 `
 V1.x 起 ChatView 在 textarea 下方（form 第二行）渲染一个 `<select id="provider-select">`，让用户在不进 Settings 的情况下切换活跃 LLM provider。
 
 **数据源**：`appStore.state.value.providers[]`（V1.5 unified schema, ADR-0012 + ADR-0015）。
-`ProviderSelect` 现在用 `codeman-group-select` 包装（`shared/components/ui/codeman-group-select.tsx`），按 provider 分组渲染（ItemGroup + ItemGroupLabel）；enabled + llm filter 由 `buildEnabledProviders` 提取（`src/features/chat/lib/build-enabled-providers.ts`）；组件位于 `chat-view.tsx` 内作为本地子组件。
+`ProviderSelect` 现在用 `codeman-group-select` 包装（`shared/components/internal/codeman-group-select.tsx`，@ark-ui/solid Select 包装），按 provider 分组渲染（ItemGroup + ItemGroupLabel）；enabled + llm filter 由 `buildEnabledProviders` 提取（`src/features/chat/lib/build-enabled-providers.ts`）；组件位于 `chat-view.tsx` 内作为本地子组件。
 billing-only / disabled / 无 llm 的 provider 不显示。
 
 **写路径**：
@@ -186,7 +186,8 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 - **File tools**：`src/features/file-tools/lib/file-tools.ts` 导出 `fileTools`（5 个：read / write / edit / search / delete），本 feature `lib/runtime.ts` 注册到 `Agent`。
 - **跨域类型**：从 `src/shared/lib/types.ts` 导入（ADR-0010 后从 `shared/types/` 迁）。
 - **跨域 IPC**：从 `src/shared/lib/ipc.ts` 导入 Service Tags。
-- **`codeman-select` / `codeman-group-select` wrappers from `shared/components/ui/`** — used by HomeAgentForm (workspace picker) + chat-view ProviderSelect (provider picker)
+- **`codeman-select` / `codeman-group-select` wrappers from `shared/components/internal/`** (2026-07 起从 `ui/` 迁出, 因为引入 @ark-ui/solid 不属于纯 design system atom) — used by HomeAgentForm (workspace picker) + chat-view ProviderSelect (provider picker)
+- **`codeman-textarea` from `shared/components/internal/`** — used by HomeAgentForm + ChatView 的 chat input。内部 USE `ui/Textarea` atom + IME-safe onValueChange (中文拼音 composition 安全)。
 
 ## Wave 笔记
 

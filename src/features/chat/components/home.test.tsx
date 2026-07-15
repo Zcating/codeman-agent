@@ -783,4 +783,32 @@ describe("HomeAgentForm — Ctrl+Enter / Cmd+Enter send shortcut (T4.3)", () => 
     expect(createConversation).not.toHaveBeenCalled();
     expect(sendMessage).not.toHaveBeenCalled();
   });
+
+  // ─── IME 兼容性 (Regression: 与 chat-view.tsx 同一根因) ────────────────
+  it("T4.4.1: 中文 IME composition 期间 onInput 不写 signal — send 按钮保持 disabled", () => {
+    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockSelectedWsId = "ws-1";
+
+    const { container } = render(() => <HomeAgentForm />);
+    const textarea = container.querySelector("[data-testid='codex-input']") as HTMLTextAreaElement;
+    const sendButton = container.querySelector("[data-testid='codex-send']") as HTMLButtonElement;
+
+    expect(sendButton.disabled).toBe(true);
+
+    // 模拟拼音 IME 输入 "ni" → "你":composition 内 setInput 不应触发,
+    // 避免 value={input()} 响应绑定中断 IME composition 状态。
+    fireEvent(textarea, new Event("compositionstart", { bubbles: true }));
+    fireEvent.input(textarea, { target: { value: "n" } });
+    fireEvent.input(textarea, { target: { value: "ni" } });
+    fireEvent.input(textarea, { target: { value: "你" } });
+
+    // Composition 期间 send 应保持 disabled
+    expect(sendButton.disabled).toBe(true);
+
+    // Composition 结束 — signal 一次性同步
+    fireEvent(textarea, new Event("compositionend", { bubbles: true }));
+    fireEvent.input(textarea, { target: { value: "你" } });
+
+    expect(sendButton.disabled).toBe(false);
+  });
 });

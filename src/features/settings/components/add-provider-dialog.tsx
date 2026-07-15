@@ -16,7 +16,7 @@ import {
   DialogFooter,
 } from "../../../shared/components/ui/dialog";
 import { Button } from "../../../shared/components/ui/button";
-import { Input } from "../../../shared/components/ui/input";
+import { CodemanInput } from "../../../shared/components/internal/codeman-input";
 import { Checkbox } from "../../../shared/components/ui/checkbox";
 import { Dialog } from "../../../shared/components/internal/codeman-dialog";
 import type { Provider } from "../../../shared/lib/types";
@@ -96,16 +96,33 @@ export function createProviderFormDialog(): Promise<Provider | null> {
         {/* Fields */}
         <div class="flex flex-col gap-3 mt-4">
           <div><label class="text-xs text-muted-foreground">Label</label>
-            <Input data-testid="provider-field-label" value={label()} onInput={(e) => setLabel(e.currentTarget.value)} />
+            <CodemanInput
+              data-testid="provider-field-label"
+              value={label()}
+              onValueChange={setLabel}
+            />
           </div>
           <div><label class="text-xs text-muted-foreground">Base URL</label>
-            <Input data-testid="provider-field-base-url" value={baseUrl()} onInput={(e) => setBaseUrl(e.currentTarget.value)} />
+            <CodemanInput
+              data-testid="provider-field-base-url"
+              value={baseUrl()}
+              onValueChange={setBaseUrl}
+            />
           </div>
           <div><label class="text-xs text-muted-foreground">Default model</label>
-            <Input data-testid="provider-field-default-model" value={defaultModel()} onInput={(e) => setDefaultModel(e.currentTarget.value)} />
+            <CodemanInput
+              data-testid="provider-field-default-model"
+              value={defaultModel()}
+              onValueChange={setDefaultModel}
+            />
           </div>
           <div><label class="text-xs text-muted-foreground">API key</label>
-            <Input type="password" data-testid="provider-field-api-key" value={apiKey()} onInput={(e) => setApiKey(e.currentTarget.value)} />
+            <CodemanInput
+              type="password"
+              data-testid="provider-field-api-key"
+              value={apiKey()}
+              onValueChange={setApiKey}
+            />
           </div>
           <label class="flex items-center gap-2 text-sm">
             <Checkbox checked={enabled()} onChange={(e) => setEnabled(e.currentTarget.checked)} />
