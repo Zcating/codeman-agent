@@ -650,8 +650,18 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
     expect(model2Option).toBeTruthy();
     fireEvent.click(model2Option);
 
-    // Should set defaultLlmProviderId to provider-2 (which has model-2)
-    expect(appStore.set).toHaveBeenCalledWith({ defaultLlmProviderId: "provider-2" });
+    // Should set defaultLlmProviderId + providers (immutable update with updated llm.defaultModel)
+    expect(appStore.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultLlmProviderId: "provider-2",
+        providers: expect.arrayContaining([
+          expect.objectContaining({
+            id: "provider-2",
+            llm: expect.objectContaining({ defaultModel: "model-2" }),
+          }),
+        ]),
+      }),
+    );
     expect(settingsSaver.scheduleSave).toHaveBeenCalledTimes(1);
   });
 
@@ -670,6 +680,59 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
     // First provider minimax → model "MiniMax-M2.5-highspeed"
     const modelOption = document.querySelector('li[data-value="MiniMax-M2.5-highspeed"]');
     expect(modelOption).toBeTruthy();
+  });
+
+  // ─── Regression: 同 provider 非首项模型回写 ─────────────────────────────
+  it("T4.2.9: LLM picker 点击同 provider 非首项模型 → 写 provider.llm.defaultModel + defaultLlmProviderId", async () => {
+    const { appStore } = await import("../../../shared/stores/app.store");
+    const { settingsSaver } = await import("../../settings/lib/settings-saver");
+    // 单个 provider，2 个模型，默认选第一个
+    appStore.state.value.providers = [
+      {
+        id: "provider-multi",
+        label: "MultiModel Provider",
+        apiKey: "key-multi",
+        enabled: true,
+        llm: {
+          defaultModel: "model-first",
+          baseUrl: "https://api.multi.com",
+          apiType: "anthropic-messages" as const,
+          modelsEndpoint: "https://api.multi.com/models",
+          models: [
+            { id: "model-first", label: "Model First", contextWindow: 100000, deprecated: false, thinking: false },
+            { id: "model-second", label: "Model Second", contextWindow: 200000, deprecated: false, thinking: false },
+          ],
+        },
+      },
+    ];
+    mockDefaultLlmProvider.id = "provider-multi";
+
+    const { getByTestId } = render(() => <HomeAgentForm />);
+
+    // Open LLM picker and click the second model (non-first item)
+    const llmPickerTrigger = getByTestId("llm-picker-trigger");
+    fireEvent.click(llmPickerTrigger);
+
+    const secondModelOption = document.querySelector('li[data-value="model-second"]') as HTMLElement;
+    expect(secondModelOption).toBeTruthy();
+    fireEvent.click(secondModelOption);
+
+    // scheduleSave should be called
+    expect(settingsSaver.scheduleSave).toHaveBeenCalledTimes(1);
+
+    // appStore.set must be called with updated providers (immutable update) and defaultLlmProviderId
+    expect(appStore.set).toHaveBeenCalledTimes(1);
+    expect(appStore.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultLlmProviderId: "provider-multi",
+        providers: expect.arrayContaining([
+          expect.objectContaining({
+            id: "provider-multi",
+            llm: expect.objectContaining({ defaultModel: "model-second" }),
+          }),
+        ]),
+      }),
+    );
   });
 });
 
