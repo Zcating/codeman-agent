@@ -23,6 +23,7 @@ import type {
   ModelMeta,
   FileMatch,
 } from "./types";
+import { parseModelsApiResponse } from "./parse-models-api-response";
 
 /** Tauri-Electron IPC error - distinct from AppError for service-specific error handling */
 export interface TauriError {
@@ -375,6 +376,9 @@ export const ProviderServiceLive = Layer.effect(
             );
           }
           const apiKey = provider.apiKey;
+          // fetch + JSON parse happens in the Effect body; the unknown-shape
+          // response is normalized via parseModelsApiResponse (handles both
+          // OpenAI `{ id, name? }` and MiniMax `{ id }`-only shapes).
           const response = yield* Effect.tryPromise({
             try: async () => {
               const res = await fetch(modelsEndpoint, {
@@ -386,19 +390,11 @@ export const ProviderServiceLive = Layer.effect(
               if (!res.ok) {
                 throw new Error(`HTTP ${res.status}: ${await res.text()}`);
               }
-              return res.json() as Promise<{
-                data: Array<{ id: string; name: string; context_window?: number }>;
-              }>;
+              return res.json();
             },
             catch: (e) => TauriError.IPC(`fetchModels failed: ${String(e)}`),
           });
-          return response.data.map((m) => ({
-            id: m.id,
-            label: m.name,
-            contextWindow: m.context_window,
-            deprecated: false,
-            thinking: false,
-          }));
+          return parseModelsApiResponse(response);
         }),
 
       delete: (id) =>
