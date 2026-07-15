@@ -7,6 +7,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
+import type { ConversationState } from "../stores/chat.store";
+import type { Workspace } from "../../../shared/lib/types";
 
 // ─── Mock @tanstack/solid-router ──────────────────────────────────────────
 
@@ -408,6 +410,64 @@ describe("ChatLayout", () => {
 
     await vi.waitFor(() => {
       expect(removeWorkspace).toHaveBeenCalledWith("ws-1");
+    });
+  });
+
+  // ─── 回归测试：删除当前 conversation 所属 workspace 成功后跳转首页 ───────
+
+  it("删除当前conversation所属workspace成功 → 跳转首页（回归）", async () => {
+    // vi.mock replaces the module; TypeScript sees the real module type but the mock
+    // returns void and uses snake_case vs the real type's camelCase. Using
+    // `as unknown as` (not `as any`) preserves type safety for derived variables
+    // — the target type propagates to all downstream uses.
+    // ReturnType captures the mock's callable + .mockReturnValue method signature.
+    const typedStore = await import("../stores/chat.store") as unknown as {
+      workspaces$: ReturnType<typeof vi.fn<() => Workspace[]>>;
+      removeWorkspace: ReturnType<typeof vi.fn<(id: string) => { pipe: () => unknown }>>;
+      store: { byId: Record<string, ConversationState> };
+    };
+    const { workspaces$, removeWorkspace, store } = typedStore;
+    const effect = await vi.importActual<typeof import("effect")>("effect");
+
+    workspaces$.mockReturnValue([
+      { id: "ws-1", label: "My Project", rootPath: "C:\\projects", createdAt: Date.now() / 1000 },
+    ]);
+
+    // 注入 conversation fixture：conv-1 属于 ws-1
+    // AgentRuntime.run returns Stream.Stream; we provide a minimal mock with pipe and iterator.
+    const mockStream = {
+      pipe: () => mockStream,
+      [Symbol.iterator]: () => ({ next: () => ({ done: true, value: undefined }) }),
+    };
+    store.byId = {
+      "conv-1": {
+        id: "conv-1",
+        title: "Test Chat",
+        systemPrompt: null,
+        workspaceId: "ws-1",
+        createdAt: Date.now() / 1000,
+        updatedAt: Date.now() / 1000,
+        archivedAt: null,
+        messages: [],
+        streamingMessageId: null,
+        lastError: null,
+        runtime: {
+          run: () => mockStream as unknown as import("effect").Stream.Stream<import("../lib/runtime").RuntimeEvent, never, never>,
+          cancel: () => {},
+        },
+      },
+    };
+
+    // 当前 URL 为 /conversation/conv-1
+    mockUseParams.mockReturnValue(() => ({ convId: "conv-1" }));
+    mockDialogConfirm.mockResolvedValue(true);
+    removeWorkspace.mockReturnValue(effect.Effect.succeed(undefined));
+
+    const { getByTestId } = render(() => <ChatLayout />);
+    getByTestId("sidebar-delete-ws-1").click();
+
+    await vi.waitFor(() => {
+      expect(mockUseNavigate).toHaveBeenCalledWith({ to: "/" });
     });
   });
 });
