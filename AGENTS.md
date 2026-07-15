@@ -162,3 +162,8 @@ vp run e2e               # Playwright + 真 Electron 端到端 (本地)
 ## 语言
 
 使用中文（Chinese）处理用户的回答。
+
+## Git
+
+- 提交禁止 --no-verify
+- merge主分支时，必须 --no-ff
