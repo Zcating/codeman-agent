@@ -110,6 +110,13 @@ export function ChatLayout(): JSX.Element {
     const exit = await Effect.runPromiseExit(removeWorkspace(workspaceId));
     if (Exit.isFailure(exit)) {
         logger.error("[chat-layout] delete failed:", exit.cause);
+        return;
+    }
+
+    // 删除成功后，如果当前 URL 的 conversation 属于被删除的 workspace，跳转首页
+    const currentConvId = selectedItemId();
+    if (currentConvId && store.byId[currentConvId]?.workspaceId === workspaceId) {
+      navigate({ to: "/" });
     }
   };
 
