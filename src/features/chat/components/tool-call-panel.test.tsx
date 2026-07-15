@@ -2,7 +2,7 @@
 //!
 //! 纯 UI,不依赖 chat.store (props 流式)。
 //! 契约:
-//!  - 始终 <details open> — tool result 是核心内容,不该默认隐藏
+//!  - 默认 <details> 折叠(关闭)— 用户可点 summary 手动展开查看 args/result
 //!  - summary 反映 status:running → "正在调用工具…",success → "已调用工具",error → "工具调用失败"
 //!  - data-testid="tool-call-panel" + data-message-id + data-tool-call-id 是稳定锚点
 //!  - 内嵌 ToolCallCard 渲染 args + result(由 mock 验证)
@@ -36,14 +36,14 @@ describe("ToolCallPanel", () => {
 		args: { path: "/tmp/x.txt" },
 	};
 
-	it("默认 <details open> — tool result 是核心内容,不该默认隐藏", () => {
+	it("默认 <details> 折叠(关闭) — 用户可点 summary 手动展开", () => {
 		const { container } = render(() => (
 			<ToolCallPanel toolCall={toolCall} messageId="msg-1" />
 		));
 		const panel = container.querySelector('[data-testid="tool-call-panel"]');
 		expect(panel).toBeTruthy();
 		expect(panel?.tagName).toBe("DETAILS");
-		expect(panel?.hasAttribute("open")).toBe(true);
+		expect(panel?.hasAttribute("open")).toBe(false);
 	});
 
 	it("running(无 result)→ summary 显示 '正在调用工具…' + 工具名", () => {
