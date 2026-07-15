@@ -128,7 +128,7 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 
 **写路径**：
 
-- 用户切换 → `appStore.set({ default_llm_provider_id: nextId })` 同步更新本地 state
+- 用户切换 → 同步更新 `appStore` 中对应 provider 的 `llm.defaultModel` 为选中模型，并更新 `defaultLlmProviderId` 为其 providerId（ADR-0016 Default Model Invariant）
 - 然后 `settingsSaver.scheduleSave()` debounced 500ms 刷到后端（跟 settings 域同 pattern, ADR-0015）
 - `conversations.store.sendMessage()` 入口从 `appStore` 读当前 `default_llm_provider_id` + 对应 provider 配置,构造 `ProviderConfig` 传给 `runtime.run({ ..., provider })`(per ADR-0019 D2 "provider 是 run-time 参数")
 

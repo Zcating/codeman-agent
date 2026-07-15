@@ -317,6 +317,110 @@ test.describe("10 — HomeAgentForm Home", () => {
     await expect(modelOptions).toBeGreaterThan(0);
   });
 
+  test("选择非第一个 LLM 模型并持久化到 Settings", async ({ tauriEnv }) => {
+    test.setTimeout(60_000);
+    const { page } = tauriEnv;
+    const wsLabel = "LLM Persistence Test";
+    const wsRoot = "/tmp/llm-persist-test";
+
+    // D8-W: clean up any existing workspace with the same label
+    try {
+      const existingWs = await invoke<{ id: string; label: string }[]>(page, "listWorkspaces");
+      for (const ws of existingWs) {
+        if (ws.label === wsLabel) {
+          await invoke(page, "deleteWorkspace", { id: ws.id });
+        }
+      }
+    } catch { /* best-effort */ }
+
+    // Provision workspace via WorkspaceService IPC
+    await invoke(page, "addWorkspace", { label: wsLabel, rootPath: wsRoot });
+
+    // Read current settings and inject a two-model provider
+    const current = await invoke<Record<string, unknown>>(page, "getSettings");
+    const twoModelProvider = {
+      id: "test-two-model",
+      label: "Test Two Model",
+      enabled: true,
+      apiKey: "test-key",
+      llm: {
+        defaultModel: "model-first",
+        baseUrl: "https://api.test.com/anthropic",
+        apiType: "anthropic-messages",
+        models: [
+          {
+            id: "model-first",
+            label: "Model First",
+            contextWindow: 200_000,
+            deprecated: false,
+            thinking: false,
+          },
+          {
+            id: "model-second",
+            label: "Model Second",
+            contextWindow: 200_000,
+            deprecated: false,
+            thinking: false,
+          },
+        ],
+        modelsEndpoint: "https://api.test.com/v1/models",
+      },
+    };
+
+    // Preserve existing providers and set the two-model provider as default
+    const existingProviders = (current.providers as unknown[] ?? []) as unknown[];
+    const newSettings = {
+      ...current,
+      providers: [...existingProviders, twoModelProvider],
+      defaultLlmProviderId: "test-two-model",
+    };
+
+    await invoke(page, "updateSettings", { newSettings });
+
+    // Reload renderer to pick up the new provider
+    await reloadPageForSettings(page);
+
+    // Select the workspace
+    await selectWorkspaceInPicker(page, wsLabel);
+
+    // Open the LLM picker dropdown
+    await page.locator("[data-testid='llm-picker-trigger']").click();
+    const llmContent = page.locator("[data-testid='llm-picker-content']");
+    await assert.visible(llmContent, { timeout: 5_000 });
+
+    // Click the "Model Second" option
+    await page.evaluate(() => {
+      const content = document.querySelector('[data-testid="llm-picker-content"]');
+      if (!content) throw new Error("llm-picker-content not found");
+      const options = content.querySelectorAll('[role="option"]');
+      for (const option of Array.from(options)) {
+        if ((option.textContent ?? "").trim() === "Model Second") {
+          (option as HTMLElement).click();
+          return;
+        }
+      }
+      throw new Error("Model Second option not found");
+    });
+
+    // Verify trigger text becomes "Model Second"
+    const triggerTextAfter = await page.evaluate(() => {
+      const el = document.querySelector("[data-testid='llm-picker-trigger']");
+      return el?.textContent ?? "";
+    });
+    expect(triggerTextAfter).toContain("Model Second");
+
+    // Wait for debounced persistence (settingsSaver uses 500ms debounce)
+    await new Promise((r) => setTimeout(r, 600));
+
+    // Verify getSettings returns the correct model
+    const settingsAfter = await invoke<Record<string, unknown>>(page, "getSettings");
+    const providersAfter = (settingsAfter.providers as Array<Record<string, unknown>>) ?? [];
+    const testProvider = providersAfter.find((p) => p.id === "test-two-model");
+    expect(testProvider).toBeDefined();
+    const llmAfter = testProvider?.llm as Record<string, unknown> | undefined;
+    expect(llmAfter?.defaultModel).toBe("model-second");
+  });
+
   test("Action slot 按钮存在且点击不报错 (picker 在 e2e 不弹真 dialog)", async ({ tauriEnv }) => {
     test.setTimeout(60_000);
     const { page } = tauriEnv;

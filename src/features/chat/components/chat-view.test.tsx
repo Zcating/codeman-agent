@@ -4,9 +4,54 @@
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup, fireEvent } from "@solidjs/testing-library";
+import { For } from "solid-js";
 import { Effect } from "effect";
 import { ChatView } from "./chat-view";
 import type { Message } from "../../../shared/lib/types";
+import type { CodemanGroupSelectProps } from "../../../shared/components/internal/codeman-group-select";
+
+// ─── Mock codeman-group-select: 轻量测试替身，渲染 trigger + role=option ──────
+vi.mock("../../../shared/components/internal/codeman-group-select", () => ({
+  CodemanGroupSelect: (props: CodemanGroupSelectProps) => {
+    const selectedLabel = () => {
+      for (const group of props.groups) {
+        const found = group.options.find((o) => o.value === props.value);
+        if (found) return found.label;
+      }
+      return props.placeholder ?? "";
+    };
+    return (
+      <div data-testid={props["data-testid"]}>
+        <button
+          data-testid={`${props["data-testid"]}-trigger`}
+          disabled={props.disabled}
+          aria-label={props["aria-label"]}
+        >
+          {selectedLabel()}
+        </button>
+        <For each={props.groups}>
+          {(group) => (
+            <For each={group.options}>
+              {(option) => (
+                <div
+                  role="option"
+                  data-value={option.value}
+                  onClick={() => {
+                    if (!option.disabled) {
+                      props.onChange(option.value);
+                    }
+                  }}
+                >
+                  {option.label}
+                </div>
+              )}
+            </For>
+          )}
+        </For>
+      </div>
+    );
+  },
+}));
 
 // V2 ADR-0019: 不再 mock messages.store / agent.store，全部走 chat.store
 // 注意: vi.mock 会被 hoisting，所以 mock 数据必须内联在工厂函数内部
@@ -247,6 +292,53 @@ describe("ChatView", () => {
   // (C11 rewrites 10-home-agent.spec.ts and adds coverage for the full HomeAgentForm flow).
   it.skip("切换 provider 触发 appStore.set + settingsSaver.scheduleSave", async () => {
     // Skipped: deferred to V2.2 or e2e rewrite. See TODO above.
+  });
+
+  // ─── Bug: 选择非首项模型后 currentModelId() 弹回首项 ─────────────────────
+  // Bug 根因: currentModelId() 始终返回 provider.models[0].id（首项），
+  // handleChange() 只写 defaultLlmProviderId，不写 provider.llm.defaultModel。
+  // 结果：同 provider 下点击非首项模型，受控值立即弹回首项。
+  it("Bug: 选择非首项模型 MiniMax-M2.7 后，llm.defaultModel 应为 MiniMax-M2.7（不弹回首项）", async () => {
+    const { appStore } = await import("../../../shared/stores/app.store");
+    // 通过 appStore.set 设置多模型 fixture（shallow merge，替换整个 providers 数组）
+    appStore.set({
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          enabled: true,
+          apiKey: "test-key",
+          llm: {
+            defaultModel: "MiniMax-M2.5-highspeed",
+            baseUrl: "https://api.minimaxi.com/anthropic",
+            apiType: "anthropic-messages",
+            models: [
+              { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", deprecated: false, thinking: false },
+              { id: "MiniMax-M2.7", label: "MiniMax-M2.7", deprecated: false, thinking: false },
+            ],
+            modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          },
+        },
+      ],
+      defaultLlmProviderId: "minimax",
+    });
+
+    const { container } = render(() => <ChatView convId="conv-1" />);
+
+    // 点击 provider-select trigger 打开下拉
+    const trigger = container.querySelector('button[data-testid="provider-select-trigger"]') as HTMLButtonElement;
+    expect(trigger).toBeTruthy();
+    trigger.click();
+
+    // 点击非首项模型 MiniMax-M2.7（触发 CodemanGroupSelect onChange）
+    const m27Option = container.querySelector('[data-value="MiniMax-M2.7"]') as HTMLElement;
+    expect(m27Option).toBeTruthy();
+    m27Option.click();
+
+    // 断言 MiniMax provider 的 llm.defaultModel 已更新为 MiniMax-M2.7
+    // 红灯原因：handleChange() 只写 defaultLlmProviderId，未写 providers[].llm.defaultModel
+    const minimaxProvider = appStore.state.value.providers?.find((p) => p.id === "minimax");
+    expect(minimaxProvider?.llm?.defaultModel).toBe("MiniMax-M2.7");
   });
 
   it("无 enabled provider 时显示空状态链接到 /settings", async () => {

@@ -53,17 +53,27 @@ function LlmPicker(): JSX.Element {
     const providerId = appStore.state.value.defaultLlmProviderId;
     const enabled = buildEnabledProviders(appStore.state.value.providers ?? []);
     const provider = enabled.find((p) => p.id === providerId);
-    if (!provider) return enabled[0]?.models[0]?.id ?? null;
-    return provider.models[0]?.id ?? null;
+    if (!provider) {
+      return enabled[0]?.models[0]?.id ?? null;
+    }
+    // Look up the raw provider to read llm.defaultModel (EnabledProvider has no llm field)
+    const rawProvider = (appStore.state.value.providers ?? []).find((p) => p.id === providerId);
+    const defaultModel = rawProvider?.llm?.defaultModel;
+    const modelValid = defaultModel && provider.models.some((m) => m.id === defaultModel);
+    return modelValid ? defaultModel : provider.models[0]?.id ?? null;
   };
 
   const handleChange = (modelId: string) => {
     if (!modelId) return;
-    const provider = buildEnabledProviders(appStore.state.value.providers ?? []).find((p) =>
+    const providers = appStore.state.value.providers ?? [];
+    const provider = buildEnabledProviders(providers).find((p) =>
       p.models.some((m) => m.id === modelId),
     );
     if (provider) {
-      appStore.set({ defaultLlmProviderId: provider.id });
+      const updatedProviders = providers.map((p) =>
+        p.id === provider.id ? { ...p, llm: { ...p.llm, defaultModel: modelId } } : p,
+      );
+      appStore.set({ providers: updatedProviders, defaultLlmProviderId: provider.id });
       settingsSaver.scheduleSave();
     }
   };
