@@ -35,7 +35,7 @@ export function ToolCallPanel(props: ToolCallPanelProps) {
 
 	return (
 		<details
-			class="max-w-prose mb-2 border border-border/60 rounded-md bg-muted/40 overflow-hidden"
+			class="mb-2 border border-border/60 rounded-md bg-muted/40 overflow-hidden"
 			data-testid="tool-call-panel"
 			data-message-id={props.messageId}
 			data-tool-call-id={props.toolCall.id}

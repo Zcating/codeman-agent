@@ -81,4 +81,16 @@ describe("ThinkingPanel", () => {
 		expect(pre).toBeTruthy();
 		expect(pre?.textContent).toBe("");
 	});
+
+	// 回归断言:W3.x (commit 036e7cd) 把外层 assistant bubble 改成 w-full,
+	// 内嵌的 ThinkingPanel 也必须跟上 — 不再被 max-w-prose 卡片宽度限制。
+	// 防止以后 W3.x 宽度契约被无声回滚。
+	it("regression: <details> 没有 max-w-prose — 跟外层 assistant bubble (w-full) 同宽", () => {
+		const { container } = render(() => (
+			<ThinkingPanel thinking="..." streaming={false} messageId="msg-w3x" />
+		));
+		const panel = container.querySelector('[data-testid="thinking-panel"]');
+		expect(panel).toBeTruthy();
+		expect(panel).not.toHaveClass("max-w-prose");
+	});
 });
