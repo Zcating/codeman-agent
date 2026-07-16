@@ -210,6 +210,17 @@ vi.mock("../../settings/lib/settings-saver", () => ({
   },
 }));
 
+// ─── Mock codeman-toast (ADR-0029 D5) ──────────────────────────────────────────
+const mockCodemanToast = vi.hoisted(() => ({
+  error: vi.fn(),
+  success: vi.fn(),
+}));
+
+vi.mock("../../../shared/components/internal/codeman-toast", () => ({
+  codemanToast: mockCodemanToast,
+  ToasterMount: () => null,
+}));
+
 vi.mock(import("../lib/runtime"), async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/runtime")>();
   return {
@@ -568,19 +579,28 @@ describe("ChatView", () => {
     expect(container.textContent).toBeTruthy();
   });
 
-  // ─── Bug B: lastError UX ─────────────────────────────────────────────────
+  // ─── Bug B: lastError UX (ADR-0029 D5: inline banner 移除 → toast 替代) ─────
 
-  it("Bug B: lastError ≠ null 时在消息列表上方渲染红色错误 banner（含错误文案）", () => {
+  it("Bug B (ADR-0029 D5): inline error banner 已移除", () => {
     const { container } = render(() => <ChatView convId="conv-err" />);
     const banner = container.querySelector('[data-testid="chat-error-banner"]');
-    expect(banner).toBeTruthy();
-    expect(banner?.textContent).toContain("AnthropicTransport");
+    expect(banner).toBeNull(); // banner 取消, toast 接管
   });
 
-  it("Bug B: lastError = null / undefined 时不渲染错误 banner", () => {
+  it("Bug B (ADR-0029 D5): lastError = null / undefined 时不渲染 banner", () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
     const banner = container.querySelector('[data-testid="chat-error-banner"]');
     expect(banner).toBeNull();
+  });
+
+  it("Bug B (ADR-0029 D5): lastError 非空 → codemanToast.error 被调 (runtime error 通知)", async () => {
+    mockCodemanToast.error.mockClear();
+    render(() => <ChatView convId="conv-err" />);
+    await vi.waitFor(() => {
+      expect(mockCodemanToast.error).toHaveBeenCalledWith(
+        expect.stringContaining("AnthropicTransport"),
+      );
+    });
   });
 
   // ─── Ctrl+Enter send shortcut ─────────────────────────────────────────────
