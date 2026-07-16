@@ -14,6 +14,8 @@ import {
   navigateInputHistoryNext,
   handleArrowUp,
   handleArrowDown,
+  handleArrowUpField,
+  handleArrowDownField,
   _resetInputHistoryForTest,
 } from "./input-history.store";
 
@@ -332,6 +334,83 @@ describe("recordInputEntry 重置 cursor（even on dedup/blank）", () => {
       recordInputEntry("a");
       navigateInputHistoryPrev();
       recordInputEntry("   "); // trim 空
+      expect(inputHistoryCursor$()).toBe(-1);
+    });
+  });
+});
+
+// ─── handleArrowUpField / handleArrowDownField (ADR-0029 PR 5) ──────────────
+//
+// form.Field-aware variants: caller passes a () => FieldAccessor (TanStack Form's
+// render prop shape) instead of writing closures for getInput/setInput.
+
+describe("handleArrowUpField (form.Field-aware ↑)", () => {
+  it("input 空 + 历史非空 → 进入 newest + 通过 field.handleChange 写回", () => {
+    createRoot(() => {
+      recordInputEntry("foo");
+      recordInputEntry("bar"); // history = ["bar", "foo"]
+      const fieldValue = { current: "" };
+      const field = () => ({
+        state: { value: fieldValue.current },
+        handleChange: (v: string) => {
+          fieldValue.current = v;
+        },
+      });
+      const handled = handleArrowUpField(field);
+      expect(handled).toBe(true);
+      expect(fieldValue.current).toBe("bar");
+      expect(inputHistoryCursor$()).toBe(0);
+    });
+  });
+
+  it("input 非空 → 返回 false,field 值不变 (原生 caret 接管)", () => {
+    createRoot(() => {
+      recordInputEntry("old");
+      const fieldValue = { current: "draft" };
+      const field = () => ({
+        state: { value: fieldValue.current },
+        handleChange: (v: string) => {
+          fieldValue.current = v;
+        },
+      });
+      const handled = handleArrowUpField(field);
+      expect(handled).toBe(false);
+      expect(fieldValue.current).toBe("draft");
+    });
+  });
+});
+
+describe("handleArrowDownField (form.Field-aware ↓)", () => {
+  it("cursor = -1 → 返回 false", () => {
+    createRoot(() => {
+      const fieldValue = { current: "" };
+      const field = () => ({
+        state: { value: fieldValue.current },
+        handleChange: (v: string) => {
+          fieldValue.current = v;
+        },
+      });
+      const handled = handleArrowDownField(field);
+      expect(handled).toBe(false);
+      expect(fieldValue.current).toBe("");
+    });
+  });
+
+  it("cursor = 0 退回 → field 清空 + cursor -1", () => {
+    createRoot(() => {
+      recordInputEntry("a");
+      const fieldValue = { current: "" };
+      const field = () => ({
+        state: { value: fieldValue.current },
+        handleChange: (v: string) => {
+          fieldValue.current = v;
+        },
+      });
+      handleArrowUpField(field); // → cursor 0, field "a"
+      expect(fieldValue.current).toBe("a");
+      const handled = handleArrowDownField(field);
+      expect(handled).toBe(true);
+      expect(fieldValue.current).toBe("");
       expect(inputHistoryCursor$()).toBe(-1);
     });
   });

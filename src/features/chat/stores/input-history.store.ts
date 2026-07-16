@@ -150,3 +150,28 @@ export function handleArrowDown(setInput: (value: string) => void): boolean {
   if (result !== null) setInput(result.value);
   return true;
 }
+
+// ─── form.Field-aware wrappers (ADR-0029 PR 5) ─────────────────────────────────
+//
+// TanStack Form 的 `form.Field` render prop 暴露一个 FieldApi 实例，
+// 包含 `state.value` + `handleChange(v)`。调用方不必手写 closure 来把
+// form.Field 适配成 (getInput, setInput) 签名。
+
+/** 描述 form.Field accessor 的最小 subset（避免 import @tanstack/solid-form 类型）。 */
+export interface FieldAccessor {
+  readonly state: { readonly value: string };
+  handleChange(value: string): void;
+}
+
+/** form.Field-aware ↑ 包装。语义同 handleArrowUp，写回通过 field().handleChange。 */
+export function handleArrowUpField(field: () => FieldAccessor): boolean {
+  return handleArrowUp(
+    () => field().state.value,
+    (v) => field().handleChange(v),
+  );
+}
+
+/** form.Field-aware ↓ 包装。语义同 handleArrowDown，写回通过 field().handleChange。 */
+export function handleArrowDownField(field: () => FieldAccessor): boolean {
+  return handleArrowDown((v) => field().handleChange(v));
+}
