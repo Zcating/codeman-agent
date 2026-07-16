@@ -6,6 +6,18 @@ import { HomeAgentForm } from "./home";
 import type { ProviderConfig } from "../lib/runtime";
 import { createConversation, sendMessage, addWorkspace as addWorkspaceFromStore } from "../stores/chat.store";
 
+// ─── Mock codeman-toast (ADR-0029 D5 silent-drop fix verification) ────────────
+
+const mockCodemanToast = vi.hoisted(() => ({
+  error: vi.fn(),
+  success: vi.fn(),
+}));
+
+vi.mock("../../../shared/components/internal/codeman-toast", () => ({
+  codemanToast: mockCodemanToast,
+  ToasterMount: () => null,
+}));
+
 // Mock @ark-ui/solid Select for jsdom — same pattern as codeman-select.test.tsx
 let mockIsOpen = false;
 let sharedOnValueChanges: ((details: { value: string[] }) => void)[] = [];
@@ -381,6 +393,34 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
 
     // Action slot ("+ Add new workspace…") also present (home.tsx renders it)
     expect(document.querySelector("[data-testid='workspace-select-add-btn']")).toBeTruthy();
+  });
+
+  // ADR-0029 D5: silent-drop bug fix — createConversation 失败 → codemanToast.error 被调
+  it("ADR-0029 D5: createConversation 失败 → codemanToast.error 被调 (替代 silent return)", async () => {
+    mockWorkspaces.push({ id: "ws-1", label: "Frontend", rootPath: "/p" });
+    mockSelectedWsId = "ws-1";
+
+    // Override createConversation to return failure (simulate DB error)
+    vi.mocked(createConversation).mockReturnValueOnce(
+      Effect.fail({ _tag: "Database", message: "DB connection lost" }) as any,
+    );
+
+    const { container } = render(() => <HomeAgentForm />);
+
+    // Type valid draft
+    const textarea = container.querySelector("[data-testid='codex-input']") as HTMLTextAreaElement;
+    fireEvent.input(textarea, { target: { value: "hello" } });
+
+    // Click Send
+    const sendBtn = container.querySelector("[data-testid='codex-send']") as HTMLButtonElement;
+    fireEvent.click(sendBtn);
+
+    await waitFor(() => {
+      expect(mockCodemanToast.error).toHaveBeenCalledTimes(1);
+    });
+
+    // Verify sendMessage was NOT called (createConversation failure short-circuits)
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });
 

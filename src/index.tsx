@@ -7,6 +7,7 @@ import { appStore } from "./shared/stores/app.store";
 import { Effect, Exit } from "effect";
 import { logger } from "./shared/lib/logger";
 import * as chatStore from "./features/chat/stores/chat.store";
+import { ToasterMount } from "./shared/components/internal/codeman-toast";
 
 // Render the RouterProvider FIRST with the in-memory defaultSettings, so the SPA
 // is visible immediately even if the Rust backend is slow or `get_settings` IPC
@@ -28,7 +29,12 @@ function bootstrap() {
     logger.error("[index.tsx] #root not found — cannot mount Solid");
     return;
   }
-  render(() => <RouterProvider router={router} />, root);
+  render(() => (
+    <>
+      <RouterProvider router={router} />
+      <ToasterMount />
+    </>
+  ), root);
 
   // Best-effort background refresh. We swallow errors so they don't surface as
   // unhandled rejections — the user keeps the defaults and the UI works.
