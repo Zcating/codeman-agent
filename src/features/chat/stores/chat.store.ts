@@ -385,7 +385,17 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
 // ─── cancel: 调 runtime.cancel() 中断 in-flight stream ───────
 
 export function cancel(convId: string): void {
-  store.byId[convId]?.runtime.cancel();
+  // Bug B fix (e2e spec 09 D2): synchronously clear streamingMessageId so the UI
+  // (chat-view's isRunning() + sidebar's isStreaming badge) sees the conv as non-streaming
+  // IMMEDIATELY after cancel(), without waiting for the error event to propagate through
+  // the Effect fiber. Without this, the textarea stays disabled for ~1 render frame
+  // between cancel() and the error event handler, causing D2 ("Cancel → Send 按钮恢复")
+  // to flake in CI environments with slower Effect fiber scheduling.
+  const cs = store.byId[convId];
+  if (!cs) return;
+  cs.runtime.cancel();
+  setStore("byId", convId, "streamingMessageId", null);
+  setConversationsSignal(Object.values(store.byId));
 }
 
 // ─── archiveConversation: cancel + 从 store 移除 + DB archive ──
