@@ -27,7 +27,7 @@ export interface ThinkingPanelProps {
 export function ThinkingPanel(props: ThinkingPanelProps) {
 	return (
 		<details
-			class="max-w-prose mb-2 border border-border/60 rounded-md bg-muted/40 overflow-hidden"
+			class="mb-2 border border-border/60 rounded-md bg-muted/40 overflow-hidden"
 			data-testid="thinking-panel"
 			data-message-id={props.messageId}
 		>

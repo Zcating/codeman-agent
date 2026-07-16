@@ -95,4 +95,16 @@ describe("ToolCallPanel", () => {
 		expect(card?.getAttribute("data-tool-name")).toBe("read_file");
 		expect(card?.getAttribute("data-has-result")).toBe("true");
 	});
+
+	// 回归断言:W3.x (commit 036e7cd) 把外层 assistant bubble 改成 w-full,
+	// 内嵌的 ToolCallPanel 也必须跟上 — 不再被 max-w-prose 卡片宽度限制。
+	// 防止以后 W3.x 宽度契约被无声回滚。
+	it("regression: <details> 没有 max-w-prose — 跟外层 assistant bubble (w-full) 同宽", () => {
+		const { container } = render(() => (
+			<ToolCallPanel toolCall={toolCall} messageId="msg-w3x" />
+		));
+		const panel = container.querySelector('[data-testid="tool-call-panel"]');
+		expect(panel).toBeTruthy();
+		expect(panel).not.toHaveClass("max-w-prose");
+	});
 });
