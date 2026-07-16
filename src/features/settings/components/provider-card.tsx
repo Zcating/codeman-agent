@@ -245,9 +245,9 @@ export function ProviderCard(props: ProviderCardProps) {
                   type="text"
                   value={field().state.value}
                   onValueChange={field().handleChange}
-                  onBlur={() => {
+                  onBlur={async () => {
                     field().handleBlur();
-                    void form.handleSubmit();
+                    await form.handleSubmit();
                   }}
                   error={firstErrorMessage(field().state.meta.errors)}
                   placeholder="https://api.example.com/v1"
@@ -284,10 +284,13 @@ export function ProviderCard(props: ProviderCardProps) {
                 <CodemanInput
                   type="password"
                   value={field().state.value}
-                  onValueChange={field().handleChange}
-                  onBlur={() => {
-                    field().handleBlur();
+                  onValueChange={(v) => {
+                    field().handleChange(v);
                     void form.handleSubmit();
+                  }}
+                  onBlur={async () => {
+                    field().handleBlur();
+                    await form.handleSubmit();
                   }}
                   error={firstErrorMessage(field().state.meta.errors)}
                   placeholder="sk-…"
