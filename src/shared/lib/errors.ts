@@ -1,9 +1,9 @@
-//! ADR-0025 Phase 3 (PR 1) — Effect Schema-based AppError model.
+//! ADR-0025 — Effect Schema-based AppError model.
 //!
 //! Eight INDEPENDENT `Schema.TaggedError` leaf classes, each carrying its own
 //! instance `_tag`, exported as the `AppError` union + an `isAppError` type guard.
-//! Replaces the legacy `{ kind }` union in `./types` (renamed `LegacyAppErrorUnion`
-//! for the PR1→PR2 window).
+//! Replaces the legacy `{ kind }` union that previously lived in `./types`
+//! (deleted in PR 2).
 //!
 //! DESIGN NOTE (ADR-0025 D4 correction): the ADR proposed a common base class with
 //! `static _tag` overrides. That is BROKEN on Effect 3.x — `Schema.TaggedError()`
