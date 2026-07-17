@@ -405,6 +405,60 @@ describe("CodemanSidebar (D7-CS cascade tree, @ark-ui/solid Accordion 驱动)", 
       fireEvent.click(container.querySelector("[aria-label='取消删除']") as HTMLElement);
       expect(container.querySelector("[aria-label='确认删除']")).toBeNull();
     });
+
+    it("delete 按钮默认隐藏（hover-only），含 opacity-0 类", () => {
+      // 回归：showOnHover=true → 默认 opacity-0 group-hover:opacity-100
+      const { container } = render(() => (
+        <CodemanSidebar {...defaultProps({
+          nodes: [makeWs("ws-1", "WS", [{ kind: "conv", id: "c-1", label: "Chat 1" }])],
+          onDeleteItem: vi.fn(),
+        })} />
+      ));
+      const trigger = container.querySelector('[data-workspace-id="ws-1"] [data-part="item-trigger"]') as HTMLElement;
+      fireEvent.click(trigger);
+      const deleteBtn = container.querySelector("[aria-label='Delete']") as HTMLElement;
+      expect(deleteBtn).toBeTruthy();
+      expect(deleteBtn.className).toContain("opacity-0");
+      expect(deleteBtn.className).toContain("group-hover:opacity-100");
+    });
+
+    it("Confirm UI overlay 覆盖整行 (absolute inset-0)，不是 inline push", () => {
+      // 回归：confirm UI 现在是 absolute overlay，而不是紧贴行末的 inline flex
+      const { container } = render(() => (
+        <CodemanSidebar {...defaultProps({
+          nodes: [makeWs("ws-1", "WS", [{ kind: "conv", id: "c-1", label: "Chat 1" }])],
+          onDeleteItem: vi.fn(),
+        })} />
+      ));
+      const trigger = container.querySelector('[data-workspace-id="ws-1"] [data-part="item-trigger"]') as HTMLElement;
+      fireEvent.click(trigger);
+      fireEvent.click(container.querySelector("[aria-label='Delete']") as HTMLElement);
+      const confirmBtn = container.querySelector("[aria-label='确认删除']") as HTMLElement;
+      expect(confirmBtn).toBeTruthy();
+      // confirm button 的父级 overlay 应该是 absolute inset-0
+      const overlay = confirmBtn.parentElement as HTMLElement;
+      expect(overlay.className).toContain("absolute");
+      expect(overlay.className).toContain("inset-0");
+      // overlay 应该比 ml-auto 的 inline push 更靠右（justify-end 对齐按钮群在右）
+      expect(overlay.className).toContain("justify-end");
+    });
+
+    it("conv row 有 relative 容器让 absolute overlay 能定位", () => {
+      // 回归：SidebarMenuItem 上必须有 relative，绝对定位 overlay 才能落在行内
+      const { container } = render(() => (
+        <CodemanSidebar {...defaultProps({
+          nodes: [makeWs("ws-1", "WS", [{ kind: "conv", id: "c-1", label: "Chat 1" }])],
+        })} />
+      ));
+      const trigger = container.querySelector('[data-workspace-id="ws-1"] [data-part="item-trigger"]') as HTMLElement;
+      fireEvent.click(trigger);
+      const convBtn = container.querySelector("[data-conv-id='c-1']") as HTMLElement;
+      // data-conv-id 在 SidebarMenuButton 上；它的父级是 <li class="group relative">
+      const row = convBtn.closest("li");
+      expect(row).toBeTruthy();
+      expect((row as HTMLElement).className).toContain("relative");
+      expect((row as HTMLElement).className).toContain("group");
+    });
   });
 
   describe("Create button", () => {
@@ -431,6 +485,24 @@ describe("CodemanSidebar (D7-CS cascade tree, @ark-ui/solid Accordion 驱动)", 
     it("无 workspaces 时显示空态文本（No workspaces）", () => {
       const { container } = render(() => <CodemanSidebar {...defaultProps()} />);
       expect(container.textContent).toContain("No workspaces");
+    });
+  });
+
+  // ─── settingsSlot 渲染到 sidebar footer ──────────────────────────────────
+
+  describe("settingsSlot footer", () => {
+    it("settingsSlot 提供时渲染到 sidebar footer（不提供时不渲染 footer）", () => {
+      // 不提供 settingsSlot — 应无 [data-testid="sidebar-footer-anchor"]
+      const { container: c1 } = render(() => (
+        <CodemanSidebar {...defaultProps({
+          settingsSlot: <a data-testid="sidebar-footer-anchor" href="/settings">设置</a>,
+        })} />
+      ));
+      expect(c1.querySelector("[data-testid='sidebar-footer-anchor']")).toBeTruthy();
+
+      // 不提供 settingsSlot — 应无 [data-testid="sidebar-footer-anchor"]
+      const { container: c2 } = render(() => <CodemanSidebar {...defaultProps()} />);
+      expect(c2.querySelector("[data-testid='sidebar-footer-anchor']")).toBeNull();
     });
   });
 

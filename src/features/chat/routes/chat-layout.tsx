@@ -132,14 +132,7 @@ export function ChatLayout(): JSX.Element {
         onRenameWorkspace={handleRenameWorkspace}
         onDeleteWorkspace={handleDeleteWorkspace}
         class="border-r border-sidebar-border"
-      />
-
-      <section class="flex-1 flex flex-col overflow-hidden">
-        <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
-          <Outlet />
-        </div>
-        <footer class="flex items-center justify-between px-4 py-2 border-t border-border bg-card text-xs text-muted-foreground">
-          <span>codeman-agent</span>
+        settingsSlot={
           <Link
             to="/settings"
             activeProps={{ class: "text-primary font-medium" }}
@@ -151,6 +144,15 @@ export function ChatLayout(): JSX.Element {
             <SettingsIcon class="h-3.5 w-3.5" aria-hidden="true" />
             <span>设置</span>
           </Link>
+        }
+      />
+
+      <section class="flex-1 flex flex-col overflow-hidden">
+        <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
+          <Outlet />
+        </div>
+        <footer class="flex items-center px-4 py-2 border-t border-border bg-card text-xs text-muted-foreground">
+          <span>codeman-agent</span>
         </footer>
       </section>
     </main>
