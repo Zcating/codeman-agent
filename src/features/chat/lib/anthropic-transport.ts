@@ -403,7 +403,7 @@ function mapStopReason(anthropicReason: string | undefined): StopReason {
 
 // ─── SSE 流解析 + AssistantMessage 累积 ────────────────────────────
 
-async function parseSseStream(
+export async function parseSseStream(
     body: ReadableStream<Uint8Array>,
     model: Model<string>,
     signal: AbortSignal | undefined,
@@ -653,7 +653,10 @@ async function parseSseStream(
 
     // Aborted 优先于 stopReason — reader loop 退出时若 signal 已被 abort,
     // 返回 aborted message 而非不完整的 stop
-    if (signal?.aborted) {
+    // BUG FIX: 如果已经有累积的 content（已经从 SSE 流完全读取），即使 signal
+    // 已 abort 也应该返回这些 content，而不是 makeAbortedMessage(content: [])。
+    // 只有在 content 为空时才返回 makeAbortedMessage（真正没有任何内容可返回）。
+    if (signal?.aborted && content.length === 0) {
         return makeAbortedMessage(model);
     }
     return {

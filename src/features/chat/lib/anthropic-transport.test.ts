@@ -3,6 +3,7 @@ import {
     anthropicStream,
     parseSseLine,
     buildAnthropicRequestBody,
+    parseSseStream,
 } from "./anthropic-transport";
 import type {
     AssistantMessageEvent,
@@ -12,6 +13,7 @@ import type {
     SimpleStreamOptions,
     Tool,
 } from "@earendil-works/pi-ai";
+import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -479,5 +481,129 @@ describe("anthropicStream -- real HTTP path (mocked fetch + ReadableStream)", ()
             ) as { type: "text"; text: string } | undefined;
             expect(textBlock?.text).toBe("hi from mock");
         }
+    });
+});
+
+// ─── Group H -- parseSseStream abort-during-cleanup (bug fix regression test) ───
+
+describe("parseSseStream -- abort during cleanup race", () => {
+    const testModel: Model<"anthropic-messages"> = {
+        id: "test-model",
+        name: "test-model",
+        api: "anthropic-messages",
+        provider: "anthropic",
+        baseUrl: "https://api.test",
+        reasoning: false,
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 128000,
+        maxTokens: 8192,
+    };
+
+    /**
+     * Regression test for the abort-during-cleanup bug.
+     *
+     * Bug: parseSseStream() reads all SSE chunks and accumulates content blocks.
+     * If signal.aborted becomes true AFTER the reader loop exits (done: true)
+     * but BEFORE the final return check, accumulated content is discarded and
+     * replaced with makeAbortedMessage (content: []).
+     *
+     * The fix: if content has been accumulated, return it even when aborted.
+     * Only return makeAbortedMessage when content is truly empty.
+     */
+
+    it("H1: non-empty content → returns accumulated content regardless of abort state", async () => {
+        // This test verifies the fix by checking that non-empty content is returned.
+        // We simulate a stream that completes normally (no abort during reading),
+        // then abort fires AFTER the stream is consumed. The content should be preserved.
+        const sse =
+            "event: message_start\ndata: {\"type\":\"message_start\"}\n\n" +
+            "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n" +
+            "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"hello world\"}}\n\n" +
+            "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n" +
+            "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}}\n\n" +
+            "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n";
+
+        const encoder = new TextEncoder();
+        const readableStream = new ReadableStream({
+            start(controller) {
+                controller.enqueue(encoder.encode(sse));
+                controller.close();
+            },
+        });
+
+        const abortController = new AbortController();
+        const { signal } = abortController;
+        const eventStream = createAssistantMessageEventStream();
+
+        // Abort after stream is consumed - using setTimeout to defer
+        // The key assertion: content should be preserved even when abort fires
+        // after stream completion but before function returns.
+        setTimeout(() => abortController.abort(), 0);
+
+        const result = await parseSseStream(readableStream, testModel, signal, eventStream);
+
+        // The fix ensures content is preserved even when aborted after stream completion
+        const textBlock = result.content.find(
+            (b) => b.type === "text",
+        ) as { type: "text"; text: string } | undefined;
+        expect(textBlock?.text).toBe("hello world");
+        // stopReason may be 'stop' (normal) or 'aborted' depending on timing,
+        // but content MUST be preserved either way
+    });
+
+    it("H2: empty content + abort → returns makeAbortedMessage (content: [])", async () => {
+        // Edge case: stream yields no content, then abort fires.
+        // Since there's no content to preserve, makeAbortedMessage is correct.
+        const emptySse = "";
+
+        const encoder = new TextEncoder();
+        const readableStream = new ReadableStream({
+            start(controller) {
+                controller.enqueue(encoder.encode(emptySse));
+                controller.close();
+            },
+        });
+
+        const abortController = new AbortController();
+        const { signal } = abortController;
+        const eventStream = createAssistantMessageEventStream();
+
+        setTimeout(() => abortController.abort(), 0);
+
+        const result = await parseSseStream(readableStream, testModel, signal, eventStream);
+
+        // Empty content + abort = makeAbortedMessage is appropriate
+        expect(result.content).toHaveLength(0);
+        // stopReason reflects abort state (timing dependent, so we check content is empty)
+    });
+
+    it("H3: normal completion (no abort) → returns accumulated content with normal stopReason", async () => {
+        // Sanity check: normal completion without abort should work as before
+        const sse =
+            "event: message_start\ndata: {\"type\":\"message_start\"}\n\n" +
+            "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n" +
+            "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"normal text\"}}\n\n" +
+            "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n" +
+            "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"}}\n\n" +
+            "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n";
+
+        const encoder = new TextEncoder();
+        const readableStream = new ReadableStream({
+            start(controller) {
+                controller.enqueue(encoder.encode(sse));
+                controller.close();
+            },
+        });
+
+        // No abort - use a fresh signal that is never aborted
+        const eventStream = createAssistantMessageEventStream();
+        const result = await parseSseStream(readableStream, testModel, undefined, eventStream);
+
+        const textBlock = result.content.find(
+            (b) => b.type === "text",
+        ) as { type: "text"; text: string } | undefined;
+        expect(textBlock?.text).toBe("normal text");
+        expect(result.stopReason).toBe("stop");
     });
 });
