@@ -223,7 +223,11 @@ export function HomeAgentForm(): JSX.Element {
                   }}
                   disabled={isInputDisabled() || form.state.isSubmitting}
                   placeholder={placeholder()}
-                  error={firstErrorMessage(field().state.meta.errors)}
+                  error={
+                    field().state.meta.isTouched
+                      ? firstErrorMessage(field().state.meta.errors)
+                      : undefined
+                  }
                 />
               </>
             )}

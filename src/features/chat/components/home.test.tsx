@@ -248,6 +248,37 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
     expect(textarea.placeholder).toBe("Select a workspace above");
   });
 
+  // Bug fix regression: 输入框下方不应常驻 generic "Invalid value (Type)" 提示。
+  // 用户原始 bug 描述："输入框下方为什么会有这个提示？不应该常驻"
+  // 根因：TanStack Form form-level `onMount: effectSchema(HomeFormSchema)` 跑
+  // `{ draft: "", workspaceId: "" }` 触发 NonEmptyString 失败；ParseIssue 无 message annotation
+  // → effect-schema-adapter fallback "Invalid value (Type)" → 渲染到 textarea 下方。
+  // 修复：home.tsx line 226 用 `field().state.meta.isTouched` gate 错误显示。
+  it("Bug: 输入框下方不应常驻 generic 'Invalid value (Type)' 提示", async () => {
+    mockWorkspaces.push(
+      { id: "ws-1", label: "Project A", rootPath: "C:\\a" },
+      { id: "ws-2", label: "Project B", rootPath: "C:\\b" },
+    );
+    mockSelectedWsId = null;
+
+    const { container } = render(() => <HomeAgentForm />);
+
+    // 用户可见的 textarea 渲染（sanity）
+    const textarea = container.querySelector(
+      "[data-testid='codex-input']",
+    ) as HTMLTextAreaElement;
+    expect(textarea).toBeTruthy();
+    expect(textarea.disabled).toBe(true);
+
+    // 关键断言：<p class="text-xs text-destructive">Invalid value (Type)</p>
+    // 不应在没有任何用户触摸 field 的状态下出现。
+    const destructiveMessages = Array.from(
+      container.querySelectorAll("p.text-destructive"),
+    ).map((el) => el.textContent ?? "");
+
+    expect(destructiveMessages).not.toContain("Invalid value (Type)");
+  });
+
   it("T4.1.4: 2+ workspaces → no pre-select; clicking workspace Select option enables input + calls setSelectedWorkspaceId", async () => {
     mockWorkspaces.push(
       { id: "ws-1", label: "Project A", rootPath: "C:\\a" },
