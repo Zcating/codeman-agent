@@ -38,8 +38,10 @@ export function SettingsPage() {
   // footer Save = force flush（跳过 debounce）。Await so the IPC update_settings
   // resolves before the caller continues — V2 e2e tests call get_settings
   // immediately after click(Save) and expect the new api_key to be on disk.
-  const save = (): void => {
-    void settingsSaver.flushNow().catch((e: unknown) => {
+  // Fix: async/await 确保 flushNow() 的 IPC 完成才让 click handler 返回，
+  // 否则 getSettings 在 IPC 仍在途时读磁盘会得到旧值。
+  const save = async (): Promise<void> => {
+    await settingsSaver.flushNow().catch((e: unknown) => {
       logger.error("[SettingsPage] flushNow failed:", e);
     });
   };
