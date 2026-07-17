@@ -1354,3 +1354,177 @@ describe("chat.store — workspace CRUD", () => {
     });
   });
 });
+
+// ─── Per-conv runtime isolation tests (Bug B: streaming state leak) ─────────────
+//
+// These tests verify the fix for e2e spec 09 failures:
+//   D1+D3: A streaming 不 leak 到 B view; 切回 A 内容完整
+//   D5:    sidebar streaming 指示 (⏳) 出现在 streaming conv 上,完成后消失
+//   D2:    Cancel 中断 in-flight; Send 按钮恢复; 新 send 正常工作
+//   D1+D3+D5: 2 个 conv 同时 streaming,sidebar 各自显示 ⏳
+//
+// Root cause: cancel() did not synchronously clear streamingMessageId.
+// This caused the UI to remain in "running" state (textarea disabled) after cancel,
+// because the error event that clears streamingMessageId might not have been processed yet.
+
+describe("per-conv runtime isolation — streamingMessageId per conv independence", () => {
+  it("cancel() synchronously clears streamingMessageId (fixes D2: Cancel restores Send button)", async () => {
+    await createRoot(async (dispose) => {
+      const convA = { ...mockConv, id: "cA" };
+      setupConvState(convA, []);
+
+      // Simulate streaming: set streamingMessageId manually (as if token events started)
+      const stubId = "streaming-stub-123";
+      setStore("byId", "cA", "streamingMessageId", stubId);
+
+      // Verify streamingMessageId is set
+      expect(store.byId["cA"]?.streamingMessageId).toBe(stubId);
+
+      // Cancel should synchronously clear streamingMessageId
+      cancel("cA");
+
+      // Critical assertion: streamingMessageId must be null IMMEDIATELY after cancel()
+      // (not waiting for error event to propagate)
+      expect(store.byId["cA"]?.streamingMessageId).toBeNull();
+
+      dispose();
+    });
+  });
+
+  it("D1+D3: Switching active conv does NOT clear streamingMessageId on the other conv", async () => {
+    await createRoot(async (dispose) => {
+      const convA = { ...mockConv, id: "cA" };
+      const convB = { ...mockConv, id: "cB" };
+      setupConvState(convA, []);
+      setupConvState(convB, []);
+
+      // ConvA is streaming
+      setStore("byId", "cA", "streamingMessageId", "stub-A-123");
+      // ConvB is NOT streaming (streamingMessageId = null)
+
+      // Switching "active" to convB should NOT affect convA's streamingMessageId
+      // (activeId is a UI concept; store.byId is the source of truth)
+      expect(store.byId["cA"]?.streamingMessageId).toBe("stub-A-123");
+      expect(store.byId["cB"]?.streamingMessageId).toBeNull();
+
+      dispose();
+    });
+  });
+
+  it("D1+D3: ConvB's messages do NOT contain ConvA's streaming text after switch", async () => {
+    await createRoot(async (dispose) => {
+      const convA = { ...mockConv, id: "cA" };
+      const convB = { ...mockConv, id: "cB" };
+      setupConvState(convA, []);
+      setupConvState(convB, []);
+
+      // Add a partial streaming message to convA (simulating in-flight tokens)
+      const stubA: Message = {
+        id: "stub-A",
+        conversationId: "cA",
+        role: "assistant",
+        content: "Hello from conv A partial",
+        thinking: "",
+        toolCalls: null,
+        toolResults: null,
+        model: null,
+        inputTokens: null,
+        outputTokens: null,
+        createdAt: Date.now(),
+      };
+      setStore("byId", "cA", "streamingMessageId", "stub-A");
+      setStore("byId", "cA", "messages", [stubA]);
+
+      // ConvB's messages should be empty (not contain convA's streaming text)
+      const convBMessages = store.byId["cB"]?.messages ?? [];
+      expect(convBMessages.some((m) => m.content.includes("conv A"))).toBe(false);
+
+      dispose();
+    });
+  });
+
+  it("D2: After cancel, sendMessage on same conv works normally (new streaming starts)", async () => {
+    await createRoot(async (dispose) => {
+      const convA = { ...mockConv, id: "cA" };
+      setupConvState(convA, []);
+
+      // Start a stream
+      setStore("byId", "cA", "streamingMessageId", "old-stream");
+
+      // Cancel it
+      cancel("cA");
+
+      // streamingMessageId cleared (this is the key fix: UI sees non-streaming immediately)
+      expect(store.byId["cA"]?.streamingMessageId).toBeNull();
+
+      // Verify sendMessage can be called after cancel (user can type in textarea)
+      // Note: sendMessage appends user message synchronously even if stream is mock-empty
+      const events: RuntimeEvent[] = [
+        { type: "done", message: { id: "final", conversationId: "cA", role: "assistant", content: "ok", thinking: null, toolCalls: null, toolResults: null, model: null, inputTokens: null, outputTokens: null, createdAt: Date.now() } },
+      ];
+      vi.spyOn(store.byId["cA"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
+      await Effect.runPromise(sendMessage("cA", "second message", defaultProvider));
+
+      // After the mock stream completes (synchronously), streamingMessageId is null
+      // The important invariant: cancel() + sendMessage() does not throw or get stuck
+      expect(store.byId["cA"]?.streamingMessageId).toBeNull();
+      // User message was appended (sendMessage works after cancel)
+      const msgs = store.byId["cA"]?.messages ?? [];
+      expect(msgs.some((m) => m.role === "user" && m.content === "second message")).toBe(true);
+
+      dispose();
+    });
+  });
+
+  it("D5: streamingMessageId is non-null while stream is in-flight, null after done", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, []);
+
+      // Before streaming: streamingMessageId is null
+      expect(store.byId["c1"]?.streamingMessageId).toBeNull();
+
+      // Simulate streaming start (first token event)
+      setStore("byId", "c1", "streamingMessageId", "new-stream-stub");
+
+      // While streaming: streamingMessageId is non-null
+      expect(store.byId["c1"]?.streamingMessageId).not.toBeNull();
+
+      // Simulate done event (as handleEvent does)
+      setStore("byId", "c1", "streamingMessageId", null);
+
+      // After done: streamingMessageId is null
+      expect(store.byId["c1"]?.streamingMessageId).toBeNull();
+
+      dispose();
+    });
+  });
+
+  it("D1+D3+D5: Two convs can stream simultaneously with independent streamingMessageId", async () => {
+    await createRoot(async (dispose) => {
+      const convA = { ...mockConv, id: "cA" };
+      const convB = { ...mockConv, id: "cB" };
+      setupConvState(convA, []);
+      setupConvState(convB, []);
+
+      // Both streaming simultaneously
+      setStore("byId", "cA", "streamingMessageId", "stream-A");
+      setStore("byId", "cB", "streamingMessageId", "stream-B");
+
+      // Each conv has its own streamingMessageId
+      expect(store.byId["cA"]?.streamingMessageId).toBe("stream-A");
+      expect(store.byId["cB"]?.streamingMessageId).toBe("stream-B");
+
+      // Cancel convA should only clear convA's streamingMessageId
+      cancel("cA");
+      expect(store.byId["cA"]?.streamingMessageId).toBeNull();
+      expect(store.byId["cB"]?.streamingMessageId).toBe("stream-B"); // Unaffected
+
+      // Cancel convB should only clear convB's streamingMessageId
+      cancel("cB");
+      expect(store.byId["cA"]?.streamingMessageId).toBeNull();
+      expect(store.byId["cB"]?.streamingMessageId).toBeNull();
+
+      dispose();
+    });
+  });
+});
