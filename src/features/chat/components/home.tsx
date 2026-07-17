@@ -156,10 +156,14 @@ export function HomeAgentForm(): JSX.Element {
   }));
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
+  // Read selectedWorkspaceId$ directly instead of form.state.values.workspaceId so
+  // the gate flips when chat.store.loadWorkspaces() resolves after home mount
+  // (the form's defaultValues are captured once at createForm() time, so they
+  // always see the boot-time `null` state and never the async auto-select).
+  // See src/index.tsx:32-58 for the boot order.
   const isInputDisabled = createMemo(() => {
     if (wsCount() === 0) return true;
-    // form.values.workspaceId is "" until user picks (sentinel); gate input + form-level validator handles submit.
-    if (form.state.values.workspaceId === "") return true;
+    if (selectedWorkspaceId$() === null) return true;
     return false;
   });
 
