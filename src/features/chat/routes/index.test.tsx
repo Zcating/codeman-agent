@@ -87,6 +87,9 @@ vi.mock("../../../shared/components/internal/codeman-sidebar", () => ({
         New conversation
       </button>
       <span data-testid="sidebar-selected-item">{props.selectedItemId ?? "none"}</span>
+      {props.settingsSlot ? (
+        <div data-testid="sidebar-footer">{props.settingsSlot}</div>
+      ) : null}
     </div>
   ),
   type: {},
@@ -206,9 +209,11 @@ describe("ChatLayout", () => {
     expect(getByTestId("codeman-sidebar")).toBeTruthy();
   });
 
-  it("Renders footer with settings link", () => {
-    const { getByText } = render(() => <ChatLayout />);
+  it("Renders chat-area footer with brand and sidebar footer with settings link", () => {
+    const { getByText, getByTestId } = render(() => <ChatLayout />);
     expect(getByText("codeman-agent")).toBeTruthy();
+    // Settings link now lives in the CodemanSidebar footer (rendered via settingsSlot)
+    expect(getByTestId("sidebar-footer")).toBeTruthy();
     expect(getByText("设置")).toBeTruthy();
   });
 

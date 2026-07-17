@@ -15,6 +15,7 @@ import {
   Sidebar,
   SidebarHeader,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
@@ -64,6 +65,10 @@ export interface CodemanSidebarProps {
 
   // Additional styling
   class?: string;
+
+  // Optional footer slot — caller renders arbitrary content (e.g. settings link).
+  // Rendered inside <SidebarFooter> at the bottom of the sidebar.
+  settingsSlot?: JSX.Element;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -193,7 +198,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
                           <SidebarMenu>
                             <For each={ws.children}>
                               {(c) => (
-                                <SidebarMenuItem>
+                                <SidebarMenuItem class="group relative">
                                   <SidebarMenuButton
                                     isActive={c.id === props.selectedItemId}
                                     onClick={() => {
@@ -230,6 +235,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
                                       when={confirmingId() === c.id}
                                       fallback={
                                         <SidebarMenuAction
+                                          showOnHover={true}
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             setConfirmingId(c.id);
@@ -240,11 +246,12 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
                                         </SidebarMenuAction>
                                       }
                                     >
-                                      {/* Inline confirm UI */}
-                                      <div class="ml-auto flex gap-1">
+                                      {/* Confirm overlay — covers the entire row so the
+                                          buttons aren't crammed at the row's end. */}
+                                      <div class="absolute inset-0 z-10 flex items-center justify-end gap-1 rounded-md bg-sidebar pr-2">
                                         <button
                                           type="button"
-                                          class="h-7 px-2 text-xs bg-destructive text-destructive-foreground rounded-md hover:bg-destructive-600"
+                                          class="h-7 px-2 text-xs bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             props.onDeleteItem?.(c.id);
@@ -282,6 +289,10 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      <Show when={props.settingsSlot}>
+        <SidebarFooter>{props.settingsSlot}</SidebarFooter>
+      </Show>
     </Sidebar>
   );
 }
