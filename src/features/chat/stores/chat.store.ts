@@ -500,6 +500,16 @@ export const loadWorkspaces = Effect.fnUntraced(
     const result = yield* svc.list();
     setStore("workspaces", result);
     setWorkspacesSignal(Object.values(store.workspaces));
+    // Bug-fix (2026-07): app startup with 1 persisted workspace leaves
+    // selectedWorkspaceId$ at null, so home.tsx's initialWorkspaceId() falls back
+    // to "" and HomeAgentForm's textarea stays permanently disabled. Mirror
+    // addWorkspace's pattern: if exactly 1 workspace exists and no current
+    // selection, auto-select that one. 0 workspaces: stay null (HomeAgentForm
+    // disabled by design, prompting user to add). 2+ workspaces: stay null so
+    // user picks via picker.
+    if (selectedWorkspaceId() === null && result.length === 1) {
+      setSelectedWorkspaceIdSignal(result[0].id);
+    }
   },
   Effect.provide(WorkspaceServiceLive),
 );
