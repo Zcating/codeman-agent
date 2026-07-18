@@ -813,6 +813,53 @@ describe("ChatView Bug regression: Invalid value (Type)", () => {
   });
 });
 
+// ─── Bug fix regression: 输入框 blur 后不应出现 '请输入消息内容' (submit-only 校验) ───
+// 根因：aabd902 给 NonEmptyString 加了 { message: () => "请输入消息内容" } annotation,
+// 把 generic 'Invalid value (Type)' 替换成友好提示。但 chat-view.tsx 的
+// <form.Field name="draft"> 仍用 validators={{ onBlur: effectSchema(DraftFieldSchema) }}
+// + error={field().state.meta.isTouched ? ...} —— 用户 focus 再 blur 空 textarea 时
+// onBlur validator 跑空字符串触发友好提示,isTouched=true 后错误渲染。
+// 期望：blur 不应触发校验,只有提交才校验数据。
+describe("ChatView Bug regression: '请输入消息内容' on blur (submit-only)", () => {
+  let scrollSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    scrollSpy = vi
+      .spyOn(Element.prototype, "scrollIntoView")
+      .mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    scrollSpy.mockRestore();
+    cleanup();
+  });
+
+  it("Bug: 输入框 blur 后不应出现 '请输入消息内容' (只有提交才校验)", async () => {
+    const { container } = render(() => <ChatView convId="conv-1" />);
+
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    expect(textarea).toBeTruthy();
+
+    // Sanity: mount 阶段不会有任何 destructive 提示
+    const mountMessages = Array.from(
+      container.querySelectorAll("p.text-destructive"),
+    ).map((el) => el.textContent ?? "");
+    expect(mountMessages).not.toContain("请输入消息内容");
+
+    // 模拟用户 focus → blur 空 textarea
+    textarea.focus();
+    fireEvent.blur(textarea);
+
+    // 等待 Solid 同步 flush + TanStack Form 状态更新
+    await waitFor(() => {
+      const messages = Array.from(
+        container.querySelectorAll("p.text-destructive"),
+      ).map((el) => el.textContent ?? "");
+      expect(messages).not.toContain("请输入消息内容");
+    });
+  });
+});
+
 // ─── Bug fix regression: 首次进入对话不应动画滚动 ───────────────────────────────
 //
 // 根因：chat-view.tsx 的 auto-scroll createEffect 在 mount 时立即执行,

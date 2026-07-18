@@ -31,7 +31,6 @@ import {
   recordInputEntry,
 } from "../stores/input-history.store";
 import {
-  DraftFieldSchema,
   ModelIdFieldSchema,
   ChatViewFormSchema,
   type ChatViewFormValue,
@@ -195,11 +194,8 @@ export function ChatView(props: { convId?: string }): JSX.Element {
           void form.handleSubmit();
         }}
       >
-        {/* draft field (textarea) */}
-        <form.Field
-          name="draft"
-          validators={{ onBlur: effectSchema(DraftFieldSchema) }}
-        >
+        {/* draft field (textarea) — submit-only validation (per UX request) */}
+        <form.Field name="draft">
           {(field) => (
             <>
               <label for="chat-input" class="sr-only">
@@ -234,7 +230,10 @@ export function ChatView(props: { convId?: string }): JSX.Element {
                 placeholder="发条消息…"
                 disabled={isRunning() || form.state.isSubmitting}
                 error={
-                  field().state.meta.isTouched
+                  // submit-only: 错误只在用户提交后才显示。isTouched 在 blur 后变 true,
+                  // 不再用作显示门控(避免 blur 触发校验后立即渲染错误)。
+                  // form.state.isSubmitted 在首次 handleSubmit() 后变 true (TanStack Form)。
+                  form.state.isSubmitted
                     ? firstErrorMessage(field().state.meta.errors)
                     : undefined
                 }

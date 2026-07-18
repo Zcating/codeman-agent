@@ -45,7 +45,6 @@ import {
   recordInputEntry,
 } from "../stores/input-history.store";
 import {
-  DraftFieldSchema,
   ModelIdFieldSchema,
   WorkspaceIdFieldSchema,
   HomeFormSchema,
@@ -188,11 +187,8 @@ export function HomeAgentForm(): JSX.Element {
           }}
           class="space-y-2"
         >
-          {/* draft field (textarea) */}
-          <form.Field
-            name="draft"
-            validators={{ onBlur: effectSchema(DraftFieldSchema) }}
-          >
+          {/* draft field (textarea) — submit-only validation (per UX request) */}
+          <form.Field name="draft">
             {(field) => (
               <>
                 <label for="codex-input" class="sr-only">
@@ -228,7 +224,10 @@ export function HomeAgentForm(): JSX.Element {
                   disabled={isInputDisabled() || form.state.isSubmitting}
                   placeholder={placeholder()}
                   error={
-                    field().state.meta.isTouched
+                    // submit-only: 错误只在用户提交后才显示。isTouched 在 blur 后变 true,
+                    // 不再用作显示门控(避免 blur 触发校验后立即渲染错误)。
+                    // form.state.isSubmitted 在首次 handleSubmit() 后变 true (TanStack Form)。
+                    form.state.isSubmitted
                       ? firstErrorMessage(field().state.meta.errors)
                       : undefined
                   }

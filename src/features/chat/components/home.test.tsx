@@ -996,3 +996,55 @@ describe("HomeAgentForm Bug regression: Invalid value (Type) on blur", () => {
     });
   });
 });
+
+// ─── Bug fix regression: 输入框 blur 后不应出现 '请输入消息内容' (submit-only 校验) ───
+// 根因：aabd902 给 NonEmptyString 加了 { message: () => "请输入消息内容" } annotation,
+// 把 generic 'Invalid value (Type)' 替换成友好提示。但 home.tsx / chat-view.tsx 的
+// <form.Field name="draft"> 仍用 validators={{ onBlur: effectSchema(DraftFieldSchema) }}
+// + error={field().state.meta.isTouched ? ...} —— 用户 focus 再 blur 空 textarea 时
+// onBlur validator 跑空字符串触发友好提示,isTouched=true 后错误渲染。
+// 期望：blur 不应触发校验,只有提交才校验数据。
+describe("HomeAgentForm Bug regression: '请输入消息内容' on blur (submit-only)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockIsOpen = false;
+    sharedOnValueChanges = [];
+    mockWorkspaces.length = 0;
+    mockSelectedWsId = null;
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("Bug: 输入框 blur 后不应出现 '请输入消息内容' (只有提交才校验)", async () => {
+    // 1 workspace → input enabled
+    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockSelectedWsId = "ws-1";
+
+    const { container } = render(() => <HomeAgentForm />);
+    const textarea = container.querySelector(
+      "[data-testid='codex-input']",
+    ) as HTMLTextAreaElement;
+    expect(textarea).toBeTruthy();
+    expect(textarea.disabled).toBe(false);
+
+    // Sanity: mount 阶段不会有任何 destructive 提示
+    const mountMessages = Array.from(
+      container.querySelectorAll("p.text-destructive"),
+    ).map((el) => el.textContent ?? "");
+    expect(mountMessages).not.toContain("请输入消息内容");
+
+    // 模拟用户 focus → blur 空 textarea
+    textarea.focus();
+    fireEvent.blur(textarea);
+
+    // 等待 Solid 同步 flush + TanStack Form 状态更新
+    await waitFor(() => {
+      const messages = Array.from(
+        container.querySelectorAll("p.text-destructive"),
+      ).map((el) => el.textContent ?? "");
+      expect(messages).not.toContain("请输入消息内容");
+    });
+  });
+});
