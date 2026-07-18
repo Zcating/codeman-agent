@@ -42,7 +42,7 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     const { page } = tauriEnv;
 
     // Q→A entry 04::hello-intro 输出 "你好！我是一个 AI 助手，很高兴认识你。"
-    // 见 e2e/fixtures/qa-w{0..3}.json。
+    // ADR-0027 D2: per-worker fixtures removed — single seed now.
 
     // 等待 Send 按钮出现（clickNewConversationAndWait 触发的 mock 完成后）
     try {
