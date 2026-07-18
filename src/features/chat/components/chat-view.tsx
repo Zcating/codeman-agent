@@ -228,7 +228,11 @@ export function ChatView(props: { convId?: string }): JSX.Element {
                 }}
                 placeholder="发条消息…"
                 disabled={isRunning() || form.state.isSubmitting}
-                error={firstErrorMessage(field().state.meta.errors)}
+                error={
+                  field().state.meta.isTouched
+                    ? firstErrorMessage(field().state.meta.errors)
+                    : undefined
+                }
               />
             </>
           )}
