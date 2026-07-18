@@ -116,23 +116,29 @@ describe("T4b — electron/main/file-sandbox.ts", () => {
   });
 
   describe("validatePathInWorkspace — blocked patterns", () => {
-    it("rejects Windows long-path prefix", async () => {
+    it("rejects Windows long-path prefix as SandboxViolation", async () => {
       try {
         await validatePathInWorkspace("\\\\?\\C:\\foo", workspace);
         expect.fail("should have thrown");
       } catch (e) {
         const err = e as AppError;
-        expect(err.kind).toBe("Blocked");
+        expect(err.kind).toBe("SandboxViolation");
+        if (err.kind === "SandboxViolation") {
+          expect(err.message).toMatch(/long-path|alternate data stream|not allowed/i);
+        }
       }
     });
 
-    it("rejects NTFS alternate data stream", async () => {
+    it("rejects NTFS alternate data stream as SandboxViolation", async () => {
       try {
         await validatePathInWorkspace("C:\\file.txt::data", workspace);
         expect.fail("should have thrown");
       } catch (e) {
         const err = e as AppError;
-        expect(err.kind).toBe("Blocked");
+        expect(err.kind).toBe("SandboxViolation");
+        if (err.kind === "SandboxViolation") {
+          expect(err.message).toMatch(/long-path|alternate data stream|not allowed/i);
+        }
       }
     });
   });

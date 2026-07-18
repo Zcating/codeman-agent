@@ -16,8 +16,11 @@ import { join, sep } from "node:path";
 
 export type AppError =
   | { kind: "NotFound"; path: string }
-  | { kind: "SandboxViolation"; path: string; workspaceRoot: string }
-  | { kind: "Blocked"; path: string; reason: string }
+  // TODO(ADR-0025 migration): renderer-side Schema.TaggedError SandboxViolation
+  // expects `workspaceLabel: Schema.String`; electron-side carries `workspaceRoot`.
+  // Field-name mismatch will reconcile when file-sandbox.ts migrates to
+  // Schema.TaggedError (out of scope per task B2). See decode-app-error.ts:5-6.
+  | { kind: "SandboxViolation"; path: string; workspaceRoot: string; message?: string }
   | { kind: "Unknown"; message: string };
 
 const BLOCKED_PATH_PATTERNS: RegExp[] = [
@@ -34,19 +37,30 @@ export async function validatePathForWrite(
   inputPath: string,
   workspaceRoot: string,
 ): Promise<string> {
-  // 1. Reject dangerous prefixes.
+  // 1. realpath the workspace root first (needed for Blocked-throw + final check).
+  let realRoot: string;
+  try {
+    realRoot = await realpath(workspaceRoot);
+  } catch {
+    throw {
+      kind: "Unknown" as const,
+      message: `workspace realpath failed`,
+    };
+  }
+
+  // 2. Reject dangerous prefixes (now with realRoot available for error context).
   for (const re of BLOCKED_PATH_PATTERNS) {
     if (re.test(inputPath)) {
-      const err: AppError = {
-        kind: "Blocked",
+      throw {
+        kind: "SandboxViolation" as const,
         path: inputPath,
-        reason: "Long-path prefix or NTFS alternate data stream not allowed",
+        workspaceRoot: realRoot,
+        message: "Long-path prefix or NTFS alternate data stream not allowed",
       };
-      throw err;
     }
   }
 
-  // 2. Resolve relative paths against workspaceRoot, not process CWD.
+  // 3. Resolve relative paths against workspaceRoot, not process CWD.
   //    Without this, `dirname("relative.txt")` = `"."` → `realpath(".")`
   //    resolves to Electron's CWD, which is outside the workspace and
   //    always triggers a SandboxViolation.
@@ -65,17 +79,6 @@ export async function validatePathForWrite(
       throw err;
     }
     throw { kind: "Unknown" as const, message: `parent realpath failed: ${String(e)}` };
-  }
-
-  // 3. realpath the workspace root, then check that joined path is inside.
-  let realRoot: string;
-  try {
-    realRoot = await realpath(workspaceRoot);
-  } catch {
-    throw {
-      kind: "Unknown" as const,
-      message: `workspace realpath failed`,
-    };
   }
 
   const candidate = join(realParent, basename(absolutePath));
@@ -103,19 +106,31 @@ export async function validatePathInWorkspace(
   inputPath: string,
   workspaceRoot: string,
 ): Promise<string> {
-  // 1. Reject dangerous prefixes BEFORE realpath (don't trust renderer).
+  // 1. realpath the workspace root first (needed for Blocked-throw + final check).
+  let realRoot: string;
+  try {
+    realRoot = await realpath(workspaceRoot);
+  } catch (e: unknown) {
+    const err: AppError = {
+      kind: "Unknown",
+      message: `workspace realpath failed: ${String(e)}`,
+    };
+    throw err;
+  }
+
+  // 2. Reject dangerous prefixes BEFORE realpath (don't trust renderer).
   for (const re of BLOCKED_PATH_PATTERNS) {
     if (re.test(inputPath)) {
-      const err: AppError = {
-        kind: "Blocked",
+      throw {
+        kind: "SandboxViolation" as const,
         path: inputPath,
-        reason: "Long-path prefix or NTFS alternate data stream not allowed",
+        workspaceRoot: realRoot,
+        message: "Long-path prefix or NTFS alternate data stream not allowed",
       };
-      throw err;
     }
   }
 
-  // 2. Resolve relative paths against workspaceRoot (not process CWD).
+  // 3. Resolve relative paths against workspaceRoot (not process CWD).
   //    Without this, realpath("relative.txt") resolves against Electron's CWD,
   //    which is outside the workspace, and always triggers SandboxViolation.
   const { isAbsolute, resolve } = await import("node:path");
@@ -123,7 +138,7 @@ export async function validatePathInWorkspace(
     ? inputPath
     : resolve(workspaceRoot, inputPath);
 
-  // 3. realpath.native — resolves symlinks + absolute path.
+  // 4. realpath.native — resolves symlinks + absolute path.
   //    Throws ENOENT if path doesn't exist (Rust canonicalize also errors here,
   //    but V3 explicitly distinguishes NotFound from SandboxViolation per
   //    ADR-0024 amendment D2).
@@ -143,19 +158,7 @@ export async function validatePathInWorkspace(
     throw err;
   }
 
-  // 4. realpath the workspace root, then prefix check.
-  let realRoot: string;
-  try {
-    realRoot = await realpath(workspaceRoot);
-  } catch (e: unknown) {
-    const err: AppError = {
-      kind: "Unknown",
-      message: `workspace realpath failed: ${String(e)}`,
-    };
-    throw err;
-  }
-
-  // Prefix check (path must be inside realRoot).
+  // 5. Prefix check (path must be inside realRoot).
   const inside =
     real === realRoot || real.startsWith(realRoot + sep);
   if (!inside) {
