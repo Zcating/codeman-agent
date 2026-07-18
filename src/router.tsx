@@ -3,15 +3,31 @@
 //! Code-based routing (no Vite plugin). Route structure:
 //! - /              → ChatLayout → HomeRoute (HomeAgentForm)
 //! - /conversation/$convId → ChatLayout → ConversationRoute (ChatView + back)
-//! - /settings      → SettingsPage
+//! - /settings      → SettingsSidebar (layout) → 4 child sections
+//!   - /settings/llm       → LlmSection
+//!   - /settings/app       → AppSection
+//!   - /settings/window    → WindowSection
+//!   - /settings/advanced  → AdvancedSection
+//!
+//! `/settings` (no tab) → redirect to `/settings/llm` via `beforeLoad`.
 //!
 //! V3 e2e patch: exposes `window.__router` so cdp-driver.ts::goto can call
 //! `router.navigate({ to: path })` directly (bypasses `history.pushState`
 //! which on file:// URLs can't update the absolute Windows path).
 
-import { createRouter, createRoute, createRootRoute, Outlet } from "@tanstack/solid-router";
+import {
+  createRouter,
+  createRoute,
+  createRootRoute,
+  Outlet,
+  redirect,
+} from "@tanstack/solid-router";
 import { ChatLayout, HomeRoute, ConversationRoute } from "./features/chat/routes/index";
-import { SettingsPage } from "./features/settings/routes/settings";
+import { SettingsSidebar } from "./features/settings/components/settings-sidebar";
+import { LlmSection } from "./features/settings/routes/sections/llm-section";
+import { AppSection } from "./features/settings/routes/sections/app-section";
+import { WindowSection } from "./features/settings/routes/sections/window-section";
+import { AdvancedSection } from "./features/settings/routes/sections/advanced-section";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -66,15 +82,57 @@ const conversationRoute = createRoute({
   component: ConversationRoute,
 });
 
-const settingsRoute = createRoute({
+// ─── Settings nested routes (ADR-0030 D8) ────────────────────────────────
+//
+// Parent route uses `path: "/settings"` + `beforeLoad` redirect — this is
+// the canonical TanStack Router pattern that lights up SettingsSidebar on
+// every `/settings/*` URL. (Plan-agent Q1: confirmed ADR-0030 wins over
+// the `id: "settings"` alternative — that variant doesn't auto-mount
+// the layout on /settings/* paths.)
+
+const settingsLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
-  component: SettingsPage,
+  component: SettingsSidebar,
+  beforeLoad: ({ location }) => {
+    if (location.pathname === "/settings") {
+      throw redirect({ to: "/settings/llm", replace: true });
+    }
+  },
+});
+
+const settingsLlmRoute = createRoute({
+  getParentRoute: () => settingsLayoutRoute,
+  path: "llm",
+  component: LlmSection,
+});
+
+const settingsAppRoute = createRoute({
+  getParentRoute: () => settingsLayoutRoute,
+  path: "app",
+  component: AppSection,
+});
+
+const settingsWindowRoute = createRoute({
+  getParentRoute: () => settingsLayoutRoute,
+  path: "window",
+  component: WindowSection,
+});
+
+const settingsAdvancedRoute = createRoute({
+  getParentRoute: () => settingsLayoutRoute,
+  path: "advanced",
+  component: AdvancedSection,
 });
 
 export const routeTree = rootRoute.addChildren([
   chatLayoutRoute.addChildren([homeRoute, conversationRoute]),
-  settingsRoute,
+  settingsLayoutRoute.addChildren([
+    settingsLlmRoute,
+    settingsAppRoute,
+    settingsWindowRoute,
+    settingsAdvancedRoute,
+  ]),
 ]);
 
 export const router = createRouter({

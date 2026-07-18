@@ -1,0 +1,61 @@
+//! AdvancedSection — `/settings/advanced` route component tests.
+
+import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
+import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
+import { AdvancedSection } from "./advanced-section";
+import { mockState } from "../../../../__mocks__/ipc-mock";
+
+vi.mock("@tanstack/solid-router", () => ({
+  // No router usage in this section, but include minimal stub for safety
+}));
+
+beforeEach(() => {
+  mockState.calls = [];
+  mockState.rejected = undefined;
+});
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+
+describe("AdvancedSection — /settings/advanced", () => {
+  it("renders 'Clear all history…' button (idle state)", () => {
+    render(() => <AdvancedSection />);
+    expect(screen.getByText(/Clear all history/i)).toBeInTheDocument();
+  });
+
+  it("clicking Clear shows confirm overlay with Yes / Cancel", async () => {
+    render(() => <AdvancedSection />);
+    const clearBtn = screen.getByText(/Clear all history/i);
+    fireEvent.click(clearBtn);
+    expect(
+      screen.getByText(/Delete all conversations\? This cannot be undone\./i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Yes, delete all/i)).toBeInTheDocument();
+  });
+
+  it("clicking Cancel in confirm overlay returns to idle state", () => {
+    render(() => <AdvancedSection />);
+    // Enter confirm state
+    fireEvent.click(screen.getByText(/Clear all history/i));
+    expect(
+      screen.getByText(/Delete all conversations\?/i),
+    ).toBeInTheDocument();
+    // Click Cancel
+    fireEvent.click(screen.getAllByText(/Cancel/i)[0]!);
+    // Back to idle
+    expect(screen.getByText(/Clear all history/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Delete all conversations\?/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("clicking 'Yes, delete all' triggers invoke('clearAllHistory')", async () => {
+    render(() => <AdvancedSection />);
+    fireEvent.click(screen.getByText(/Clear all history/i));
+    fireEvent.click(screen.getByText(/Yes, delete all/i));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(mockState.calls).toContain("clearAllHistory");
+  });
+});
