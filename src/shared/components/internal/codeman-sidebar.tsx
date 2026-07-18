@@ -1,298 +1,332 @@
-//! CodemanSidebar — Layer 2 business composition (per ADR-0022 D3 + ADR-0023 D7-CS)。
-//! Consumes Layer 1 (`ui/sidebar.tsx`), adds chat-aware layout.
-//! Strictly prop-driven. ZERO business logic, ZERO feature/store imports。
+//! CodemanSidebar — universal render-driven sidebar (per ADR-0030).
 //!
-//! Cascade accordion 由 @ark-ui/solid Accordion 承载（D7-CS8）：
-//! - Ark UI 自动处理 ARIA / 键盘导航 / 折叠-展开状态机
-//! - 我们仅叠加语义 data 属性（data-workspace-id / data-conv-id）供 e2e 选择
-//! - 展开状态完全由 Ark UI 内部管理（uncontrolled via defaultValue）
-//!   符合 ADR-0023 D7-CS2「组件内部 signal，不持久化、不耦合 appStore」。
+//! Layer 2 business composition (per ADR-0022 D3): strictly prop-driven,
+//! ZERO business logic, ZERO feature/store imports. Layer 1 primitives
+//! live in `ui/sidebar.tsx`.
+//!
+//! Design philosophy (ADR-0030 D2):
+//! - Consumer passes `options: SidebarOption[]` and a `renderItem` function.
+//! - sidebar wraps each rendered node with active highlight + hover bg + click
+//!   handler (consumer doesn't need to manage classes or onclick).
+//! - Accordion state managed by @ark-ui/solid internally (uncontrolled via
+//!   defaultValue), per ADR-0023 D7-CS2 (component internal signal, not coupled
+//!   to appStore).
+//! - 5 slots (header / sidebarHeader / sidebarFooter / footer / children)
+//!   expose page-level layout while sidebar owns the two-column shell.
 
-import { createSignal, For, Show, type JSX } from "solid-js";
-import { ChevronRight, Folder, MessageSquare, Loader2, Plus, Pencil, Trash2 } from "lucide-solid";
+import { For, Show, type JSX } from "solid-js";
 import { Accordion } from "@ark-ui/solid";
 import {
-  Sidebar,
-  SidebarHeader,
+  Sidebar as SidebarPrimitive,
   SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarMenuAction,
-  SidebarMenuBadge,
+  SidebarFooter as SidebarPrimitiveFooter,
+  SidebarHeader as SidebarPrimitiveHeader,
 } from "../ui/sidebar";
 import { cn } from "../../lib/cn";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Types ─────────────────────────────────────────────────────────────────
 
-export interface ConvNode {
-  kind: "conv";
-  id: string;
+/**
+ * Per-node configuration. Consumers build `SidebarOption[]` from their domain
+ * data (chat: WorkspaceNode[] + ConvNode[]; settings: 4-tab nav config).
+ */
+export interface SidebarItemConfig {
+  /** Required: human-readable label (form semantic, also used as fallback key). */
   label: string;
-  subLabel?: string; // e.g., "2024-01-15" formatted date
-  isStreaming?: boolean; // Show streaming badge
-  isDisabled?: boolean; // e.g. for "Needs workspace" V1.x convs (filtered out upstream per D7-CS7)
-  disabledReason?: string;
+  /** Optional: navigation key. Falls back to `label` if not provided. */
+  value?: string;
+  /** Optional: leading icon (lucide-solid `<Icon />` typically). */
+  icon?: JSX.Element;
+  /** Optional: disabled items get opacity-60 + `<button disabled>` (no click). */
+  disabled?: boolean;
 }
 
-export interface WorkspaceNode {
-  kind: "workspace";
-  id: string;
-  label: string;
-  rootPath: string; // Display path, e.g., "C:\\Users\\foo\\projects\\bar"
-  children: ConvNode[]; // Sorted by updated_at desc (parent responsibility)
+/**
+ * Top-level option (group / nav item). Extends leaf config with Accordion
+ * defaults and nested children (2-level depth only, per ADR-0030 D1).
+ */
+export interface SidebarOption extends SidebarItemConfig {
+  /** Uncontrolled: expand this group on mount. Maps to Accordion.defaultValue. */
+  defaultExpanded?: boolean;
+  /** Children: leaves inside this group. 2-level nesting (group > leaf). */
+  children?: SidebarItemConfig[];
 }
+
+/** Consumer's per-item render function — receives a leaf config, returns JSX. */
+export type SidebarRenderItem = (item: SidebarItemConfig) => JSX.Element;
+
+/** Custom active predicate. Receives (itemValue, currentValue). */
+export type SidebarIsActiveFn = (
+  value: string | undefined,
+  currentValue: string | undefined,
+) => boolean;
 
 export interface CodemanSidebarProps {
-  // Cascade tree: WorkspaceNode[] with nested ConvNode[]
-  nodes: WorkspaceNode[];
-  selectedItemId: string | null; // Currently active conv id
-  onSelectItem: (id: string) => void;
-  onDeleteItem?: (id: string) => void;
-  onCreateItem?: () => void;
-  onEmptyWorkspaceClick?: (workspaceId: string) => void; // D7-CS6
-  onRenameWorkspace?: (workspaceId: string, currentLabel: string) => void;
-  onDeleteWorkspace?: (workspaceId: string, label: string) => void;
+  /** Tree of nodes (groups + leaves). */
+  options: SidebarOption[];
+  /** Render function called once per leaf (and per child inside groups). */
+  renderItem: SidebarRenderItem;
+  /**
+   * Optional override for the group trigger content. When provided, replaces
+   * the default `<span>{label}</span>`. Use this for group-level actions
+   * (rename, delete) that must coexist with the accordion trigger.
+   * Falls back to plain label when omitted.
+   */
+  renderGroupHeader?: (group: SidebarOption) => JSX.Element;
 
-  // Customization
-  createLabel?: string; // default: "新对话"
-  workspacesEmptyText?: string; // default: "No workspaces"
-  emptyConvText?: string; // default: "该 workspace 暂无会话"
+  /**
+   * Current value for active highlighting. Syntactic sugar: when provided
+   * without a custom `isActive`, sidebar uses `value === currentValue`.
+   */
+  currentValue?: string;
+  /** Custom active predicate. Receives `(value, currentValue)`. */
+  isActive?: SidebarIsActiveFn;
+  /** Click handler for leaf items. Called with `item.value` (or label fallback). */
+  onItemSelect?: (value: string) => void;
+  /**
+   * Optional click handler for "empty group" placeholder. When a group's
+   * `children` array is empty AND this handler is provided, sidebar renders
+   * an inline "该 workspace 暂无会话" button (or equivalent) inside the group
+   * body. Click → calls `onEmptyWorkspaceClick(group.value)`.
+   * Skipped when the handler is omitted (consumer can render own empty UI
+   * via `renderGroupHeader`).
+   */
+  onEmptyGroupClick?: (groupValue: string) => void;
 
-  // Additional styling
+  // ─── 5 slots (per ADR-0030 D3) ────────────────────────────────────────
+  /** Outer top slot (above sidebar shell — page header). */
+  header?: JSX.Element;
+  /** Inner top slot (inside sidebar, above menu). */
+  sidebarHeader?: JSX.Element;
+  /** Inner bottom slot (inside sidebar, below menu). */
+  sidebarFooter?: JSX.Element;
+  /** Outer bottom slot (below sidebar shell — page footer). */
+  footer?: JSX.Element;
+  /** Main content slot — rendered in `SidebarInset` (right column). */
+  children?: JSX.Element;
+
+  /** Shown when `options.length === 0`. */
+  emptyMessage?: string;
+  /** Tailwind utility class merged into the root `<aside>`. */
   class?: string;
-
-  // Optional footer slot — caller renders arbitrary content (e.g. settings link).
-  // Rendered inside <SidebarFooter> at the bottom of the sidebar.
-  settingsSlot?: JSX.Element;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+/** Default active predicate: strict equality. */
+const isEqual = (a: unknown, b: unknown): boolean => a === b;
+
+/**
+ * Compute whether an item is currently active.
+ * Uses custom `isActive` if provided; otherwise falls back to
+ * `value === currentValue` (strict equality).
+ */
+function computeActive(
+  item: SidebarItemConfig,
+  currentValue: string | undefined,
+  isActiveFn: SidebarIsActiveFn | undefined,
+): boolean {
+  const value = item.value ?? item.label;
+  if (isActiveFn) return isActiveFn(value, currentValue);
+  return isEqual(value, currentValue);
+}
+
+/**
+ * Render a leaf wrapped in a `<div role="menuitem">` with click + active +
+ * disabled attrs. Slices 4-7 cover: active highlight, click → onItemSelect,
+ * disabled blocks click + opacity-60 visual. Slice 13: element carries
+ * data-value for e2e.
+ *
+ * Wrapper is a `<div role="menuitem">` (not `<button>`) so consumers can
+ * nest their own `<button>` elements inside (e.g., per-item delete action).
+ * Click + keyboard activation (Enter/Space) are handled manually since div
+ * has no native button semantics. Per WAI-ARIA menu pattern.
+ */
+function renderLeaf(
+  item: SidebarItemConfig,
+  props: CodemanSidebarProps,
+): JSX.Element {
+  const active = (): boolean =>
+    computeActive(item, props.currentValue, props.isActive);
+  const handleClick = (): void => {
+    if (item.disabled) return;
+    props.onItemSelect?.(item.value ?? item.label);
+  };
+  const handleKeyDown = (e: KeyboardEvent): void => {
+    if (item.disabled) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleClick();
+    }
+  };
+  const valueKey = item.value ?? item.label;
+  return (
+    <div
+      role="menuitem"
+      tabindex={item.disabled ? undefined : 0}
+      data-value={valueKey}
+      class={cn(
+        "group/row relative flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors",
+        "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+        active()
+          ? "bg-sidebar-primary text-sidebar-primary-foreground"
+          : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        item.disabled && "opacity-60 cursor-not-allowed",
+      )}
+      aria-current={active() ? "page" : undefined}
+      aria-disabled={item.disabled || undefined}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+    >
+      {props.renderItem(item)}
+    </div>
+  );
+}
+
+// ─── Component ──────────────────────────────────────────────────────────────
 
 export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
-  // Inline delete confirm UI state — NOT data state, only transient UI flag
-  // for showing the "确认 / 取消" inline confirm UI on a conv item.
-  // Cascade accordion state is owned by Ark UI Accordion internally.
-  // We pass a render-prop handler for conv click to clear it.
-  // NOTE: Ark UI Accordion's uncontrolled mode means we don't track item open
-  // state here; only the inline-confirm transient state lives in this component.
-  const [confirmingId, setConfirmingId] = createSignal<string | null>(null);
+  // Split options into flat leaves vs groups.
+  // Discriminator: `children === undefined` → flat leaf (no nesting).
+  // `children: []` (empty array) → group with empty body (renders onEmptyGroupClick button).
+  // `children: [...]` (non-empty) → group with leaves.
+  // This distinction preserves chat-domain semantics: workspace with no
+  // conversations is still a group (not a flat leaf).
+  const flatLeaves = (): SidebarOption[] =>
+    props.options.filter((o) => o.children === undefined);
+  const groups = (): SidebarOption[] =>
+    props.options.filter((o) => o.children !== undefined);
+
+  // Accordion initial value: groups with `defaultExpanded: true`.
+  // ADR-0023 D7-CS2 + ADR-0030 D5: uncontrolled via defaultValue.
+  const accordionDefaultValue = (): string[] =>
+    props.options
+      .filter((o) => o.children !== undefined && o.defaultExpanded)
+      .map((o) => o.value ?? o.label);
 
   return (
-    <Sidebar class={props.class}>
-      {/* Create button — only when onCreateItem provided */}
-      <Show when={props.onCreateItem}>
-        <SidebarHeader>
-          <button
-            type="button"
-            class={cn(
-              "flex h-8 w-full items-center gap-2 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary-600 transition-colors",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-            )}
-            onClick={() => props.onCreateItem?.()}
-            aria-label={props.createLabel ?? "新对话"}
-          >
-            <Plus class="h-4 w-4" />
-            {props.createLabel ?? "新对话"}
-          </button>
-        </SidebarHeader>
+    <div class="flex h-full w-full flex-col">
+      {/* Outer header slot — above sidebar shell (page-level) */}
+      <Show when={props.header}>
+        <div data-slot="header" class="shrink-0">
+          {props.header}
+        </div>
       </Show>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Workspaces</SidebarGroupLabel>
-          <SidebarGroupContent>
+      {/* Two-column row: sidebar + main content */}
+      <div class="flex flex-1 min-h-0">
+        <SidebarPrimitive class={props.class}>
+          {/* Inner sidebar header slot — inside sidebar, above menu */}
+          <Show when={props.sidebarHeader}>
+            <SidebarPrimitiveHeader>
+              {props.sidebarHeader}
+            </SidebarPrimitiveHeader>
+          </Show>
+
+          <SidebarContent>
             <Show
-              when={props.nodes.length > 0}
+              when={props.options.length > 0}
               fallback={
-                <div class="p-3 text-sm text-muted-foreground">
-                  <p>{props.workspacesEmptyText ?? "No workspaces"}</p>
-                </div>
+                <Show when={props.emptyMessage}>
+                  <div
+                    data-testid="empty-state"
+                    class="p-3 text-sm text-muted-foreground"
+                  >
+                    {props.emptyMessage}
+                  </div>
+                </Show>
               }
             >
-              {/* Ark UI Accordion: cascade with single-expand + collapsible (D7-CS1) */}
-              <Accordion.Root
-                multiple={false}
-                collapsible={true}
-                // Expand the first workspace by default so convs are immediately visible
-                defaultValue={props.nodes.length > 0 ? [props.nodes[0]!.id] : []}
-                data-testid="sidebar-accordion"
-              >
-                <For each={props.nodes}>
-                  {(ws) => (
-                    <Accordion.Item
-                      value={ws.id}
-                      data-workspace-id={ws.id}
-                      class="group/item"
-                    >
-                      <Accordion.ItemTrigger
-                        aria-label={`Workspace: ${ws.label}`}
-                        class={cn(
-                          "flex h-7 w-full items-center gap-2 rounded-md px-2 text-sm",
-                          "hover:bg-accent hover:text-accent-foreground",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-                        )}
-                      >
-                        <ChevronRight
-                          class="h-4 w-4 shrink-0 transition-transform group-data-[state=open]/item:rotate-90"
-                          aria-hidden="true"
-                        />
-                        <Folder class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        <span class="truncate flex-1">{ws.label}</span>
-                        <Show when={props.onRenameWorkspace || props.onDeleteWorkspace}>
-                          <span
-                            class="pointer-events-auto flex items-center gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <Show when={props.onRenameWorkspace}>
-                              <button
-                                type="button"
-                                class="flex h-4 w-4 items-center justify-center rounded-md hover:bg-accent"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  props.onRenameWorkspace?.(ws.id, ws.label);
-                                }}
-                                aria-label={`Rename ${ws.label}`}
-                              >
-                                <Pencil class="h-3 w-3" aria-hidden="true" />
-                              </button>
-                            </Show>
-                            <Show when={props.onDeleteWorkspace}>
-                              <button
-                                type="button"
-                                class="flex h-4 w-4 items-center justify-center rounded-md hover:bg-accent hover:text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  props.onDeleteWorkspace?.(ws.id, ws.label);
-                                }}
-                                aria-label={`Delete ${ws.label}`}
-                              >
-                                <Trash2 class="h-3 w-3" aria-hidden="true" />
-                              </button>
-                            </Show>
-                          </span>
-                        </Show>
-                      </Accordion.ItemTrigger>
+              {/* Flat leaves (no children): render via renderItem directly */}
+              <Show when={flatLeaves().length > 0}>
+                <ul class="flex flex-col gap-0.5 list-none p-0 m-0">
+                  <For each={flatLeaves()}>
+                    {(item) => <li>{renderLeaf(item, props)}</li>}
+                  </For>
+                </ul>
+              </Show>
 
-                      <Accordion.ItemContent>
-                        <Show
-                          when={ws.children.length > 0}
-                          fallback={
+              {/* Groups (have children): render via @ark-ui/solid Accordion */}
+              <Show when={groups().length > 0}>
+                <Accordion.Root
+                  multiple={false}
+                  collapsible={true}
+                  defaultValue={accordionDefaultValue()}
+                >
+                  <For each={groups()}>
+                    {(group) => (
+                  <Accordion.Item
+                    value={group.value ?? group.label}
+                    data-value={group.value ?? group.label}
+                  >
+                    <Accordion.ItemTrigger>
+                      {props.renderGroupHeader
+                        ? props.renderGroupHeader(group)
+                        : <span>{group.label}</span>}
+                    </Accordion.ItemTrigger>
+                    <Accordion.ItemContent>
+                      <Show
+                        when={
+                          group.children &&
+                          group.children.length > 0
+                        }
+                        fallback={
+                          <Show when={props.onEmptyGroupClick}>
                             <div class="pl-6 pr-3 pb-2">
                               <button
                                 type="button"
                                 class="w-full text-left px-2 py-1 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
-                                onClick={() => props.onEmptyWorkspaceClick?.(ws.id)}
-                                aria-label={`${ws.label}: ${props.emptyConvText ?? "该 workspace 暂无会话"}`}
-                                data-empty-workspace-id={ws.id}
+                                onClick={() =>
+                                  props.onEmptyGroupClick?.(
+                                    group.value ?? group.label,
+                                  )
+                                }
+                                aria-label={`${group.label}: empty group`}
+                                data-empty-group-value={
+                                  group.value ?? group.label
+                                }
                               >
-                                {props.emptyConvText ?? "该 workspace 暂无会话"}
+                                {group.label} (empty)
                               </button>
                             </div>
-                          }
-                        >
-                          <SidebarMenu>
-                            <For each={ws.children}>
-                              {(c) => (
-                                <SidebarMenuItem class="group relative">
-                                  <SidebarMenuButton
-                                    isActive={c.id === props.selectedItemId}
-                                    onClick={() => {
-                                      setConfirmingId(null);
-                                      props.onSelectItem(c.id);
-                                    }}
-                                    class={c.isDisabled ? "opacity-60" : undefined}
-                                    aria-label={`会话: ${c.label}`}
-                                    aria-current={c.id === props.selectedItemId ? "page" : undefined}
-                                    data-conv-id={c.id}
-                                  >
-                                    <MessageSquare class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    <div class="flex min-w-0 flex-1 flex-col">
-                                      <span class="truncate text-sm">{c.label}</span>
-                                      <Show when={c.subLabel}>
-                                        <span class="truncate text-xs text-muted-foreground">{c.subLabel}</span>
-                                      </Show>
-                                    </div>
-                                  </SidebarMenuButton>
-
-                                  {/* Streaming badge */}
-                                  <Show when={c.isStreaming}>
-                                    <SidebarMenuBadge>
-                                      <Loader2
-                                        class="h-3 w-3 animate-spin"
-                                        aria-label="streaming"
-                                      />
-                                    </SidebarMenuBadge>
-                                  </Show>
-
-                                  {/* Delete action — only when onDeleteItem provided */}
-                                  <Show when={props.onDeleteItem && !c.isDisabled}>
-                                    <Show
-                                      when={confirmingId() === c.id}
-                                      fallback={
-                                        <SidebarMenuAction
-                                          showOnHover={true}
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setConfirmingId(c.id);
-                                          }}
-                                          aria-label="Delete"
-                                        >
-                                          <span aria-hidden="true">×</span>
-                                        </SidebarMenuAction>
-                                      }
-                                    >
-                                      {/* Confirm overlay — covers the entire row so the
-                                          buttons aren't crammed at the row's end. */}
-                                      <div class="absolute inset-0 z-10 flex items-center justify-end gap-1 rounded-md bg-sidebar pr-2">
-                                        <button
-                                          type="button"
-                                          class="h-7 px-2 text-xs bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            props.onDeleteItem?.(c.id);
-                                            setConfirmingId(null);
-                                          }}
-                                          aria-label="确认删除"
-                                        >
-                                          删除
-                                        </button>
-                                        <button
-                                          type="button"
-                                          class="h-7 px-2 text-xs rounded-md border border-input hover:bg-accent"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setConfirmingId(null);
-                                          }}
-                                          aria-label="取消删除"
-                                        >
-                                          取消
-                                        </button>
-                                      </div>
-                                    </Show>
-                                  </Show>
-                                </SidebarMenuItem>
-                              )}
-                            </For>
-                          </SidebarMenu>
-                        </Show>
-                      </Accordion.ItemContent>
-                    </Accordion.Item>
-                  )}
-                </For>
-              </Accordion.Root>
+                          </Show>
+                        }
+                      >
+                        <ul class="flex flex-col gap-0.5 list-none p-0 m-0">
+                          <For each={group.children}>
+                            {(child) => <li>{renderLeaf(child, props)}</li>}
+                          </For>
+                        </ul>
+                      </Show>
+                    </Accordion.ItemContent>
+                      </Accordion.Item>
+                    )}
+                  </For>
+                </Accordion.Root>
+              </Show>
             </Show>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
+          </SidebarContent>
 
-      <Show when={props.settingsSlot}>
-        <SidebarFooter>{props.settingsSlot}</SidebarFooter>
+          {/* Inner sidebar footer slot — inside sidebar, below menu */}
+          <Show when={props.sidebarFooter}>
+            <SidebarPrimitiveFooter>
+              {props.sidebarFooter}
+            </SidebarPrimitiveFooter>
+          </Show>
+        </SidebarPrimitive>
+
+        {/* Children slot — main content area (right column) */}
+        <Show when={props.children}>
+          <main class="flex-1 min-w-0 overflow-y-auto">{props.children}</main>
+        </Show>
+      </div>
+
+      {/* Outer footer slot — below sidebar shell (page-level) */}
+      <Show when={props.footer}>
+        <div data-slot="footer" class="shrink-0">
+          {props.footer}
+        </div>
       </Show>
-    </Sidebar>
+    </div>
   );
 }
