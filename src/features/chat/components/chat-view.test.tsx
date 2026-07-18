@@ -3,7 +3,7 @@
 //! Mocked: conversations store (V2 ADR-0019，不再 mock messages.store / agent.store）。
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, cleanup, fireEvent } from "@solidjs/testing-library";
+import { render, cleanup, fireEvent, waitFor } from "@solidjs/testing-library";
 import { For } from "solid-js";
 import { Effect } from "effect";
 import { ChatView } from "./chat-view";
@@ -780,5 +780,35 @@ describe("ChatView Bug regression: Invalid value (Type)", () => {
       container.querySelectorAll("p.text-destructive"),
     ).map((el) => el.textContent ?? "");
     expect(destructiveMessages).not.toContain("Invalid value (Type)");
+  });
+
+  // 对称 home.test.tsx 的 "Bug regression: Invalid value (Type) on blur"。
+  // 根因：DraftFieldSchema = NonEmptyString = Schema.minLength(1) 无 message annotation。
+  // 用户 focus textarea 后 click 外部 → onBlur validator 跑空字符串 →
+  // effect-schema-adapter 的 fallback "Invalid value (Type)" 渲染到 textarea 下方。
+  // 修复：Schema.minLength(1) 加 { message: "..." } annotation，fallback 不再触发。
+  it("Bug: 输入框 blur 后不应出现 generic 'Invalid value (Type)' 提示", async () => {
+    const { container } = render(() => <ChatView convId="conv-1" />);
+
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    expect(textarea).toBeTruthy();
+
+    // Sanity: mount 阶段 (未 touch) 不会有任何 destructive 提示
+    const mountMessages = Array.from(
+      container.querySelectorAll("p.text-destructive"),
+    ).map((el) => el.textContent ?? "");
+    expect(mountMessages).not.toContain("Invalid value (Type)");
+
+    // 模拟用户 focus → blur 空 textarea (DraftFieldSchema 触发 onBlur validator)
+    textarea.focus();
+    fireEvent.blur(textarea);
+
+    // 等待 Solid 同步 flush + TanStack Form 状态更新
+    await waitFor(() => {
+      const messages = Array.from(
+        container.querySelectorAll("p.text-destructive"),
+      ).map((el) => el.textContent ?? "");
+      expect(messages).not.toContain("Invalid value (Type)");
+    });
   });
 });
