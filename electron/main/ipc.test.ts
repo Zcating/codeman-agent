@@ -61,6 +61,10 @@ const EXPECTED_CHANNELS = [
   "notify",
   "openExternal",
   "getLogPath",
+  // Provider CRUD
+  "deleteProvider",
+  // Abort
+  "abortRequest",
   // QA 表由 electron/main/mock-server.ts 直接经 qa-loader.ts 读,不暴露 IPC
 ];
 
@@ -70,7 +74,7 @@ describe("T3 — electron/main/ipc.ts", () => {
     fakeWin.webContents.send.mockClear();
   });
 
-  it("registers all 23 expected ipcMain.handle channels (qa:get_table removed — handled by mock-server)", async () => {
+  it("registers all 27 expected ipcMain.handle channels (qa:get_table removed — handled by mock-server)", async () => {
     const { registerIpcHandlers } = await import("./ipc");
     registerIpcHandlers({ getMainWindow: () => fakeWin as any });
     const channels = fakeIpcMain.handle.mock.calls.map((c) => c[0]);
@@ -101,5 +105,13 @@ describe("T3 — electron/main/ipc.ts", () => {
     emitStreamChunk({ kind: "token", content: "x" });
     expect(destroyed.webContents.send).not.toHaveBeenCalled();
     expect(fakeWin.webContents.send).toHaveBeenCalled();
+  });
+
+  it("deleteProvider + abortRequest handlers are registered", async () => {
+    const { registerIpcHandlers } = await import("./ipc");
+    registerIpcHandlers({ getMainWindow: () => fakeWin as any });
+    const channels = fakeIpcMain.handle.mock.calls.map((c) => c[0]);
+    expect(channels).toContain("deleteProvider");
+    expect(channels).toContain("abortRequest");
   });
 });

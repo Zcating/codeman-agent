@@ -59,6 +59,8 @@ export interface CodemanApi {
    * 留此声明是为 renderer/preload 类型一致，避免 dispatchInvoke 命中 default 抛 Unknown。
    */
   deleteProvider: (id: string) => Promise<unknown>;
+  // ADR-0024 D7: abort in-flight LLM request by requestId
+  abortRequest: (requestId: string) => Promise<unknown>;
   readFile: (workspaceId: string, path: string) => Promise<unknown>;
   writeFile: (workspaceId: string, path: string, content: string) => Promise<unknown>;
   editFile: (
@@ -140,6 +142,8 @@ async function dispatchInvoke<T>(
       return (await a.pickWorkspacePath()) as T;
     case "deleteProvider":
       return (await a.deleteProvider(arg("id") as string)) as T;
+    case "abortRequest":
+      return (await a.abortRequest(arg("requestId") as string)) as T;
     case "readFile":
       return (await a.readFile(arg("workspaceId") as string, arg("path") as string)) as T;
     case "writeFile":

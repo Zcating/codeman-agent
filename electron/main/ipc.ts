@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { initDatabase, getDatabase } from "./db/mod";
 // QA 路由由 electron/main/mock-server.ts 负责(POST /mock/anthropic/v1/messages
 // 经 qa-loader.ts 读 Q→A 文件);不再走 IPC。
-import { sanitize, migrationsV0ToV15, migrateV15SnakeToCamel, type SettingsV15 } from "./settings-schema";
+import { sanitize, migrationsV0ToV15, type SettingsV15 } from "./settings-schema";
 import {
   validatePathInWorkspace,
   readFileInWorkspace,
@@ -24,6 +24,9 @@ import {
 // ─── Settings store (JSON file under app.getPath("userData")) ─────────
 
 let settingsCache: SettingsV15 | null = null;
+
+// ADR-0024 D7: Map<requestId, AbortController> for aborting in-flight LLM requests
+const abortControllers = new Map<string, AbortController>();
 
 function settingsPath(): string {
   // app.setPath('userData') is called BEFORE registerIpcHandlers in main/index.ts.
@@ -41,10 +44,7 @@ function loadSettings(): SettingsV15 {
       raw = {};
     }
   }
-  // ADR-0024 D10: convert legacy V3 snake_case settings.json to canonical
-  // camelCase BEFORE V0→V15 migration check. Idempotent on already-camel input.
-  const camelRaw = migrateV15SnakeToCamel(raw);
-  const migrated = migrationsV0ToV15(camelRaw as Parameters<typeof migrationsV0ToV15>[0]);
+  const migrated = migrationsV0ToV15(raw as Parameters<typeof migrationsV0ToV15>[0]);
   settingsCache = sanitize(migrated);
   saveSettings();
   return settingsCache;
@@ -234,12 +234,7 @@ export function registerIpcHandlers(_deps: {
     // V2 spec convention: args may be { newSettings } OR just the patch object.
     const rawPatch =
       (args && typeof args === "object" && ("newSettings" in args ? (args as { newSettings: unknown }).newSettings : args)) ?? {};
-    // ADR-0024 D10: normalize incoming patches from legacy V3 snake_case to
-    // canonical V15 camelCase before merging into the in-memory cache.
-    // loadSettings() applies the same migration on file read — this keeps the
-    // cache uniform regardless of which form callers emit. Idempotent: a no-op
-    // on already-camel input.
-    const patch = migrateV15SnakeToCamel(rawPatch) as Partial<SettingsV15>;
+    const patch = rawPatch as Partial<SettingsV15>;
     return updateSettings(patch);
   });
   ipcMain.handle("clearAllHistory", () => {
@@ -488,6 +483,26 @@ export function registerIpcHandlers(_deps: {
   ipcMain.handle("getLogPath", async () => {
     const { default: log } = await import("electron-log");
     return log.transports.file.getFile()?.path ?? null;
+  });
+  // ADR-0026 D1: Provider CRUD — delete provider from settings
+  ipcMain.handle("deleteProvider", (_e, args: { id: string }) => {
+    loadSettings();
+    const next = {
+      ...settingsCache!,
+      providers: settingsCache!.providers.filter((p) => p.id !== args.id),
+    };
+    settingsCache = sanitize(next);
+    saveSettings();
+    return settingsCache!.providers;
+  });
+  // ADR-0024 D7: abort in-flight request by requestId
+  ipcMain.handle("abortRequest", (_e, args: { requestId: string }) => {
+    const ctrl = abortControllers.get(args.requestId);
+    if (ctrl) {
+      ctrl.abort();
+      abortControllers.delete(args.requestId);
+    }
+    return null;
   });
 }
 

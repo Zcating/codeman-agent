@@ -57,11 +57,13 @@ const codeman = {
     ipcRenderer.invoke("deleteWorkspace", { id }),
   pickWorkspacePath: () => ipcRenderer.invoke("pickWorkspacePath"),
 
-  // Provider CRUD (V3+ ADR-0023 D8-W). NOTE: Electron main process does NOT
-  // currently register a "deleteProvider" handler — the IPC will surface a
-  // "no handler registered" error from main. Local appStore.deleteProvider()
-  // already mutates client state; backend sync is a follow-up task.
+  // Provider CRUD (V3+ ADR-0023 D8-W). ADR-0026 D1 mandates this channel;
+  // main handler at electron/main/ipc.ts (deleteProvider handler).
   deleteProvider: (id: string) => ipcRenderer.invoke("deleteProvider", { id }),
+
+  // ADR-0024 D7: abort in-flight LLM request by requestId
+  abortRequest: (requestId: string) =>
+    ipcRenderer.invoke("abortRequest", { requestId }),
 
   // Filesystem
   readFile: (workspaceId: string, path: string) =>
