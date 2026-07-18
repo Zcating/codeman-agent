@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { initDatabase, getDatabase } from "./db/mod";
 // QA 路由由 electron/main/mock-server.ts 负责(POST /mock/anthropic/v1/messages
 // 经 qa-loader.ts 读 Q→A 文件);不再走 IPC。
-import { sanitize, migrationsV0ToV15, type SettingsV15 } from "./settings-schema";
+import { sanitize, type SettingsV15 } from "./settings-schema";
 import {
   validatePathInWorkspace,
   readFileInWorkspace,
@@ -44,8 +44,9 @@ function loadSettings(): SettingsV15 {
       raw = {};
     }
   }
-  const migrated = migrationsV0ToV15(raw as Parameters<typeof migrationsV0ToV15>[0]);
-  settingsCache = sanitize(migrated);
+  // Load (or initialize) V1.5 camelCase settings from disk.
+  // Schema.decodeUnknownEither inside sanitize() validates; malformed JSON → DEFAULT_SETTINGS.
+  settingsCache = sanitize(raw as Partial<SettingsV15>);
   saveSettings();
   return settingsCache;
 }

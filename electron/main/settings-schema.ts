@@ -1,80 +1,78 @@
-// T4a — electron/main/settings-schema.ts: Settings schema + sanitize + V0→V15
-// migration + V15-snake→V15-camel migration.
+// T4a — electron/main/settings-schema.ts: Settings schema (canonical V1.5 / camelCase) + sanitize.
 //
 // Ports src-tauri/src/settings.rs to TypeScript. Settings persist via
 // electron-store (T3 wires readSettings/writeSettings to IPC). Per
 // ADR-0024 D10 (V3.1 amend): V15 fields use camelCase on disk and in IPC
-// payload; legacy V3 users' snake_case settings.json are auto-upgraded by
-// `migrateV15SnakeToCamel()` at load time. V0 historical snake fields are
-// consumed upstream by `migrationsV0ToV15()` and not touched by the V15
-// rename pass.
+// payload.
+//
+// V0 historical shape is no longer supported — disk must contain V1.5
+// camelCase or loadSettings() falls back to DEFAULT_SETTINGS.
 
-// ─── Types (V0 historical snake; V15 canonical camel) ────────────
+import { Schema } from "effect";
 
-export interface ModelMeta {
-  id: string;
-  label: string;
-  contextWindow?: number;
-  deprecated?: boolean;
-  thinking?: boolean;
-}
+// ─── V15 Schema definitions (per src/AGENTS.md:52) ────────────────
 
-export interface ProviderBilling {
-  kind: "balance" | "plan_quota";
-}
+const ModelMetaStruct = Schema.Struct({
+  id: Schema.String,
+  label: Schema.String,
+  contextWindow: Schema.optional(Schema.Number),
+  deprecated: Schema.optional(Schema.Boolean),
+  thinking: Schema.optional(Schema.Boolean),
+});
 
-export interface ProviderLlm {
-  defaultModel: string;
-  baseUrl: string;
+const ProviderBillingStruct = Schema.Struct({
+  kind: Schema.Literal("balance", "plan_quota"),
+});
+
+const ProviderLlmStruct = Schema.Struct({
+  defaultModel: Schema.String,
+  baseUrl: Schema.String,
   /** ADR-0011: V1 only supports anthropic-messages protocol */
-  apiType: "anthropic-messages";
-  models: ModelMeta[];
-  modelsEndpoint: string;
-}
+  apiType: Schema.Literal("anthropic-messages"),
+  models: Schema.Array(ModelMetaStruct),
+  modelsEndpoint: Schema.String,
+});
 
-export interface Provider {
-  id: string;
-  label: string;
-  enabled: boolean;
+const ProviderStruct = Schema.Struct({
+  id: Schema.String,
+  label: Schema.String,
+  enabled: Schema.Boolean,
   /** ADR-0015: plaintext in Settings JSON */
-  apiKey: string;
-  llm: ProviderLlm;
-  billing?: ProviderBilling;
-}
+  apiKey: Schema.String,
+  llm: ProviderLlmStruct,
+  billing: Schema.optional(ProviderBillingStruct),
+});
 
-export interface SettingsV15 {
-  schemaVersion: "1.5";
-  providers: Provider[];
-  defaultLlmProviderId?: string;
-  userLanguage: "zh" | "en" | "auto";
-  theme: "light" | "dark" | "system";
-  startAtLogin: boolean;
-  window: {
-    rememberPosition: boolean;
-    rememberSize: boolean;
-    defaultSize: { width: number; height: number };
-    minSize: { width: number; height: number };
-  };
-  systemPrompt: { default: string; userCanEdit: boolean };
-  conversations: { autoArchiveAfterDays: number; maxHistory: number };
-}
+export const SettingStruct = Schema.Struct({
+  schemaVersion: Schema.Literal("1.5"),
+  providers: Schema.Array(ProviderStruct),
+  defaultLlmProviderId: Schema.optional(Schema.String),
+  userLanguage: Schema.Literal("zh", "en", "auto"),
+  theme: Schema.Literal("light", "dark", "system"),
+  startAtLogin: Schema.Boolean,
+  window: Schema.Struct({
+    rememberPosition: Schema.Boolean,
+    rememberSize: Schema.Boolean,
+    defaultSize: Schema.Struct({ width: Schema.Number, height: Schema.Number }),
+    minSize: Schema.Struct({ width: Schema.Number, height: Schema.Number }),
+  }),
+  systemPrompt: Schema.Struct({
+    default: Schema.String,
+    userCanEdit: Schema.Boolean,
+  }),
+  conversations: Schema.Struct({
+    autoArchiveAfterDays: Schema.Number,
+    maxHistory: Schema.Number,
+  }),
+});
 
-// V0 (historical pre-ADR-0023) — kept snake for back-compat reasons
-// (deprecation chain upstream of V1.5 / V15).
-export interface SettingsV0Provider {
-  id: string;
-  label: string;
-  api_key: string;
-  billing_kind: "balance" | "plan_quota" | "none";
-  models: string[];
-}
+// ─── Derived types (preserves downstream `import type { Settings }`) ──
 
-export interface SettingsV0 {
-  providers?: SettingsV0Provider[];
-  default_provider_id?: string;
-  window?: { width: number; height: number };
-  user_language?: "zh" | "en" | "auto";
-}
+export type ModelMeta = Schema.Type<typeof ModelMetaStruct>;
+export type ProviderBilling = Schema.Type<typeof ProviderBillingStruct>;
+export type ProviderLlm = Schema.Type<typeof ProviderLlmStruct>;
+export type Provider = Schema.Type<typeof ProviderStruct>;
+export type Settings = Schema.Type<typeof SettingStruct>;
 
 // ─── Constants ──────────────────────────────────────────────────
 
@@ -90,25 +88,7 @@ const DEEPSEEK_MODELS_ENDPOINT = "https://api.deepseek.com/v1/models";
 const MINIMAX_DEFAULT_MODEL = "MiniMax-M2.5-highspeed";
 const DEEPSEEK_DEFAULT_MODEL = "deepseek-chat";
 
-const KNOWN_V0_BASE_URLS: Record<string, string> = {
-  minimax: MINIMAX_BASE_URL,
-  deepseek: DEEPSEEK_BASE_URL,
-  "minimax-m2": MINIMAX_BASE_URL,
-};
-
-const KNOWN_V0_MODELS_ENDPOINTS: Record<string, string> = {
-  minimax: MINIMAX_MODELS_ENDPOINT,
-  deepseek: DEEPSEEK_MODELS_ENDPOINT,
-  "minimax-m2": MINIMAX_MODELS_ENDPOINT,
-};
-
-const KNOWN_V0_DEFAULT_MODELS: Record<string, string> = {
-  minimax: MINIMAX_DEFAULT_MODEL,
-  deepseek: DEEPSEEK_DEFAULT_MODEL,
-  "minimax-m2": MINIMAX_DEFAULT_MODEL,
-};
-
-export const DEFAULT_SETTINGS: SettingsV15 = {
+export const DEFAULT_SETTINGS: Settings = {
   schemaVersion: "1.5",
   providers: [
     {
@@ -153,24 +133,32 @@ export const DEFAULT_SETTINGS: SettingsV15 = {
 // ─── sanitize() ──────────────────────────────────────────────────
 
 /**
- * Clamp settings to documented invariants. Per ADR-0024 amendment: this
- * matches the Rust Settings::sanitized() logic 1:1, with V3.1 (D10) field
- * names in camelCase.
+ * Clamp settings to documented invariants. Per ADR-0024 amendment: V15 fields
+ * use camelCase on disk and in IPC payload.
+ * Uses Schema.decodeUnknownEither for input validation — falls back to
+ * DEFAULT_SETTINGS on parse failure.
  */
-export function sanitize(input: Partial<SettingsV15>): SettingsV15 {
-  const merged: SettingsV15 = {
+export function sanitize(input: Partial<Settings>): Settings {
+  // Validate input via Schema. Falls back to DEFAULT_SETTINGS on Left.
+  const decoded = Schema.decodeUnknownEither(SettingStruct)(input);
+  const safe: Settings =
+    decoded._tag === "Right"
+      ? (decoded.right as Settings)
+      : DEFAULT_SETTINGS;
+
+  const merged: Settings = {
     ...DEFAULT_SETTINGS,
-    ...input,
-    window: { ...DEFAULT_SETTINGS.window, ...(input.window ?? {}) },
+    ...safe,
+    window: { ...DEFAULT_SETTINGS.window, ...(safe.window ?? {}) },
     systemPrompt: {
       ...DEFAULT_SETTINGS.systemPrompt,
-      ...(input.systemPrompt ?? {}),
+      ...(safe.systemPrompt ?? {}),
     },
     conversations: {
       ...DEFAULT_SETTINGS.conversations,
-      ...(input.conversations ?? {}),
+      ...(safe.conversations ?? {}),
     },
-    providers: input.providers?.length ? input.providers : DEFAULT_SETTINGS.providers,
+    providers: safe.providers?.length ? safe.providers : DEFAULT_SETTINGS.providers,
   };
 
   merged.conversations.autoArchiveAfterDays = Math.max(
@@ -197,115 +185,4 @@ export function sanitize(input: Partial<SettingsV15>): SettingsV15 {
   merged.schemaVersion = "1.5";
 
   return merged;
-}
-
-// ─── V15 snake → V15 camel migration (ADR-0024 D10) ──────────────
-
-/**
- * Specific V15 snake→camel key renames. NOT a generic regex — V0 keys
- * (default_provider_id, billing_kind, etc.) are intentionally left
- * untouched so migrationsV0ToV15() can consume them upstream.
- */
-const V15_SNAKE_TO_CAMEL: Record<string, string> = {
-  schema_version: "schemaVersion",
-  default_llm_provider_id: "defaultLlmProviderId",
-  user_language: "userLanguage",
-  start_at_login: "startAtLogin",
-  system_prompt: "systemPrompt",
-  user_can_edit: "userCanEdit",
-  remember_position: "rememberPosition",
-  remember_size: "rememberSize",
-  default_size: "defaultSize",
-  min_size: "minSize",
-  auto_archive_after_days: "autoArchiveAfterDays",
-  max_history: "maxHistory",
-  api_key: "apiKey",
-  default_model: "defaultModel",
-  base_url: "baseUrl",
-  api_type: "apiType",
-  models_endpoint: "modelsEndpoint",
-  context_window: "contextWindow",
-};
-
-function renameKeysDeep(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(renameKeysDeep);
-  if (value && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      const camelKey = V15_SNAKE_TO_CAMEL[k] ?? k;
-      out[camelKey] = renameKeysDeep(v);
-    }
-    return out;
-  }
-  return value;
-}
-
-/**
- * ADR-0024 D10: Migrate V15 settings.json on-disk format from V3 pre-D10
- * snake_case to V3.1 canonical camelCase. Idempotent on already-camel input.
- * V0 legacy keys (e.g. default_provider_id) are NOT renamed — they are
- * consumed upstream by `migrationsV0ToV15()`.
- *
- * Called from `loadSettings()` in ipc.ts BEFORE migrationsV0ToV15().
- */
-export function migrateV15SnakeToCamel(raw: unknown): unknown {
-  return renameKeysDeep(raw);
-}
-
-// ─── V0 → V1.5 migration ─────────────────────────────────────────
-
-function v0ProviderToV15(v0: SettingsV0Provider): Provider {
-  const id = (v0.id ?? "").toLowerCase();
-  const baseUrl = KNOWN_V0_BASE_URLS[id] ?? MINIMAX_BASE_URL;
-  const modelsEndpoint = KNOWN_V0_MODELS_ENDPOINTS[id] ?? MINIMAX_MODELS_ENDPOINT;
-  const defaultModel = KNOWN_V0_DEFAULT_MODELS[id] ?? v0.models?.[0] ?? MINIMAX_DEFAULT_MODEL;
-
-  const models: ModelMeta[] = (v0.models ?? []).map((m) => ({
-    id: m,
-    label: m,
-  }));
-
-  const billing: ProviderBilling | undefined =
-    v0.billing_kind === "balance" || v0.billing_kind === "plan_quota"
-      ? { kind: v0.billing_kind }
-      : undefined;
-
-  return {
-    id: v0.id,
-    label: v0.label,
-    enabled: true,
-    apiKey: v0.api_key,
-    llm: {
-      defaultModel,
-      baseUrl,
-      apiType: "anthropic-messages",
-      models,
-      modelsEndpoint,
-    },
-    billing,
-  };
-}
-
-/**
- * Migrate V0 (pre-ADR-0023) settings.json to V1.5. Idempotent: if input
- * already has schemaVersion "1.5" (canonical post-D10), returns sanitized
- * passthrough. Caller is expected to run migrateV15SnakeToCamel() FIRST so
- * V3-pre-D10 snake inputs are normalized to canonical camel before this
- * passthrough check.
- */
-export function migrationsV0ToV15(input: SettingsV0 | SettingsV15): SettingsV15 {
-  // V1.5 passthrough (idempotent).
-  if ((input as SettingsV15).schemaVersion === "1.5") {
-    return sanitize(input as SettingsV15);
-  }
-
-  const v0 = input as SettingsV0;
-  const providers = (v0.providers ?? []).map(v0ProviderToV15);
-
-  return sanitize({
-    ...DEFAULT_SETTINGS,
-    providers: providers.length ? providers : DEFAULT_SETTINGS.providers,
-    defaultLlmProviderId: v0.default_provider_id,
-    userLanguage: v0.user_language ?? DEFAULT_SETTINGS.userLanguage,
-  });
 }
