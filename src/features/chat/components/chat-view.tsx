@@ -111,11 +111,16 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     return store.byId[id]?.messages ?? [];
   };
 
-  // Auto-scroll to bottom on messages change
+  // Auto-scroll to bottom on messages change.
+  // 首次进入对话(mount 后第一次 effect 执行)用 instant 直接定位,后续消息追加
+  // 用 smooth 让用户感知到新内容到达。
+  let hasScrolledInitially = false;
   createEffect(() => {
     currentMessages();
     if (!messagesEndRef) return;
-    queueMicrotask(() => messagesEndRef.scrollIntoView({ behavior: "smooth" }));
+    const behavior = hasScrolledInitially ? "smooth" : "instant";
+    queueMicrotask(() => messagesEndRef.scrollIntoView({ behavior }));
+    hasScrolledInitially = true;
   });
 
   // Runtime error → toast (ADR-0029 D5 — banner removed; toast replaces it)

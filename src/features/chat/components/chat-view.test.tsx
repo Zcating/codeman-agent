@@ -2,7 +2,7 @@
 //!
 //! Mocked: conversations store (V2 ADR-0019，不再 mock messages.store / agent.store）。
 
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, cleanup, fireEvent, waitFor } from "@solidjs/testing-library";
 import { For } from "solid-js";
 import { Effect } from "effect";
@@ -810,5 +810,44 @@ describe("ChatView Bug regression: Invalid value (Type)", () => {
       ).map((el) => el.textContent ?? "");
       expect(messages).not.toContain("Invalid value (Type)");
     });
+  });
+});
+
+// ─── Bug fix regression: 首次进入对话不应动画滚动 ───────────────────────────────
+//
+// 根因：chat-view.tsx 的 auto-scroll createEffect 在 mount 时立即执行,
+// behavior 硬编码 "smooth",导致首次进入对话时浏览器播放滚动动画(用户感知为
+// "闪一下" + 滚动条移动)。期望：首次 = instant(直接定位,无动画),
+// 后续消息追加 = smooth(用户能感知新内容)。
+describe("ChatView Scroll: 首次进入对话不应动画滚动", () => {
+  let scrollSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    // vitest.setup.ts 默认 stub scrollIntoView 为 no-op,不记录参数。
+    // 用 spyOn 替换为 mock,既能断言调用,又阻止真实 DOM 调用(jsdom 无 layout)。
+    scrollSpy = vi
+      .spyOn(Element.prototype, "scrollIntoView")
+      .mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    scrollSpy.mockRestore();
+    cleanup();
+  });
+
+  it("Bug: 首次进入对话 scrollIntoView 应使用 instant (无动画),后续 smooth", async () => {
+    render(() => <ChatView convId="conv-1" />);
+
+    // 等待 Solid effect + queueMicrotask flush
+    await waitFor(() => {
+      expect(scrollSpy).toHaveBeenCalled();
+    });
+
+    const calls = scrollSpy.mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+
+    // 关键断言：首次 scrollIntoView 必须不是 smooth(用户感知为"动画")
+    const firstCallArgs = calls[0][0] as ScrollIntoViewOptions | undefined;
+    expect(firstCallArgs?.behavior).not.toBe("smooth");
   });
 });
