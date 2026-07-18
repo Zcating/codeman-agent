@@ -23,8 +23,19 @@ export type ToolCallId = Schema.Schema.Type<typeof ToolCallIdSchema>;
 
 // ─── Form schemas (ADR-0029 PR 1, D2) ────────────────────────────────────────
 
-/** 共享 strict 非空串：field-level & form-level 都用这个（保持 ProviderCard 模板一致深度）。 */
-const NonEmptyString = Schema.String.pipe(Schema.minLength(1));
+/** 共享 strict 非空串：field-level & form-level 都用这个（保持 ProviderCard 模板一致深度）。
+ *
+ * `{ message }` 注解是为了替换 effect-schema-adapter 的 fallback 文案
+ * "Invalid value (${_tag})"。根因：TanStack Form 的 onBlur validator 跑空字符串触发
+ * Schema.minLength 失败,ParseIssue 默认无 annotation → adapter 渲染 generic 提示。
+ * 加注解后,所有 NonEmptyString 失败都走友好文案 ("请输入消息内容")。
+ *
+ * 当前唯一显示该错误的 UI 是 draft textarea (Home + ChatView),workspace picker
+ * 无 onBlur handler → 永不显示错误,所以共用同一文案安全。
+ */
+const NonEmptyString = Schema.String.pipe(
+  Schema.minLength(1, { message: () => "请输入消息内容" }),
+);
 
 /** 草稿字段（HomeAgentForm + ChatView）：用户在 textarea 编辑的文本。 */
 export const DraftFieldSchema = NonEmptyString;

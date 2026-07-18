@@ -31,7 +31,6 @@ import {
   recordInputEntry,
 } from "../stores/input-history.store";
 import {
-  DraftFieldSchema,
   ModelIdFieldSchema,
   ChatViewFormSchema,
   type ChatViewFormValue,
@@ -111,11 +110,16 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     return store.byId[id]?.messages ?? [];
   };
 
-  // Auto-scroll to bottom on messages change
+  // Auto-scroll to bottom on messages change.
+  // 首次进入对话(mount 后第一次 effect 执行)用 instant 直接定位,后续消息追加
+  // 用 smooth 让用户感知到新内容到达。
+  let hasScrolledInitially = false;
   createEffect(() => {
     currentMessages();
     if (!messagesEndRef) return;
-    queueMicrotask(() => messagesEndRef.scrollIntoView({ behavior: "smooth" }));
+    const behavior = hasScrolledInitially ? "smooth" : "instant";
+    queueMicrotask(() => messagesEndRef.scrollIntoView({ behavior }));
+    hasScrolledInitially = true;
   });
 
   // Runtime error → toast (ADR-0029 D5 — banner removed; toast replaces it)
@@ -190,11 +194,8 @@ export function ChatView(props: { convId?: string }): JSX.Element {
           void form.handleSubmit();
         }}
       >
-        {/* draft field (textarea) */}
-        <form.Field
-          name="draft"
-          validators={{ onBlur: effectSchema(DraftFieldSchema) }}
-        >
+        {/* draft field (textarea) — submit-only validation (per UX request) */}
+        <form.Field name="draft">
           {(field) => (
             <>
               <label for="chat-input" class="sr-only">
@@ -229,7 +230,10 @@ export function ChatView(props: { convId?: string }): JSX.Element {
                 placeholder="发条消息…"
                 disabled={isRunning() || form.state.isSubmitting}
                 error={
-                  field().state.meta.isTouched
+                  // submit-only: 错误只在用户提交后才显示。isTouched 在 blur 后变 true,
+                  // 不再用作显示门控(避免 blur 触发校验后立即渲染错误)。
+                  // form.state.isSubmitted 在首次 handleSubmit() 后变 true (TanStack Form)。
+                  form.state.isSubmitted
                     ? firstErrorMessage(field().state.meta.errors)
                     : undefined
                 }
