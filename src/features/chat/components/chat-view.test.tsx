@@ -753,3 +753,32 @@ describe("ChatView IME 兼容性", () => {
     expect(submitBtn).not.toBeDisabled();
   });
 });
+
+// ─── Bug fix regression: 输入框下方不应常驻 generic "Invalid value (Type)" 提示。──
+// 对称 chat-view.tsx / home.tsx(已在 fix/home-textarea-error-persistence 修复)。
+// 根因: form-level `onMount: effectSchema(ChatViewFormSchema)` 跑默认值
+// `{ draft: "" }`,触发 NonEmptyString 失败;ParseIssue 无 message annotation
+// → effect-schema-adapter fallback "Invalid value (Type)" → 渲染到 textarea 下方。
+// 修复:chat-view.tsx 错误展示也走 `field().state.meta.isTouched` 门控,避免
+// 在用户尚未触摸 field 时常驻 generic 错误(mount + 即将与 field 交互的瞬间)。
+//
+// 范围:本测试只断言 mount 时点无错误(对称 home.test.tsx:257-280 的 BUG: 测试)；
+// 一旦用户blur 后 isTouched=true,通用文案会再次出现 — 这是 TanStack Form
+// 预期行为,与 home 修复一致;要更换为友好文案走 schema message annotation
+// 路径另开修复(本修复范围之外)。
+describe("ChatView Bug regression: Invalid value (Type)", () => {
+  afterEach(() => cleanup());
+
+  it("Bug: 输入框下方不应常驻 generic 'Invalid value (Type)' 提示", async () => {
+    const { container } = render(() => <ChatView convId="conv-1" />);
+
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    expect(textarea).toBeTruthy();
+
+    // 关键断言:mount 后(用户尚未触摸 field),不允许常驻 generic 错误。
+    const destructiveMessages = Array.from(
+      container.querySelectorAll("p.text-destructive"),
+    ).map((el) => el.textContent ?? "");
+    expect(destructiveMessages).not.toContain("Invalid value (Type)");
+  });
+});
