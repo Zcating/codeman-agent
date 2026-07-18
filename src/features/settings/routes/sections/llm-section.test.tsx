@@ -1,21 +1,22 @@
-﻿//! SettingsPage 路由测试 (V1.5)。
+//! LlmSection — `/settings/llm` route component tests.
 //!
-//! Mocked: SettingsService Effect 服务（通过 src/__mocks__/@tauri-apps/api/core.ts）。
-//! V1.5: 测试 providers[] 渲染，空状态、2 providers 场景。
-//! Link 从 @tanstack/solid-router mock 以避免需要 RouterProvider。
+//! Migrated from settings.test.tsx (V1.5 provider rendering tests).
+//! Verifies:
+//! - Renders 1 card for 1 provider
+//! - Renders 2 cards for 2 providers
+//! - Shows empty state when providers[] is empty
+//! - Footer has Save button
+//! - Add provider button is visible
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, cleanup } from "@solidjs/testing-library";
 import { Effect } from "effect";
-import { SettingsPage } from "./settings";
-import { mockState, SettingsV15 } from "../../../__mocks__/ipc-mock";
-import type { Provider } from "../../../shared/lib/types";
+import { LlmSection } from "./llm-section";
+import { mockState, SettingsV15 } from "../../../../__mocks__/ipc-mock";
+import type { Provider } from "../../../../shared/lib/types";
 
-// Mock solid-js/store — SettingsPage 导入 appStore, appStore 用 createStore。
-// jsdom 没有 Solid reactive context,需要这个 mock。
-// **不**在 vitest.setup.ts 全局注册(per ADR-0020):conversations.store.test.ts
-// 用 createRoot + 真 Solid 运行时,全局 mock 会与真 Solid signal 冲突。
-// 因此本文件内联 28 行 mock 块——6 个 settings/shared 测试文件保持同一模式。
+// Mock solid-js/store — LlmSection imports appStore, appStore uses createStore.
+// jsdom lacks Solid reactive context, this mock provides minimal proxy.
 vi.mock("solid-js/store", () => {
   let store: { value: unknown } = { value: null };
   const setStore = vi.fn((...args: unknown[]) => {
@@ -28,9 +29,7 @@ vi.mock("solid-js/store", () => {
   });
   const storeProxy = new Proxy(store, {
     get(t, p) {
-      if (p === "value") {
-        return store.value;
-      }
+      if (p === "value") return store.value;
       return (t as any)[p];
     },
     set(t, p, v) {
@@ -45,21 +44,7 @@ vi.mock("solid-js/store", () => {
   return { createStore: () => [storeProxy, setStore] };
 });
 
-import { appStore, _resetAppStoreForTest } from "../../../shared/stores/app.store";
-
-vi.mock("@tanstack/solid-router", async () => {
-  const actual = await vi.importActual("@tanstack/solid-router");
-  return {
-    ...actual,
-    // Mock Link 以避免需要 useRouter/useLinkProps（需要 RouterProvider context）。
-    Link: (props: { to?: string; href?: string; class?: string; children?: unknown }) => (
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      <a href={props.to ?? props.href} class={props.class}>
-        {props.children as any}
-      </a>
-    ),
-  };
-});
+import { appStore, _resetAppStoreForTest } from "../../../../shared/stores/app.store";
 
 // V1.5 mock providers
 const mockMiniMaxProvider: Provider = {
@@ -92,7 +77,14 @@ const mockDeepSeekProvider: Provider = {
     defaultModel: "deepseek-chat",
     baseUrl: "https://api.deepseek.com/anthropic",
     apiType: "anthropic-messages",
-    models: [{ id: "deepseek-chat", label: "DeepSeek Chat", deprecated: false, thinking: false }],
+    models: [
+      {
+        id: "deepseek-chat",
+        label: "DeepSeek Chat",
+        deprecated: false,
+        thinking: false,
+      },
+    ],
     modelsEndpoint: "https://api.deepseek.com/anthropic/v1/models",
   },
 };
@@ -115,19 +107,15 @@ const baseSettings: SettingsV15 = {
   llmProviders: [],
 };
 
-describe("SettingsPage — V1.5 provider rendering", () => {
+describe("LlmSection — /settings/llm", () => {
   beforeEach(async () => {
-    // 重置 appStore,避免 appStore.state.value 为 null 导致 render 时崩溃
     _resetAppStoreForTest();
-    // Reset to default V1.5 settings with 1 provider (MiniMax)
     mockState.settings = {
       ...baseSettings,
       providers: [mockMiniMaxProvider],
     };
-    // Clear resolved so the mock handler is used
     mockState.resolved = undefined;
     mockState.v0FixtureActive = false;
-    // 触发 refresh 把 mockState.settings 同步到 appStore
     await Effect.runPromise(appStore.refresh());
   });
 
@@ -137,14 +125,12 @@ describe("SettingsPage — V1.5 provider rendering", () => {
   });
 
   it("renders 1 card for 1 provider (MiniMax)", async () => {
-    render(() => <SettingsPage />);
-    // Wait for async loading to complete
+    render(() => <LlmSection />);
     await new Promise((resolve) => setTimeout(resolve, 10));
-
-    // MiniMax provider card should be visible
     expect(screen.getByText("MiniMax")).toBeInTheDocument();
-    // Should NOT show empty state
-    expect(screen.queryByText(/No providers configured/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/No providers configured/i),
+    ).not.toBeInTheDocument();
   });
 
   it("renders 2 cards for 2 providers", async () => {
@@ -154,7 +140,7 @@ describe("SettingsPage — V1.5 provider rendering", () => {
     };
     await Effect.runPromise(appStore.refresh());
 
-    render(() => <SettingsPage />);
+    render(() => <LlmSection />);
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(screen.getByText("MiniMax")).toBeInTheDocument();
@@ -162,39 +148,29 @@ describe("SettingsPage — V1.5 provider rendering", () => {
   });
 
   it("shows empty state when providers[] is empty", async () => {
-    mockState.settings = {
-      ...baseSettings,
-      providers: [],
-    };
+    mockState.settings = { ...baseSettings, providers: [] };
     await Effect.runPromise(appStore.refresh());
 
-    render(() => <SettingsPage />);
+    render(() => <LlmSection />);
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    expect(screen.getByText(/No providers configured/i)).toBeInTheDocument();
-    expect(screen.getByText(/Add your first provider/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/No providers configured/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Add your first provider/i),
+    ).toBeInTheDocument();
   });
 
-  it("renders 5 tabs", async () => {
-    const { container } = render(() => <SettingsPage />);
+  it("renders Save button (force flush for provider edits)", async () => {
+    render(() => <LlmSection />);
     await new Promise((resolve) => setTimeout(resolve, 10));
-    const tabs = container.querySelectorAll("nav button");
-    expect(tabs.length).toBe(4); // V2: billing tab removed
+    expect(screen.getByText("Save")).toBeInTheDocument();
   });
 
-  it("header has Back link with correct text", async () => {
-    const { container } = render(() => <SettingsPage />);
+  it("renders Add provider button", async () => {
+    render(() => <LlmSection />);
     await new Promise((resolve) => setTimeout(resolve, 10));
-    const backLink = container.querySelector("header a");
-    expect(backLink?.textContent).toContain("Back");
-  });
-
-  it("footer has Save button", async () => {
-    const { container } = render(() => <SettingsPage />);
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    const saveBtn = container.querySelector("footer button");
-    expect(saveBtn?.textContent).toContain("Save");
+    expect(screen.getByText("Add provider")).toBeInTheDocument();
   });
 });
-
-
