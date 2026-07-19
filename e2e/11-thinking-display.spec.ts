@@ -84,7 +84,7 @@ test.describe("11 — Thinking display after stream ends", () => {
         await submitForm(page);
 
         // 等 assistant bubble 出现
-        const assistantBubble = page.locator("div.justify-start > div[class*='bg-card']");
+        const assistantBubble = page.locator('[data-testid="agent-bubble"]');
         await assert.visible(assistantBubble.first(), { timeout: 10_000 });
 
         // 等 thinking-panel 出现(maybe multiple in multi-turn; last 即可)
@@ -103,7 +103,7 @@ test.describe("11 — Thinking display after stream ends", () => {
 
         // 等流完(text 块到达)
         await assert.visible(
-            page.locator("div.justify-start > div[class*='bg-card']").filter({
+            page.locator('[data-testid="agent-bubble"]').filter({
                 hasText: TEXT_SNIPPET,
             }),
             { timeout: 10_000 },
@@ -123,7 +123,7 @@ test.describe("11 — Thinking display after stream ends", () => {
 
         // 等流完(text 块到达 → done 事件即将到达)
         await assert.visible(
-            page.locator("div.justify-start > div[class*='bg-card']").filter({
+            page.locator('[data-testid="agent-bubble"]').filter({
                 hasText: TEXT_SNIPPET,
             }),
             { timeout: 15_000 },
@@ -159,7 +159,7 @@ test.describe("11 — Thinking display after stream ends", () => {
 
         // 等流完
         await assert.visible(
-            page.locator("div.justify-start > div[class*='bg-card']").filter({
+            page.locator('[data-testid="agent-bubble"]').filter({
                 hasText: TEXT_SNIPPET,
             }),
             { timeout: 15_000 },
@@ -220,7 +220,7 @@ test.describe("11 — Thinking display after stream ends", () => {
         await submitForm(page);
 
         // 等 assistant bubble 出现(可能只是空 text + thinking section)
-        const assistantBubble = page.locator("div.justify-start > div[class*='bg-card']");
+        const assistantBubble = page.locator('[data-testid="agent-bubble"]');
         await assert.visible(assistantBubble.first(), { timeout: 10_000 });
 
         // 给流一些时间

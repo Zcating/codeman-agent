@@ -55,6 +55,13 @@ test.describe("08 — 文件工具 (mock LLM)", () => {
     await clearAllHistory(page);
     // clickNewConversationAndWait title send → default Q→A entry (warning SSE)
     await clickNewConversationAndWait(page);
+    // Wait for streaming from clickNewConversationAndWait to complete
+    // (Send button reappears when streamingMessageId is cleared)
+    try {
+      await page.locator('button[type="submit"]').waitFor({ state: "visible", timeout: 10_000 });
+    } catch {
+      await cancelRunningAgent(page);
+    }
   });
 
   test.afterAll(async () => {

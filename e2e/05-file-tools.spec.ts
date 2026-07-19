@@ -76,7 +76,7 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
     let sawResult = false;
     while (Date.now() < deadline1) {
       const assistantBubbles = await page
-        .locator("div.justify-start > div[class*='bg-card']")
+        .locator('[data-testid="agent-bubble"]')
         .count();
       if (assistantBubbles > 0) {
         sawResult = true;

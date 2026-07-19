@@ -11,7 +11,6 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-  DialogClose,
 } from "../ui/dialog";
 import { Button } from "../ui/button";
 
@@ -145,9 +144,13 @@ export const Dialog = {
                   <DialogDescription>{opts.content}</DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
-                  <DialogClose data-testid="cancel-btn" onClick={handleClose}>
+                  <Button
+                    variant="outline"
+                    onClick={handleClose}
+                    data-testid="cancel-btn"
+                  >
                     {opts.cancelText ?? "Cancel"}
-                  </DialogClose>
+                  </Button>
                   <Button
                     variant={opts.destructive ? "destructive" : "default"}
                     onClick={handleConfirm}

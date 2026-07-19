@@ -14,7 +14,7 @@
 //!  8. accordion defaultExpanded
 //!  9. accordion toggle
 //! 10. accordion single-expand
-//! 11. 5 slots (header / sidebarHeader / sidebarFooter / footer / children)
+//! 11. 3 slots (header / footer / children)
 //! 12. class prop
 //! 13. data-value hook
 //!
@@ -614,67 +614,38 @@ describe("CodemanSidebar", () => {
     });
   });
 
-  // ─── Slice 11: 5 slots ──────────────────────────────────────────────
-  describe("5 slots", () => {
-    it("header slot renders above sidebar (page header)", () => {
+  // ─── Slice 11: 3 slots ──────────────────────────────────────────────
+  describe("3 slots", () => {
+    it("header slot renders inside sidebar at top", () => {
       render(() => (
         <CodemanSidebar
           {...defaultProps({
-            header: <div data-testid="slot-header">PAGE HEADER</div>,
+            header: <div data-testid="slot-header">SIDEBAR TOP</div>,
           })}
         />
       ));
       const header = document.querySelector("[data-testid='slot-header']");
       expect(header).toBeTruthy();
-      expect(header!.textContent).toBe("PAGE HEADER");
-      // Header is OUTSIDE the <aside> (page-level slot)
+      expect(header!.textContent).toBe("SIDEBAR TOP");
+      // Header is INSIDE the <aside> (sidebar-internal top slot)
       const aside = document.querySelector("aside")!;
-      expect(aside.contains(header!)).toBe(false);
+      expect(aside.contains(header!)).toBe(true);
     });
 
-    it("sidebarHeader slot renders inside sidebar at top", () => {
+    it("footer slot renders inside sidebar at bottom", () => {
       render(() => (
         <CodemanSidebar
           {...defaultProps({
-            sidebarHeader: <div data-testid="slot-sidebar-header">SIDEBAR TOP</div>,
-          })}
-        />
-      ));
-      const sh = document.querySelector("[data-testid='slot-sidebar-header']");
-      expect(sh).toBeTruthy();
-      const aside = document.querySelector("aside")!;
-      expect(aside.contains(sh!)).toBe(true);
-      // Above menu content
-      const content = aside.querySelector(":scope > div");
-      expect(content!.contains(sh!)).toBe(true);
-    });
-
-    it("sidebarFooter slot renders inside sidebar at bottom", () => {
-      render(() => (
-        <CodemanSidebar
-          {...defaultProps({
-            sidebarFooter: <div data-testid="slot-sidebar-footer">SIDEBAR BOTTOM</div>,
-          })}
-        />
-      ));
-      const sf = document.querySelector("[data-testid='slot-sidebar-footer']");
-      expect(sf).toBeTruthy();
-      const aside = document.querySelector("aside")!;
-      expect(aside.contains(sf!)).toBe(true);
-    });
-
-    it("footer slot renders below sidebar (page footer)", () => {
-      render(() => (
-        <CodemanSidebar
-          {...defaultProps({
-            footer: <div data-testid="slot-footer">PAGE FOOTER</div>,
+            footer: <div data-testid="slot-footer">SIDEBAR BOTTOM</div>,
           })}
         />
       ));
       const footer = document.querySelector("[data-testid='slot-footer']");
       expect(footer).toBeTruthy();
+      expect(footer!.textContent).toBe("SIDEBAR BOTTOM");
+      // Footer is INSIDE the <aside> (sidebar-internal bottom slot)
       const aside = document.querySelector("aside")!;
-      expect(aside.contains(footer!)).toBe(false);
+      expect(aside.contains(footer!)).toBe(true);
     });
 
     it("children slot renders as main content next to sidebar (two-column layout)", () => {

@@ -323,43 +323,55 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       break;
     case "done": {
       const stubId = store.byId[convId]?.streamingMessageId;
-      logger.debug(
-        "[chat.store/diag] done event: stubId=" +
-        stubId +
-        " evtMsgId=" +
-        evt.message.id +
-        " content.length=" +
-        (evt.message.content ?? "").length +
-        " content_preview=" +
-        String(evt.message.content ?? "").slice(0, 100) +
-        " thinking.length=" +
-        (evt.message.thinking?.length ?? 0) +
-        " tool_calls=" +
-        JSON.stringify(evt.message.toolCalls) +
-        " tool_results_count=" +
-        (evt.message.toolResults?.length ?? 0),
-      );
       if (stubId) {
+        // Normal path: replace the streaming stub with the final message.
         setStore("byId", convId, "messages", (msgs) =>
           msgs.map((m) => (m.id === stubId ? { ...evt.message, id: stubId } : m)),
         );
-        // V3.x debug: 替换后立即读回,确认 toolCalls 真的写进 store
-        const after = store.byId[convId]?.messages.find((m) => m.id === stubId);
         logger.debug(
-          "[chat.store/diag] after replace: stubId=" +
-          stubId +
-          " content.length=" +
-          (after?.content?.length ?? 0) +
-          " tool_calls=" +
-          JSON.stringify(after?.toolCalls) +
-          " tool_results_count=" +
-          (after?.toolResults?.length ?? 0),
+          "[chat.store/diag] done replace stub: stubId=" + stubId +
+          " content.length=" + (evt.message.content ?? "").length,
         );
       } else {
-        setStore("byId", convId, "messages", (msgs) => [...msgs, evt.message]);
-        logger.debug(
-          "[chat.store/diag] done append (no stubId): new msgId=" + evt.message.id,
-        );
+        // Resilient path: no stubId (e.g. duplicate done event or no token events fired).
+        // Instead of blindly appending (which creates a duplicate assistant message),
+        // find the LAST assistant message and replace it. Do NOT replace if the
+        // existing message already has content AND the new message is empty — this
+        // prevents a duplicate done (from Agent emitting two turn_end events)
+        // from erasing correct content with an empty message.
+        const msgs = store.byId[convId]?.messages ?? [];
+        // Walk backwards to find the last assistant message. Using
+        // `length - 1 - findIndex` would yield 0 (not -1) when msgs is empty,
+        // which would then access msgs[0] and throw "undefined.content".
+        let lastAsstIdx = -1;
+        for (let i = msgs.length - 1; i >= 0; i--) {
+          if (msgs[i]?.role === "assistant") {
+            lastAsstIdx = i;
+            break;
+          }
+        }
+        if (lastAsstIdx >= 0) {
+          const lastAsst = msgs[lastAsstIdx];
+          const newContent = (evt.message.content ?? "").trim();
+          const existingContent = (lastAsst.content ?? "").trim();
+          // Skip empty duplicate if the existing message is already non-empty.
+          if (newContent.length === 0 && existingContent.length > 0) {
+            logger.debug("[chat.store/diag] done skip empty duplicate: lastAsstIdx=" + lastAsstIdx);
+          } else {
+            setStore("byId", convId, "messages", (msgs) =>
+              msgs.map((m, i) => (i === lastAsstIdx ? { ...evt.message, id: m.id } : m)),
+            );
+            logger.debug(
+              "[chat.store/diag] done replace last asst (no stubId): idx=" + lastAsstIdx +
+              " oldMsgId=" + lastAsst.id + " content.length=" + newContent.length,
+            );
+          }
+        } else {
+          setStore("byId", convId, "messages", (msgs) => [...msgs, evt.message]);
+          logger.debug(
+            "[chat.store/diag] done append (no stubId, no asst to replace): new msgId=" + evt.message.id,
+          );
+        }
       }
       setStore("byId", convId, "streamingMessageId", null);
       // Notify sidebar re: streaming ended (triggers conversations$ update → badge removal)

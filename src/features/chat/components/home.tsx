@@ -15,7 +15,7 @@
 //! - 1 workspace  → auto-select, input enabled
 //! - 2+ workspaces → 无预选, input disabled until user picks
 
-import { createMemo, Show, type JSX } from "solid-js";
+import { createMemo, createEffect, Show, type JSX } from "solid-js";
 import { Send } from "lucide-solid";
 import { Effect, Exit } from "effect";
 import { useNavigate } from "@tanstack/solid-router";
@@ -115,6 +115,11 @@ export function HomeAgentForm(): JSX.Element {
       workspaceId: initialWorkspaceId(),
     } satisfies HomeFormValue,
     validators: {
+      // onMount + onChange — canSubmit must reflect validation state from
+      // the first render. Without onMount, canSubmit defaults to true even
+      // when draft is empty, leaving the send button enabled and causing
+      // submit-with-no-input (which then calls createConversation with an
+      // empty title). onChange keeps the gate accurate as fields change.
       onMount: effectSchema(HomeFormSchema),
       onChange: effectSchema(HomeFormSchema),
     },
@@ -153,6 +158,17 @@ export function HomeAgentForm(): JSX.Element {
       void Effect.runPromiseExit(sendMessage(convId, text, provider));
     },
   }));
+
+  // Sync workspace ID from store signal to form field when async load resolves.
+  // Without this, the form field stays "" (captured at createForm time before
+  // loadWorkspaces completes) and the onChange validator rejects it, making
+  // canSubmit=false and the send button permanently disabled.
+  createEffect(() => {
+    const wsId = selectedWorkspaceId$();
+    if (wsId && wsId !== form.state.values.workspaceId) {
+      form.setFieldValue("workspaceId", wsId);
+    }
+  });
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
   // Read selectedWorkspaceId$ directly instead of form.state.values.workspaceId so

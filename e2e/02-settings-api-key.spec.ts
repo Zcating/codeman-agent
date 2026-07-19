@@ -38,10 +38,11 @@ test.describe("02 — 设置 LLM API key", () => {
     await page.goto("/");
 
     // 1. 通过真实用户会点击的链接到达 /settings。
-    const settingsLink = page.locator('a[href="/settings"]');
+    //    Router 自动 redirect /settings → /settings/llm（router.tsx beforeLoad）。
+    let settingsLink = page.locator('a[href="/settings"]');
     await assert.visible(settingsLink, { timeout: 10_000 });
     await settingsLink.click();
-    await assert.urlMatches(page, /\/settings$/);
+    await assert.urlMatches(page, /\/settings\/llm/);
 
     // 2. 找到第一个 provider 的 LLM API Key password input。
     //    V1.5+ ProviderCard 永远显示 LLM input（无折叠），第一个 input[type=password]。
@@ -50,11 +51,11 @@ test.describe("02 — 设置 LLM API key", () => {
     await passwordInput.fill(FAKE_KEY);
 
     // 3. ADR-0015: ProviderCard 无 per-row Save 按钮。所有变更通过
-    //    appStore.set() + debounced auto-flush（500ms）；footer Save 按钮
+    //    appStore.set() + debounced auto-flush（500ms）；Save 按钮
     //    调用 settingsSaver.flushNow() 跳过 debounce 立即写入。
-    //    footer 特征：border-t 类（`border-t border-zinc-200 dark:border-zinc-700`）。
+    //    LlmSection 中 Save 按钮在 `<div class="flex justify-end gap-2">` 内，
+    //    不在 `<footer>` 中。
     const footerSaveButton = page
-      .locator("footer")
       .locator("button")
       .filter({ hasText: /^Save$/ });
     await assert.visible(footerSaveButton, { timeout: 5_000 });
@@ -77,10 +78,15 @@ test.describe("02 — 设置 LLM API key", () => {
     expect(minimaxProvider?.apiKey, `minimax provider apiKey 应为 ${FAKE_KEY}`).toBe(FAKE_KEY);
 
     // 6. Navigate back to / then to /settings -- password input should reflect saved value.
-    await page.locator('a[href="/"]').click();
+    // Use goto() instead of clicking a[href="/"] because the settings layout
+    // (SettingsSidebar) doesn't have a direct anchor link to home.
+    await page.goto("/");
     await assert.urlMatches(page, /\//);
-    await page.getByRole("link", { name: /设置/ }).click();
-    await assert.urlMatches(page, /\/settings$/);
+    // Navigate back to settings via the footer link (same as step 1).
+    settingsLink = page.locator('a[href="/settings"]');
+    await assert.visible(settingsLink, { timeout: 10_000 });
+    await settingsLink.click();
+    await assert.urlMatches(page, /\/settings\/llm/);
 
     // When idle, password input is present (V1.5+ always shown) and should reflect saved value --
     await assert.visible(page.locator('input[type="password"]').first(), { timeout: 5_000 });

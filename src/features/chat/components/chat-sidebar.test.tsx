@@ -20,8 +20,8 @@ interface CapturedProps {
   currentValue?: string;
   onItemSelect?: (value: string) => void;
   onEmptyGroupClick?: (groupValue: string) => void;
-  sidebarHeader?: any;
-  sidebarFooter?: any;
+  header?: any;
+  footer?: any;
   emptyMessage?: string;
   class?: string;
   children?: any;
@@ -105,8 +105,8 @@ vi.mock("../../../shared/components/internal/codeman-sidebar", () => ({
       currentValue: props.currentValue,
       onItemSelect: props.onItemSelect,
       onEmptyGroupClick: props.onEmptyGroupClick,
-      sidebarHeader: props.sidebarHeader,
-      sidebarFooter: props.sidebarFooter,
+      header: props.header,
+      footer: props.footer,
       emptyMessage: props.emptyMessage,
       class: props.class,
       children: props.children,
@@ -193,14 +193,14 @@ describe("ChatSidebar", () => {
     expect(F.mockSetSelectedWorkspaceId).toHaveBeenCalledWith("ws-1");
   });
 
-  it("sidebarHeader is provided (NewChatButton)", () => {
+  it("header is provided (NewChatButton)", () => {
     render(() => <ChatSidebar />);
-    expect(F.capturedProps?.sidebarHeader).toBeTruthy();
+    expect(F.capturedProps?.header).toBeTruthy();
   });
 
-  it("sidebarFooter is provided (SettingsLink)", () => {
+  it("footer is provided (SettingsLink)", () => {
     render(() => <ChatSidebar />);
-    expect(F.capturedProps?.sidebarFooter).toBeTruthy();
+    expect(F.capturedProps?.footer).toBeTruthy();
   });
 
   it("children prop is provided (Outlet rendered inside CodemanSidebar)", () => {

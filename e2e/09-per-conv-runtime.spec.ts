@@ -89,6 +89,13 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     // 3) clickNewConversationAndWait title → default Q→A entry (warning SSE)
     const { convId } = await clickNewConversationAndWait(page);
     beforeEachConvId = convId;
+    // Wait for streaming from clickNewConversationAndWait to complete
+    // (Send button reappears when streamingMessageId is cleared)
+    try {
+      await page.locator('button[type="submit"]').waitFor({ state: "visible", timeout: 10_000 });
+    } catch {
+      await cancelRunningAgent(page);
+    }
   });
 
   // ─── D1 + D3: 跨 conv 流式隔离(主 bug 修复) ─────────────────
@@ -118,12 +125,12 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     // 等第一个 chunk(4 chars)到达 — 触发 streamingMessageId 设置
     // 注意:最新的 assistant 消息在后面(streaming stub 追加到 messages 末尾),
     // 前面是 beforeEach 产生的 "Mock setup" 消息。用 nth(-1) 取最后一个。
-    const assistantBubbles = page.locator("div.justify-start > div[class*='bg-card']");
+    const assistantBubbles = page.locator('[data-testid="agent-bubble"]');
     // Wait for at least one visible assistant bubble
     await assert.visible(assistantBubbles.first(), { timeout: 10_000 });
     // Count bubbles, then check the last one for our streaming text
     const count = await page.evaluate(() =>
-      document.querySelectorAll("div.justify-start > div[class*='bg-card']").length
+      document.querySelectorAll('[data-testid="agent-bubble"]').length
     );
     const lastBubble = count > 1
       ? assistantBubbles.nth(count - 1)
@@ -158,7 +165,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     const idx1AssistantCount = await page.evaluate(() => {
       const section = document.querySelector("section.flex-1");
       if (!section) return 999;
-      return Array.from(section.querySelectorAll("div.justify-start > div[class*='bg-card']")).length;
+      return Array.from(section.querySelectorAll('[data-testid="agent-bubble"]')).length;
     });
     expect(idx1AssistantCount, "idx1 view 应有 1 个 assistant bubble (新建 conv 的 fallback 响应)").toBe(1);
 
@@ -166,7 +173,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     await convIdx0.click();
     await new Promise((r) => setTimeout(r, 200));
     await assert.visible(
-      page.locator("div.justify-start > div[class*='bg-card']").filter({ hasText: TEXT_A }),
+      page.locator('[data-testid="agent-bubble"]').filter({ hasText: TEXT_A }),
       { timeout: 10_000 },
     );
 
@@ -179,7 +186,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
 
     // 等 idx1 的 assistant 完整文本
     await assert.visible(
-      page.locator("div.justify-start > div[class*='bg-card']").filter({ hasText: TEXT_B }),
+      page.locator('[data-testid="agent-bubble"]').filter({ hasText: TEXT_B }),
       { timeout: 10_000 },
     );
   });
@@ -198,7 +205,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     await submitForm(page);
 
     // 等第一个 token chunk 到达 → 触发 streamingMessageId 设置
-    const assistantBubble = page.locator("div.justify-start > div[class*='bg-card']");
+    const assistantBubble = page.locator('[data-testid="agent-bubble"]');
     await assert.visible(assistantBubble.first(), { timeout: 10_000 });
 
     // ⏳ 徽标出现在 active conv 上 (DOM 内存在即视为流式激活)。
@@ -218,7 +225,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     // streamingMessageId 出现在完整文本后可能持续存在几秒(done 事件发射的时序),
     // 但 TEXT_A 的可见性证明 LLM 响应已完成(最后一个 token 已到达并渲染)。
     await assert.visible(
-      page.locator("div.justify-start > div[class*='bg-card']").filter({ hasText: TEXT_A }),
+      page.locator('[data-testid="agent-bubble"]').filter({ hasText: TEXT_A }),
       { timeout: 10_000 },
     );
   });
@@ -253,7 +260,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     // 等第二条完成
     await assert.visible(
       page
-        .locator("div.justify-start > div[class*='bg-card']")
+        .locator('[data-testid="agent-bubble"]')
         .filter({ hasText: "Second response after cancel" }),
       { timeout: 10_000 },
     );
@@ -281,7 +288,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     await submitForm(page);
 
     // 等 idx 0 第一个 chunk
-    await assert.visible(page.locator("div.justify-start > div[class*='bg-card']").first(), {
+    await assert.visible(page.locator('[data-testid="agent-bubble"]').first(), {
       timeout: 10_000,
     });
 
@@ -308,7 +315,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     await submitForm(page);
 
     // 等 idx1 第一个 chunk
-    await assert.visible(page.locator("div.justify-start > div[class*='bg-card']").first(), {
+    await assert.visible(page.locator('[data-testid="agent-bubble"]').first(), {
       timeout: 10_000,
     });
 
@@ -326,7 +333,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     await convIdx0.click();
     await new Promise((r) => setTimeout(r, 200));
     await assert.visible(
-      page.locator("div.justify-start > div[class*='bg-card']").filter({ hasText: TEXT_A }),
+      page.locator('[data-testid="agent-bubble"]').filter({ hasText: TEXT_A }),
       { timeout: 10_000 },
     );
 
@@ -334,7 +341,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     await convIdx1.click();
     await new Promise((r) => setTimeout(r, 200));
     await assert.visible(
-      page.locator("div.justify-start > div[class*='bg-card']").filter({ hasText: TEXT_B }),
+      page.locator('[data-testid="agent-bubble"]').filter({ hasText: TEXT_B }),
       { timeout: 10_000 },
     );
   });
