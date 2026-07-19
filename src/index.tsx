@@ -1,4 +1,4 @@
-﻿/* @refresh reload */
+/* @refresh reload */
 import "./index.css";
 import { render } from "solid-js/web";
 import { RouterProvider } from "@tanstack/solid-router";

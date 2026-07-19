@@ -1,4 +1,4 @@
-﻿//! ProviderCard — V1.8+ ADR-0015/0016 unified provider card.
+//! ProviderCard — V1.8+ ADR-0015/0016 unified provider card.
 //! 1 card per provider with LLM subform (always).
 //! V1.8+ ADR-0016: all writes go through appStore (debounced 500ms auto-flush);
 //! handleRefreshModels + handleDelete 走 appStore.refreshProviderModels / appStore.deleteProvider,

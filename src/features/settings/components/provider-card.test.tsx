@@ -1,4 +1,4 @@
-﻿//! ProviderCard V1.7+ tests 鈥?ADR-0015 appStore refactor.
+//! ProviderCard V1.7+ tests 鈥?ADR-0015 appStore refactor.
 //! Tests for appStore integration, toggle, refresh, dropdown,
 //! delete removes provider from appStore, API Key input, and no Save buttons.
 

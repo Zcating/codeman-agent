@@ -1,4 +1,4 @@
-﻿//! 06 — Mock LLM round-trip: 1 user + 1 assistant = 2 bubble。
+//! 06 — Mock LLM round-trip: 1 user + 1 assistant = 2 bubble。
 //!
 //! 使用 mock LLM provider（不依赖 .env 真实 key）。验证:
 //!  1. 用户输入消息 → user bubble 出现

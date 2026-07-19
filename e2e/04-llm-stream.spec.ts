@@ -1,4 +1,4 @@
-﻿//! 04 — 流式 LLM 非空文本验收。
+//! 04 — 流式 LLM 非空文本验收。
 //!
 //! 验证 V1 chat 域的流式 LLM 输出。使用 mock LLM provider（不依赖 .env 真实 key）。
 //! Mock 提供确定性流式响应，验证 assistant bubble 包含 ≥5 char 文本。

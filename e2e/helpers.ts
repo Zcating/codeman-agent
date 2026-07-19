@@ -1,4 +1,4 @@
-﻿//! e2e/helpers.ts — 共享 utility。Spec 们从这里导入 invoke / clearAllHistory /
+//! e2e/helpers.ts — 共享 utility。Spec 们从这里导入 invoke / clearAllHistory /
 //! cancelRunningAgent / assert / ElectronLocator / ElectronPage 等。
 //!
 //! Multi-worker 改造 (2026-06): 删除了原来的 module-singleton `page` +

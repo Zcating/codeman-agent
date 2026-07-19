@@ -1,4 +1,4 @@
-﻿//! Settings feature barrel。
+//! Settings feature barrel。
 //!
 //! 重新导出：
 //!   - ProviderCard UI 组件

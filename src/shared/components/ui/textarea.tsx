@@ -1,4 +1,4 @@
-﻿//! Textarea — 多行文本输入原子组件。
+//! Textarea — 多行文本输入原子组件。
 //! 纯 cn，rows 透传。Pattern from solidcn-ui/solidcn。
 
 import type { Component, ComponentProps } from "solid-js";

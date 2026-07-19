@@ -1,4 +1,4 @@
-﻿//! e2e/env-loader.ts — 读 .env 文件,把 key=value 解析为 Record。
+//! e2e/env-loader.ts — 读 .env 文件,把 key=value 解析为 Record。
 //!
 //! .env 格式:每行 `KEY=VALUE`,VALUE 可选地用单/双引号包裹,允许 # 开头注释。
 //! 不支持多行值 / 转义(本项目测试用例不涉及)。

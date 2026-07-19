@@ -1,4 +1,4 @@
-﻿//! Settings feature 的 debounced save coordinator (ADR-0015 V1.7+ + ADR-0016 D3).
+//! Settings feature 的 debounced save coordinator (ADR-0015 V1.7+ + ADR-0016 D3).
 //!
 //! 架构约束：
 //! - debounce 逻辑从 app.store 移到这里（Settings feature 层）

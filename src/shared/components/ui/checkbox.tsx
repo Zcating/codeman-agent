@@ -1,4 +1,4 @@
-﻿//! Checkbox — 布尔切换原子组件。
+//! Checkbox — 布尔切换原子组件。
 //! 纯 cn，原生 <input type="checkbox"> 包装器。无 Kobalte/Radix（V1 排除）。
 
 import type { Component, ComponentProps } from "solid-js";

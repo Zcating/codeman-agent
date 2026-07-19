@@ -1,4 +1,4 @@
-﻿//! 05 — Agent 页面:输入内容 → user message bubble 必须出现。
+//! 05 — Agent 页面:输入内容 → user message bubble 必须出现。
 //!
 //! 测试的契约:用户在聊天视图输入并发送消息后,消息作为 user-role bubble
 //! 渲染在列表中,相同消息持久化到 SQLite(可通过 `listMessages` IPC 命令验证)。
