@@ -137,26 +137,32 @@ beforeEach(() => {
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
 describe("ChatSidebar", () => {
-  it("builds options from workspaces + conversations (groups + leaves)", () => {
+  it("builds 3-level options from workspaces + conversations", () => {
     render(() => <ChatSidebar />);
     expect(F.capturedProps).toBeTruthy();
     const opts = F.capturedProps!.options;
-    expect(opts.length).toBe(2);
+    expect(opts.length).toBe(1);
     expect(opts[0]).toMatchObject({
+      label: "项目",
+      value: "workspace",
+      defaultExpanded: true,
+    });
+    expect(opts[0].children.length).toBe(2);
+    expect(opts[0].children[0]).toMatchObject({
       label: "Frontend",
       value: "ws-1",
       defaultExpanded: true,
     });
-    expect(opts[0].children).toEqual([
+    expect(opts[0].children[0].children).toEqual([
       { label: "Chat 1", value: "c-1" },
       { label: "Chat 2", value: "c-2" },
     ]);
-    expect(opts[1]).toMatchObject({
+    expect(opts[0].children[1]).toMatchObject({
       label: "Backend",
       value: "ws-2",
       defaultExpanded: false,
     });
-    expect(opts[1].children).toEqual([{ label: "Chat 3", value: "c-3" }]);
+    expect(opts[0].children[1].children).toEqual([{ label: "Chat 3", value: "c-3" }]);
   });
 
   it("passes emptyMessage='No workspaces' to CodemanSidebar", () => {
@@ -166,8 +172,9 @@ describe("ChatSidebar", () => {
 
   it("first workspace has defaultExpanded=true; second false", () => {
     render(() => <ChatSidebar />);
-    expect(F.capturedProps!.options[0].defaultExpanded).toBe(true);
-    expect(F.capturedProps!.options[1].defaultExpanded).toBe(false);
+    const children = F.capturedProps!.options[0].children;
+    expect(children[0].defaultExpanded).toBe(true);
+    expect(children[1].defaultExpanded).toBe(false);
   });
 
   it("currentValue comes from URL params (convId)", () => {

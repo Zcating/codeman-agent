@@ -20,7 +20,6 @@ import { Outlet, useLocation, useNavigate, useParams, Link } from "@tanstack/sol
 import { Settings as SettingsIcon } from "lucide-solid";
 import {
   CodemanSidebar,
-  type SidebarItemConfig,
   type SidebarOption,
 } from "../../../shared/components/internal/codeman-sidebar";
 import { Dialog } from "../../../shared/components/internal/codeman-dialog";
@@ -120,26 +119,31 @@ export function ChatSidebar(): JSX.Element {
 
   // ─── Sidebar tree builders ───────────────────────────────────────────────
 
-  const options = (): SidebarOption[] =>
-    wsList().map((ws) => {
-      const wsConvs = convList()
-        .filter((c) => c.workspaceId === ws.id)
-        .sort((a, b) => b.updatedAt - a.updatedAt)
-        .map(
-          (c): SidebarItemConfig => ({
-            label: c.title,
-            value: c.id,
-          }),
-        );
-      return {
-        label: ws.label,
-        value: ws.id,
-        defaultExpanded: ws.id === firstWsId(),
-        children: wsConvs,
-      };
-    });
+  const options = (): SidebarOption[] => {
+    if (wsList().length === 0) return [];
 
-  const renderLeaf = (item: SidebarItemConfig): JSX.Element => {
+    return [
+      {
+        label: "项目",
+        value: "workspace",
+        defaultExpanded: true,
+        children: wsList().map((ws) => ({
+          label: ws.label,
+          value: ws.id,
+          defaultExpanded: ws.id === firstWsId(),
+          children: convList()
+            .filter((c) => c.workspaceId === ws.id)
+            .sort((a, b) => b.updatedAt - a.updatedAt)
+            .map((c): SidebarOption => ({
+              label: c.title,
+              value: c.id,
+            })),
+        })),
+      },
+    ];
+  };
+
+  const renderLeaf = (item: SidebarOption): JSX.Element => {
     const convId = item.value ?? item.label;
     const isStreaming = (): boolean =>
       store.byId[convId]?.streamingMessageId != null;
@@ -153,18 +157,29 @@ export function ChatSidebar(): JSX.Element {
     );
   };
 
-  const renderGroupHeader = (group: SidebarOption): JSX.Element => (
-    <WorkspaceActions
-      wsId={group.value ?? group.label}
-      label={group.label}
-      onRename={(id, label) => {
-        void handleRenameWorkspace(id, label);
-      }}
-      onDelete={(id, label) => {
-        void handleDeleteWorkspace(id, label);
-      }}
-    />
-  );
+  const renderGroupHeader = (group: SidebarOption): JSX.Element => {
+    // Top-level "项目" category group — no rename/delete actions.
+    if (group.value === "workspace") {
+      return (
+        <div class="flex w-full items-center gap-2 min-w-0">
+          <span class="truncate font-semibold">{group.label}</span>
+        </div>
+      );
+    }
+    // Workspace-level group — rename + delete actions.
+    return (
+      <WorkspaceActions
+        wsId={group.value ?? group.label}
+        label={group.label}
+        onRename={(id, label) => {
+          void handleRenameWorkspace(id, label);
+        }}
+        onDelete={(id, label) => {
+          void handleDeleteWorkspace(id, label);
+        }}
+      />
+    );
+  };
 
   // ─── Render ──────────────────────────────────────────────────────────────
 

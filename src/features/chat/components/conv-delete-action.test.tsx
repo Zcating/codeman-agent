@@ -77,9 +77,12 @@ describe("ConvDeleteAction", () => {
     const cancelBtn = container.querySelector("[aria-label='取消删除']");
     expect(confirmBtn).toBeTruthy();
     expect(cancelBtn).toBeTruthy();
-    // Trash icon is hidden in confirm state (replaced by overlay)
-    expect(container.querySelector("[aria-label='Delete conversation']"))
-      .toBeNull();
+    // Trash icon stays in DOM for layout stability, but invisible
+    const trashAfterConfirm = container.querySelector(
+      "[aria-label='Delete conversation']",
+    );
+    expect(trashAfterConfirm).toBeTruthy();
+    expect((trashAfterConfirm as HTMLElement).className).toContain("invisible");
   });
 
   it("clicking 确认 calls onDelete with convId", () => {

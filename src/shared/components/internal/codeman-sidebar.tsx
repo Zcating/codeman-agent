@@ -17,6 +17,7 @@
 
 import { For, Show, type JSX } from "solid-js";
 import { Accordion } from "@ark-ui/solid";
+import { ChevronRight } from "lucide-solid";
 import {
   Sidebar as SidebarPrimitive,
   SidebarContent,
@@ -28,10 +29,15 @@ import { cn } from "../../lib/cn";
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 /**
- * Per-node configuration. Consumers build `SidebarOption[]` from their domain
- * data (chat: WorkspaceNode[] + ConvNode[]; settings: 4-tab nav config).
+ * Tree node — recursive, supports N-level nesting via `children`.
+ *
+ * Consumers build `SidebarOption[]` from their domain data (chat: category →
+ * workspace → conversation; settings: 4-tab flat nav).
+ *
+ * - `children === undefined` → leaf (rendered as `<div role="menuitem">`)
+ * - `children` is array (empty or not) → group (rendered with `<Accordion.Item>`)
  */
-export interface SidebarItemConfig {
+export interface SidebarOption {
   /** Required: human-readable label (form semantic, also used as fallback key). */
   label: string;
   /** Optional: navigation key. Falls back to `label` if not provided. */
@@ -40,21 +46,17 @@ export interface SidebarItemConfig {
   icon?: JSX.Element;
   /** Optional: disabled items get opacity-60 + `<button disabled>` (no click). */
   disabled?: boolean;
-}
-
-/**
- * Top-level option (group / nav item). Extends leaf config with Accordion
- * defaults and nested children (2-level depth only, per ADR-0030 D1).
- */
-export interface SidebarOption extends SidebarItemConfig {
   /** Uncontrolled: expand this group on mount. Maps to Accordion.defaultValue. */
   defaultExpanded?: boolean;
-  /** Children: leaves inside this group. 2-level nesting (group > leaf). */
-  children?: SidebarItemConfig[];
+  /**
+   * Child nodes (recursive). `undefined` = leaf; `[]` = empty group (renders
+   * onEmptyGroupClick button when provided); `SidebarOption[]` = nested group.
+   */
+  children?: SidebarOption[];
 }
 
-/** Consumer's per-item render function — receives a leaf config, returns JSX. */
-export type SidebarRenderItem = (item: SidebarItemConfig) => JSX.Element;
+/** Consumer's per-node render function — receives a SidebarOption, returns JSX. */
+export type SidebarRenderItem = (item: SidebarOption) => JSX.Element;
 
 /** Custom active predicate. Receives (itemValue, currentValue). */
 export type SidebarIsActiveFn = (
@@ -119,7 +121,7 @@ const isEqual = (a: unknown, b: unknown): boolean => a === b;
  * `value === currentValue` (strict equality).
  */
 function computeActive(
-  item: SidebarItemConfig,
+  item: SidebarOption,
   currentValue: string | undefined,
   isActiveFn: SidebarIsActiveFn | undefined,
 ): boolean {
@@ -140,7 +142,7 @@ function computeActive(
  * has no native button semantics. Per WAI-ARIA menu pattern.
  */
 function renderLeaf(
-  item: SidebarItemConfig,
+  item: SidebarOption,
   props: CodemanSidebarProps,
 ): JSX.Element {
   const active = (): boolean =>
@@ -180,27 +182,93 @@ function renderLeaf(
   );
 }
 
+// ─── Recursive renderTree ───────────────────────────────────────────────────
+
+/**
+ * Recursive tree renderer. Handles N-level nesting: each group is an
+ * Accordion item, its children are rendered via a recursive call.
+ */
+function renderTree(
+  options: SidebarOption[],
+  props: CodemanSidebarProps,
+): JSX.Element {
+  const flatLeaves = options.filter((o) => o.children === undefined);
+  const groups = options.filter((o) => o.children !== undefined);
+  const defaultValue = groups
+    .filter((o) => o.defaultExpanded)
+    .map((o) => o.value ?? o.label);
+
+  return (
+    <>
+      <Show when={flatLeaves.length > 0}>
+        <ul class="flex flex-col gap-0.5 list-none p-0 m-0">
+          <For each={flatLeaves}>
+            {(item) => <li>{renderLeaf(item, props)}</li>}
+          </For>
+        </ul>
+      </Show>
+      <Show when={groups.length > 0}>
+        <Accordion.Root
+          multiple={false}
+          collapsible={true}
+          defaultValue={defaultValue}
+        >
+          <For each={groups}>
+            {(group) => (
+              <Accordion.Item
+                value={group.value ?? group.label}
+                data-value={group.value ?? group.label}
+              >
+                <Accordion.ItemTrigger class="group/row relative w-full px-2 py-2">
+                  <span class="flex w-full items-center gap-2 min-w-0">
+                    <Accordion.ItemIndicator>
+                      <ChevronRight class="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-data-[state=open]/row:rotate-90" />
+                    </Accordion.ItemIndicator>
+                    {props.renderGroupHeader
+                      ? props.renderGroupHeader(group)
+                      : <span>{group.label}</span>}
+                  </span>
+                </Accordion.ItemTrigger>
+                <Accordion.ItemContent class="pt-1">
+                  <Show
+                    when={group.children && group.children.length > 0}
+                    fallback={
+                      <Show when={props.onEmptyGroupClick}>
+                        <div class="pl-6 pr-3 pb-2">
+                          <button
+                            type="button"
+                            class="w-full text-left px-2 py-1 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
+                            onClick={() =>
+                              props.onEmptyGroupClick?.(
+                                group.value ?? group.label,
+                              )
+                            }
+                            aria-label={`${group.label}: empty group`}
+                            data-empty-group-value={
+                              group.value ?? group.label
+                            }
+                          >
+                            {group.label} (empty)
+                          </button>
+                        </div>
+                      </Show>
+                    }
+                  >
+                    {renderTree(group.children!, props)}
+                  </Show>
+                </Accordion.ItemContent>
+              </Accordion.Item>
+            )}
+          </For>
+        </Accordion.Root>
+      </Show>
+    </>
+  );
+}
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
-  // Split options into flat leaves vs groups.
-  // Discriminator: `children === undefined` → flat leaf (no nesting).
-  // `children: []` (empty array) → group with empty body (renders onEmptyGroupClick button).
-  // `children: [...]` (non-empty) → group with leaves.
-  // This distinction preserves chat-domain semantics: workspace with no
-  // conversations is still a group (not a flat leaf).
-  const flatLeaves = (): SidebarOption[] =>
-    props.options.filter((o) => o.children === undefined);
-  const groups = (): SidebarOption[] =>
-    props.options.filter((o) => o.children !== undefined);
-
-  // Accordion initial value: groups with `defaultExpanded: true`.
-  // ADR-0023 D7-CS2 + ADR-0030 D5: uncontrolled via defaultValue.
-  const accordionDefaultValue = (): string[] =>
-    props.options
-      .filter((o) => o.children !== undefined && o.defaultExpanded)
-      .map((o) => o.value ?? o.label);
-
   return (
     <div class="flex h-full w-full flex-col">
       {/* Two-column row: sidebar + main content */}
@@ -227,73 +295,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
                 </Show>
               }
             >
-              {/* Flat leaves (no children): render via renderItem directly */}
-              <Show when={flatLeaves().length > 0}>
-                <ul class="flex flex-col gap-0.5 list-none p-0 m-0">
-                  <For each={flatLeaves()}>
-                    {(item) => <li>{renderLeaf(item, props)}</li>}
-                  </For>
-                </ul>
-              </Show>
-
-              {/* Groups (have children): render via @ark-ui/solid Accordion */}
-              <Show when={groups().length > 0}>
-                <Accordion.Root
-                  multiple={false}
-                  collapsible={true}
-                  defaultValue={accordionDefaultValue()}
-                >
-                  <For each={groups()}>
-                    {(group) => (
-                  <Accordion.Item
-                    value={group.value ?? group.label}
-                    data-value={group.value ?? group.label}
-                  >
-                    <Accordion.ItemTrigger>
-                      {props.renderGroupHeader
-                        ? props.renderGroupHeader(group)
-                        : <span>{group.label}</span>}
-                    </Accordion.ItemTrigger>
-                    <Accordion.ItemContent>
-                      <Show
-                        when={
-                          group.children &&
-                          group.children.length > 0
-                        }
-                        fallback={
-                          <Show when={props.onEmptyGroupClick}>
-                            <div class="pl-6 pr-3 pb-2">
-                              <button
-                                type="button"
-                                class="w-full text-left px-2 py-1 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
-                                onClick={() =>
-                                  props.onEmptyGroupClick?.(
-                                    group.value ?? group.label,
-                                  )
-                                }
-                                aria-label={`${group.label}: empty group`}
-                                data-empty-group-value={
-                                  group.value ?? group.label
-                                }
-                              >
-                                {group.label} (empty)
-                              </button>
-                            </div>
-                          </Show>
-                        }
-                      >
-                        <ul class="flex flex-col gap-0.5 list-none p-0 m-0">
-                          <For each={group.children}>
-                            {(child) => <li>{renderLeaf(child, props)}</li>}
-                          </For>
-                        </ul>
-                      </Show>
-                    </Accordion.ItemContent>
-                      </Accordion.Item>
-                    )}
-                  </For>
-                </Accordion.Root>
-              </Show>
+              {renderTree(props.options, props)}
             </Show>
           </SidebarContent>
 

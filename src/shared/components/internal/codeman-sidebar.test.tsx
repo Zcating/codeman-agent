@@ -28,7 +28,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CodemanSidebar,
   type CodemanSidebarProps,
-  type SidebarItemConfig,
   type SidebarOption,
 } from "./codeman-sidebar";
 
@@ -77,6 +76,10 @@ function refreshDomForItems() {
         content.style.display = "none";
       }
     }
+    // Sync ItemIndicator data-state for chevron rotation.
+    itemEl.querySelectorAll("[data-part='item-indicator']").forEach((ind) => {
+      ind.setAttribute("data-state", isOpen ? "open" : "closed");
+    });
   });
 }
 
@@ -164,9 +167,16 @@ vi.mock("@ark-ui/solid", async () => {
           </div>
         );
       },
-      ItemIndicator: (props: any) => (
-        <span data-part="item-indicator">{props.children}</span>
-      ),
+      ItemIndicator: (props: any) => {
+        // Walk up to parent [data-part='item'] to read initial open state.
+        const onRef = (el: HTMLSpanElement) => {
+          if (!el) return;
+          const itemEl = el.closest("[data-part='item']");
+          const isOpen = itemEl?.getAttribute("data-state") === "open";
+          el.setAttribute("data-state", isOpen ? "open" : "closed");
+        };
+        return <span ref={onRef} data-part="item-indicator">{props.children}</span>;
+      },
     },
   };
 });
@@ -246,7 +256,7 @@ describe("CodemanSidebar", () => {
     });
 
     it("treats children: undefined as flat leaf (no group wrapper)", () => {
-      const renderItem = vi.fn((item: SidebarItemConfig) => (
+      const renderItem = vi.fn((item: SidebarOption) => (
         <span data-testid="leaf">{item.label}</span>
       ));
       const { container } = render(() => (
@@ -296,7 +306,7 @@ describe("CodemanSidebar", () => {
     });
 
     it("calls renderItem once per flat leaf, with the right config", () => {
-      const renderItem = vi.fn((item: SidebarItemConfig) => (
+      const renderItem = vi.fn((item: SidebarOption) => (
         <span data-testid="leaf">{item.label}</span>
       ));
       const options: SidebarOption[] = [
@@ -329,7 +339,7 @@ describe("CodemanSidebar", () => {
   // ─── Slice 3: group header renders ────────────────────────────────────
   describe("group header", () => {
     it("renders group label via sidebar (not renderItem) when collapsed", () => {
-      const renderItem = vi.fn((item: SidebarItemConfig) => (
+      const renderItem = vi.fn((item: SidebarOption) => (
         <span data-testid="leaf">{item.label}</span>
       ));
       const options: SidebarOption[] = [

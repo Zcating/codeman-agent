@@ -68,7 +68,7 @@ describe("WorkspaceActions", () => {
     expect(onRename).toHaveBeenCalledWith("ws-42", "Project 42");
   });
 
-  it("clicking delete button calls onDelete(wsId, label)", () => {
+  it("delete shows inline confirm, then confirm triggers onDelete(wsId, label)", () => {
     const onDelete = vi.fn();
     const { container } = render(() => (
       <WorkspaceActions
@@ -78,9 +78,19 @@ describe("WorkspaceActions", () => {
         onDelete={onDelete}
       />
     ));
+    // Step 1: click trash → inline confirm overlay shows
     fireEvent.click(
       container.querySelector(
         "[aria-label='Delete Project 42']",
+      ) as HTMLElement,
+    );
+    expect(
+      container.querySelector("[data-state='confirming']"),
+    ).toBeTruthy();
+    // Step 2: click "删除" in overlay → onDelete called
+    fireEvent.click(
+      container.querySelector(
+        "[aria-label='确认删除']",
       ) as HTMLElement,
     );
     expect(onDelete).toHaveBeenCalledWith("ws-42", "Project 42");
