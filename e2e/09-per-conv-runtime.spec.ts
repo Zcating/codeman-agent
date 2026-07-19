@@ -215,8 +215,8 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     });
 
     // 等流完 — done 事件清除 streamingMessageId,⏳ 消失
-    // streamingMessageId 出现在完整文本后可�?持续存在几秒(done 事件发射��时序),
-    // 但 TEXT_A 的可见性证明 LLM 响应已完成(最后一��token 已到达并渲染)。
+    // streamingMessageId 出现在完整文本后可能持续存在几秒(done 事件发射的时序),
+    // 但 TEXT_A 的可见性证明 LLM 响应已完成(最后一个 token 已到达并渲染)。
     await assert.visible(
       page.locator("div.justify-start > div[class*='bg-card']").filter({ hasText: TEXT_A }),
       { timeout: 10_000 },

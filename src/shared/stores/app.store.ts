@@ -1,4 +1,4 @@
-﻿//! 全局 app-store (ADR-0015 + ADR-0016).
+//! 全局 app-store (ADR-0015 + ADR-0016).
 //!
 //! Settings 的全局 reactive 桥接层。UI 通过 `appStore.state.value` 读，
 //! 通过 `appStore.set(patch)` / `appStore.forceFlush()` / `appStore.refresh()`

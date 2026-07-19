@@ -863,7 +863,7 @@ describe("mock-server HTTP — POST /mock/anthropic/v1/messages", () => {
     expect(textIdx).toBeGreaterThan(thinkingIdx);
   });
 
-  it("T28b: single-turn entry WITH done:true + asstCount=0 (initial request) → still serves turns[0] (短�� 不触发)", async () => {
+  it("T28b: single-turn entry WITH done:true + asstCount=0 (initial request) → still serves turns[0] (短对话不触发)", async () => {
     // done:true 只在 agent 走完最后一轮后才触发;初次请求照常服务 turns[0]。
     writeFileSync(
       qaPath,

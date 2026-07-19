@@ -1,4 +1,4 @@
-﻿//! app.store 鍗曟祴 (ADR-0015 V1.7+).
+//! app.store 鍗曟祴 (ADR-0015 V1.7+).
 //!
 //! 娴嬭瘯瑕嗙洊锛?
 //! - set() 鍚屾鏇存柊 state锛屼笉瑙﹀彂 IPC锛坉ebounce 閫昏緫鍦?settings-saver锛?

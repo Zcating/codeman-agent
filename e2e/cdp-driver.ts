@@ -1,4 +1,4 @@
-﻿//! e2e/cdp-driver.ts — 直接通过 Chrome DevTools Protocol 驱动 Electron 的 Chromium。
+//! e2e/cdp-driver.ts — 直接通过 Chrome DevTools Protocol 驱动 Electron 的 Chromium。
 //!
 //! V3 背景：V2 走 WebView2，现在 V3 走 Electron 43 自带的 Chromium 134。
 //! 同样的原因 — Playwright `chromium.connectOverCDP` 不工作（`Browser.setDownloadBehavior`

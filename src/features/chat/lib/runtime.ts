@@ -1,4 +1,4 @@
-﻿//! AgentRuntime — pi-agent-core 0.80.3 的 Effect Stream 包装 (V2 ADR-0019 重构)。
+//! AgentRuntime — pi-agent-core 0.80.3 的 Effect Stream 包装 (V2 ADR-0019 重构)。
 //!
 //! 工厂模式,无 Context.Tag / 无 Layer DI / 无 Ref<Map<ConvId, Agent>>:
 //! - `createAgentRuntime()` 返回 `AgentRuntime` 接口,closure 持有 per-run 状态

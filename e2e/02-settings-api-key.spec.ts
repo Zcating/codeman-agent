@@ -1,4 +1,4 @@
-﻿//! 02 — 设置：配置 LLM API key 并验证其持久化（V1.5+ ADR-0015 架构）。
+//! 02 — 设置：配置 LLM API key 并验证其持久化（V1.5+ ADR-0015 架构）。
 //!
 //! 流程（ADR-0015: ProviderCard 无 per-row Save 按钮；单一 footer Save）：
 //!  1. 通过 footer 链接导航到 /settings。

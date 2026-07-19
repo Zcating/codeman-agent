@@ -1,4 +1,4 @@
-﻿//! 格式化 Effect 错误 (ADR-0016 D3 + ADR-0025 Phase 3).
+//! 格式化 Effect 错误 (ADR-0016 D3 + ADR-0025 Phase 3).
 //!
 //! 把 `Cause.Cause<AppError>` 拍平成人类可读字符串。ADR-0025 PR 2 起单源：
 //!   - Schema.TaggedError 实例 → 用 `_tag` 判别 (isAppError)。

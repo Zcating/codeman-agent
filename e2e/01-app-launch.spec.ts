@@ -1,4 +1,4 @@
-﻿//! 01 — Application launch: cold-start Tauri and verify the SPA mounted.
+//! 01 — Application launch: cold-start Tauri and verify the SPA mounted.
 //!
 //! Canary spec. If this fails, the entire e2e pipeline is broken (wrong CDP
 //! port, webview not loaded, or app panicked on startup). All other specs

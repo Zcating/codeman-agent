@@ -1,4 +1,4 @@
-﻿//! 04 — 主题切换:light / dark / system。
+//! 04 — 主题切换:light / dark / system。
 //!
 //! 设置页面没有专用主题切换 UI(主题通过与所有其他内容相同的
 //! Save 流程修改 Settings.theme,实际视觉切换发生在共享 theme store
