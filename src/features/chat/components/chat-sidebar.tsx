@@ -16,7 +16,7 @@
 //! (sidebar + main) shell. Children slot is `<Outlet />` from TanStack Router.
 
 import type { JSX } from "solid-js";
-import { Outlet, useNavigate, useParams, Link } from "@tanstack/solid-router";
+import { Outlet, useLocation, useNavigate, useParams, Link } from "@tanstack/solid-router";
 import { Settings as SettingsIcon } from "lucide-solid";
 import {
   CodemanSidebar,
@@ -42,6 +42,10 @@ import { NewChatButton } from "./new-chat-button";
 
 export function ChatSidebar(): JSX.Element {
   const navigate = useNavigate();
+  // Capture the current pathname so the settings "Back" button can return
+  // to the page the user was on before entering settings (not to a
+  // settings subpage like /settings/llm or /settings/app).
+  const location = useLocation();
 
   // URL-derived active conv id (per chat AGENTS.md: URL is single source of truth)
   const params = useParams({ strict: false });
@@ -172,12 +176,13 @@ export function ChatSidebar(): JSX.Element {
       currentValue={selectedConvId() ?? undefined}
       onItemSelect={handleSelectConv}
       onEmptyGroupClick={handleEmptyWorkspaceClick}
-      sidebarHeader={
+      header={
         <NewChatButton onClick={handleNewConversation} />
       }
-      sidebarFooter={
+      footer={
         <Link
           to="/settings"
+          state={{ from: location().pathname }}
           activeProps={{ class: "text-primary font-medium" }}
           inactiveProps={{
             class:

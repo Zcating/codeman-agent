@@ -1,4 +1,4 @@
-# 0030 — CodemanSidebar 通用化：renderItem 全权控制 + 5 slots 两栏布局
+# 0030 — CodemanSidebar 通用化：renderItem 全权控制 + header/footer 两栏布局
 
 **Status**: accepted · **Date**: 2026-07-18
 **Scope**: `src/shared/components/internal/codeman-sidebar.tsx` (重写) + `src/shared/components/internal/codeman-sidebar.test.tsx` (重写) + `src/features/chat/components/chat-sidebar.tsx` (新增) + `src/features/chat/routes/chat-layout.tsx` (改) + `src/features/chat/stores/chat.store.ts` (改 — 删除 `buildSidebarNodes`) + `src/features/chat/components/conv-delete-action.tsx` (新增) + `src/features/chat/components/workspace-actions.tsx` (新增) + `src/features/settings/components/settings-sidebar.tsx` (新增) + `src/features/settings/routes/settings-layout.tsx` (新增) + `src/router.tsx` (改 — 嵌套路由 `/settings/$tab`)
@@ -14,7 +14,7 @@ settings 域新需求 (2026-07)：点击 sidebar 设置链接后保留 sidebar�
 两个核心张力：
 
 1. **通用化深度**：chat 域的 inline confirm / hover delete / 流式 spinner / 日期 subLabel 等视觉差异，要复用 sidebar 抽象还是要 consumer 自管？
-2. **抽象边界**：sidebar 提供 Accordion 状态管理 + active 高亮 + hover bg + click navigate，还是降级为 Accordion wrapper + 5 slots 全部交给 consumer？
+2. **抽象边界**：sidebar 提供 Accordion 状态管理 + active 高亮 + hover bg + click navigate，还是降级为 Accordion wrapper + header/footer 全部交给 consumer？
 
 经过 8 轮 grilling（用户："新建一个新的 sidebar" → "通用化" → "业务逻辑应该挪出" → "renderItem 接管 sidebar" → "改成 label-value" → "参考 shadcn-style 设计" → 拍板最终 schema），结论是 **renderItem 完全接管节点 DOM 结构 + sidebar 内部包容器 + active/hover 视觉 + click navigate**。
 
@@ -55,7 +55,7 @@ export interface SidebarProps {
   currentValue?: string;
   isActive?: SidebarIsActiveFn;
   onItemSelect?: (value: string) => void;
-  // ... 5 slots
+  // ... 3 slots
 }
 ```
 
@@ -63,23 +63,22 @@ export interface SidebarProps {
 
 **为什么不要 helpers**：第 3 轮 grilling 我推过 `helpers: { option, isActive, isExpanded }` 让 consumer 自己加 active class。参考 shadcn-style sidebar 设计后发现：sidebar 自己包 active 高亮更符合 library-grade 习惯（shadcn `SidebarMenuButton` 接受 `isActive` prop，consumer 不用管 class）—— **简化 consumer 代码 50%+**，一致性由 sidebar 保证。
 
-### D3 — 5 slots（外顶 / 内顶 / 内底 / 外底 / children）+ 两栏布局封装
+### D3 — 3 slots（header / footer / children）+ 两栏布局封装
 
 ```typescript
 export interface SidebarProps {
   // ...
-  header?: JSX.Element;                     // 外顶（page header，sticky）
-  sidebarHeader?: JSX.Element;              // 内顶（sidebar 内部）
-  sidebarFooter?: JSX.Element;              // 内底
-  footer?: JSX.Element;                     // 外底
+  header?: JSX.Element;                     // 侧边栏内顶部 slot（menu 之上）
+  footer?: JSX.Element;                     // 侧边栏内底部 slot（menu 之下）
   children?: JSX.Element;                   // 主内容（SidebarInset）
 }
 ```
 
-**5 slots 区分**：
-- `header` / `footer` 是 **sidebar 外** 的 page-level slot（sticky top / 页面底部）
-- `sidebarHeader` / `sidebarFooter` 是 **sidebar 内** 的 slot（group label 之上 / menu 之下）
+**3 slots 区分**：
+- `header` / `footer` 都是 **sidebar 内** 的 slot（menu 之上 / menu 之下）
 - `children` 是 `SidebarInset` 的主内容（两栏布局右栏）
+
+**为什么只有 2 个内部 slot 而非 4 个**：原设计有 `sidebarHeader` / `sidebarFooter`（内）+ `header` / `footer`（外）共 4 slot，但实际使用中所有 consumer（chat + settings）只用 1 个内顶 + 1 个内底 + 1 个 children。"外顶 / 外底"是 page-level slot，但实际无 consumer 需求——属于 YAGNI。简化后 API 更聚焦：sidebar 只暴露 "在菜单里塞一块内容" 2 个入口 + 主内容入口。
 
 **两栏布局封装**：sidebar 自带 `<SidebarProvider>` + `<Sidebar>` + `<SidebarInset>{children}</SidebarInset>` 三件套。consumer 不用自己拼两栏布局，`<Sidebar>{<Outlet />}</Sidebar>` 一行搞定。
 
@@ -88,8 +87,8 @@ export interface SidebarProps {
 <Sidebar
   options={nodes}
   currentValue={currentConvId()}
-  sidebarHeader={<NewChatButton />}
-  sidebarFooter={<SettingsLink />}
+  header={<NewChatButton />}
+  footer={<SettingsLink />}
 >
   <Outlet />  {/* ChatView / HomeAgentForm */}
 </Sidebar>
@@ -100,7 +99,8 @@ export interface SidebarProps {
 <Sidebar
   options={SETTINGS_OPTIONS}
   currentValue={currentTab()}
-  sidebarHeader={<h2>Settings</h2>}
+  header={<h2>Settings</h2>}
+  footer={<BackButton />}
 >
   <Outlet />  {/* /settings/$tab section */}
 </Sidebar>
@@ -156,7 +156,7 @@ sidebar 内部用 `@ark-ui/solid Accordion`，`defaultExpanded` 转 `Accordion.R
 
 ### D6 — 业务逻辑全部挪出 sidebar（hover delete / 二次确认 / rename 是 chat 域组件，不是 sidebar）
 
-chat 域需要的视觉/行为差异（hover delete 按钮 + 二次确认 + workspace rename）作为 **chat 域组件** 实现，通过 sidebar 的 5 slots / nodes icon / children 注入，sidebar 不持有任何 chat 域状态：
+chat 域需要的视觉/行为差异（hover delete 按钮 + 二次确认 + workspace rename）作为 **chat 域组件** 实现，通过 sidebar 的 header/footer slots / nodes icon / children 注入，sidebar 不持有任何 chat 域状态：
 
 | chat 域需求             | 实现位置                                  | sidebar 知道吗 |
 | ----------------------- | ----------------------------------------- | -------------- |
@@ -213,8 +213,8 @@ export function ChatSidebar() {
       options={nodes}
       currentValue={currentConvId()}
       onItemSelect={(value) => navigate({ to: `/conversation/${value}` })}
-      sidebarHeader={<NewChatButton />}
-      sidebarFooter={<SettingsLink />}
+      header={<NewChatButton />}
+      footer={<SettingsLink />}
     >
       <Outlet />
     </Sidebar>
@@ -267,7 +267,7 @@ accepted
 - **A — 完全独立两个 sidebar**：chat 域 sidebar 保持不变（chat 专用），settings 域新建 `codeman-settings-sidebar`。**拒**：两套 sidebar 代码重复 80%，未来第三个域需要 sidebar 又得新建；抽象机会成本高。
 - **B — 通用化字段，不加 escape hatch**：把所有 chat 域差异用 schema 字段表达（subLabel / badge / onSelect / href / action 等 5+ 字段）。**拒**：第 2 轮 grilling 用户明确拒绝字段穷举（"字段会逐渐膨胀为 avatar/thumbnail/progress/..."），字段表达力有上限（drag handle / 嵌入 image 等覆盖不到）。
 - **C — 节点级 renderItem escape hatch**：节点自带 `render?: (helpers) => JSX.Element`，99% 节点用字段、1% 自定义的传 render。**拒**：第 4 轮 grilling 用户明确拒绝节点级 escape（"字段穷举"）—— 走的是"sidebar 完全 wrapper，consumer 全权"的 library-grade 方向，不是"sidebar 管 99%、escape 1%"的混合方向。
-- **D — sidebar prop 级 renderItem + sidebar 自己包 active/hover/click**（最终方案）：5 slots + 5 slots 接管所有视觉/行为 + sidebar 内部包容器保证一致性 + Accordion uncontrolled。**选**：consumer 代码最简单（renderItem 只管 icon + label 排列），sidebar 提供 Accordion + active + hover + click + 两栏布局"五件套"。
+- **D — sidebar prop 级 renderItem + sidebar 自己包 active/hover/click**（最终方案）：3 slots（header / footer / children）+ slots 接管所有视觉/行为 + sidebar 内部包容器保证一致性 + Accordion uncontrolled。**选**：consumer 代码最简单（renderItem 只管 icon + label 排列），sidebar 提供 Accordion + active + hover + click + 两栏布局"五件套"。
 - **E — 不抽 sidebar，直接在 chat-layout / settings-layout 里手写 `<aside>` + `<For>`**：**拒**：chat 域已有 298 行 sidebar 抽象（ADR-0022 首例），放弃抽象 = ADR-0022 反转，需要新 ADR 解释为什么不抽。
 
 ## Consequences
@@ -277,7 +277,7 @@ accepted
 - **两域 sidebar 共享一份实现**：chat 域（嵌套 tree + 流式 + hover delete）和 settings 域（扁平 4 项 nav）走同一个 `<Sidebar>`，代码 0 重复
 - **settings 域新增 sidebar 零成本**：未来 settings 域加第 5/6 个 tab（"Models" / "Telemetry"），只需在 `SETTINGS_OPTIONS` 数组加一行
 - **chat 域业务逻辑完全解耦**：sidebar 不再 import chat.store / workspace 概念；hover delete / 二次确认是 chat 域独立组件
-- **5 slots 覆盖完整布局需求**：page header（外顶）+ sidebar header（内顶）+ sidebar footer（内底）+ page footer（外底）+ 主内容（SidebarInset），不再需要在 chat-layout / settings-layout 里手拼两栏
+- **3 slots 覆盖完整布局需求**：header（内顶）+ footer（内底）+ 主内容（SidebarInset），不再需要在 chat-layout / settings-layout 里手拼两栏
 - **URL 是 single source of truth**：`/settings/$tab` 嵌套路由 + `/settings` redirect，刷新 / 深链 / 浏览器 back-forward 都 work
 - **test 覆盖更纯**：sidebar 自身测 helper 行为（mock options + 断言 active 计算 / Accordion defaultValue），consumer 测自己的 renderItem 内容，互不依赖
 
@@ -322,7 +322,7 @@ accepted
 验证：
 - `vp run typecheck` exit 0
 - `vp run test` 全绿
-- sidebar 自身测试覆盖：active 计算 / Accordion defaultValue / 5 slots / emptyMessage / disabled opacity
+- sidebar 自身测试覆盖：active 计算 / Accordion defaultValue / 3 slots / emptyMessage / disabled opacity
 
 ### 阶段 2：chat 域迁移（PR 2）
 
@@ -377,7 +377,7 @@ section 拆分：
 | Q4 | active 高亮谁管                   | sidebar 自己（`SidebarMenuButton isActive` prop）          |
 | Q5 | hover bg / click 谁管             | sidebar 自己                                              |
 | Q6 | disabled 视觉                     | `option.disabled?: boolean` → sidebar 加 `opacity-60`       |
-| Q7 | slots 数量                        | 5（外顶 / 内顶 / 内底 / 外底 / children）                    |
+| Q7 | slots 数量                        | 3（header / footer / children）                              |
 | Q8 | `children` 是否支持              | ✅（SidebarInset 主内容）                                  |
 | Q9 | `currentValue` + `isActive` 并存  | ✅（currentValue 是语法糖，isActive 默认 isEqual）         |
 | Q10 | Accordion 模式                    | uncontrolled（按 ADR-0023 D7-CS2）                          |

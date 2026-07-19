@@ -9,8 +9,9 @@
 //! `/settings` route's `component`).
 
 import { type JSX } from "solid-js";
-import { Outlet, useNavigate, useParams } from "@tanstack/solid-router";
+import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/solid-router";
 import {
+  ArrowLeft,
   Brain,
   SlidersHorizontal,
   AppWindow,
@@ -50,6 +51,11 @@ const SETTINGS_NAV: readonly SidebarOption[] = [
 
 export function SettingsSidebar(): JSX.Element {
   const navigate = useNavigate();
+  // Read `from` from router state — the chat sidebar's "设置" link passes
+  // `state={{ from: location.pathname }}` so the Back button returns to
+  // the page the user was on before entering settings (e.g. /conversation/c-1)
+  // instead of a settings subpage (e.g. /settings/llm).
+  const location = useLocation();
   // TanStack Router's `useParams` returns a typed accessor; we read `tab`
   // with a single cast through a named alias (instead of `as unknown as`)
   // so the type narrows consistently for downstream consumers.
@@ -69,18 +75,37 @@ export function SettingsSidebar(): JSX.Element {
     navigate({ to: `/settings/${value}` });
   };
 
+  const handleBack = (): void => {
+    const state = location().state as { from?: string } | undefined;
+    // Fallback to "/" when no `from` is set (deep-link entry, browser refresh,
+    // or direct URL paste). Don't use window.history.back() because that
+    // would land on a settings subpage if the user has navigated between tabs.
+    const target = state?.from ?? "/";
+    navigate({ to: target });
+  };
+
   return (
     <CodemanSidebar
       options={[...SETTINGS_NAV]}
       renderItem={renderItem}
       currentValue={currentTab()}
       onItemSelect={handleSelect}
-      sidebarHeader={
+      header={
         <h2 class="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           Settings
         </h2>
       }
       class="border-r border-sidebar-border"
+      footer={
+        <button
+          type="button"
+          onClick={handleBack}
+          class="hover:text-foreground transition-colors flex items-center gap-1 px-2 py-1 -mx-2 -my-1 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+        >
+          <ArrowLeft class="h-3.5 w-3.5" aria-hidden="true" />
+          <span>Back</span>
+        </button>
+      }
     >
       <Outlet />
     </CodemanSidebar>

@@ -64,8 +64,7 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     const deadline = Date.now() + 30_000;
     let ok = false;
     while (Date.now() < deadline) {
-      const chatArea = page.locator("div.flex-1.overflow-y-auto");
-      const bubbles = chatArea.locator("div.justify-start").locator("div.max-w-prose");
+      const bubbles = page.locator('[data-testid="agent-bubble"]');
       const bubbleCount = await bubbles.count();
       let hasNonEmptyAssistantText = false;
       if (bubbleCount > 0) {

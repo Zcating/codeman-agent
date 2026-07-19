@@ -68,6 +68,7 @@ export function ConvDeleteAction(
           aria-label="streaming"
         />
       </Show>
+      <span class="truncate flex-1 text-sm">{props.label}</span>
       <button
         type="button"
         class="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring transition-opacity"

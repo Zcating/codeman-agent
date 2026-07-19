@@ -71,7 +71,7 @@ test.describe("06 — LLM round-trip (mock)", () => {
     let foundText = "";
     while (Date.now() < textDeadline) {
       foundText = await page.evaluate((target: string) => {
-        const bubbles = document.querySelectorAll("div.justify-start > div[class*='bg-card']");
+        const bubbles = document.querySelectorAll('[data-testid="agent-bubble"]');
         for (const b of Array.from(bubbles)) {
           const t = (b.textContent ?? "").trim();
           if (t.includes(target)) return t;
@@ -93,7 +93,7 @@ test.describe("06 — LLM round-trip (mock)", () => {
     await assert.visible(userBubbleWithText.first(), { timeout: 5_000 });
 
     const assistantBubbleWithText = page
-      .locator("div.justify-start > div[class*='bg-card']")
+      .locator('[data-testid="agent-bubble"]')
       .filter({ hasText: cannedText });
     await assert.visible(assistantBubbleWithText.first(), { timeout: 15_000 });
   });

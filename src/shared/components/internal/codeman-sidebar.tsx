@@ -11,8 +11,9 @@
 //! - Accordion state managed by @ark-ui/solid internally (uncontrolled via
 //!   defaultValue), per ADR-0023 D7-CS2 (component internal signal, not coupled
 //!   to appStore).
-//! - 5 slots (header / sidebarHeader / sidebarFooter / footer / children)
-//!   expose page-level layout while sidebar owns the two-column shell.
+//! - 3 slots (header / footer / children) — header/footer are rendered
+//!   inside the sidebar shell (top/bottom of menu). Two-column layout is
+//!   owned by the sidebar; consumers only feed content via slots.
 
 import { For, Show, type JSX } from "solid-js";
 import { Accordion } from "@ark-ui/solid";
@@ -93,14 +94,10 @@ export interface CodemanSidebarProps {
    */
   onEmptyGroupClick?: (groupValue: string) => void;
 
-  // ─── 5 slots (per ADR-0030 D3) ────────────────────────────────────────
-  /** Outer top slot (above sidebar shell — page header). */
+  // ─── 3 slots (per ADR-0030 D3) ────────────────────────────────────────
+  /** Top slot (inside sidebar shell, above menu). */
   header?: JSX.Element;
-  /** Inner top slot (inside sidebar, above menu). */
-  sidebarHeader?: JSX.Element;
-  /** Inner bottom slot (inside sidebar, below menu). */
-  sidebarFooter?: JSX.Element;
-  /** Outer bottom slot (below sidebar shell — page footer). */
+  /** Bottom slot (inside sidebar shell, below menu). */
   footer?: JSX.Element;
   /** Main content slot — rendered in `SidebarInset` (right column). */
   children?: JSX.Element;
@@ -206,20 +203,13 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
 
   return (
     <div class="flex h-full w-full flex-col">
-      {/* Outer header slot — above sidebar shell (page-level) */}
-      <Show when={props.header}>
-        <div data-slot="header" class="shrink-0">
-          {props.header}
-        </div>
-      </Show>
-
       {/* Two-column row: sidebar + main content */}
       <div class="flex flex-1 min-h-0">
         <SidebarPrimitive class={props.class}>
-          {/* Inner sidebar header slot — inside sidebar, above menu */}
-          <Show when={props.sidebarHeader}>
+          {/* Header slot — inside sidebar shell, above menu */}
+          <Show when={props.header}>
             <SidebarPrimitiveHeader>
-              {props.sidebarHeader}
+              {props.header}
             </SidebarPrimitiveHeader>
           </Show>
 
@@ -307,10 +297,10 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
             </Show>
           </SidebarContent>
 
-          {/* Inner sidebar footer slot — inside sidebar, below menu */}
-          <Show when={props.sidebarFooter}>
+          {/* Footer slot — inside sidebar shell, below menu */}
+          <Show when={props.footer}>
             <SidebarPrimitiveFooter>
-              {props.sidebarFooter}
+              {props.footer}
             </SidebarPrimitiveFooter>
           </Show>
         </SidebarPrimitive>
@@ -320,13 +310,6 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
           <main class="flex-1 min-w-0 overflow-y-auto">{props.children}</main>
         </Show>
       </div>
-
-      {/* Outer footer slot — below sidebar shell (page-level) */}
-      <Show when={props.footer}>
-        <div data-slot="footer" class="shrink-0">
-          {props.footer}
-        </div>
-      </Show>
     </div>
   );
 }

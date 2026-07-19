@@ -53,9 +53,12 @@ export default async function globalSetup(): Promise<void> {
   //    Uses `pnpm run build` (= electron-vite build). Does NOT run
   //    electron-builder --dir — the per-worker fixture falls back to
   //    LOCAL_BIN mode (node_modules/electron + dist-electron/main/index.js).
-  //    Skip if dist-electron/ already exists (dev shortcut).
+  //    Skip if dist-electron/ already exists AND migrations are present
+  //    (dev shortcut; rebuild if migrations are missing — e.g. old build
+  //    that predates the copy-migrations-plugin).
   const mainEntry = resolve(process.cwd(), "dist-electron", "main", "index.js");
-  if (existsSync(mainEntry)) {
+  const migrationsDir = resolve(process.cwd(), "dist-electron", "main", "db", "migrations");
+  if (existsSync(mainEntry) && existsSync(migrationsDir)) {
     console.log(`[e2e warm] skip pnpm run build — dist-electron/ ready`);
   } else {
     runStep("pnpm run build", () => {

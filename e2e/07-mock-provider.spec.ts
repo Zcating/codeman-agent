@@ -46,6 +46,7 @@ test.describe("07 — Mock LLM provider", () => {
     page.on("pageerror", (err: Error) => {
       console.log("[" + __filename + " page pageerror]", err.message);
     });
+
     await cancelRunningAgent(page);
     await clearAllHistory(page);
     // clickNewConversationAndWait title send → default Q→A entry (warning SSE)
@@ -75,13 +76,14 @@ test.describe("07 — Mock LLM provider", () => {
     // 等 assistant bubble 出现并包含预置文本
     // Use evaluate to check ANY assistant bubble (not just .first()) because
     // beforeEach's clickNewConversationAndWait already consumed one mock
-    // response — there's already an assistant bubble "Mock setup" from the
-    // conv-title send, so .first() would match the wrong one.
+    // response — there's already an assistant bubble from the conv-title
+    // send, so .first() would match the wrong one.
+    // V3.x: assistant bubble div has data-testid="agent-bubble" (bg-card was removed).
     const textDeadline = Date.now() + 10_000;
     let foundText = "";
     while (Date.now() < textDeadline) {
       foundText = await page.evaluate((target: string) => {
-        const bubbles = document.querySelectorAll("div.justify-start > div[class*='bg-card']");
+        const bubbles = document.querySelectorAll('[data-testid="agent-bubble"]');
         for (const b of Array.from(bubbles)) {
           const t = (b.textContent ?? "").trim();
           if (t.includes(target)) return t;

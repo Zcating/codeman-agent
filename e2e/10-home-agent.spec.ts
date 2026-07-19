@@ -113,6 +113,8 @@ test.describe("10 — HomeAgentForm Home", () => {
     page.on("console", (msg) => {
       if (msg.type() === "error") console.error("[10 spec console]", msg.text());
     });
+    // Clean up workspaces from previous tests to avoid state leakage
+    await resetSidebar(page);
   });
 
   test("0 workspaces: input disabled + 'No workspaces' placeholder visible", async ({ tauriEnv }) => {
@@ -409,16 +411,25 @@ test.describe("10 — HomeAgentForm Home", () => {
     });
     expect(triggerTextAfter).toContain("Model Second");
 
-    // Wait for debounced persistence (settingsSaver uses 500ms debounce)
-    await new Promise((r) => setTimeout(r, 600));
-
-    // Verify getSettings returns the correct model
-    const settingsAfter = await invoke<Record<string, unknown>>(page, "getSettings");
-    const providersAfter = (settingsAfter.providers as Array<Record<string, unknown>>) ?? [];
-    const testProvider = providersAfter.find((p) => p.id === "test-two-model");
-    expect(testProvider).toBeDefined();
-    const llmAfter = testProvider?.llm as Record<string, unknown> | undefined;
-    expect(llmAfter?.defaultModel).toBe("model-second");
+    // Wait for debounced persistence (settingsSaver uses 500ms debounce).
+    // Poll up to 5s for the model to persist, since debounce + IPC flush
+    // can take longer than a fixed sleep in parallel CI.
+    const persistDeadline = Date.now() + 5_000;
+    let modelPersisted = false;
+    while (Date.now() < persistDeadline) {
+      const settingsAfter = await invoke<Record<string, unknown>>(page, "getSettings");
+      const providersAfter = (settingsAfter.providers as Array<Record<string, unknown>>) ?? [];
+      const testProvider = providersAfter.find((p) => p.id === "test-two-model");
+      if (testProvider) {
+        const llmAfter = testProvider?.llm as Record<string, unknown> | undefined;
+        if (llmAfter?.defaultModel === "model-second") {
+          modelPersisted = true;
+          break;
+        }
+      }
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    expect(modelPersisted, "model-second should be persisted within 5s").toBe(true);
   });
 
   test("Action slot 按钮存在且点击不报错 (picker 在 e2e 不弹真 dialog)", async ({ tauriEnv }) => {
