@@ -65,6 +65,25 @@
 - **Form-First Form Pattern (TanStack Form 模式下 ProviderCard 的提交策略)** — `ProviderCard` 把 4 个字段（baseUrl / apiKey / model / enabled）全走 `form.Field`，每个 `form.Field` 的 `onBlur` / `onChange` 调 `form.handleSubmit()`。onSubmit handler 写 `appStore.set({providers})` + `settingsSaver.flushNow()`（统一 flush，替代 V1.8+ 的"apiKey 走 flushNow、其它走 scheduleSave"二元路径，简单优先）。per-field schemas now live in `features/settings/lib/schemas.ts`, authored via the `withMessage(schema, message)` helper that writes to `SchemaAST.MessageAnnotationId` directly (no `as never` cast). _避免_：在 form 提交时同时在 `onChange` 也写 store（per-keystroke 写 store 是 V1.8+ 反模式，bug 根因）。
 - **Draft (form field)** — `HomeAgentForm` 与 `ChatView` 中 textarea 绑定的用户在编辑文本。TanStack Form 接管后，submit 时从 `form.getFieldValue('draft')` 读取，触发三步流程（Home：`createConversation` → `recordInputEntry + navigate` → `sendMessage`；ChatView：`recordInputEntry` → `sendMessage`）。**哨兵**：field schema = `Schema.Union(Schema.Literal(''), Schema.String.pipe(Schema.minLength(1)))`，空草稿视为 invalid → Send 按钮 disable + form-level validator 拒提交，与 `Message.content`（已持久化的 assistant 正文）显式区分。V2.5 引入，per [ADR-0029](./adr/0029-form-mode-for-home-and-chat-input.md) D2。_避免_：叫 `input`（与本地 signal 命名冲突；语义"草稿、未提交"不够显式）；叫 `content`（与 `Message.content` 撞名，提交前后语义不同）。
 
+### Skills (V3.1, Plan → V2.5+ ADR-0031)
+
+- **Skill (技能)** — 端用户可加载的 prompt augmentation，存储为 `~/.agents/skills/<skill-name>/SKILL.md`（YAML frontmatter + Markdown body）。**职责**：仅修改 system prompt，不带新 AgentTool / 不带 UI 资源。与 MCP（加能力）正交。**双轨激活**：(1) 描述驱动自动发现（LLM 读 manifest 后主动 `_load_skill`）；(2) Slash command（用户在 chat 输入框打 `/<skill-name>`）。per [ADR-0031](./adr/0031-skills-system.md)。_避免_：与项目自带 `.agents/skills/`（AI agent 自身用）混淆——两者**目录字面一致**但**语义不同**（项目级 vs 用户级），互不读取对方目录。
+- **Skill Manifest (技能清单)** — SKILL.md 的 YAML frontmatter 块：`{ name: string, description: string }`。`name` 必须 = 所在目录名；`description` 必填（为空 → 不出现在自动发现 manifest）。每次 `runtime.run()` 时所有 enabled skills 的 manifest 被 `formatSkillsManifestSection()` 拼成 `<available_skills>...</available_skills>` XML 块注入 system prompt。per ADR-0031 D3。_避免_：把 description 与 body 混在一起读（description 必须小到能塞进 system prompt 不撑爆）。
+- **Slash Command (斜杠命令)** — 用户在 chat 输入框打 `/<skill-name>` 触发的显式 Skill 加载。V1 简化：解析 `/skill-name` 前缀并去掉，剩余文本作为正常 user 消息；skill body 通过 meta-tool `_load_skill` 等价路径立即注入 context。**不**在对话历史留下 `/skill-name` 字面（避免污染历史）。per ADR-0031 D5。
+- **Slash Menu (斜杠菜单)** — Chat 输入框 + Home 表单中输入 `/` 触发的 fuzzy-filter 候选 popup，列出 enabled Skills。选中后插入 `/<skill-name> ` 到 textarea。组件位于 `src/features/skills/components/slash-menu.tsx`，基于 `@ark-ui/solid` Combobox；触发/定位由 chat-view.tsx + home.tsx 的 onKeyDown hook。per ADR-0031 D10。
+- **Pre-installed Skill (预装技能)** — Ship-with-app Skill，bundled 进 `electron/resources/skills/<name>/SKILL.md`，通过 electron-builder `extraResources` 打包。Electron main `whenReady` 阶段 `ensurePreinstalledSkills()` 一次性复制到 `~/.agents/skills/<name>/SKILL.md`（idempotent：已存在跳过，**不**覆盖用户修改）。V1 预装 4 个：`commit-helper` / `code-review` / `explain-error` / `summarize`。per ADR-0031 D6 + D7。_避免_：覆盖用户修改过的 SKILL.md（V1 idempotent-skip 是简化,V2+ 加 hash 检测 + 更新提示）。
+- **`_load_skill` (meta-tool)** — 注入到 runtime tools[] 的特殊 AgentTool（name 前缀下划线暗示 meta 性质），LLM 主动调用以拉取 Skill 全文。`parameters: { skillName: string }`，`execute` 返回 `{ content: skillBody }`。与现有 tool result 同语义,body 不进 system prompt 而是经 tool_result message 流——避免永久累积撑爆 context window。per ADR-0031 D4。
+
+### MCP (V3.1, Plan → V3.1 ADR-0032)
+
+- **MCP (Model Context Protocol)** — Anthropic 2024-11 发布的 agent 工具扩展协议，让 agent 通过 JSON-RPC 调用外部 server 提供的 tools / resources / prompts。本项目 V1 仅以 **MCP Client** 角色接入（不支持作为 server）。per [ADR-0032](./adr/0032-mcp-client-stdio.md)。_避免_：与 Skills 混淆——Skill = 知识（prompt 上下文），MCP = 能力（新 tool）；两者职责正交，互不替代。
+- **MCP Client (MCP 客户端)** — codeman-agent 扮演的角色：通过 stdio 启子进程 + JSON-RPC 2.0 (newline-delimited JSON over stdin/stdout) 与外部 MCP server 通信。**Transport**：V1 仅 stdio（生态 95%+ 覆盖）；SSE / Streamable HTTP 在 V2+ 评估。手写 JSON-RPC 客户端（不引 SDK）。per ADR-0032 D2。
+- **MCP Server (MCP 服务器)** — 外部子进程，提供 tools 给 agent。本项目不**实现** server（仅消费 server）。Server 由用户配置启动：`npx -y @modelcontextprotocol/server-<name>` 之类。per ADR-0032。
+- **MCP Server Config (MCP 服务器配置)** — `~/.agents/mcp_servers.json` 中的单条 server 记录：`{ name: string, command: string, args: string[], env?: Record<string,string>, enabled: boolean }`。**与 Skills 同根**（`~/.agents/`），与 Settings JSON（`%LocalAppData%\codeman-agent\settings.json`）分立——遵循「agent 生态配置走 `~/.agents/`，app 配置走 Settings JSON」(per ADR-0015)。enabled 字段控制启停（首次扫描到默认 `enabled: false`，需用户主动 enable）。per ADR-0032 D1 + D6。
+- **MCP Tool (MCP 工具)** — MCP server 声明并通过 `tools/list` 返回的工具定义。注入 agent tool registry 时**强制重命名**为 `mcp_<server-name>_<tool-name>`（per ADR-0032 D3 grill 决议 mcp-a）——前缀避免与现有 7 个内置 tool 撞名 + LLM 一眼识别来源。`<server-name>` slug 化（小写 + 非字母数字替换为 `_`）；命名冲突由 runtime 保证唯一（冲突时 throw 启动错误 + disable 该 server）。
+- **MCP-Enabled Tool Set (MCP 启用工具集)** — `runtime.tools[]` 中由 MCP server 注入的子集。**每次 `run()` 时 lazy fetch**（不缓存）——反映 MCP server enable/disable 最新状态；fetch 失败（IPC error）→ log warning + 空数组（不阻塞 LLM 启动）。per ADR-0032 D8。
+- **MCP Server Status (MCP 服务器状态)** — 单 server 在 UI 显示的运行态枚举：`connected` / `spawn_failed` / `crashed` / `disabled` / `protocol_error` / `timeout`。每个状态有对应 lucide icon + 灰标错误信息。per ADR-0032 D5。
+
 ### 密钥
 
 - **API Key (API 密钥)** — Provider 的对外调用凭据，shape 为 `Provider.apiKey: string`。**明文存于 Settings JSON**（`%LocalAppData%\codeman-agent\settings.json`，由 `app.setPath('userData', '%LocalAppData%\\codeman-agent')` 锁定，per ADR-0024），与 Settings 其它字段同档；不再分 LLM / Billing 二分（ADR-0015）。LLM 调用和计费工具调端点都复用同一 key。V1 单机单用户威胁模型下接受明文；如未来需 OS 级密钥管理（keytar / Windows Credential Manager / Electron `safeStorage`）需重做 ADR-0015。_避免_：把 key 单独走 OS keychain 再走 IPC（V1.7+ 前的设计，已废止）。
@@ -257,7 +276,7 @@ interface ModelMeta {
 - 历史图表 / 时序数据
 - 分支会话
 - 跨会话用户事实的自动记忆 / 跨 session 持久化
-- 计费与文件工具之外的通用工具（无 shell、无 IDE 集成）
+- 内置通用工具（无 shell、无 IDE 集成——但用户可经 MCP 引入外部工具，per ADR-0032）
 - 无鼠标操作（无热键、无键盘快捷键）
 - 跨平台打包（Electron 保持可移植；仅 Windows，per ADR-0024）
 - 自动更新、代码签名
