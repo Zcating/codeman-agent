@@ -11,7 +11,7 @@ import { createSignal, type Accessor } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 
 import { Effect, Stream } from "effect";
-import type { Conversation, Message, Workspace } from "../../../shared/lib/types";
+import type { Conversation, Message, SkillManifest, Workspace } from "../../../shared/lib/types";
 import { logger } from "../../../shared/lib/logger";
 import type { AppError } from "../../../shared/lib/errors";
 import {
@@ -31,6 +31,8 @@ import {
   WorkspaceServiceLive,
 } from "../../../shared/lib/workspace-service";
 import { deriveLabelFromPath } from "../../../shared/lib/derive-label-from-path";
+import { appStore } from "../../../shared/stores/app.store";
+import { skillsManifests$ } from "../../../plugins/skills/stores/skills.store";
 
 // ─── ConversationState 类型 (inline 在 chat.store) ──────
 
@@ -183,10 +185,20 @@ export const sendMessage = Effect.fnUntraced(
     //    T27: 同时把 workspaceId 通过 ProviderConfig 传给 runtime,作为兜底 —
     //    即使 LLM 没传 workspaceId(系统 prompt 是 hint,不是 contract),
     //    `createFileTools(workspaceId)` 包装层会在 schema 校验后注入到 args。
+    //
+    //    V3.1 ADR-0031 D3: 同时附 enabled skills manifest。Runtime 会拼成
+    //    `<available_skills>...</available_skills>` 段注入 system prompt,
+    //    LLM 读 manifest 后主动 `_load_skill` 拉全文。
+    const enabledNames = appStore.state.value.enabledSkills ?? [];
+    const enabledSkills: readonly SkillManifest[] = skillsManifests$().filter(
+      (m) => enabledNames.includes(m.name),
+    );
+
     const augmentedProvider: ProviderConfig = cs.workspaceId
       ? {
         ...provider,
         workspaceId: cs.workspaceId,
+        enabledSkills,
         systemPrompt:
           `${provider.systemPrompt}\n\n` +
           `[Workspace context]\n` +
@@ -196,7 +208,7 @@ export const sendMessage = Effect.fnUntraced(
           `Do NOT infer the id from user messages, folder names, or any other context — ` +
           `use ONLY the id given above.`,
       }
-      : provider;
+      : { ...provider, enabledSkills };
 
     // 4. Run runtime + subscribe
     const stream = cs.runtime.run({ context, provider: augmentedProvider });

@@ -22,6 +22,7 @@ import type {
   Provider,
   ModelMeta,
   FileMatch,
+  SkillManifest,
 } from "./types";
 import { parseModelsApiResponse } from "./parse-models-api-response";
 
@@ -80,6 +81,9 @@ export interface CodemanApi {
   openExternal: (url: string) => Promise<unknown>;
   setLoginItem: (enabled: boolean) => Promise<unknown>;
   getLogPath: () => Promise<unknown>;
+  // Skills plugin (ADR-0031) — main process reads ~/.agents/skills/
+  skillsScan: () => Promise<unknown>;
+  skillsLoad: (name: string) => Promise<unknown>;
   onStreamChunk: (handler: (evt: unknown) => void) => () => void;
 }
 
@@ -164,6 +168,10 @@ async function dispatchInvoke<T>(
       )) as T;
     case "deleteFile":
       return (await a.deleteFile(arg("workspaceId") as string, arg("path") as string)) as T;
+    case "skillsScan":
+      return (await a.skillsScan()) as T;
+    case "skillsLoad":
+      return (await a.skillsLoad(arg("name") as string)) as T;
     default:
       throw new Unknown({ message: `Unknown IPC: ${name}` });
   }
@@ -309,6 +317,15 @@ export class FileService extends Context.Tag("FileService")<
       contentPattern: string | null,
     ) => Effect.Effect<FileMatch[], AppError>;
     readonly deleteFile: (workspaceId: string, path: string) => Effect.Effect<void, AppError>;
+  }
+>() {}
+
+// Skills plugin service (ADR-0031 Wave A3) — wraps the 2 skills IPC channels.
+export class SkillsService extends Context.Tag("SkillsService")<
+  SkillsService,
+  {
+    readonly scan: () => Effect.Effect<SkillManifest[], AppError>;
+    readonly load: (name: string) => Effect.Effect<string, AppError>;
   }
 >() {}
 
@@ -507,6 +524,11 @@ export const FileServiceLive = Layer.succeed(FileService, {
 
   deleteFile: (workspaceId: string, path: string) =>
     invoke<void>("deleteFile", { workspaceId, path }),
+});
+
+export const SkillsServiceLive = Layer.succeed(SkillsService, {
+  scan: () => invoke<SkillManifest[]>("skillsScan"),
+  load: (name: string) => invoke<string>("skillsLoad", { name }),
 });
 
 // ─── Bridge functions (Promise-based, for Solid UI) ─────────────

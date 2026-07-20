@@ -64,6 +64,9 @@ export const SettingStruct = Schema.Struct({
     autoArchiveAfterDays: Schema.Number,
     maxHistory: Schema.Number,
   }),
+  // V3.1 ADR-0031: 已启用的 skill 名字列表 (按名字, 不含整个 manifest)。
+  // 用于 runtime 在 system prompt 注入 <available_skills>...</available_skills> 段。
+  enabledSkills: Schema.optional(Schema.Array(Schema.String)),
 });
 
 // ─── Derived types (preserves downstream `import type { Settings }`) ──
@@ -128,6 +131,8 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   systemPrompt: { default: "", userCanEdit: true },
   conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
+  // V3.1 ADR-0031: 默认启用全部 4 个 ship-with-app Skills
+  enabledSkills: ["commit-helper", "code-review", "explain-error", "summarize"],
 };
 
 // ─── sanitize() ──────────────────────────────────────────────────

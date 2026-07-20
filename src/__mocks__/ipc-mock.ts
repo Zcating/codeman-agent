@@ -389,6 +389,15 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
   qaGetTable(_args?: IPCArgs): unknown {
     return mockState.qaTable ?? [];
   },
+
+  // ─── Skills plugin IPC (ADR-0031) ──────────────────────────────────
+  skillsScan(_args?: IPCArgs): unknown {
+    return mockState.resolved ?? [];
+  },
+
+  skillsLoad(_args?: IPCArgs): unknown {
+    return mockState.resolved ?? "";
+  },
 };
 
 // ─── Invoke Mock ────────────────────────────────────────────────
@@ -471,6 +480,8 @@ function buildCodemanMock(): Record<string, unknown> {
     editFile: { cmd: "editFile", build: (wid, p, ot, nt, ra) => ({ workspaceId: wid, path: p, oldText: ot, newText: nt, replaceAll: ra }) },
     searchFiles: { cmd: "searchFiles", build: (wid, g, cp) => ({ workspaceId: wid, glob: g, contentPattern: cp }) },
     deleteFile: { cmd: "deleteFile", build: (wid, p) => ({ workspaceId: wid, path: p }) },
+    skillsScan: { cmd: "skillsScan", build: () => ({}) },
+    skillsLoad: { cmd: "skillsLoad", build: (n) => ({ name: n }) },
   };
 
   const codeman: Record<string, unknown> = {};

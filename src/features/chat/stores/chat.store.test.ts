@@ -31,12 +31,21 @@ import type { RuntimeEvent, ProviderConfig } from "../lib/runtime";
 
 vi.mock("../../../shared/lib/ipc", async () => {
   const { Layer, Effect: E } = await import("effect");
-  const { MessageService, ConversationService } = await vi.importActual<
-    typeof import("../../../shared/lib/ipc")
-  >("../../../shared/lib/ipc");
+  const {
+    MessageService,
+    ConversationService,
+    ProviderService,
+    SettingsService,
+    SkillsService,
+  } = await vi.importActual<typeof import("../../../shared/lib/ipc")>(
+    "../../../shared/lib/ipc",
+  );
   return {
     MessageService,
     ConversationService,
+    ProviderService,
+    SettingsService,
+    SkillsService,
     MessageServiceLive: Layer.succeed(MessageService, {
       list: () => E.succeed([] as Message[]),
       append: (args: {
@@ -87,6 +96,60 @@ vi.mock("../../../shared/lib/ipc", async () => {
         } as Conversation),
       archive: () => E.void,
       delete: () => E.void,
+    }),
+    // V3.1 ADR-0031 + ADR-0016: appStore reads these — provide minimal stubs
+    ProviderServiceLive: Layer.succeed(ProviderService, {
+      list: () => E.succeed([]),
+      get: () => E.fail({ kind: "IPC", message: "not used" } as never),
+      getModels: () => E.succeed([]),
+      fetchModels: () => E.succeed([]),
+      delete: () => E.void,
+    }),
+    SettingsServiceLive: Layer.succeed(SettingsService, {
+      getSettings: () =>
+        E.succeed({
+          providers: [],
+          schemaVersion: "1.5" as const,
+          defaultLlmProviderId: undefined,
+          userLanguage: "auto" as const,
+          theme: "system" as const,
+          startAtLogin: false,
+          window: {
+            rememberPosition: true,
+            rememberSize: true,
+            defaultSize: { width: 800, height: 600 },
+            minSize: { width: 600, height: 400 },
+          },
+          systemPrompt: { default: "", userCanEdit: true },
+          conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
+          enabledSkills: [] as string[],
+          llmProviders: [],
+        }),
+      updateSettings: () =>
+        E.succeed({
+          providers: [],
+          schemaVersion: "1.5" as const,
+          defaultLlmProviderId: undefined,
+          userLanguage: "auto" as const,
+          theme: "system" as const,
+          startAtLogin: false,
+          window: {
+            rememberPosition: true,
+            rememberSize: true,
+            defaultSize: { width: 800, height: 600 },
+            minSize: { width: 600, height: 400 },
+          },
+          systemPrompt: { default: "", userCanEdit: true },
+          conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
+          enabledSkills: [] as string[],
+          llmProviders: [],
+        }),
+      clearAllHistory: () => E.void,
+      getActiveLlmProvider: () => E.succeed(null),
+    }),
+    SkillsServiceLive: Layer.succeed(SkillsService, {
+      scan: () => E.succeed([]),
+      load: () => E.succeed(""),
     }),
   };
 });
@@ -292,8 +355,11 @@ describe("sendMessage — G4: 调用 runtime.run({ context, provider })", () => 
       await Effect.runPromise(sendMessage("c1", "hello", defaultProvider));
       expect(runSpy).toHaveBeenCalledTimes(1);
       const opts = runSpy.mock.calls[0][0] as { context: Message[]; provider: ProviderConfig };
-      // mockConv.workspace_id === "" → augmentation is a no-op → provider identity preserved
-      expect(opts.provider).toBe(defaultProvider);
+      // mockConv.workspace_id === "" → workspace augmentation skipped
+      // V3.1 ADR-0031: 但 enabledSkills 仍被注入 (新对象, identity 不再 preserve)
+      expect(opts.provider).not.toBe(defaultProvider);
+      expect(opts.provider.systemPrompt).toBe(defaultProvider.systemPrompt);
+      expect(opts.provider.enabledSkills).toBeDefined();
       expect(opts.context).toBeDefined();
       dispose();
     });
@@ -325,7 +391,7 @@ describe("sendMessage — G4: 调用 runtime.run({ context, provider })", () => 
     });
   });
 
-  it("sendMessage() 当 conv.workspace_id 为空时 → 不修改 provider (passthrough)", async () => {
+  it("sendMessage() 当 conv.workspace_id 为空时 → 不修改 systemPrompt 但注入 enabledSkills", async () => {
     await createRoot(async (dispose) => {
       setupConvState(mockConv, []); // mockConv.workspace_id === ""
       const runSpy = vi
@@ -333,8 +399,10 @@ describe("sendMessage — G4: 调用 runtime.run({ context, provider })", () => 
         .mockReturnValue(Stream.fromIterable([]));
       await Effect.runPromise(sendMessage("c1", "hello", defaultProvider));
       const opts = runSpy.mock.calls[0][0] as { provider: ProviderConfig };
-      expect(opts.provider).toBe(defaultProvider); // identity preserved
-      expect(opts.provider.systemPrompt).toBe(defaultProvider.systemPrompt); // untouched
+      // V3.1 ADR-0031: 即使 workspaceId 为空, enabledSkills 字段也被注入(即使为空数组)
+      expect(opts.provider).not.toBe(defaultProvider); // 对象身份已被扩 (新对象)
+      expect(opts.provider.systemPrompt).toBe(defaultProvider.systemPrompt); // systemPrompt 未追加 workspace context
+      expect(opts.provider.enabledSkills).toEqual([]); // 空 enabled skills
       dispose();
     });
   });

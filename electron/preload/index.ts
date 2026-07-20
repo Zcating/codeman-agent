@@ -98,12 +98,15 @@ const codeman = {
     ipcRenderer.invoke("deleteFile", { workspaceId, path }),
 
   // Native shims
-  notify: (title: string, body: string) =>
+notify: (title: string, body: string) =>
     ipcRenderer.invoke("notify", { title, body }),
   openExternal: (url: string) => ipcRenderer.invoke("openExternal", { url }),
-  setLoginItem: (enabled: boolean) =>
-    ipcRenderer.invoke("setLoginItem", { enabled }),
+  setLoginItem: (enabled: boolean) => ipcRenderer.invoke("setLoginItem", { enabled }),
   getLogPath: () => ipcRenderer.invoke("getLogPath"),
+
+  // Skills plugin (ADR-0031)
+  skillsScan: () => ipcRenderer.invoke("skillsScan"),
+  skillsLoad: (name: string) => ipcRenderer.invoke("skillsLoad", { name }),
 
   // Streaming: preload exposes a callback registration API; main calls
   // webContents.send('stream-chunk', evt). Renderer wraps onStreamChunk

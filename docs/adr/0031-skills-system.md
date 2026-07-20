@@ -1,6 +1,6 @@
 # 0031 — Skills System (V1: Prompt Augmentation, Local Directory + Ship-with-App)
 
-**Status**: accepted · **Date**: 2026-07-21 · **Scope**: src/features/skills/ (新增) + electron/main/skills-* (新增) + electron/resources/skills/ (新增) + src/features/chat/lib/runtime.ts (改 — system prompt injection) + src/features/chat/components/chat-view.tsx (改 — SlashMenu) + src/features/chat/components/home.tsx (改 — SlashMenu) + src/features/settings/components/skills-tab.tsx (新增) + src/shared/lib/ipc.ts (改 — SkillsService) + electron/main/index.ts (改 — first-launch skill seeding) + electron-builder.yml (改 — extraResources)
+**Status**: accepted · **Date**: 2026-07-21 · **Scope**: src/plugins/skills/ (新增) + electron/main/skills-* (新增) + electron/resources/skills/ (新增) + src/features/chat/lib/runtime.ts (改 — system prompt injection) + src/features/chat/components/chat-view.tsx (改 — SlashMenu) + src/features/chat/components/home.tsx (改 — SlashMenu) + src/features/settings/components/skills-tab.tsx (新增) + src/shared/lib/ipc.ts (改 — SkillsService) + electron/main/index.ts (改 — first-launch skill seeding) + electron-builder.yml (改 — extraResources)
 
 **Related**: ADR-0003 (Effect-TS logic layer, 不变), ADR-0010 (5+1 feature whitelist — 新增 skills feature 第 4 个), ADR-0019 (per-run transient agent — Skills 在 run() 入口注入 system prompt), ADR-0025 (effect/Schema default)
 
@@ -63,7 +63,7 @@ Skill 的全部内容在 LLM 主动 `_load_skill` 或 slash 触发后被读入�
 
 ### D3 — System prompt 注入：每次 `run()` 拼一次 manifest
 
-`src/features/skills/lib/skill-injector.ts::formatSkillsManifestSection(manifests: SkillManifest[]): string` 返回：
+`src/plugins/skills/lib/skill-injector.ts::formatSkillsManifestSection(manifests: SkillManifest[]): string` 返回：
 
 ```xml
 <available_skills>
@@ -90,7 +90,7 @@ You have access to the following skills. When a user's request matches a skill's
 Skill manifest 不告诉 LLM 怎么加载完整内容——LLM 必须能**主动拉**。决议：**meta-tool 模式**。
 
 ```ts
-// src/features/skills/lib/skill-meta-tool.ts
+// src/plugins/skills/lib/skill-meta-tool.ts
 const loadSkillTool: AgentTool = {
   name: "_load_skill",
   description: "Load the full instructions of a previously-listed skill into the conversation context.",
@@ -118,7 +118,7 @@ Chat 输入框 + Home 表单中：
 - Enter 选中 → 在 textarea 插入 `/<skill-name> `，并触发立即加载（等价于先发一条 `/<skill-name> ` 用户消息，**加上** runtime 在该 turn 入口预加载 skill body）
 
 **实现**：
-- 独立组件 `src/features/skills/components/slash-menu.tsx`，使用 `@ark-ui/solid` Popover / Combobox（V1 用现成的 `codeman-select` 不合适——需 fuzzy filter + custom 渲染）
+- 独立组件 `src/plugins/skills/components/slash-menu.tsx`，使用 `@ark-ui/solid` Popover / Combobox（V1 用现成的 `codeman-select` 不合适——需 fuzzy filter + custom 渲染）
 - hook 进 chat-view.tsx + home.tsx 的 textarea onKeyDown（检测 `/` 触发）
 - 选中后处理：
   - 在 input value 里插入 `/<skill-name> ` 文本（带 trailing space）
@@ -176,7 +176,7 @@ Chat 输入框 + Home 表单中：
 ### D10 — SlashMenu 组件契约
 
 ```tsx
-// src/features/skills/components/slash-menu.tsx
+// src/plugins/skills/components/slash-menu.tsx
 export interface SlashMenuProps {
   /** 当 textarea 含 "/" 触发; null = 关闭 */
   trigger: { query: string; textareaRect: DOMRect } | null;
@@ -238,19 +238,19 @@ export interface SlashMenuProps {
 
 | 文件 | 改动 |
 |---|---|
-| `src/features/skills/index.ts` | 新增 barrel |
-| `src/features/skills/AGENTS.md` | 新增 |
-| `src/features/skills/lib/skill-loader.ts` | 新增 — scan + parse YAML frontmatter |
-| `src/features/skills/lib/skill-loader-schema.ts` | 新增 — SkillManifest / SkillFrontmatter schemas |
-| `src/features/skills/lib/skill-loader.test.ts` | 新增 |
-| `src/features/skills/lib/skill-injector.ts` | 新增 — formatSkillsManifestSection() |
-| `src/features/skills/lib/skill-injector.test.ts` | 新增 |
-| `src/features/skills/lib/skill-meta-tool.ts` | 新增 — `_load_skill` AgentTool wrapper |
-| `src/features/skills/lib/skill-meta-tool.test.ts` | 新增 |
-| `src/features/skills/stores/skills.store.ts` | 新增 — enabled skills signal + loadSkill() action |
-| `src/features/skills/stores/skills.store.test.ts` | 新增 |
-| `src/features/skills/components/slash-menu.tsx` | 新增 |
-| `src/features/skills/components/slash-menu.test.tsx` | 新增 |
+| `src/plugins/skills/index.ts` | 新增 barrel |
+| `src/plugins/skills/AGENTS.md` | 新增 |
+| `src/plugins/skills/lib/skill-loader.ts` | 新增 — scan + parse YAML frontmatter |
+| `src/plugins/skills/lib/skill-loader-schema.ts` | 新增 — SkillManifest / SkillFrontmatter schemas |
+| `src/plugins/skills/lib/skill-loader.test.ts` | 新增 |
+| `src/plugins/skills/lib/skill-injector.ts` | 新增 — formatSkillsManifestSection() |
+| `src/plugins/skills/lib/skill-injector.test.ts` | 新增 |
+| `src/plugins/skills/lib/skill-meta-tool.ts` | 新增 — `_load_skill` AgentTool wrapper |
+| `src/plugins/skills/lib/skill-meta-tool.test.ts` | 新增 |
+| `src/plugins/skills/stores/skills.store.ts` | 新增 — enabled skills signal + loadSkill() action |
+| `src/plugins/skills/stores/skills.store.test.ts` | 新增 |
+| `src/plugins/skills/components/slash-menu.tsx` | 新增 |
+| `src/plugins/skills/components/slash-menu.test.tsx` | 新增 |
 | `electron/main/skills-host.ts` | 新增 — preinstalled skills seed + IPC handlers |
 | `electron/main/skills-host.test.ts` | 新增 |
 | `electron/main/index.ts` | 改 — `whenReady` 内调 `ensurePreinstalledSkills()` |
@@ -275,7 +275,7 @@ export interface SlashMenuProps {
 
 ### 不可逆性
 推翻本 ADR 需:
-- 删 `src/features/skills/` 全树
+- 删 `src/plugins/skills/` 全树
 - 回退 `runtime.ts` system prompt 拼接
 - 回退 settings-schema enabledSkills 字段
 - 删 4 个 ship-with-app Skills

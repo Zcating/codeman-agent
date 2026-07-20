@@ -14,15 +14,23 @@
 //!   - `model.reasoning: true` (跟 thinkingLevel 联动,Claude 等推理模型才能产出 thinking blocks)
 //!   - `subscribe((evt) => ...)` → `subscribe((evt, signal) => ...)`
 //!   - 旧 anthropic-transport.ts 的 agent loop 全部删除(由 Agent 内部处理)
+//!
+//! V3.1 Skills integration (ADR-0031):
+//!   - ProviderConfig.enabledSkills: SkillManifest[] — caller (chat.store) 提供
+//!   - systemPrompt 自动追加 `<available_skills>...</available_skills>` 段
+//!   - tools[] 数组添加 `_load_skill` meta-tool (LLM 主动调用拉全文)
 
 import { Effect, Stream } from "effect";
 import { match } from "ts-pattern";
 import type { Message } from "../../../shared/lib/types";
+import type { SkillManifest } from "../../../shared/lib/types";
 import { logger } from "../../../shared/lib/logger";
 import { anthropicStream } from "./anthropic-transport";
 import { Agent, type AgentEvent } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai";
 import { createFileTools } from "../../file-tools/lib/file-tools";
+import { formatSkillsManifestSection } from "../../../plugins/skills/lib/skill-injector";
+import { loadSkillTool } from "../../../plugins/skills/lib/skill-meta-tool";
 import {
   isTextBlock,
   isThinkingBlock,
@@ -67,6 +75,12 @@ export interface ProviderConfig {
    * 但 LLM 没传时,`createFileTools()` 自动注入。空 = 不注入(保留 LLM 传的或让工具报错)。
    */
   workspaceId?: string;
+  /**
+   * V3.1 ADR-0031: 已启用的 skill manifest 列表。Runtime 在每次 run() 入口自动
+   * 拼成 `<available_skills>...</available_skills>` 段追加到 system prompt。
+   * 空 / undefined = 不注入该段。
+   */
+  enabledSkills?: readonly SkillManifest[];
 }
 
 // ─── Run options ────────────────────────────────────────────────
@@ -327,11 +341,20 @@ export function createAgentRuntime(): AgentRuntime {
           maxTokens: 8192,
         };
 
-        const tools = createFileTools(provider.workspaceId);
+        const fileTools = createFileTools(provider.workspaceId);
+        // 顺序: file tools 先, skills meta-tool 末 (便于 LLM 先看到主要工具)
+        const tools = [...fileTools, loadSkillTool];
+
+        // V3.1 ADR-0031 D3: 拼接 enabled skills manifest 到 system prompt。
+        // 空数组 → formatSkillsManifestSection 返回 "" → 原 systemPrompt 不变。
+        const skillsSection = formatSkillsManifestSection(provider.enabledSkills ?? []);
+        const finalSystemPrompt = skillsSection
+          ? `${provider.systemPrompt}\n\n${skillsSection}`
+          : provider.systemPrompt;
 
         const agent = new Agent({
           initialState: {
-            systemPrompt: provider.systemPrompt,
+            systemPrompt: finalSystemPrompt,
             model,
             // 默认 medium:显示完整思考过程。reasoning:true 的模型产出 thinking_delta
             // → chat.store 累积到 stub.thinking → done 时合并到 final message.thinking
