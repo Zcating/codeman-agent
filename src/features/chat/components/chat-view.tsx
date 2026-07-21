@@ -35,6 +35,11 @@ import {
   ChatViewFormSchema,
   type ChatViewFormValue,
 } from "../lib/schemas";
+// Wave A7: Slash menu integration
+import { useSlashTrigger } from "../../../plugins/skills/lib/use-slash-trigger";
+import { SlashMenu } from "../../../plugins/skills/components/slash-menu";
+import { skillsManifests$ } from "../../../plugins/skills/stores/skills.store";
+import type { SkillManifest } from "../../../shared/lib/types";
 
 // ─── ProviderSelect (model picker bound to form.Field "modelId") ─────────────
 
@@ -89,6 +94,9 @@ function ProviderSelect(props: {
 export function ChatView(props: { convId?: string }): JSX.Element {
   const convId = (): string | undefined => props.convId;
   let messagesEndRef: HTMLDivElement | undefined;
+  // Wave A7: textarea ref for slash trigger
+  let textareaEl: HTMLTextAreaElement | null = null;
+  const textareaRef = () => textareaEl;
 
   onMount(() => {
     startThemeSync();
@@ -180,6 +188,43 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     cancel(id);
   };
 
+  // ─── Wave A7: Slash trigger + skills ─────────────────────────────────────
+  // useSlashTrigger needs to be called in the component render (not in an effect),
+  // and needs the form's getValue. We use a derived accessor.
+  const slashTrigger = useSlashTrigger({
+    textareaRef,
+    getValue: () => form.getFieldValue("draft") ?? "",
+  });
+
+  /** Enabled skills = manifests ∩ appStore.enabledSkills */
+  const enabledSkills = createMemo((): readonly SkillManifest[] => {
+    const all = skillsManifests$();
+    const enabledNames = new Set(appStore.state.value.enabledSkills ?? []);
+    return all.filter((s) => enabledNames.has(s.name));
+  });
+
+  /** Handle skill selection: replace /<query> with /<skill-name> + space */
+  const handleSkillSelect = (skill: SkillManifest) => {
+    const trigger = slashTrigger();
+    if (!trigger) return;
+
+    const currentValue = form.getFieldValue("draft") ?? "";
+    const triggerPos = trigger.cursorPosition;
+
+    // Replace everything from triggerPos to end with /<skill-name>
+    const newValue =
+      currentValue.slice(0, triggerPos) + `/${skill.name} ` + currentValue.slice(triggerPos);
+
+    form.setFieldValue("draft", newValue);
+    // Blur the textarea so the cursor moves to the end of the inserted text
+    textareaEl?.focus();
+    // Move cursor to after the inserted skill name
+    const newCursorPos = triggerPos + skill.name.length + 2; // "/" + name + " "
+    queueMicrotask(() => {
+      textareaEl?.setSelectionRange(newCursorPos, newCursorPos);
+    });
+  };
+
   return (
     <>
       <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
@@ -208,6 +253,9 @@ export function ChatView(props: { convId?: string }): JSX.Element {
                 value={field().state.value}
                 onValueChange={(v) => field().handleChange(v)}
                 onBlur={() => field().handleBlur()}
+                ref={(el) => {
+                  textareaEl = el;
+                }}
                 onKeyDown={(e) => {
                   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
                     e.preventDefault();
@@ -301,7 +349,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
         </div>
       </form>
 
-      {/* Cancel button — form-external sibling (per ADR-0029 D6) */}
+        {/* Cancel button — form-external sibling (per ADR-0029 D6) */}
       <Show when={isRunning()}>
         <div class="flex justify-end p-2 border-t border-border bg-card">
           <Button
@@ -315,6 +363,22 @@ export function ChatView(props: { convId?: string }): JSX.Element {
           </Button>
         </div>
       </Show>
+
+      {/* Wave A7: SlashMenu popup */}
+      <SlashMenu
+        trigger={slashTrigger()}
+        candidates={enabledSkills()}
+        query={slashTrigger()?.query ?? ""}
+        onSelect={handleSkillSelect}
+        onClose={() => {
+          const trigger = slashTrigger();
+          if (trigger?.rect) {
+            // Focus back to textarea and reset selection
+            textareaEl?.focus();
+          }
+        }}
+        anchorRect={slashTrigger()?.rect ?? null}
+      />
     </>
   );
 }
