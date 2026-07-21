@@ -32,7 +32,7 @@
 - **Plugin 之间的边界**:`src/plugins/<a>/` 不直接 import `src/plugins/<b>/`;需共享代码提升到 `src/shared/`。
 - **错误走 `AppError` union 复用**(`Schema.TaggedError`, 共享于 `src/shared/lib/errors.ts`)。
 - **`as any` / `@ts-ignore` / 空 catch 全部禁用**(per src/AGENTS.md 全局规则)。
-- **业务函数 `Effect.fnUntraced` 包装**(per `.repos/effect/.patterns/effect.md`)。
+- **业务函数 (`lib/*.ts` / `stores/*.ts`) 默认用 `Effect.fnUntraced` 包装**（per `.repos/effect/.patterns/effect.md`）。但 IIFE-constructed services that pipe `Effect.provide` 可以用 `Effect.gen`（closure allocation is one-time，trace overhead 不值得）。
 - **新增 plugin 必须开 ADR**——plugin 是新的扩展点,需文档化设计决策。
 
 ## Import 方向

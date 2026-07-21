@@ -110,12 +110,13 @@ notify: (title: string, body: string) =>
 
   // MCP plugin (ADR-0032)
   mcpListServers: () => ipcRenderer.invoke("mcp:list-servers"),
+  mcpGetTools: (args: { serverName: string }) => ipcRenderer.invoke("mcp:get-tools", args),
   mcpGetAllTools: () => ipcRenderer.invoke("mcp:get-all-tools"),
   mcpEnable: (args: { serverName: string; enabled: boolean }) =>
     ipcRenderer.invoke("mcp:enable", args),
   mcpRestart: (args: { serverName: string }) =>
     ipcRenderer.invoke("mcp:restart", args),
-  mcpCallTool: (args: { agentName: string; args: unknown }) =>
+  mcpCallTool: (args: { serverName: string; toolName: string; args: unknown }) =>
     ipcRenderer.invoke("mcp:call-tool", args),
   mcpOpenConfigDir: () => ipcRenderer.invoke("mcp:open-config-dir"),
 

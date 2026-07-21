@@ -232,6 +232,8 @@ export interface McpServerInfo {
 export interface McpToolEntry {
   serverName: string;
   agentName: string;
+  /** Original tool name (before slugification), e.g. "create_issue". */
+  toolName: string;
   description: string;
   inputSchema: unknown;
 }

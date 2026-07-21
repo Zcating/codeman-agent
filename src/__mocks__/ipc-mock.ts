@@ -408,6 +408,10 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
     return mockState.resolved ?? [];
   },
 
+  "mcp:get-tools"(_args?: IPCArgs): unknown {
+    return mockState.resolved ?? [];
+  },
+
   "mcp:enable"(_args?: IPCArgs): unknown {
     return undefined;
   },
@@ -508,10 +512,11 @@ function buildCodemanMock(): Record<string, unknown> {
     skillsScan: { cmd: "skillsScan", build: () => ({}) },
     skillsLoad: { cmd: "skillsLoad", build: (n) => ({ name: n }) },
     mcpListServers: { cmd: "mcp:list-servers", build: () => ({}) },
+    mcpGetTools: { cmd: "mcp:get-tools", build: (a) => a as Record<string, unknown> },
     mcpGetAllTools: { cmd: "mcp:get-all-tools", build: () => ({}) },
     mcpEnable: { cmd: "mcp:enable", build: (a) => a as Record<string, unknown> },
     mcpRestart: { cmd: "mcp:restart", build: (sn) => ({ serverName: sn }) },
-    mcpCallTool: { cmd: "mcp:call-tool", build: (an, a) => ({ agentName: an, args: a }) },
+    mcpCallTool: { cmd: "mcp:call-tool", build: (sn, tn, a) => ({ serverName: sn, toolName: tn, args: a }) },
     mcpOpenConfigDir: { cmd: "mcp:open-config-dir", build: () => ({}) },
   };
 

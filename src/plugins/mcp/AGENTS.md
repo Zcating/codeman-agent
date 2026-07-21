@@ -10,7 +10,6 @@
 src/plugins/mcp/
 ├── index.ts              # Barrel (plugin 根级唯一允许的文件之一)
 ├── AGENTS.md             # 本文件
-├── types.ts              # 类型 re-export (源在 src/shared/lib/types.ts)
 │
 ├── components/           # UI 组件
 │   └── settings-tab.tsx  # McpSettingsTab — MCP 服务器管理 UI
@@ -30,24 +29,25 @@ electron/main/mcp-manager.ts  ←IPC→  McpService (shared/lib/ipc.ts)
                               McpSettingsTab (components/settings-tab.tsx)
 ```
 
-## IPC 通道 (mini-3 合约)
+## IPC 通道 (mini-3 合约, 7 channels)
 
 | 通道 | 方向 | 类型 |
 |---|---|---|
 | `mcp:list-servers` | main → renderer | `McpServerInfo[]` |
-| `mcp:get-all-tools` | main → renderer | `McpToolEntry[]` |
+| `mcp:get-tools` | main → renderer | `McpTool[]` (per-server, per ADR-0032 D7) |
+| `mcp:get-all-tools` | main → renderer | `McpToolEntry[]` (flat, for renderer buildMcpTools) |
 | `mcp:enable` | renderer → main | `void` (args: `{serverName, enabled}`) |
 | `mcp:restart` | renderer → main | `void` (args: `{serverName}`) |
-| `mcp:call-tool` | renderer → main | `McpCallResult` (args: `{agentName, args}`) |
+| `mcp:call-tool` | renderer → main | `McpCallResult` (args: `{serverName, toolName, args}`) |
 | `mcp:open-config-dir` | renderer → main | `void` |
 
 ## 硬性规则
 
 - **UI 组件 (`components/*.tsx`) 禁止导入 `effect` 用于计算**，但允许 `Effect.runPromiseExit` 在事件处理器里执行 store 返回的 Effect（与 skills-section.tsx 同模式）。
-- **业务函数 (`stores/*.ts`) 用 `Effect.gen` + `Effect.provide(McpServiceLive)`** 包装；不需要 `Effect.fnUntraced`（一次性 IIFE）。
+- **业务函数 (`stores/*.ts`) 用 `Effect.gen` + `Effect.provide(McpServiceLive)` 包装**（per parent rule in `src/plugins/AGENTS.md` — IIFE services get the carve-out, trace overhead not worth it for one-time construction）。
 - **错误复用 `AppError` union**（`NotFound` / `InvalidConfig` / `Unknown`）。
 - **`as any` / `@ts-ignore` / 空 catch 全部禁用**。
-- **类型 re-export 自 `src/shared/lib/types.ts`**；本地 `types.ts` 只做 re-export，不重新定义。
+- **类型 re-export 自 `src/shared/lib/types.ts`**（在 `index.ts` 中做 re-export，不新建文件）。
 
 ## 与 runtime.ts 集成 (ADR-0032 D4)
 
@@ -64,7 +64,7 @@ electron/main/mcp-manager.ts  ←IPC→  McpService (shared/lib/ipc.ts)
 }
 ```
 
-工具名格式 (`mcp_<server-slug>_<tool-slug>`) 由 `electron/main/mcp-manager.ts::McpManager.listAllTools()` 保证唯一性；冲突时第一个胜出，第二个被丢弃并 log warning。
+工具名格式 (`mcp_<server-slug>_<tool-slug>`) 由 `electron/main/mcp-manager.ts::McpManager.startAll()` 保证唯一性；冲突时第二个 server 被标记 `protocol_error` 并停止（per ADR-0032 D3）。
 
 ## ADR 参考
 

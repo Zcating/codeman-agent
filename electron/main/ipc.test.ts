@@ -91,6 +91,7 @@ const EXPECTED_CHANNELS = [
   // QA 表由 electron/main/mock-server.ts 直接经 qa-loader.ts 读,不暴露 IPC
   // MCP plugin (ADR-0032)
   "mcp:list-servers",
+  "mcp:get-tools",
   "mcp:get-all-tools",
   "mcp:enable",
   "mcp:restart",
@@ -104,7 +105,7 @@ describe("T3 — electron/main/ipc.ts", () => {
     fakeWin.webContents.send.mockClear();
   });
 
-  it("registers all 33 expected ipcMain.handle channels (qa:get_table removed — handled by mock-server)", async () => {
+  it("registers all 34 expected ipcMain.handle channels (qa:get_table removed — handled by mock-server)", async () => {
     const { registerIpcHandlers } = await import("./ipc");
     const { McpManager } = await import("./mcp-manager");
     const { registerMcpIpcHandlers } = await import("./mcp-ipc");

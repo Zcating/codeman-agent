@@ -19,7 +19,7 @@ import {
   restart,
   openConfigDir,
 } from "../stores/store";
-import type { McpServerStatus, McpServerInfo } from "../types";
+import type { McpServerStatus, McpServerInfo } from "../../../shared/lib/types";
 
 // ─── Status pill ────────────────────────────────────────────────
 

@@ -134,8 +134,9 @@ LLM emit `tool_call` for `mcp_github_create_issue`:
 
 | Channel | Direction | Payload |
 |---|---|---|
-| `mcp:list-servers` | renderer → main | void → `McpServerStatus[]` |
-| `mcp:get-tools` | renderer → main | `{ serverName }` → `McpTool[]` |
+| `mcp:list-servers` | renderer → main | void → `McpServerInfo[]` |
+| `mcp:get-tools` | renderer → main | `{ serverName }` → `McpTool[]` (per-server) |
+| `mcp:get-all-tools` | renderer → main | void → `McpToolEntry[]` (flat across all servers; renderer uses for `buildMcpTools`) |
 | `mcp:enable` | renderer → main | `{ serverName, enabled }` → void |
 | `mcp:restart` | renderer → main | `{ serverName }` → void |
 | `mcp:call-tool` | renderer → main | `{ serverName, toolName, args }` → `McpToolResult` |

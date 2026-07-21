@@ -32,7 +32,7 @@ import { createFileTools } from "../../file-tools/lib/file-tools";
 import { formatSkillsManifestSection } from "../../../plugins/skills/lib/skill-injector";
 import { loadSkillTool } from "../../../plugins/skills/lib/skill-meta-tool";
 import { mcpAllTools$ } from "../../../plugins/mcp/stores/store";
-import type { McpToolEntry } from "../../../plugins/mcp/types";
+import type { McpToolEntry } from "../../../shared/lib/types";
 import { McpService, McpServiceLive } from "../../../shared/lib/ipc";
 import {
   isTextBlock,
@@ -58,7 +58,7 @@ function buildMcpTools(entries: readonly McpToolEntry[]): AgentTool<TSchema, unk
     execute: async (_toolCallId: string, args: unknown): Promise<{ content: Array<{ type: "text"; text: string }>; details: unknown }> => {
       const callToolEffect = Effect.gen(function* () {
         const svc = yield* McpService;
-        return yield* svc.callTool(entry.agentName, args as Record<string, unknown>);
+        return yield* svc.callTool(entry.serverName, entry.toolName, args as Record<string, unknown>);
       }).pipe(Effect.provide(McpServiceLive));
 
       const exit = await Effect.runPromiseExit(callToolEffect);

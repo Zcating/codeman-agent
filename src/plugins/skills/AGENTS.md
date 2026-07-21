@@ -36,7 +36,7 @@ src/plugins/skills/
 ## 硬性规则
 
 - **UI 组件 (`components/*.tsx`) 禁止导入 `effect`**。它们是 Solid signal / createStore 纯消费者。
-- **业务函数 (`lib/*.ts`) 必须用 `Effect.fnUntraced` 包装**(per `.repos/effect/.patterns/effect.md`)。
+- **业务函数 (`lib/*.ts` / `stores/*.ts`) 默认用 `Effect.fnUntraced` 包装**（per `src/plugins/AGENTS.md`）。IIFE-constructed services that pipe `Effect.provide` 可用 `Effect.gen`（closure allocation is one-time，trace overhead 不值得）。
 - **错误复用 `AppError` union** (`NotFound` / `InvalidConfig`)。不为本 plugin 创建新 TaggedError variant (除非使用方需要结构化字段)。
 - **`as any` / `@ts-ignore` / 空 catch 全部禁用**。
 - **frontmatter 解析手写** — 不引 `gray-matter` / `js-yaml` 新依赖(SKILL.md 是简单 key:value 行格式)。

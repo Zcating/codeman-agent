@@ -20,4 +20,4 @@ export type {
   McpCallResult,
   McpServerInfo,
   McpToolEntry,
-} from "./types";
+} from "../../shared/lib/types";
