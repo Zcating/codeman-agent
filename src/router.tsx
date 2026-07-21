@@ -29,6 +29,7 @@ import { AppSection } from "./features/settings/routes/sections/app-section";
 import { WindowSection } from "./features/settings/routes/sections/window-section";
 import { AdvancedSection } from "./features/settings/routes/sections/advanced-section";
 import { SkillsSection } from "./features/settings/routes/sections/skills-section";
+import { McpSection } from "./features/settings/routes/sections/mcp-section";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -132,6 +133,12 @@ const settingsSkillsRoute = createRoute({
   component: SkillsSection,
 });
 
+const settingsMcpRoute = createRoute({
+  getParentRoute: () => settingsLayoutRoute,
+  path: "mcp",
+  component: McpSection,
+});
+
 export const routeTree = rootRoute.addChildren([
   chatLayoutRoute.addChildren([homeRoute, conversationRoute]),
   settingsLayoutRoute.addChildren([
@@ -139,6 +146,7 @@ export const routeTree = rootRoute.addChildren([
     settingsAppRoute,
     settingsWindowRoute,
     settingsSkillsRoute,
+    settingsMcpRoute,
     settingsAdvancedRoute,
   ]),
 ]);

@@ -1,0 +1,30 @@
+//! McpSection — `/settings/mcp` route component (ADR-0032 Phase B mini-4).
+//!
+//! Mounts the MCP settings UI and triggers initial data load.
+
+import { type JSX, onMount } from "solid-js";
+import { Effect, Exit } from "effect";
+import { McpSettingsTab } from "../../../../plugins/mcp/components/settings-tab";
+import { refresh } from "../../../../plugins/mcp/stores/store";
+import { codemanToast } from "../../../../shared/components/internal/codeman-toast";
+
+export function McpSection(): JSX.Element {
+  onMount(async () => {
+    const exit = await Effect.runPromiseExit(refresh);
+    if (Exit.isSuccess(exit)) {
+      const { servers } = exit.value;
+      if (servers.length > 0) {
+        codemanToast.success(`Loaded ${servers.length} MCP server(s)`);
+      }
+    } else {
+      const cause = exit.cause;
+      const errMsg =
+        cause._tag === "Fail"
+          ? String(cause.error)
+          : "(unknown error)";
+      codemanToast.error(`Failed to load MCP servers: ${errMsg}`);
+    }
+  });
+
+  return <McpSettingsTab />;
+}

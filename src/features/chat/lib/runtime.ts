@@ -20,17 +20,20 @@
 //!   - systemPrompt 自动追加 `<available_skills>...</available_skills>` 段
 //!   - tools[] 数组添加 `_load_skill` meta-tool (LLM 主动调用拉全文)
 
-import { Effect, Stream } from "effect";
+import { Effect, Exit, Stream } from "effect";
 import { match } from "ts-pattern";
 import type { Message } from "../../../shared/lib/types";
 import type { SkillManifest } from "../../../shared/lib/types";
 import { logger } from "../../../shared/lib/logger";
 import { anthropicStream } from "./anthropic-transport";
-import { Agent, type AgentEvent } from "@earendil-works/pi-agent-core";
+import { Agent, type AgentEvent, type AgentTool } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai";
 import { createFileTools } from "../../file-tools/lib/file-tools";
 import { formatSkillsManifestSection } from "../../../plugins/skills/lib/skill-injector";
 import { loadSkillTool } from "../../../plugins/skills/lib/skill-meta-tool";
+import { mcpAllTools$ } from "../../../plugins/mcp/stores/store";
+import type { McpToolEntry } from "../../../plugins/mcp/types";
+import { McpService, McpServiceLive } from "../../../shared/lib/ipc";
 import {
   isTextBlock,
   isThinkingBlock,
@@ -40,6 +43,54 @@ import {
 import { validateProvider } from "./runtime-validate-provider";
 import { extractToolErrorText } from "./runtime-tool-error";
 import { toPiMessages } from "./runtime-to-pi-messages";
+import { AppError } from "../../../shared/lib/errors";
+import type { TSchema } from "@sinclair/typebox";
+
+// ─── MCP tools builder (ADR-0032 D4) ────────────────────────────────────────
+
+/** Convert MCP tool entries to pi-agent AgentTool definitions. */
+function buildMcpTools(entries: readonly McpToolEntry[]): AgentTool<TSchema, unknown>[] {
+  return entries.map((entry) => ({
+    label: entry.agentName,
+    name: entry.agentName,
+    description: entry.description,
+    parameters: entry.inputSchema as TSchema,
+    execute: async (_toolCallId: string, args: unknown): Promise<{ content: Array<{ type: "text"; text: string }>; details: unknown }> => {
+      const callToolEffect = Effect.gen(function* () {
+        const svc = yield* McpService;
+        return yield* svc.callTool(entry.agentName, args as Record<string, unknown>);
+      }).pipe(Effect.provide(McpServiceLive));
+
+      const exit = await Effect.runPromiseExit(callToolEffect);
+      if (Exit.isFailure(exit)) {
+        const cause = exit.cause;
+        const err: AppError =
+          cause._tag === "Fail"
+            ? (cause.error as AppError)
+            : ({ _tag: "Unknown", message: String(cause) } as AppError);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `MCP tool error (${err._tag}): ${"message" in err ? err.message : JSON.stringify(err)}`,
+            },
+          ],
+          details: err,
+        };
+      }
+      const result = exit.value as { content: Array<{ type: string; text?: string; [k: string]: unknown }> };
+      return {
+        content: result.content.map((block) => {
+          if (block.type === "text" && block.text !== undefined) {
+            return { type: "text" as const, text: block.text };
+          }
+          return { type: "text" as const, text: JSON.stringify(block) };
+        }),
+        details: result,
+      };
+    },
+  }));
+}
 
 // ─── Runtime event types (6 variants,ADR-0017 + thinking) ──────────────────
 
@@ -342,8 +393,9 @@ export function createAgentRuntime(): AgentRuntime {
         };
 
         const fileTools = createFileTools(provider.workspaceId);
-        // 顺序: file tools 先, skills meta-tool 末 (便于 LLM 先看到主要工具)
-        const tools = [...fileTools, loadSkillTool];
+        const mcpTools = buildMcpTools(mcpAllTools$());
+        // 顺序: file tools 先, MCP tools 中, skills meta-tool 末 (便于 LLM 先看到主要工具)
+        const tools = [...fileTools, ...mcpTools, loadSkillTool];
 
         // V3.1 ADR-0031 D3: 拼接 enabled skills manifest 到 system prompt。
         // 空数组 → formatSkillsManifestSection 返回 "" → 原 systemPrompt 不变。
