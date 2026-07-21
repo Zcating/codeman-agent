@@ -23,6 +23,8 @@ import type {
   ModelMeta,
   FileMatch,
   SkillManifest,
+  McpServerInfo,
+  McpToolEntry,
 } from "./types";
 import { parseModelsApiResponse } from "./parse-models-api-response";
 
@@ -84,6 +86,13 @@ export interface CodemanApi {
   // Skills plugin (ADR-0031) — main process reads ~/.agents/skills/
   skillsScan: () => Promise<unknown>;
   skillsLoad: (name: string) => Promise<unknown>;
+  // MCP plugin (ADR-0032) — MCP client IPC
+  mcpListServers: () => Promise<unknown>;
+  mcpGetAllTools: () => Promise<unknown>;
+  mcpEnable: (args: { serverName: string; enabled: boolean }) => Promise<unknown>;
+  mcpRestart: (args: { serverName: string }) => Promise<unknown>;
+  mcpCallTool: (args: { agentName: string; args: unknown }) => Promise<unknown>;
+  mcpOpenConfigDir: () => Promise<unknown>;
   onStreamChunk: (handler: (evt: unknown) => void) => () => void;
 }
 
@@ -172,6 +181,18 @@ async function dispatchInvoke<T>(
       return (await a.skillsScan()) as T;
     case "skillsLoad":
       return (await a.skillsLoad(arg("name") as string)) as T;
+    case "mcpListServers":
+      return (await a.mcpListServers()) as T;
+    case "mcpGetAllTools":
+      return (await a.mcpGetAllTools()) as T;
+    case "mcpEnable":
+      return (await a.mcpEnable({ serverName: arg("serverName") as string, enabled: !!arg("enabled") })) as T;
+    case "mcpRestart":
+      return (await a.mcpRestart({ serverName: arg("serverName") as string })) as T;
+    case "mcpCallTool":
+      return (await a.mcpCallTool({ agentName: arg("agentName") as string, args: arg("args") as unknown })) as T;
+    case "mcpOpenConfigDir":
+      return (await a.mcpOpenConfigDir()) as T;
     default:
       throw new Unknown({ message: `Unknown IPC: ${name}` });
   }
@@ -326,6 +347,19 @@ export class SkillsService extends Context.Tag("SkillsService")<
   {
     readonly scan: () => Effect.Effect<SkillManifest[], AppError>;
     readonly load: (name: string) => Effect.Effect<string, AppError>;
+  }
+>() {}
+
+// MCP client service (ADR-0032) — wraps the 6 MCP IPC channels.
+export class McpService extends Context.Tag("McpService")<
+  McpService,
+  {
+    readonly listServers: () => Effect.Effect<McpServerInfo[], AppError>;
+    readonly getAllTools: () => Effect.Effect<McpToolEntry[], AppError>;
+    readonly enable: (serverName: string, enabled: boolean) => Effect.Effect<void, AppError>;
+    readonly restart: (serverName: string) => Effect.Effect<void, AppError>;
+    readonly callTool: (agentName: string, args: unknown) => Effect.Effect<unknown, AppError>;
+    readonly openConfigDir: () => Effect.Effect<void, AppError>;
   }
 >() {}
 
@@ -529,6 +563,17 @@ export const FileServiceLive = Layer.succeed(FileService, {
 export const SkillsServiceLive = Layer.succeed(SkillsService, {
   scan: () => invoke<SkillManifest[]>("skillsScan"),
   load: (name: string) => invoke<string>("skillsLoad", { name }),
+});
+
+export const McpServiceLive = Layer.succeed(McpService, {
+  listServers: () => invoke<McpServerInfo[]>("mcp:list-servers"),
+  getAllTools: () => invoke<McpToolEntry[]>("mcp:get-all-tools"),
+  enable: (serverName: string, enabled: boolean) =>
+    invoke<void>("mcp:enable", { serverName, enabled }),
+  restart: (serverName: string) => invoke<void>("mcp:restart", { serverName }),
+  callTool: (agentName: string, args: unknown) =>
+    invoke<unknown>("mcp:call-tool", { agentName, args }),
+  openConfigDir: () => invoke<void>("mcp:open-config-dir"),
 });
 
 // ─── Bridge functions (Promise-based, for Solid UI) ─────────────

@@ -108,6 +108,17 @@ notify: (title: string, body: string) =>
   skillsScan: () => ipcRenderer.invoke("skillsScan"),
   skillsLoad: (name: string) => ipcRenderer.invoke("skillsLoad", { name }),
 
+  // MCP plugin (ADR-0032)
+  mcpListServers: () => ipcRenderer.invoke("mcp:list-servers"),
+  mcpGetAllTools: () => ipcRenderer.invoke("mcp:get-all-tools"),
+  mcpEnable: (args: { serverName: string; enabled: boolean }) =>
+    ipcRenderer.invoke("mcp:enable", args),
+  mcpRestart: (args: { serverName: string }) =>
+    ipcRenderer.invoke("mcp:restart", args),
+  mcpCallTool: (args: { agentName: string; args: unknown }) =>
+    ipcRenderer.invoke("mcp:call-tool", args),
+  mcpOpenConfigDir: () => ipcRenderer.invoke("mcp:open-config-dir"),
+
   // Streaming: preload exposes a callback registration API; main calls
   // webContents.send('stream-chunk', evt). Renderer wraps onStreamChunk
   // in Stream.async (T5).

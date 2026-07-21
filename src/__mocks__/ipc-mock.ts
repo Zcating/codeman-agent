@@ -398,6 +398,31 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
   skillsLoad(_args?: IPCArgs): unknown {
     return mockState.resolved ?? "";
   },
+
+  // ─── MCP plugin IPC (ADR-0032) ─────────────────────────────────────
+  "mcp:list-servers"(_args?: IPCArgs): unknown {
+    return mockState.resolved ?? [];
+  },
+
+  "mcp:get-all-tools"(_args?: IPCArgs): unknown {
+    return mockState.resolved ?? [];
+  },
+
+  "mcp:enable"(_args?: IPCArgs): unknown {
+    return undefined;
+  },
+
+  "mcp:restart"(_args?: IPCArgs): unknown {
+    return undefined;
+  },
+
+  "mcp:call-tool"(_args?: IPCArgs): unknown {
+    return { content: [{ type: "text", text: "mock tool result" }], isError: false };
+  },
+
+  "mcp:open-config-dir"(_args?: IPCArgs): unknown {
+    return undefined;
+  },
 };
 
 // ─── Invoke Mock ────────────────────────────────────────────────
@@ -482,6 +507,12 @@ function buildCodemanMock(): Record<string, unknown> {
     deleteFile: { cmd: "deleteFile", build: (wid, p) => ({ workspaceId: wid, path: p }) },
     skillsScan: { cmd: "skillsScan", build: () => ({}) },
     skillsLoad: { cmd: "skillsLoad", build: (n) => ({ name: n }) },
+    mcpListServers: { cmd: "mcp:list-servers", build: () => ({}) },
+    mcpGetAllTools: { cmd: "mcp:get-all-tools", build: () => ({}) },
+    mcpEnable: { cmd: "mcp:enable", build: (a) => a as Record<string, unknown> },
+    mcpRestart: { cmd: "mcp:restart", build: (sn) => ({ serverName: sn }) },
+    mcpCallTool: { cmd: "mcp:call-tool", build: (an, a) => ({ agentName: an, args: a }) },
+    mcpOpenConfigDir: { cmd: "mcp:open-config-dir", build: () => ({}) },
   };
 
   const codeman: Record<string, unknown> = {};

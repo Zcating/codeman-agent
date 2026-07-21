@@ -29,6 +29,8 @@ import { registerIpcHandlers } from "./ipc";
 import { loadQaTable } from "./qa-loader";
 import { startMockServer } from "./mock-server";
 import { ensurePreinstalledSkills, registerSkillHandlers } from "./skills-host";
+import { McpManager } from "./mcp-manager";
+import { registerMcpIpcHandlers } from "./mcp-ipc";
 
 // Worker suffix for e2e parallel workers (CODEMAN_TEST_WORKER = w0, w1, …).
 // When set, paths are suffixed (codeman-agent.w0, codeman-agent.w1) so
@@ -168,6 +170,17 @@ app.whenReady().then(() => {
 	void ensurePreinstalledSkills().catch((e) => {
 		console.error("[skills-host] ensurePreinstalledSkills failed:", e);
 	});
+
+	// V3.1 MCP — instantiate manager + register handlers.
+	const mcpManager = new McpManager();
+	registerMcpIpcHandlers(mcpManager);
+	void mcpManager.startAll().catch((e) => {
+		console.error("[mcp] startAll failed:", e);
+	});
+	app.on("before-quit", () => {
+		void mcpManager.stopAll();
+	});
+
 	mainWindow = createMainWindow();
 });
 

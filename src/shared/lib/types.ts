@@ -191,3 +191,47 @@ export interface SkillManifest {
   /** 绝对路径指向 SKILL.md 文件, 供 IPC handler 读全文用 */
   path: string;
 }
+
+// ============================================================================
+// V3.1 MCP Client (ADR-0032)
+// ============================================================================
+
+export type McpServerStatus =
+  | { kind: "disabled" }
+  | { kind: "starting" }
+  | { kind: "connected"; toolCount: number }
+  | { kind: "spawn_failed"; error: string }
+  | { kind: "protocol_error"; error: string }
+  | { kind: "crashed"; exitCode: number | null; signal: NodeJS.Signals | null; error: string };
+
+export interface McpServerConfig {
+  name: string;
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+  enabled: boolean;
+}
+
+export interface McpTool {
+  name: string;
+  description: string;
+  inputSchema: unknown;
+}
+
+export interface McpCallResult {
+  content: Array<{ type: string; text?: string; [k: string]: unknown }>;
+  isError?: boolean;
+}
+
+export interface McpServerInfo {
+  config: McpServerConfig;
+  status: McpServerStatus;
+  tools: McpTool[];
+}
+
+export interface McpToolEntry {
+  serverName: string;
+  agentName: string;
+  description: string;
+  inputSchema: unknown;
+}
