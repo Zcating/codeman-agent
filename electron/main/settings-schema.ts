@@ -81,15 +81,9 @@ const MIN_SIZE_HEIGHT = 100;
 const MIN_AUTO_ARCHIVE_DAYS = 1;
 const MIN_MAX_HISTORY = 10;
 const MINIMAX_BASE_URL = "https://api.minimaxi.com/anthropic";
-const DEEPSEEK_BASE_URL = "https://api.deepseek.com/anthropic";
-void DEEPSEEK_BASE_URL;
 const MINIMAX_MODELS_ENDPOINT = "https://api.minimaxi.com/v1/models";
-const DEEPSEEK_MODELS_ENDPOINT = "https://api.deepseek.com/v1/models";
-void DEEPSEEK_MODELS_ENDPOINT;
 
 const MINIMAX_DEFAULT_MODEL = "MiniMax-M2.5-highspeed";
-const DEEPSEEK_DEFAULT_MODEL = "deepseek-chat";
-void DEEPSEEK_DEFAULT_MODEL;
 
 export const DEFAULT_SETTINGS: Settings = {
   schemaVersion: "1.5",

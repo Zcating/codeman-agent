@@ -26,7 +26,7 @@ const F = vi.hoisted(() => {
 vi.mock("@tanstack/solid-router", () => ({
   Outlet: () => <div data-testid="outlet">Outlet</div>,
   Link: (props: any) => {
-    const { _inactiveProps, ...rest } = props;
+    const { _inactiveProps, _activeProps, ...rest } = props;
     return <a {...rest} {...(props.to ? { href: props.to } : {})}>{props.children}</a>;
   },
   useParams: () => F.mockUseParams({ from: "/conversation/$convId" }),
