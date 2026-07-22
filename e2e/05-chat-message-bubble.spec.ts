@@ -83,7 +83,7 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
     //    this confirms the sidebar rendered it.
     const sidebarItem = page.locator(`[data-conv-id="${convId}"]`).first();
     try {
-      await sidebarItem.waitFor({ state: "attached", timeout: 15_000 });
+      await sidebarItem.waitFor({ state: "visible", timeout: 15_000 });
     } catch {
       // Sidebar may not show conv if accordion collapsed — not a blocker
       // for the core bubble test. Proceed.

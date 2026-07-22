@@ -111,7 +111,7 @@ test.describe("10 — HomeAgentForm Home", () => {
   test.beforeEach(async ({ tauriEnv }) => {
     const { page } = tauriEnv;
     page.on("console", (msg) => {
-      if (msg.type() === "error") console.error("[10 spec console]", msg.text());
+      if (msg.type === "error") console.error("[10 spec console]", msg.text);
     });
     // Clean up workspaces from previous tests to avoid state leakage
     await resetSidebar(page);

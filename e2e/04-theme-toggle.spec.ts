@@ -82,11 +82,11 @@ test.describe("04 — 主题", () => {
       const old = await invoke<{ id: string }[]>(page, "listWorkspaces");
       for (const ws of old) await invoke(page, "deleteWorkspace", { id: ws.id });
     } catch { /* best-effort */ }
-    const wsId = (await invoke<{ id: string }>(page, "addWorkspace", {
+    await invoke(page, "addWorkspace", {
       label: "Theme Test Workspace",
       rootPath: `C:\\Temp\\codeman-e2e-theme-${process.pid}-${Math.random().toString(36).slice(2, 8)}`,
-    })).id;
-    await clickNewConversationAndWait(page, { workspaceId: wsId });
+    });
+    await clickNewConversationAndWait(page, { workspaceLabel: "Theme Test Workspace" });
 
     // 切到 / — 已经有 activeId 在 store 里,ChatLayout 仍渲染。
     await page.goto("/");
