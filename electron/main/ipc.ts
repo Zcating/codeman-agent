@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { initDatabase, getDatabase } from "./db/mod";
 // QA 路由由 electron/main/mock-server.ts 负责(POST /mock/anthropic/v1/messages
 // 经 qa-loader.ts 读 Q→A 文件);不再走 IPC。
-import { sanitize, type SettingsV15 } from "./settings-schema";
+import { sanitize, type Settings, type Provider } from "./settings-schema";
 import {
   validatePathInWorkspace,
   readFileInWorkspace,
@@ -23,7 +23,7 @@ import {
 
 // ─── Settings store (JSON file under app.getPath("userData")) ─────────
 
-let settingsCache: SettingsV15 | null = null;
+let settingsCache: Settings | null = null;
 
 // ADR-0024 D7: Map<requestId, AbortController> for aborting in-flight LLM requests
 const abortControllers = new Map<string, AbortController>();
@@ -33,7 +33,7 @@ function settingsPath(): string {
   return join(app.getPath("userData"), "settings.json");
 }
 
-function loadSettings(): SettingsV15 {
+function loadSettings(): Settings {
   if (settingsCache) return settingsCache;
   const path = settingsPath();
   let raw: unknown = {};
@@ -46,7 +46,7 @@ function loadSettings(): SettingsV15 {
   }
   // Load (or initialize) V1.5 camelCase settings from disk.
   // Schema.decodeUnknownEither inside sanitize() validates; malformed JSON → DEFAULT_SETTINGS.
-  settingsCache = sanitize(raw as Partial<SettingsV15>);
+  settingsCache = sanitize(raw as Partial<Settings>);
   saveSettings();
   return settingsCache;
 }
@@ -56,7 +56,7 @@ function saveSettings(): void {
   writeFileSync(settingsPath(), JSON.stringify(settingsCache, null, 2), "utf-8");
 }
 
-function updateSettings(patch: Partial<SettingsV15>): SettingsV15 {
+function updateSettings(patch: Partial<Settings>): Settings {
   loadSettings();
   settingsCache = sanitize({ ...settingsCache!, ...patch });
   saveSettings();
@@ -235,7 +235,7 @@ export function registerIpcHandlers(_deps: {
     // V2 spec convention: args may be { newSettings } OR just the patch object.
     const rawPatch =
       (args && typeof args === "object" && ("newSettings" in args ? (args as { newSettings: unknown }).newSettings : args)) ?? {};
-    const patch = rawPatch as Partial<SettingsV15>;
+    const patch = rawPatch as Partial<Settings>;
     return updateSettings(patch);
   });
   ipcMain.handle("clearAllHistory", () => {
@@ -490,7 +490,7 @@ export function registerIpcHandlers(_deps: {
     loadSettings();
     const next = {
       ...settingsCache!,
-      providers: settingsCache!.providers.filter((p) => p.id !== args.id),
+      providers: settingsCache!.providers.filter((p: Provider) => p.id !== args.id),
     };
     settingsCache = sanitize(next);
     saveSettings();

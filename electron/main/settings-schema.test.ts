@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   sanitize,
   DEFAULT_SETTINGS,
-  type SettingsV15,
+  type Settings,
 } from "./settings-schema";
 
-const V15: SettingsV15 = {
+const V15: Settings = {
   schemaVersion: "1.5",
   providers: [
     {
@@ -77,12 +77,12 @@ describe("T4a — electron/main/settings-schema.ts", () => {
     });
 
     it("rejects malformed schemaVersion → falls back to DEFAULT_SETTINGS", () => {
-      const r = sanitize({ schemaVersion: "garbage" } as unknown as SettingsV15);
+      const r = sanitize({ schemaVersion: "garbage" } as unknown as Settings);
       expect(r.schemaVersion).toBe("1.5");
     });
 
     it("rejects providers: not-array → falls back to DEFAULT_SETTINGS.providers", () => {
-      const r = sanitize({ providers: "not-an-array" } as unknown as SettingsV15);
+      const r = sanitize({ providers: "not-an-array" } as unknown as Settings);
       expect(r.providers).toEqual(DEFAULT_SETTINGS.providers);
     });
   });
