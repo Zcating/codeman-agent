@@ -5,7 +5,7 @@
 //!
 //! No `effect` import — this is a pure Solid composable for the UI layer.
 
-import { createSignal, onCleanup, type Accessor } from "solid-js";
+import { createSignal, onCleanup, onMount, type Accessor } from "solid-js";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -133,8 +133,10 @@ export function useSlashTrigger(
     textarea.removeEventListener("blur", handleBlur);
   };
 
-  // Set up listeners on first call
-  attachListeners();
+  // Set up listeners after the textarea is mounted. Deferring to onMount
+  // guarantees `opts.textareaRef()` returns the DOM node (not null as it
+  // does at hook init time when JSX hasn't run yet).
+  onMount(() => attachListeners());
 
   // Cleanup on unmount
   onCleanup(() => {
