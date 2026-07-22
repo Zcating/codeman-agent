@@ -43,7 +43,7 @@ function renderMarkdown(s: string): string {
  *  没匹配的 tool_call result 为 undefined (→ ToolCallCard 走 running 态)。
  */
 function pairToolCalls(message: Message): Array<{ toolCall: ToolCall; result: ToolResult | undefined }> {
-  if (!message.toolCalls) return [];
+  if (!message.toolCalls) {return [];}
   const resultsById = new Map<string, ToolResult>();
   for (const tr of message.toolResults ?? []) {
     resultsById.set(tr.toolCallId, tr);

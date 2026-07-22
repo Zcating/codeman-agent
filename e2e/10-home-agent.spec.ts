@@ -111,7 +111,7 @@ test.describe("10 — HomeAgentForm Home", () => {
   test.beforeEach(async ({ tauriEnv }) => {
     const { page } = tauriEnv;
     page.on("console", (msg) => {
-      if (msg.type === "error") console.error("[10 spec console]", msg.text);
+      if (msg.type === "error") {console.error("[10 spec console]", msg.text);}
     });
     // Clean up workspaces from previous tests to avoid state leakage
     await resetSidebar(page);
@@ -393,7 +393,7 @@ test.describe("10 — HomeAgentForm Home", () => {
     // Click the "Model Second" option
     await page.evaluate(() => {
       const content = document.querySelector('[data-testid="llm-picker-content"]');
-      if (!content) throw new Error("llm-picker-content not found");
+      if (!content) {throw new Error("llm-picker-content not found");}
       const options = content.querySelectorAll('[role="option"]');
       for (const option of Array.from(options)) {
         if ((option.textContent ?? "").trim() === "Model Second") {

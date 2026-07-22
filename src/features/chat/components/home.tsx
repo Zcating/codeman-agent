@@ -177,14 +177,14 @@ export function HomeAgentForm(): JSX.Element {
   // always see the boot-time `null` state and never the async auto-select).
   // See src/index.tsx:32-58 for the boot order.
   const isInputDisabled = createMemo(() => {
-    if (wsCount() === 0) return true;
-    if (selectedWorkspaceId$() === null) return true;
+    if (wsCount() === 0) {return true;}
+    if (selectedWorkspaceId$() === null) {return true;}
     return false;
   });
 
   const placeholder = createMemo(() => {
-    if (wsCount() === 0) return "Add a workspace to start";
-    if (form.state.values.workspaceId === "") return "Select a workspace above";
+    if (wsCount() === 0) {return "Add a workspace to start";}
+    if (form.state.values.workspaceId === "") {return "Select a workspace above";}
     return "发条消息…";
   });
 
@@ -284,7 +284,7 @@ export function HomeAgentForm(): JSX.Element {
                           return;
                         }
                         const ws = exit.value as { id: string } | null;
-                        if (!ws) return; // picker cancelled
+                        if (!ws) {return;} // picker cancelled
                         // Form field picks up the new workspace
                         field().handleChange(ws.id);
                         setSelectedWorkspaceId(ws.id);
@@ -365,7 +365,7 @@ function initialModelId(): string {
   const enabled = buildEnabledProviders(providers);
   const providerId = appStore.state.value.defaultLlmProviderId;
   const provider = enabled.find((p) => p.id === providerId) ?? enabled[0];
-  if (!provider) return "";
+  if (!provider) {return "";}
   const raw = providers.find((p) => p.id === provider.id);
   const defaultModel = raw?.llm?.defaultModel;
   if (defaultModel && provider.models.some((m) => m.id === defaultModel)) {

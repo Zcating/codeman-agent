@@ -74,12 +74,12 @@ test.describe("06 — LLM round-trip (mock)", () => {
         const bubbles = document.querySelectorAll('[data-testid="agent-bubble"]');
         for (const b of Array.from(bubbles)) {
           const t = (b.textContent ?? "").trim();
-          if (t.includes(target)) return t;
+          if (t.includes(target)) {return t;}
         }
         const last = bubbles[bubbles.length - 1];
         return last ? (last.textContent ?? "").trim() : "(no assistant bubbles)";
       }, cannedText);
-      if (foundText.includes(cannedText)) break;
+      if (foundText.includes(cannedText)) {break;}
       await new Promise((r) => setTimeout(r, 100));
     }
     expect(foundText, "assistant bubble 应包含完整 mock 预置文本").toContain(cannedText);

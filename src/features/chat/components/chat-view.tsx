@@ -54,7 +54,7 @@ function ProviderSelect(props: {
   );
 
   const handleChange = (modelId: string) => {
-    if (!modelId) return;
+    if (!modelId) {return;}
     props.onChange(modelId);
   };
 
@@ -97,7 +97,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
   // ─── Derived state ────────────────────────────────────────────────────────
   const isRunning = (): boolean => {
     const id = convId();
-    if (!id) return false;
+    if (!id) {return false;}
     return (
       store.byId[id]?.streamingMessageId !== null &&
       store.byId[id]?.streamingMessageId !== undefined
@@ -106,7 +106,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
 
   const currentMessages = () => {
     const id = convId();
-    if (!id) return [];
+    if (!id) {return [];}
     return store.byId[id]?.messages ?? [];
   };
 
@@ -116,7 +116,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
   let hasScrolledInitially = false;
   createEffect(() => {
     currentMessages();
-    if (!messagesEndRef) return;
+    if (!messagesEndRef) {return;}
     const behavior = hasScrolledInitially ? "smooth" : "instant";
     queueMicrotask(() => messagesEndRef.scrollIntoView({ behavior }));
     hasScrolledInitially = true;
@@ -126,12 +126,12 @@ export function ChatView(props: { convId?: string }): JSX.Element {
   // Tracks prev error to avoid duplicate toasts when lastError stays non-null across renders.
   const currentLastError = (): string | null => {
     const id = convId();
-    if (!id) return null;
+    if (!id) {return null;}
     return store.byId[id]?.lastError ?? null;
   };
   createEffect(() => {
     const err = currentLastError();
-    if (err) codemanToast.error(err);
+    if (err) {codemanToast.error(err);}
   });
 
   // ─── Form ─────────────────────────────────────────────────────────────────
@@ -147,7 +147,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     onSubmit: async ({ value }) => {
       const text = value.draft.trim();
       const id = convId();
-      if (!text || !id || isRunning()) return;
+      if (!text || !id || isRunning()) {return;}
 
       // Build ProviderConfig from appStore (read at submit-time, per ADR-0019 D2)
       const providerId = appStore.state.value.defaultLlmProviderId;
@@ -176,7 +176,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
   // ─── Cancel handler (form-external sibling) ───────────────────────────────
   const handleCancel = () => {
     const id = convId();
-    if (!id) return;
+    if (!id) {return;}
     cancel(id);
   };
 
@@ -326,7 +326,7 @@ function initialModelId(): string {
   const enabled = buildEnabledProviders(providers);
   const providerId = appStore.state.value.defaultLlmProviderId;
   const provider = enabled.find((p) => p.id === providerId) ?? enabled[0];
-  if (!provider) return "";
+  if (!provider) {return "";}
   const raw = providers.find((p) => p.id === provider.id);
   const defaultModel = raw?.llm?.defaultModel;
   if (defaultModel && provider.models.some((m) => m.id === defaultModel)) {

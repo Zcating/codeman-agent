@@ -260,7 +260,7 @@ function handleTurnEnd(
 /** Flatten pi-ai ToolResultMessage.content (Content[]) to chat.store ToolResult.result.
  *  Text-only results stay as string; mixed results JSON-stringify. */
 function extractResultContent(content: unknown): unknown {
-  if (!Array.isArray(content)) return content;
+  if (!Array.isArray(content)) {return content;}
   const textBlocks = content.filter(
     (b): b is { type: "text"; text: string } =>
       !!b && typeof b === "object" && (b as { type?: unknown }).type === "text",

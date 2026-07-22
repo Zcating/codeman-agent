@@ -34,7 +34,7 @@ function settingsPath(): string {
 }
 
 function loadSettings(): Settings {
-  if (settingsCache) return settingsCache;
+  if (settingsCache) {return settingsCache;}
   const path = settingsPath();
   let raw: unknown = {};
   if (existsSync(path)) {
@@ -52,7 +52,7 @@ function loadSettings(): Settings {
 }
 
 function saveSettings(): void {
-  if (!settingsCache) return;
+  if (!settingsCache) {return;}
   writeFileSync(settingsPath(), JSON.stringify(settingsCache, null, 2), "utf-8");
 }
 
@@ -166,13 +166,13 @@ async function searchFilesInWorkspace(
   const results: Array<{ path: string; line: number; text: string }> = [];
   await walkDir(root, async (relPath) => {
     const norm = relPath.replace(/\\/g, "/");
-    if (!matchGlob(norm, glob)) return;
+    if (!matchGlob(norm, glob)) {return;}
     if (contentPattern === null) {
       results.push({ path: norm, line: 0, text: "" });
       return;
     }
     const content = await readFile(join(root, relPath), "utf-8").catch(() => null);
-    if (!content) return;
+    if (!content) {return;}
     const lines = content.split("\n");
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].includes(contentPattern)) {
@@ -197,11 +197,11 @@ async function walkDir(root: string, visit: (relPath: string) => Promise<void>):
       continue;
     }
     for (const entry of entries) {
-      if (skip.has(entry)) continue;
+      if (skip.has(entry)) {continue;}
       const childRel = item.rel ? `${item.rel}/${entry}` : entry;
       const childAbs = join(root, childRel);
       const st = await stat(childAbs).catch(() => null);
-      if (!st) continue;
+      if (!st) {continue;}
       if (st.isDirectory()) {
         stack.push({ abs: childAbs, rel: childRel });
       } else if (st.isFile()) {
@@ -251,7 +251,7 @@ export function registerIpcHandlers(_deps: {
   ipcMain.handle("getConversation", (_e, args: { id: string }) => {
     dbInit();
     const row = getDatabase().prepare("SELECT * FROM conversations WHERE id = ?").get(args.id) as RawConvRow | undefined;
-    if (!row) throw new Error(`Conversation not found: ${args.id}`);
+    if (!row) {throw new Error(`Conversation not found: ${args.id}`);}
     return toConversation(row);
   });
   ipcMain.handle("createConversation", (_e, args: { title?: string; workspaceId?: string; systemPrompt?: string | null }) => {
@@ -292,7 +292,7 @@ export function registerIpcHandlers(_deps: {
   ipcMain.handle("listMessages", (_e, args: { conversationId?: string }) => {
     dbInit();
     const convId = args.conversationId;
-    if (!convId) return [];
+    if (!convId) {return [];}
     const rows = getDatabase()
       .prepare("SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC")
       .all(convId) as RawMsgRow[];

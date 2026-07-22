@@ -158,7 +158,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     // 这里确认 idx1 只有 fallback 响应,没有额外 bubble。
     const idx1AssistantCount = await page.evaluate(() => {
       const section = document.querySelector("section.flex-1");
-      if (!section) return 999;
+      if (!section) {return 999;}
       return Array.from(section.querySelectorAll('[data-testid="agent-bubble"]')).length;
     });
     expect(idx1AssistantCount, "idx1 view 应有 1 个 assistant bubble (新建 conv 的 fallback 响应)").toBe(1);
@@ -210,7 +210,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
       const deadline = Date.now() + 5_000;
       while (Date.now() < deadline) {
         const li = document.querySelector('li:has([aria-current="page"])');
-        if (li?.querySelector('[aria-label="streaming"]')) return;
+        if (li?.querySelector('[aria-label="streaming"]')) {return;}
       }
       throw new Error('streaming badge not found in active conv li after 5s');
     });
@@ -297,7 +297,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
       const deadline = Date.now() + 5_000;
       while (Date.now() < deadline) {
         const li = document.querySelector(`li:has([data-conv-id="${convId}"])`);
-        if (li?.querySelector('[aria-label="streaming"]')) return;
+        if (li?.querySelector('[aria-label="streaming"]')) {return;}
       }
       throw new Error(`streaming badge not found for conv ${convId} in li`);
     }, beforeEachConvId);
@@ -318,7 +318,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
       const deadline = Date.now() + 5_000;
       while (Date.now() < deadline) {
         const li = document.querySelector(`li:has([data-conv-id="${convId}"])`);
-        if (li?.querySelector('[aria-label="streaming"]')) return;
+        if (li?.querySelector('[aria-label="streaming"]')) {return;}
       }
       throw new Error(`streaming badge not found for conv ${convId} in li`);
     }, newConvId);

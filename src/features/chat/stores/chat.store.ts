@@ -404,7 +404,7 @@ export function cancel(convId: string): void {
   // between cancel() and the error event handler, causing D2 ("Cancel → Send 按钮恢复")
   // to flake in CI environments with slower Effect fiber scheduling.
   const cs = store.byId[convId];
-  if (!cs) return;
+  if (!cs) {return;}
   cs.runtime.cancel();
   setStore("byId", convId, "streamingMessageId", null);
   setConversationsSignal(Object.values(store.byId));
@@ -529,7 +529,7 @@ export const loadWorkspaces = Effect.fnUntraced(
 export const addWorkspace = Effect.fnUntraced(
   function* () {
     const rootPath = yield* pickWorkspacePath();
-    if (rootPath === null) return null;
+    if (rootPath === null) {return null;}
     const label = deriveLabelFromPath(rootPath);
     const svc = yield* WorkspaceService;
     const result = yield* svc.add(label, rootPath);
@@ -548,7 +548,7 @@ export const removeWorkspace = Effect.fnUntraced(
     // CASCADE deletes conversations with this workspaceId in SQLite
     setStore("workspaces", (ws) => ws.filter((w) => w.id !== id));
     setWorkspacesSignal(Object.values(store.workspaces));
-    if (selectedWorkspaceId() === id) setSelectedWorkspaceIdSignal(null);
+    if (selectedWorkspaceId() === id) {setSelectedWorkspaceIdSignal(null);}
   },
   Effect.provide(WorkspaceServiceLive),
 );

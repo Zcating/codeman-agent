@@ -21,7 +21,7 @@ function migrationsDir(): string {
   // After electron-vite build: dist-electron/main/db/migrations/*.sql
   // In dev: relative to source.
   const distPath = join(__dirname, "db", "migrations");
-  if (existsSync(distPath)) return distPath;
+  if (existsSync(distPath)) {return distPath;}
   return join(__dirname, "..", "..", "electron", "main", "db", "migrations");
 }
 
@@ -35,7 +35,7 @@ function applyMigrations(db: DB): void {
   `);
 
   const dir = migrationsDir();
-  if (!existsSync(dir)) return;
+  if (!existsSync(dir)) {return;}
   const files = readdirSync(dir)
     .filter((f) => f.endsWith(".sql"))
     .sort();
@@ -43,7 +43,7 @@ function applyMigrations(db: DB): void {
     db.prepare("SELECT name FROM _migrations").all().map((r) => (r as { name: string }).name),
   );
   for (const f of files) {
-    if (applied.has(f)) continue;
+    if (applied.has(f)) {continue;}
     const sql = readFileSync(join(dir, f), "utf-8");
     db.exec(sql);
     db.prepare("INSERT INTO _migrations (name, applied_at) VALUES (?, ?)").run(
@@ -54,7 +54,7 @@ function applyMigrations(db: DB): void {
 }
 
 export function initDatabase(): DB {
-  if (_db) return _db;
+  if (_db) {return _db;}
   const path = dbPath();
   // Ensure parent dir exists.
   const parent = dirname(path);

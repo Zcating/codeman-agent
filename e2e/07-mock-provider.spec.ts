@@ -86,13 +86,13 @@ test.describe("07 — Mock LLM provider", () => {
         const bubbles = document.querySelectorAll('[data-testid="agent-bubble"]');
         for (const b of Array.from(bubbles)) {
           const t = (b.textContent ?? "").trim();
-          if (t.includes(target)) return t;
+          if (t.includes(target)) {return t;}
         }
         // Return the last bubble text for diagnostics
         const last = bubbles[bubbles.length - 1];
         return last ? (last.textContent ?? "").trim() : "(no assistant bubbles)";
       }, cannedText);
-      if (foundText.includes(cannedText)) break;
+      if (foundText.includes(cannedText)) {break;}
       await new Promise((r) => setTimeout(r, 100));
     }
     expect(foundText, "某个 assistant bubble 应包含 mock 预置文本").toContain(cannedText);

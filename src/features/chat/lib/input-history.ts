@@ -27,9 +27,9 @@ export function loadHistory(): string[] {
   }
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return [];
+    if (raw === null) {return [];}
     const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) {return [];}
     const filtered = parsed.filter((x): x is string => typeof x === "string");
     return filtered.slice(0, MAX_ENTRIES);
   } catch {
@@ -68,10 +68,10 @@ export function recordEntry(
   content: string,
 ): string[] {
   const trimmed = content.trim();
-  if (trimmed === "") return entries.slice();
-  if (entries.length > 0 && entries[0] === trimmed) return entries.slice();
+  if (trimmed === "") {return entries.slice();}
+  if (entries.length > 0 && entries[0] === trimmed) {return entries.slice();}
   const next = [trimmed, ...entries];
-  if (next.length > MAX_ENTRIES) next.length = MAX_ENTRIES;
+  if (next.length > MAX_ENTRIES) {next.length = MAX_ENTRIES;}
   return next;
 }
 

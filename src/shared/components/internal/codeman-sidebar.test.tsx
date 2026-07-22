@@ -170,7 +170,7 @@ vi.mock("@ark-ui/solid", async () => {
       ItemIndicator: (props: any) => {
         // Walk up to parent [data-part='item'] to read initial open state.
         const onRef = (el: HTMLSpanElement) => {
-          if (!el) return;
+          if (!el) {return;}
           const itemEl = el.closest("[data-part='item']");
           const isOpen = itemEl?.getAttribute("data-state") === "open";
           el.setAttribute("data-state", isOpen ? "open" : "closed");

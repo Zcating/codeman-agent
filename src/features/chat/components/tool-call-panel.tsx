@@ -28,8 +28,8 @@ export function ToolCallPanel(props: ToolCallPanelProps) {
 	const isRunning = () => !props.result;
 	const isError = () => !!props.result?.error;
 	const statusLabel = () => {
-		if (isRunning()) return "正在调用工具…";
-		if (isError()) return "工具调用失败";
+		if (isRunning()) {return "正在调用工具…";}
+		if (isError()) {return "工具调用失败";}
 		return "已调用工具";
 	};
 

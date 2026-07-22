@@ -61,7 +61,7 @@ export const CodemanTextarea: Component<CodemanTextareaProps> = (props) => {
           local.onValueChange(e.currentTarget.value);
         }}
         onInput={(e) => {
-          if (!composing) local.onValueChange(e.currentTarget.value);
+          if (!composing) {local.onValueChange(e.currentTarget.value);}
         }}
         {...rest}
       />

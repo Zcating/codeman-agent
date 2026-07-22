@@ -35,14 +35,14 @@ const AppErrorUnion = Schema.Union(
 /** Decode `unknown` (legacy `{kind, _tag, message, ...}` plain object or instance)
  *  to a Schema.TaggedError leaf instance. Falls back to `Unknown` for unrecognised shapes. */
 export const decodeAppError = (u: unknown): AppError => {
-  if (u instanceof NotFound) return u;
-  if (u instanceof Unauthorized) return u;
-  if (u instanceof Network) return u;
-  if (u instanceof InvalidConfig) return u;
-  if (u instanceof Database) return u;
-  if (u instanceof ToolCall) return u;
-  if (u instanceof SandboxViolation) return u;
-  if (u instanceof Unknown) return u;
+  if (u instanceof NotFound) {return u;}
+  if (u instanceof Unauthorized) {return u;}
+  if (u instanceof Network) {return u;}
+  if (u instanceof InvalidConfig) {return u;}
+  if (u instanceof Database) {return u;}
+  if (u instanceof ToolCall) {return u;}
+  if (u instanceof SandboxViolation) {return u;}
+  if (u instanceof Unknown) {return u;}
 
   // Try decoding as a plain object {kind, _tag, ...} from IPC bridge.
   if (u && typeof u === "object" && ("kind" in u || "_tag" in u)) {

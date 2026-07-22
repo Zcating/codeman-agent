@@ -80,7 +80,7 @@ test.describe("04 — 主题", () => {
     // Clean old workspaces first so we have exactly 1 workspace.
     try {
       const old = await invoke<{ id: string }[]>(page, "listWorkspaces");
-      for (const ws of old) await invoke(page, "deleteWorkspace", { id: ws.id });
+      for (const ws of old) {await invoke(page, "deleteWorkspace", { id: ws.id });}
     } catch { /* best-effort */ }
     await invoke(page, "addWorkspace", {
       label: "Theme Test Workspace",

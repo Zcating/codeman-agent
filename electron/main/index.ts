@@ -121,7 +121,7 @@ function createMainWindow(): BrowserWindow {
   win.once("ready-to-show", () => win.show());
 
   win.on("close", (e) => {
-    if (process.platform === "darwin") return;
+    if (process.platform === "darwin") {return;}
     e.preventDefault();
     win.minimize();
   });
@@ -167,6 +167,6 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+  if (process.platform !== "darwin") {app.quit();}
 });
 

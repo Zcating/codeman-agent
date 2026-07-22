@@ -17,7 +17,7 @@ function copyMigrationsPlugin(): Plugin {
     closeBundle() {
       const srcDir = r("electron/main/db/migrations");
       const destDir = r("dist-electron/main/db/migrations");
-      if (!existsSync(srcDir)) return;
+      if (!existsSync(srcDir)) {return;}
       mkdirSync(destDir, { recursive: true });
       for (const f of readdirSync(srcDir)) {
         if (f.endsWith(".sql")) {

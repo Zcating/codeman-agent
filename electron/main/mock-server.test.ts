@@ -162,7 +162,7 @@ describe("buildSseTurnEvents — per-character SSE 流构造", () => {
     expect(events[2]).toContain('"input_json_delta"');
     // partial_json is a JSON-encoded STRING of the input object — parse the data line
     // to verify the JSON-decoded value matches the original input.
-    const dataLine = (events[2].match(/^data: (.+)$/m) ?? [, ""])[1];
+    const dataLine = (events[2].match(/^data: (.+)$/m) ?? [undefined, ""])[1];
     const partialParsed = JSON.parse(dataLine) as {
       delta: { partial_json: string };
     };
@@ -1177,7 +1177,7 @@ describe("mock-server HTTP — POST /mock/anthropic/v1/messages", () => {
     // 15 text deltas for "follow-up-text" (count falls in 13-25 range, depends
     // on whether response includes any default fallback padding — here no
     // fallback fires)
-    expect((body.match(/"text":"[A-Za-z\-]"/g) ?? []).length).toBeGreaterThanOrEqual(13);
+    expect((body.match(/"text":"[A-Za-z-]"/g) ?? []).length).toBeGreaterThanOrEqual(13);
     // "hello" entry's turns[1] "hello-multi-turn-1" must NOT be served
     expect(body).not.toContain("hello-multi-turn-1");
     // No "(mock) Script complete." (we serve canned content, not short-circuit)

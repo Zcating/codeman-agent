@@ -228,10 +228,10 @@ export async function clickNewConversationAndWait(
   const wsLabel = opts.workspaceLabel;
   await p.evaluate(async (label: string | null) => {
     const trigger = document.querySelector('[data-testid="workspace-select-trigger"]') as HTMLElement;
-    if (!trigger) return;
+    if (!trigger) {return;}
     const triggerText = (trigger.textContent ?? "").trim();
     const needsSelect = label !== null || triggerText === "" || triggerText === "Select a workspace…";
-    if (!needsSelect) return;
+    if (!needsSelect) {return;}
     trigger.click();
     // Poll for the workspace select content (Ark UI portal) up to 2s
     const deadline = Date.now() + 2_000;
@@ -288,7 +288,7 @@ export async function clickNewConversationAndWait(
         return String((params as { convId: unknown }).convId);
       }
       const m = w.__router.state.location.pathname.match(/\/conversation\/(.+)/);
-      if (m) return m[1] ?? null;
+      if (m) {return m[1] ?? null;}
     }
     const m = window.location.pathname.match(/\/conversation\/(.+)/);
     return m?.[1] ?? null;
@@ -366,10 +366,10 @@ export async function nthConv(
     (args: { n: number; workspaceId?: string }) => {
       if (args.workspaceId) {
         const ws = document.querySelector(`[data-workspace-id="${args.workspaceId}"]`);
-        if (!ws) return null;
+        if (!ws) {return null;}
         const convs = Array.from(ws.querySelectorAll("[data-conv-id]"));
         const el = convs[args.n];
-        if (!el) return null;
+        if (!el) {return null;}
         return {
           convId: el.getAttribute("data-conv-id")!,
           workspaceId: args.workspaceId,
@@ -377,7 +377,7 @@ export async function nthConv(
       } else {
         const convs = Array.from(document.querySelectorAll(`aside [data-conv-id]`));
         const el = convs[args.n];
-        if (!el) return null;
+        if (!el) {return null;}
         const parentWs = el.closest("[data-workspace-id]");
         return {
           convId: el.getAttribute("data-conv-id")!,
@@ -387,7 +387,7 @@ export async function nthConv(
     },
     { n, workspaceId: scope?.workspaceId },
   );
-  if (!result) throw new Error(`nthConv(${n}): not found`);
+  if (!result) {throw new Error(`nthConv(${n}): not found`);}
   return result;
 }
 
