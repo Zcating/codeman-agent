@@ -16,7 +16,7 @@
 
 import { execSync, spawnSync } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
 // Per-worker CDP ports: 9222 + parallelIndex. Kill any leftover processes
@@ -53,13 +53,42 @@ export default async function globalSetup(): Promise<void> {
   //    Uses `pnpm run build` (= electron-vite build). Does NOT run
   //    electron-builder --dir — the per-worker fixture falls back to
   //    LOCAL_BIN mode (node_modules/electron + dist-electron/main/index.js).
-  //    Skip if dist-electron/ already exists AND migrations are present
-  //    (dev shortcut; rebuild if migrations are missing — e.g. old build
-  //    that predates the copy-migrations-plugin).
+  //    Skip only when dist-electron/ already exists AND migrations are present
+  //    AND the bundles are at least as new as the tracked sources that
+  //    produce them — otherwise stale bundles (e.g. old main entry that
+  //    predates the workspaces migration) make every spec fail with
+  //    `SqliteError: no such table: workspaces`.
   const mainEntry = resolve(process.cwd(), "dist-electron", "main", "index.js");
   const migrationsDir = resolve(process.cwd(), "dist-electron", "main", "db", "migrations");
-  if (existsSync(mainEntry) && existsSync(migrationsDir)) {
-    console.log(`[e2e warm] skip pnpm run build — dist-electron/ ready`);
+  const rendererEntry = resolve(process.cwd(), "dist", "index.html");
+  const mainSrc = resolve(process.cwd(), "electron", "main", "index.ts");
+  const rendererSrc = resolve(process.cwd(), "src", "index.tsx");
+  const migrationsSrc = resolve(process.cwd(), "electron", "main", "db", "migrations");
+  const allOutputsFresh = (() => {
+    try {
+      if (!existsSync(mainEntry) || !existsSync(migrationsDir) || !existsSync(rendererEntry)) {
+        return false;
+      }
+      const outMtime = Math.max(
+        statSync(mainEntry).mtimeMs,
+        statSync(migrationsDir).mtimeMs,
+        statSync(rendererEntry).mtimeMs,
+      );
+      const srcMtimes: number[] = [];
+      if (existsSync(mainSrc)) {srcMtimes.push(statSync(mainSrc).mtimeMs);}
+      if (existsSync(rendererSrc)) {srcMtimes.push(statSync(rendererSrc).mtimeMs);}
+      if (existsSync(migrationsSrc)) {
+        for (const f of (require("node:fs") as typeof import("node:fs")).readdirSync(migrationsSrc)) {
+          if (f.endsWith(".sql")) {srcMtimes.push(statSync(resolve(migrationsSrc, f)).mtimeMs);}
+        }
+      }
+      return srcMtimes.every((t) => t <= outMtime);
+    } catch {
+      return false;
+    }
+  })();
+  if (allOutputsFresh) {
+    console.log(`[e2e warm] skip pnpm run build — dist-electron/ + dist/ up to date with sources`);
   } else {
     runStep("pnpm run build", () => {
       execSync("pnpm run build", {
