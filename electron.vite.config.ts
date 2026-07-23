@@ -15,7 +15,7 @@ function copyMigrationsPlugin(): Plugin {
   return {
     name: "copy-migrations",
     closeBundle() {
-      const srcDir = r("electron/main/db/migrations");
+      const srcDir = r("src/main/db/migrations");
       const destDir = r("dist-electron/main/db/migrations");
       if (!existsSync(srcDir)) {return;}
       mkdirSync(destDir, { recursive: true });
@@ -34,7 +34,7 @@ export default defineConfig({
     build: {
       target: "node20",
       outDir: "dist-electron/main",
-      lib: { entry: r("electron/main/index.ts") },
+      lib: { entry: r("src/main/index.ts") },
       rollupOptions: { external: ["electron"] },
     },
   },
@@ -43,7 +43,7 @@ export default defineConfig({
     build: {
       target: "node20",
       outDir: "dist-electron/preload",
-      lib: { entry: r("electron/preload/index.ts") },
+      lib: { entry: r("src/preload/index.ts") },
       rollupOptions: { external: ["electron"] },
     },
   },
@@ -51,11 +51,11 @@ export default defineConfig({
     root: ".",
     build: {
       outDir: "dist",
-      rollupOptions: { input: { index: r("index.html") } },
+      rollupOptions: { input: { index: r("src/renderer/index.html") } },
     },
     plugins: [solid(), tailwindcss()],
     resolve: {
-      alias: [{ find: "@", replacement: r("src") }],
+      alias: [{ find: "@", replacement: r("src/renderer") }],
     },
     server: { port: 1420, strictPort: true, host: "127.0.0.1" },
   },

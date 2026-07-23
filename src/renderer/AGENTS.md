@@ -1,0 +1,127 @@
+# src/ — 前端 (Solid.js + TypeScript)
+
+Vite 单页应用，渲染到单个 Electron BrowserWindow。路由走 TanStack Router（`/` = chat，`/settings` = 设置）。不需要 hash 监听。
+
+视觉层走 Tailwind v4 utility（ADR-0006），逻辑层走 Effect-TS（ADR-0003）。
+
+> **本文件覆盖整个 src/ 根级入口**。更细的 feature 规则见 `src/features/*/AGENTS.md`，shared 规则见 `src/shared/AGENTS.md`。本轮的 5+1 子目录白名单决策见 [ADR-0010](../docs/adr/0010-frontend-5-1-folder-whitelist.md)。
+
+## src/ 根级文件
+
+| 文件            | 角色                                                                               | 备注                                                                |
+| --------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `index.tsx`     | Solid 渲染入口（挂载 `<RouterProvider>`）                                          | 首行 `import "./index.css"`                                         |
+| `index.css`     | Tailwind v4 入口（`@import` + `@theme` + `@layer base`）                           | token 集中地                                                        |
+| `router.tsx`    | TanStack Router code-based 配置                                                    | 不用 `@tanstack/router-plugin`（ADR-0007）                          |
+| `vitest.setup.ts` | vitest setup（`import "./__mocks__/ipc-mock"` + `scrollIntoView` polyfill） | mockState 唯一源在 src/__mocks__/ipc-mock.ts |
+| `vite-env.d.ts` | Vite 类型                                                                          | 不可删                                                              |
+| `__tests__/` | 迁移测试（`__tests__/*.test.ts` 风格的 in-source 测试临时代码） | ⚠️ 例外：根级白名单禁止新目录，`__tests__/` 仅用于测试基础设施迁移 |
+
+## src/ 子目录（5+1 白名单）
+
+**`shared/`**：跨 feature 共享。允许子目录（白名单，按需创建）：
+
+- `lib/` — 纯函数 + 跨域类型
+- `stores/` — 跨域 Solid signal
+- `hooks/` — 跨域 composable（`use-` 前缀，V1 预留位）
+- `components/ui/` — 跨域设计系统原子
+- `components/internal/` — 跨域业务组件——codeman-* prefix（[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-N）；当前已落地 `codeman-sidebar`（首例，[ADR-0022](../docs/adr/0022-internal-components-and-design-tokens.md)）+ `codeman-dialog`（命令式 alert/confirm/show，[ADR-0023 D8-W6](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md)）
+
+**`features/`**：业务域。允许子目录（白名单，按需创建）：
+
+- `stores/` — Solid signal / store / Accessor 桥接层
+- `components/` — UI 组件
+- `routes/` — 路由组件
+- `hooks/` — Solid composable（`use-` 前缀，V1 预留位）
+- `lib/` — 纯函数 / Effect-TS service / Effect runtime / 类型 / schema
+
+**Feature 根级只允许 2 个文件**：`index.ts`（barrel）+ `AGENTS.md`（规则）。其它文件（runtime、service、tool schema、bridge）必须落在 5 个子目录之一。
+
+**`plugins/`**（V3.1 新增，与 `features/` 同级）：用户可加载的扩展/集成点（区别于 features = 产品核心域）。子目录白名单与 features 相同（lib / stores / components / routes / hooks）。Plugin 根级只允许 2 个文件（index.ts + AGENTS.md）。Plugin 不能反向依赖 feature；feature 可消费 plugin。详细规则见 [`src/plugins/AGENTS.md`](./plugins/AGENTS.md)。当前已落地：`skills/`（[ADR-0031](../docs/adr/0031-skills-system.md)）、`mcp/`（[ADR-0032](../docs/adr/0032-mcp-client-stdio.md)）。
+
+## 硬性规则
+
+- **文件命名 kebab-case，导出组件 PascalCase。** `message-bubble.tsx` 导出 `MessageBubble`。单词文件保持小写（`index.tsx` 不写 `Index.tsx`）。
+- **`shared/lib/ipc.ts` 是唯一 Electron IPC 入口。** 所有 IPC 走 `window.codeman.invoke()`（由 preload 通过 contextBridge 暴露）。不应直接 `import { invoke } from "@tauri-apps/api"`（该依赖已移除）。
+- **UI 层不导入 `effect`。** `src/features/*/components/*.tsx` 是 Solid 信号的纯消费者，订阅 `src/features/*/stores/*.ts` 暴露的 `Accessor<T>`。逻辑层（`lib/*.ts` / `stores/*.ts`）用 Effect-TS。
+- **总是通过 appStore / chatStore 读跨域状态，不走原始 IPC。** 组件订阅 Solid signal，不直接调 `window.codeman.invoke`。
+- **`createSignal` 不许出现在 store 外。** 跨组件状态走 `src/features/<feature>/stores/*.ts`；组件内部局部信号可以。
+- **`as any` 禁止。** `tsconfig` 开了 `strict + noUnusedLocals + noUnusedParameters + noFallthroughCasesInSwitch`；逃逸这些 = 编译错误，**去修类型**。
+- **测试用 vitest + jsdom。** `import.meta.vitest` 风格的 in-source test 暂不用，测试都走 `*.test.ts(x)` 旁挂。test 文件位于被测文件同目录。
+- **优先使用：** es-toolkit, ts-parttern, effect-ts 等工具，优先使用已存在的组件、工具函数等，目录在 `src/shared`
+- **业务函数（返回 `Effect` 的可复用 top-level 函数）默认用 `Effect.fnUntraced` 包装。** 引用上游 `.repos/effect/.patterns/effect.md` "Prefer `Effect.fnUntraced` over functions that only return `Effect.gen`"：复用 generator body 避免每次调用重新分配 closure，跳过 trace span（无需可观测性元数据时优先省 overhead）。需要跨函数链路命名 span 时用 `Effect.fn("name")` 或 `Effect.withSpan("name")`（属后续 wave，按需引入）。内联组合块（Service Live body / 嵌套 callback / 测试 / top-level assembly）保留 `Effect.gen` 不动。
+- **新错误必须用 `Schema.TaggedError`（共享于 `src/shared/lib/errors.ts`）。** 不允许新 `{ kind: "X", … }` 判别联合。8 个 variant 已落地（NotFound / Unauthorized / Network / InvalidConfig / Database / ToolCall / SandboxViolation / Unknown），新错误优先复用现有 variant；新 variant 走 `Schema.TaggedError<NewError>()("NewError", { ... })` 模式并扩展 `AppError` union。
+- **新 schema 必须用 `effect/Schema`（`Schema.Struct` / `Schema.brand` / `Schema.filter`）。** 不允许引入新 `@sinclair/typebox` `Type.Object({...})`。新 Branded ID 走 `Schema.String.pipe(Schema.brand("X"))`；新 domain schema 走 `Schema.Struct({...})`；新 Refinement 走 `Schema.filter`（不是 `Schema.refine`，后者已 deprecated）。
+
+## Styling（Tailwind v4）
+
+**视觉层只有 Tailwind v4 utility class（ADR-0006）。**
+
+- **BEM class 禁用。** 全部删除，不保留作语义钩子。组件测试断言从 `toHaveClass("chat-view__main")` 改成 `toHaveClass("flex-1")`，跟 Tailwind 公共 API 对齐。
+- **Tailwind v4 utility 是唯一视觉层。** 组件 JSX 只写 utility class，不用 BEM、不写内联 `<style>` 块、不引入 CSS-in-JS。
+- **不要写内联 `<style>{...}</style>` 块。** 入口 CSS 是 `src/index.css`，`@theme` 块声明 token（`primary-500`、`zinc-900` 等），组件引用 token 而不是 raw hex。
+- **主题切换走 `src/shared/stores/theme.ts`。** `<html class="dark">` 触发三态（light / dark / system）；`system` 模式用 Solid effect 监听 `prefers-color-scheme`。
+- **自定义 dark variant：** `@custom-variant dark (&:is(.dark *))` 在 `index.css` 里配置。
+
+```
+# 正确
+<div class="flex h-screen bg-zinc-50 dark:bg-zinc-900">
+
+# 错误
+<div class="chat-view__main">                    ← BEM 禁用
+<div style={{ color: '#8b5cf6' }}>              ← 内联 style 禁用
+<style>.chat-view__main { ... }</style>         ← <style> 块禁用
+```
+
+## 模式
+
+- **TanStack Router 处理路由。** 路由文件在 `src/features/<feature>/routes/`, `index.tsx` mount `<RouterProvider>`, `__root.tsx` 提供根布局, 跳设置用 `<A href="/settings">`。`ChatView` 不再监听 hash。
+- **main 窗口 = 唯一 BrowserWindow。** Electron 窗口配置在 `src/main/index.ts`，800×600 起步。不用 hash 路由，用 browser history（`createBrowserHistory`）。
+- **Effect → Solid 桥接。** 逻辑层返回 `Effect.Effect<T, AppError>` / `Stream.Stream<T, E>`，桥接层在 stores 里 `Effect.runPromiseExit()` 后写入 `createSignal`，UI 读 `Accessor`。
+- **服务对象通过 `Context.Tag` 注入。** `ConversationService` / `MessageService` / `BillingService` / `SettingsService` 在 `shared/lib/ipc.ts` 定义 Tag + Live Layer；测试用 `Layer.succeed` 提供 mock。
+- **错误上抛是 `AppError` 判别联合。** UI 不 catch Effect-typed error；桥接层用 `Exit.isSuccess` 过滤，失败的 Effect 转成空数据 / 错误 toast。
+- **测试分两层。** Effect 服务测用 `it.effect()` + mock `Layer`；Solid store 测用 `@solidjs/testing-library` 跑 jsdom。两者分开不混。
+- **mockState 唯一源**在 `src/__mocks__/ipc-mock.ts`。`vitest.setup.ts` 静态 import 该文件以初始化 `window.codeman` mock。
+- 优先使用 es-toolkit, ts-parttern, effect-ts 等工具，优先使用已存在的组件、工具函数等，目录在 `src/shared`
+
+## 查阅指南
+
+| 任务                              | 文件                                                                                                                               |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 新增 IPC channel                   | `src/main/ipc.ts`（加 `ipcMain.handle`）+ `src/preload/index.ts`（暴露到 `window.codeman`）；前端类型在 `src/renderer/shared/lib/types.ts` |
+| 新增跨域类型                      | `shared/lib/types.ts`（Electron 侧类型在 `src/main/types.ts`）                                                                     |
+| 新增设置项                        | 改 `src/main/settings-schema.ts`（schema 定义），然后同步 `src/renderer/shared/lib/types.ts` 的 TS 镜像
+| 新增 sidebar 组件                 | 改 `shared/components/ui/sidebar.tsx`（primitive） + `shared/components/internal/codeman-sidebar.tsx`（业务组合），遵循 [ADR-0022](../docs/adr/0022-internal-components-and-design-tokens.md) + [ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md)（codeman-* namespace） |
+| 改 Home 布局 / Codex form         | 改 `src/features/chat/routes/index.tsx`（状态机）+ `src/features/chat/components/home.tsx`（Codex form）                            |
+| 改 `Conversation.workspace_id`    | 改 `src/main/db/conversations.ts` + `src/renderer/shared/lib/types.ts`（TS 镜像）+ SQLite migration 在 `src/main/db/migrations/` |
+| 改 `last_used_workspace_id`       | 改 `WorkspaceService`（`src/renderer/shared/lib/workspace-service.ts`，V3+ 从 features/chat/lib 提升）+ `src/features/chat/stores/chat.store.ts`（chatStore reactive 状态）。**不再**是 Settings 字段，**不再**走 `appStore`（ADR-0023 D8-W）。|
+| 新增 Workspace CRUD               | `src/main/db/workspaces.ts`（Electron SQLite）+ `src/main/ipc.ts`（IPC handler）+ `src/renderer/shared/lib/workspace-service.ts`（Effect Context.Tag + Live Layer）+ `src/features/chat/stores/chat.store.ts`（reactive bridge）。遵循 [ADR-0023 D8-W](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md）。|
+| 新增 Dialog 原子                  | `shared/components/ui/dialog.tsx`（@ark-ui/solid Dialog 包装，shadcn/ui 风格）+ `shared/components/internal/codeman-dialog.tsx`（命令式 alert / confirm / show）。遵循 [ADR-0023 D8-W6](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md)。|
+| 新增跨域设计系统原子              | `shared/components/ui/<Name>.tsx`（PascalCase）+ 同名 `<Name>.test.tsx`；Select primitive 走 @ark-ui/solid 包装（[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-S）            |
+| 新增跨域业务组件                  | `shared/components/internal/codeman-<Name>.tsx`（**ADR-0022** 首例 `codeman-sidebar`；[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-N codeman-* prefix 锁定；新组件须严格 prop-driven）      |
+| 新增跨域 Select wrapper          | `shared/components/internal/codeman-select.tsx`（flat options）或 `codeman-group-select.tsx`（groups）；内部用 @ark-ui/solid Select（[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-S） |
+| 新增跨域 Input/Textarea wrapper  | `shared/components/internal/codeman-input.tsx`（单行）或 `codeman-textarea.tsx`（多行）；内部 USE `shared/components/ui/input.tsx` / `textarea.tsx` atom + 自己包 IME-safe 的 `onCompositionStart/End/input` 三件套 + 手动 `<label>` / `<p>` 渲染 label/helperText/error + `aria-invalid`；**调用方优先用此组件而非 `ui/Input` / `ui/Textarea`**,因为中文/日文 IME 用户输入时手写 `value={x()} onInput={setX}` 会"逐字母失焦"；CODEMAN-* 命名空间见 ADR-0023 D4-N |
+| 新增 settings 表单 (LLM Provider 等) | `features/settings/components/provider-card.tsx` 模板;`createForm(() => ({ defaultValues, validators: { onChange: effectSchema(Schema.Struct({...})) }, onSubmit }))` + `<form.Field name="..." validators={{ onBlur: effectSchema(FieldSchema) }}>` (TanStack Form + Standard Schema V1 + Effect Schema adapter) |
+| 新增跨域 Solid signal             | `shared/stores/<name>.ts`（Accessor 暴露）                                                                                         |
+| 新增业务 Effect 函数              | 顶层业务函数（`stores/*.ts` 中返回 `Effect` 的公开方法）默认 `Effect.fnUntraced` 包装；引用上游 `.repos/effect/.patterns/effect.md`；参考实现 `src/features/chat/stores/chat.store.ts::persistUserMessage`（const + generator 参数 + 第二参 transform 提供 layer）。跨函数链路需要命名 span 时改用 `Effect.fn("name")`（按需引入） |
+| 新增跨域 composable               | `shared/hooks/use-<name>.ts`（V1 预留）                                                                                            |
+| 新增 feature 子组件               | `features/<feature>/components/<name>.tsx`（kebab-case + PascalCase 导出）                                                         |
+| 新增 Effect 桥接                  | `features/<feature>/stores/<domain>.ts`（Accessor 暴露 + Effect.gen 包 IPC）                                                       |
+| 新增 feature-level Effect service | `features/<feature>/lib/<name>.ts`（Context.Tag + Layer.effect）                                                                   |
+| 新增 LLM 工具                     | `features/file-tools/lib/<name>.ts`（`Schema.Struct({...})` + execute handler；`parameters` 字段通过 `toToolParameters` 桥到 pi-ai 的 `TSchema`，详见 ADR-0025 D8 / ADR-0025.1 D-C）+ 同步 `features/chat/lib/runtime.ts` 的 `tools` 数组。**注意**：`features/billing/` 目录从未落地（ADR-0012 V2 反转时合并到 file-tools 工具 schema 模式）。 |
+| 新增 Branded ID / domain schema | 跨域 ID (WorkspaceId) 在 `shared/lib/`；feature 自治 ID (FilePath / ToolCallId / ConversationId) 在各 feature `lib/schemas.ts`；domain config (Provider / Settings) 在 `features/settings/lib/schemas.ts` |
+| 反应式异常                        | 先查 `features/<feature>/stores/*.ts` 监听器注册，再查组件                                                                         |
+| 改样式                            | 改 `@theme` token（`src/index.css`）；组件只写 utility class                                                                       |
+| 改主题行为                        | 改 `src/shared/stores/theme.ts`（Solid effect 监听 `prefers-color-scheme`）                                                        |
+
+
+## 测试
+
+```bash
+vp run test                  # vitest --run（jsdom）
+vp run test:watch            # 监听模式
+```
+
+- Effect 服务测试：`*_test.ts` 用 `it.effect()` + `Layer.succeed(Service, mock)`。
+- Solid 组件测试：`<Name>.test.tsx` 用 `@solidjs/testing-library` 的 `render` + `screen`。
+- IPC mock 走 `src/__mocks__/ipc-mock.ts`（全局 `window.codeman` mock）。

@@ -15,5 +15,5 @@
     "isolatedModules": true,
     "types": ["node", "electron"]
   },
-  "include": ["electron/**/*.ts"]
+  "include": ["src/main/**/*.ts", "src/preload/**/*.ts"]
 }

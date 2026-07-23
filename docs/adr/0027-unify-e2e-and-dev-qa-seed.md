@@ -1,7 +1,7 @@
 # 0027 — Unify e2e and dev Q→A seed into a single `qa.dev.json`
 
 **Status**: accepted · **Date**: 2026-07-12
-**Scope**: `electron/assets/qa.dev.json` (合并 19 e2e entries + 8 dev entries) + `e2e/fixtures.ts` (移除 `CODEMAN_TEST_QA_TABLE` env var 注入) + `e2e/mock-provider.ts` (header 文档) + `CONTEXT.md` (移除 "Per-Worker Q→A Isolation" 词条 + 更新 Q→A Table / Dev Q→A File / Fake LLM Provider 三词条) + 删除 `e2e/fixtures/qa-w{0..3}.json` (4 份)
+**Scope**: `src/assets/qa.dev.json` (合并 19 e2e entries + 8 dev entries) + `e2e/fixtures.ts` (移除 `CODEMAN_TEST_QA_TABLE` env var 注入) + `e2e/mock-provider.ts` (header 文档) + `CONTEXT.md` (移除 "Per-Worker Q→A Isolation" 词条 + 更新 Q→A Table / Dev Q→A File / Fake LLM Provider 三词条) + 删除 `e2e/fixtures/qa-w{0..3}.json` (4 份)
 **Supersedes**: 部分 — CONTEXT.md "Per-Worker Q→A Isolation" 词条 (V3 起 e2e 不再 per-worker 隔离 Q→A Table；per-worker port 隔离保留)
 
 **Related**: ADR-0024 (Electron shell migration — V3 e2e 打包 binary spawn 模式), CONTEXT.md "Fake LLM Provider" / "Mock Server" / "Q→A Table" / "Dev Q→A File"
@@ -23,7 +23,7 @@ V3 e2e 一度采用 "per-worker Q→A 隔离" 模型（per `e2e/fixtures.ts` 注
 
 ### D1 — 单一数据源：dev seed = e2e seed
 
-- `electron/assets/qa.dev.json` 成为 dev 与 e2e 共用的唯一 mock LLM Q→A 数据源。
+- `src/assets/qa.dev.json` 成为 dev 与 e2e 共用的唯一 mock LLM Q→A 数据源。
 - 文件条目顺序：spec-specific entries (`XX::`-前缀, 19 条) → generic dev entries (`hello`/`read`/`list`/`ping`/`think`/`tool`/`three-blocks`/`summarize`, 8 条) → default entry (`*`, 1 条)。共 28 条。
 - `mock-server.ts::lookupQaAnswer` substring first-wins 保证 spec 命中自己 entry 不会被 dev entry 截胡。
 
@@ -45,7 +45,7 @@ V3 e2e 一度采用 "per-worker Q→A 隔离" 模型（per `e2e/fixtures.ts` 注
 
 ## Consequences
 
-- **文件数量 -3**：`e2e/fixtures/` 目录清空（4 文件 → 0）；`electron/assets/qa.dev.json` 体量从 118 行 / 9 条增至 202 行 / 28 条。
+- **文件数量 -3**：`e2e/fixtures/` 目录清空（4 文件 → 0）；`src/assets/qa.dev.json` 体量从 118 行 / 9 条增至 202 行 / 28 条。
 - **dev 体验不退化**：dev 用户输入 `hello`/`read` 等仍命中 dev entry；新增 dev entry 仅需改 `qa.dev.json` 一份。
 - **e2e 维护成本下降**：新增 e2e spec 的 Q→A entry 直接在 `qa.dev.json` 加一条，无需 4 份同步。
 - **per-worker 隔离语义收窄**：只剩 port 隔离（EADDRINUSE 防）与 SQLite/Settings 隔离（`CODEMAN_TEST_WORKER=w{N}` suffix）。Q→A Table 跨 worker 共享，但因 spec keys 唯一性 + substring first-wins，无 cross-worker 漏测。

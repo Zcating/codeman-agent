@@ -25,4 +25,4 @@ if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
 // `window.codeman` on the jsdom global so V3 ipc.ts finds the mock
 // at runtime. Tests that need mockState import it directly from
 // `../__mocks__/ipc-mock` (relative path).
-import "./src/__mocks__/ipc-mock";
+import "./src/renderer/__mocks__/ipc-mock";

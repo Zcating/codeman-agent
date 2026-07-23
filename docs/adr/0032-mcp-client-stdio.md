@@ -1,6 +1,6 @@
 # 0032 — MCP Client (stdio-only, tools scope, mcp_servers.json config)
 
-**Status**: accepted · **Date**: 2026-07-21 · **Scope**: src/plugins/mcp/ (新增) + electron/main/mcp-host.ts (新增) + src/features/chat/lib/runtime.ts (改 — MCP tools 注入) + src/features/settings/components/mcp-tab.tsx (新增) + src/shared/lib/ipc.ts (改 — McpService Tag) + src/shared/lib/types.ts (改 — McpServerConfig) + electron-builder.yml (不改 — 无 electron 侧二进制)
+**Status**: accepted · **Date**: 2026-07-21 · **Scope**: src/plugins/mcp/ (新增) + src/main/mcp-host.ts (新增) + src/features/chat/lib/runtime.ts (改 — MCP tools 注入) + src/features/settings/components/mcp-tab.tsx (新增) + src/renderer/shared/lib/ipc.ts (改 — McpService Tag) + src/renderer/shared/lib/types.ts (改 — McpServerConfig) + electron-builder.yml (不改 — 无 electron 侧二进制)
 
 **Related**: ADR-0003 (Effect-TS logic layer), ADR-0010 (5+1 feature whitelist — mcp 是第 5 个 feature), ADR-0019 (per-run transient agent — MCP tools 在 run() 入口注入 tools[]), ADR-0025 (effect/Schema), ADR-0031 (Skills 是正交能力)
 
@@ -15,7 +15,7 @@ Skills 部分在 [ADR-0031](./0031-skills-system.md) 锁定。本 ADR 处理 MCP
 ### MCP 在 codeman-agent 当前形态 = 零
 
 - `src/` 中无 MCP 代码 (grep `mcp|MCP|model_context_protocol` 无命中)
-- `electron/` 中无 MCP 代码
+- `src/main/` 中无 MCP 代码
 - `package.json` 无 `@modelcontextprotocol/*` 依赖
 - 已有 MCP 集成仅限**我作为 agent** 通过 `context7` MCP server 取文档——与 codeman-agent 产品无关
 
@@ -60,7 +60,7 @@ const McpConfigFileStruct = Schema.Struct({
 
 ### D2 — stdio transport：spawn child + JSON-RPC over stdio
 
-`electron/main/mcp-host.ts::McpStdioServer` 类：
+`src/main/mcp-host.ts::McpStdioServer` 类：
 - 构造：`spawn(command, args, { env: { ...process.env, ...config.env }, stdio: ['pipe', 'pipe', 'pipe'] })`
 - 握手：
   1. send `initialize` request (JSON-RPC 2.0) → wait `InitializeResult`
@@ -228,12 +228,12 @@ const tools = [loadSkillTool, ...createFileTools(provider.workspaceId), ...mcpTo
 | `src/plugins/mcp/lib/mcp-tool-builder.test.ts` | 新增 |
 | `src/plugins/mcp/stores/mcp.store.ts` | 新增 — server status + tools signal |
 | `src/plugins/mcp/stores/mcp.store.test.ts` | 新增 |
-| `electron/main/mcp-host.ts` | 新增 — McpStdioServer + McpManager |
-| `electron/main/mcp-host.test.ts` | 新增 — mocked spawn, JSON-RPC framing, error paths |
-| `electron/main/jsonrpc.ts` | 新增 — 轻量 JSON-RPC 2.0 client (~150 行) |
-| `electron/main/jsonrpc.test.ts` | 新增 |
-| `electron/main/index.ts` | 改 — whenReady 内 `mcpManager.start()`; before-quit graceful shutdown |
-| `electron/main/ipc.ts` | 改 — 加 6 个 mcp:* IPC handlers |
+| `src/main/mcp-host.ts` | 新增 — McpStdioServer + McpManager |
+| `src/main/mcp-host.test.ts` | 新增 — mocked spawn, JSON-RPC framing, error paths |
+| `src/main/jsonrpc.ts` | 新增 — 轻量 JSON-RPC 2.0 client (~150 行) |
+| `src/main/jsonrpc.test.ts` | 新增 |
+| `src/main/index.ts` | 改 — whenReady 内 `mcpManager.start()`; before-quit graceful shutdown |
+| `src/main/ipc.ts` | 改 — 加 6 个 mcp:* IPC handlers |
 | `src/shared/lib/ipc.ts` | 改 — McpService Context.Tag + Live Layer |
 | `src/shared/lib/types.ts` | 改 — McpServerConfig / McpTool / McpServerStatus types |
 | `src/features/settings/components/mcp-tab.tsx` | 新增 — UI |
@@ -246,7 +246,7 @@ const tools = [loadSkillTool, ...createFileTools(provider.workspaceId), ...mcpTo
 
 ### 不可逆性
 推翻本 ADR 需:
-- 删 `src/plugins/mcp/` + `electron/main/mcp-host.ts` + `electron/main/jsonrpc.ts`
+- 删 `src/plugins/mcp/` + `src/main/mcp-host.ts` + `src/main/jsonrpc.ts`
 - 回退 runtime.ts tools[] 注入
 - 回退 ipc.ts 6 个 mcp:* handlers
 - 删 mcp-tab UI

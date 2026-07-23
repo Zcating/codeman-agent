@@ -1,6 +1,6 @@
 # 0031 — Skills System (V1: Prompt Augmentation, Local Directory + Ship-with-App)
 
-**Status**: accepted · **Date**: 2026-07-21 · **Scope**: src/plugins/skills/ (新增) + electron/main/skills-* (新增) + electron/resources/skills/ (新增) + src/features/chat/lib/runtime.ts (改 — system prompt injection) + src/features/chat/components/chat-view.tsx (改 — SlashMenu) + src/features/chat/components/home.tsx (改 — SlashMenu) + src/features/settings/components/skills-tab.tsx (新增) + src/shared/lib/ipc.ts (改 — SkillsService) + electron/main/index.ts (改 — first-launch skill seeding) + electron-builder.yml (改 — extraResources)
+**Status**: accepted · **Date**: 2026-07-21 · **Scope**: src/plugins/skills/ (新增) + src/main/skills-* (新增) + src/resources/skills/ (新增) + src/features/chat/lib/runtime.ts (改 — system prompt injection) + src/features/chat/components/chat-view.tsx (改 — SlashMenu) + src/features/chat/components/home.tsx (改 — SlashMenu) + src/features/settings/components/skills-tab.tsx (新增) + src/renderer/shared/lib/ipc.ts (改 — SkillsService) + src/main/index.ts (改 — first-launch skill seeding) + electron-builder.yml (改 — extraResources)
 
 **Related**: ADR-0003 (Effect-TS logic layer, 不变), ADR-0010 (5+1 feature whitelist — 新增 skills feature 第 4 个), ADR-0019 (per-run transient agent — Skills 在 run() 入口注入 system prompt), ADR-0025 (effect/Schema default)
 
@@ -30,7 +30,7 @@
    两者 SKILL.md 格式完全一致（YAML frontmatter + Markdown body）。复用 SKILL.md 格式让 OpenCode / Claude Code / Cursor 等生态里已写的 skill 直接可用。
 4. **Skill 来源？**
    grill 决议：**预装 + 本地目录**。无 marketplace、无网络安装、无 GitHub URL 流程。
-   - 预装：app 启动时把 `electron/resources/skills/<name>/SKILL.md` 拷贝到 `~/.agents/skills/<name>/SKILL.md`（idempotent：已存在不覆盖）
+   - 预装：app 启动时把 `src/resources/skills/<name>/SKILL.md` 拷贝到 `~/.agents/skills/<name>/SKILL.md`（idempotent：已存在不覆盖）
    - 本地目录：用户手动 git clone / 下载 zip / 写 SKILL.md 到 `~/.agents/skills/<name>/SKILL.md`
 
 ## Decision
@@ -55,7 +55,7 @@ Skill 的全部内容在 LLM 主动 `_load_skill` 或 slash 触发后被读入�
 
 ### D2 — 启动时一次性扫描 + manifest 缓存
 
-`electron/main/skills-scanner.ts::scanSkillsDir()`：
+`src/main/skills-scanner.ts::scanSkillsDir()`：
 - 入参：`~/.agents/skills/`
 - 出参：`SkillManifest[] = [{ name, description, path, source: "preinstalled" | "user" | "corrupt" }]`
 - 调用时机：Electron main `app.whenReady()` 内、IPC handler 首次被调时（lazy refresh on file change）
@@ -134,7 +134,7 @@ Chat 输入框 + Home 表单中：
 
 ### D6 — Ship-with-app Skills：4 个预装
 
-`electron/resources/skills/<name>/SKILL.md` 包含：
+`src/resources/skills/<name>/SKILL.md` 包含：
 
 | Skill 名 | 描述（system prompt 嵌入） |
 |---|---|
@@ -147,7 +147,7 @@ Chat 输入框 + Home 表单中：
 
 ### D7 — 启动时复制预装 Skills（idempotent）
 
-`electron/main/skills-host.ts::ensurePreinstalledSkills()`：
+`src/main/skills-host.ts::ensurePreinstalledSkills()`：
 - 在 `app.whenReady()` 内、调 IPC handler 前执行一次
 - 遍历 `process.resourcesPath/skills/<name>/SKILL.md`（electron-builder `extraResources` 路径）
 - 对 `~/.agents/skills/<name>/SKILL.md`：已存在跳过；不存在复制
@@ -251,18 +251,18 @@ export interface SlashMenuProps {
 | `src/plugins/skills/stores/skills.store.test.ts` | 新增 |
 | `src/plugins/skills/components/slash-menu.tsx` | 新增 |
 | `src/plugins/skills/components/slash-menu.test.tsx` | 新增 |
-| `electron/main/skills-host.ts` | 新增 — preinstalled skills seed + IPC handlers |
-| `electron/main/skills-host.test.ts` | 新增 |
-| `electron/main/index.ts` | 改 — `whenReady` 内调 `ensurePreinstalledSkills()` |
-| `electron/main/ipc.ts` | 改 — 加 `skills:scan` / `skills:load` / `skills:open-dir` IPC handlers |
-| `electron/resources/skills/commit-helper/SKILL.md` | 新增 |
-| `electron/resources/skills/code-review/SKILL.md` | 新增 |
-| `electron/resources/skills/explain-error/SKILL.md` | 新增 |
-| `electron/resources/skills/summarize/SKILL.md` | 新增 |
+| `src/main/skills-host.ts` | 新增 — preinstalled skills seed + IPC handlers |
+| `src/main/skills-host.test.ts` | 新增 |
+| `src/main/index.ts` | 改 — `whenReady` 内调 `ensurePreinstalledSkills()` |
+| `src/main/ipc.ts` | 改 — 加 `skills:scan` / `skills:load` / `skills:open-dir` IPC handlers |
+| `src/resources/skills/commit-helper/SKILL.md` | 新增 |
+| `src/resources/skills/code-review/SKILL.md` | 新增 |
+| `src/resources/skills/explain-error/SKILL.md` | 新增 |
+| `src/resources/skills/summarize/SKILL.md` | 新增 |
 | `electron-builder.yml` | 改 — `extraResources: ["./resources/**/*"]` |
-| `src/shared/lib/ipc.ts` | 改 — SkillsService Tag + Live Layer |
-| `src/shared/lib/types.ts` | 改 — `Settings.enabledSkills: string[]` |
-| `electron/main/settings-schema.ts` | 改 — `enabledSkills: Schema.Array(Schema.String)` + sanitize 默认 `["commit-helper", "code-review", "explain-error", "summarize"]` |
+| `src/renderer/shared/lib/ipc.ts` | 改 — SkillsService Tag + Live Layer |
+| `src/renderer/shared/lib/types.ts` | 改 — `Settings.enabledSkills: string[]` |
+| `src/main/settings-schema.ts` | 改 — `enabledSkills: Schema.Array(Schema.String)` + sanitize 默认 `["commit-helper", "code-review", "explain-error", "summarize"]` |
 | `src/features/settings/components/skills-tab.tsx` | 新增 — 列表 + toggle + Refresh |
 | `src/features/settings/routes/settings-layout.tsx` | 改 — Sidebar 加 "Skills" item |
 | `src/features/chat/lib/runtime.ts` | 改 — systemPrompt 拼接 + `_load_skill` 注册 |

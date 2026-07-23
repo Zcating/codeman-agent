@@ -6,7 +6,7 @@
 //   - own CDP port (BASE_ELECTRON_CDP_PORT + parallelIndex) for connectOverCDP.
 //   - own CODEMAN_TEST_WORKER env var → V3 main process suffixes SQLite /
 //     settings.json / window-state.json with `w{N}` so per-worker files
-//!     don't collide (electron/main/index.ts::app.setPath + main process
+//!     don't collide (src/main/index.ts::app.setPath + main process
 //!     suffixes).
 //   - own WEBVIEW2_USER_DATA_FOLDER for Chromium (Electron 43's Chromium 134)
 //     state isolation. Electron 43 binary exposes --remote-debugging-port
@@ -46,7 +46,7 @@ import { BASE_PORTS } from "../playwright.config";
 
 // V3 mock-server per-worker base port (1 base port per parallel worker so
 // 4 workers can each bind without EADDRINUSE). mock-server reads
-// `CODEMAN_MOCK_PORT` (electron/main/config-service.ts:109). The matching
+// `CODEMAN_MOCK_PORT` (src/main/config-service.ts:109). The matching
 // renderer-side URL is injected into `window.__mockBaseUrl` via
 // `Page.addScriptToEvaluateOnNewDocument` so `useMockProvider` can read it.
 const BASE_MOCK_PORT = 50000;
@@ -135,14 +135,14 @@ export const test = base.extend<{}, { tauriEnv: ElectronEnv; electronEnv: Electr
       const logPath = join(userDataDir, "electron.log");
 
       // 1. Clean stale Electron user data from previous run.
-      //    V3 main process (electron/main/index.ts) sets app.getPath('userData')
+      //    V3 main process (src/main/index.ts) sets app.getPath('userData')
       //    via app.setPath to LOCALAPPDATA/codeman-agent.
       rmSync(userDataDir, { recursive: true, force: true });
       mkdirSync(userDataDir, { recursive: true });
 
       // 1b. Clean per-worker Electron app data dir.  The main process now
       //     uses CODEMAN_TEST_WORKER to suffix its userData path (see
-      //     electron/main/index.ts), so data lives under
+      //     src/main/index.ts), so data lives under
       //     codeman-agent.w{idx}/.  Clean the entire per-worker dir so
       //     SQLite, settings, and window-state are pristine.
       const electronAppData = join(
@@ -169,9 +169,9 @@ export const test = base.extend<{}, { tauriEnv: ElectronEnv; electronEnv: Electr
             ...process.env,
             CODEMAN_TEST_WORKER: `w${idx}`,
             // Per ADR-0026: e2e tests share the dev Q→A seed
-            // (`electron/assets/qa.dev.json`) — single source of truth for
+            // (`src/assets/qa.dev.json`) — single source of truth for
             // canned mock responses across dev and e2e modes. mock-server
-            // (electron/main/mock-server.ts) loads the dev seed via its
+            // (src/main/mock-server.ts) loads the dev seed via its
             // isDev fallback path (qa-loader.ts) since this env var is not
             // set. Substring first-wins match means the per-spec `XX::`
             // entries (positioned before generic dev keys) take precedence
