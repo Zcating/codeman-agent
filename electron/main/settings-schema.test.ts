@@ -85,6 +85,23 @@ describe("T4a — electron/main/settings-schema.ts", () => {
       const r = sanitize({ providers: "not-an-array" } as unknown as Settings);
       expect(r.providers).toEqual(DEFAULT_SETTINGS.providers);
     });
+
+    it("preserves defaultLlmProviderId from input", () => {
+      const r = sanitize({ ...V15, defaultLlmProviderId: "minimax" });
+      expect(r.defaultLlmProviderId).toBe("minimax");
+    });
+
+    it("preserves defaultLlmProviderId even when other fields fall back to defaults", () => {
+      // `providers: "not-an-array"` makes sanitize() take the Schema decode
+      // Left path → DEFAULT_SETTINGS for the providers array. The caller-provided
+      // defaultLlmProviderId must still be returned (it's a top-level optional
+      // field that callers like the mock provider E2E spec rely on).
+      const r = sanitize({
+        providers: "not-an-array",
+        defaultLlmProviderId: "minimax",
+      } as unknown as Partial<Settings>);
+      expect(r.defaultLlmProviderId).toBe("minimax");
+    });
   });
 
 });

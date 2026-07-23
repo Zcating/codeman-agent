@@ -195,6 +195,7 @@ export function sanitize(input: Partial<Settings>): Settings {
   return {
     schemaVersion: rawSchemaVersion,
     providers: rawProviders,
+    defaultLlmProviderId: safe.defaultLlmProviderId ?? DEFAULT_SETTINGS.defaultLlmProviderId,
     userLanguage: rawUserLanguage,
     theme: rawTheme,
     startAtLogin: rawStartAtLogin,
