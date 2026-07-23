@@ -16,7 +16,7 @@ vi.mock("../../../shared/components/internal/codeman-group-select", () => ({
     const selectedLabel = () => {
       for (const group of props.groups) {
         const found = group.options.find((o) => o.value === props.value);
-        if (found) return found.label;
+        if (found) {return found.label;}
       }
       return props.placeholder ?? "";
     };

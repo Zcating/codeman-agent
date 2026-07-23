@@ -71,11 +71,11 @@ export const SettingStruct = Schema.Struct({
 
 // ─── Derived types (preserves downstream `import type { Settings }`) ──
 
-export type ModelMeta = Schema.Type<typeof ModelMetaStruct>;
-export type ProviderBilling = Schema.Type<typeof ProviderBillingStruct>;
-export type ProviderLlm = Schema.Type<typeof ProviderLlmStruct>;
-export type Provider = Schema.Type<typeof ProviderStruct>;
-export type Settings = Schema.Type<typeof SettingStruct>;
+export type ModelMeta = Schema.Schema.Type<typeof ModelMetaStruct>;
+export type ProviderBilling = Schema.Schema.Type<typeof ProviderBillingStruct>;
+export type ProviderLlm = Schema.Schema.Type<typeof ProviderLlmStruct>;
+export type Provider = Schema.Schema.Type<typeof ProviderStruct>;
+export type Settings = Schema.Schema.Type<typeof SettingStruct>;
 
 // ─── Constants ──────────────────────────────────────────────────
 
@@ -84,12 +84,9 @@ const MIN_SIZE_HEIGHT = 100;
 const MIN_AUTO_ARCHIVE_DAYS = 1;
 const MIN_MAX_HISTORY = 10;
 const MINIMAX_BASE_URL = "https://api.minimaxi.com/anthropic";
-const DEEPSEEK_BASE_URL = "https://api.deepseek.com/anthropic";
 const MINIMAX_MODELS_ENDPOINT = "https://api.minimaxi.com/v1/models";
-const DEEPSEEK_MODELS_ENDPOINT = "https://api.deepseek.com/v1/models";
 
 const MINIMAX_DEFAULT_MODEL = "MiniMax-M2.5-highspeed";
-const DEEPSEEK_DEFAULT_MODEL = "deepseek-chat";
 
 export const DEFAULT_SETTINGS: Settings = {
   schemaVersion: "1.5",
@@ -151,43 +148,62 @@ export function sanitize(input: Partial<Settings>): Settings {
       ? (decoded.right as Settings)
       : DEFAULT_SETTINGS;
 
-  const merged: Settings = {
-    ...DEFAULT_SETTINGS,
-    ...safe,
-    window: { ...DEFAULT_SETTINGS.window, ...(safe.window ?? {}) },
-    systemPrompt: {
-      ...DEFAULT_SETTINGS.systemPrompt,
-      ...(safe.systemPrompt ?? {}),
+  const mergedWindow = {
+    ...DEFAULT_SETTINGS.window,
+    ...(safe.window ?? {}),
+    minSize: {
+      ...DEFAULT_SETTINGS.window.minSize,
+      ...((safe.window ?? {}).minSize ?? {}),
     },
-    conversations: {
-      ...DEFAULT_SETTINGS.conversations,
-      ...(safe.conversations ?? {}),
+    defaultSize: {
+      ...DEFAULT_SETTINGS.window.defaultSize,
+      ...((safe.window ?? {}).defaultSize ?? {}),
     },
-    providers: safe.providers?.length ? safe.providers : DEFAULT_SETTINGS.providers,
   };
 
-  merged.conversations.autoArchiveAfterDays = Math.max(
-    MIN_AUTO_ARCHIVE_DAYS,
-    merged.conversations.autoArchiveAfterDays | 0,
-  );
-  merged.conversations.maxHistory = Math.max(
-    MIN_MAX_HISTORY,
-    merged.conversations.maxHistory | 0,
-  );
+  const mergedConversations = {
+    ...DEFAULT_SETTINGS.conversations,
+    ...(safe.conversations ?? {}),
+  };
 
-  merged.window.minSize.width = Math.max(MIN_SIZE_WIDTH, merged.window.minSize.width | 0);
-  merged.window.minSize.height = Math.max(MIN_SIZE_HEIGHT, merged.window.minSize.height | 0);
+  const rawSchemaVersion = (safe.schemaVersion ?? "1.5") as Settings["schemaVersion"];
+  const rawProviders = safe.providers?.length ? safe.providers : DEFAULT_SETTINGS.providers;
+  const rawUserLanguage = safe.userLanguage ?? DEFAULT_SETTINGS.userLanguage;
+  const rawTheme = safe.theme ?? DEFAULT_SETTINGS.theme;
+  const rawStartAtLogin = safe.startAtLogin ?? DEFAULT_SETTINGS.startAtLogin;
+  const rawSystemPrompt = {
+    ...DEFAULT_SETTINGS.systemPrompt,
+    ...(safe.systemPrompt ?? {}),
+  };
 
-  merged.window.defaultSize.width = Math.max(
-    merged.window.minSize.width,
-    merged.window.defaultSize.width | 0,
-  );
-  merged.window.defaultSize.height = Math.max(
-    merged.window.minSize.height,
-    merged.window.defaultSize.height | 0,
-  );
+  const clampedConversations = {
+    ...mergedConversations,
+    autoArchiveAfterDays: Math.max(MIN_AUTO_ARCHIVE_DAYS, mergedConversations.autoArchiveAfterDays | 0),
+    maxHistory: Math.max(MIN_MAX_HISTORY, mergedConversations.maxHistory | 0),
+  };
 
-  merged.schemaVersion = "1.5";
+  const clampedMinSize = {
+    width: Math.max(MIN_SIZE_WIDTH, mergedWindow.minSize.width | 0),
+    height: Math.max(MIN_SIZE_HEIGHT, mergedWindow.minSize.height | 0),
+  };
 
-  return merged;
+  const clampedDefaultSize = {
+    width: Math.max(clampedMinSize.width, mergedWindow.defaultSize.width | 0),
+    height: Math.max(clampedMinSize.height, mergedWindow.defaultSize.height | 0),
+  };
+
+  return {
+    schemaVersion: rawSchemaVersion,
+    providers: rawProviders,
+    userLanguage: rawUserLanguage,
+    theme: rawTheme,
+    startAtLogin: rawStartAtLogin,
+    window: {
+      ...mergedWindow,
+      minSize: clampedMinSize,
+      defaultSize: clampedDefaultSize,
+    },
+    systemPrompt: rawSystemPrompt,
+    conversations: clampedConversations,
+  };
 }

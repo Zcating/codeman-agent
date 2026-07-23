@@ -23,7 +23,7 @@
 //! 流式节奏: mock 每 chunk 500ms 延迟,17 字符分 5 chunks ≈ 2.5s 完成,
 //! 给切 conv + sidebar 检查充足 margin。
 
-import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm, type TauriPage } from "./fixtures";
+import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
 import * as path from "node:path";
 import * as os from "node:os";
 import { useMockProvider } from "./mock-provider";
@@ -31,6 +31,7 @@ import { useMockProvider } from "./mock-provider";
 // 慢流式:每次 chunk 间隔 500ms,text ~17 字符 = 5 chunks × 500ms = 2.5s,
 // 给切 conv + 检查 sidebar 足够 margin,避免 CI 下因 I/O 抖动 flake。
 const SLOW_DELAY_MS = 500;
+void SLOW_DELAY_MS;
 
 const TEXT_A = "Hello from conv A"; // 17 chars / 4 = 5 chunks × 300ms = 1.5s
 const TEXT_B = "Hello from conv B"; // 17 chars / 4 = 5 chunks × 300ms = 1.5s
@@ -61,13 +62,6 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
       );
     }
   });
-
-  /** 返回当前 sidebar 中的 conv 数量。 */
-  async function convCount(page: TauriPage): Promise<number> {
-    return page.evaluate(
-      () => document.querySelectorAll("aside button[data-conv-id]").length,
-    );
-  }
 
   /** Conv id created in beforeEach (idx 0 for each test body). */
   let beforeEachConvId = "";
@@ -164,7 +158,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     // 这里确认 idx1 只有 fallback 响应,没有额外 bubble。
     const idx1AssistantCount = await page.evaluate(() => {
       const section = document.querySelector("section.flex-1");
-      if (!section) return 999;
+      if (!section) {return 999;}
       return Array.from(section.querySelectorAll('[data-testid="agent-bubble"]')).length;
     });
     expect(idx1AssistantCount, "idx1 view 应有 1 个 assistant bubble (新建 conv 的 fallback 响应)").toBe(1);
@@ -216,7 +210,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
       const deadline = Date.now() + 5_000;
       while (Date.now() < deadline) {
         const li = document.querySelector('li:has([aria-current="page"])');
-        if (li?.querySelector('[aria-label="streaming"]')) return;
+        if (li?.querySelector('[aria-label="streaming"]')) {return;}
       }
       throw new Error('streaming badge not found in active conv li after 5s');
     });
@@ -303,7 +297,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
       const deadline = Date.now() + 5_000;
       while (Date.now() < deadline) {
         const li = document.querySelector(`li:has([data-conv-id="${convId}"])`);
-        if (li?.querySelector('[aria-label="streaming"]')) return;
+        if (li?.querySelector('[aria-label="streaming"]')) {return;}
       }
       throw new Error(`streaming badge not found for conv ${convId} in li`);
     }, beforeEachConvId);
@@ -324,7 +318,7 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
       const deadline = Date.now() + 5_000;
       while (Date.now() < deadline) {
         const li = document.querySelector(`li:has([data-conv-id="${convId}"])`);
-        if (li?.querySelector('[aria-label="streaming"]')) return;
+        if (li?.querySelector('[aria-label="streaming"]')) {return;}
       }
       throw new Error(`streaming badge not found for conv ${convId} in li`);
     }, newConvId);

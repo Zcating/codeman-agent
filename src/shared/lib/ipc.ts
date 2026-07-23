@@ -483,7 +483,7 @@ export const SettingsServiceLive = Layer.succeed(SettingsService, {
           const p = (settings.providers ?? []).find(
             (p) => p.id === id && p.enabled,
           );
-          if (!p || !p.llm) return null;
+          if (!p || !p.llm) {return null;}
           const v1: LLMProvider = {
             id: p.id,
             label: p.label,
@@ -516,7 +516,7 @@ export const SettingsServiceImpl = {
           const p = (settings.providers ?? []).find(
             (p) => p.id === id && p.enabled,
           );
-          if (!p || !p.llm) return null;
+          if (!p || !p.llm) {return null;}
           const v1: LLMProvider = {
             id: p.id,
             label: p.label,

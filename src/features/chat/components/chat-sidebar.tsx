@@ -79,7 +79,7 @@ export function ChatSidebar(): JSX.Element {
     currentLabel: string,
   ): Promise<void> => {
     const newLabel = await showRenameDialog(currentLabel);
-    if (!newLabel || newLabel === currentLabel) return;
+    if (!newLabel || newLabel === currentLabel) {return;}
     const ok = await chatSidebarActions.renameWorkspace(
       workspaceId,
       newLabel,
@@ -100,7 +100,7 @@ export function ChatSidebar(): JSX.Element {
       cancelText: "Cancel",
       destructive: true,
     });
-    if (!confirmed) return;
+    if (!confirmed) {return;}
 
     const ok = await chatSidebarActions.removeWorkspace(workspaceId);
     if (!ok) {
@@ -120,7 +120,7 @@ export function ChatSidebar(): JSX.Element {
   // ─── Sidebar tree builders ───────────────────────────────────────────────
 
   const options = (): SidebarOption[] => {
-    if (wsList().length === 0) return [];
+    if (wsList().length === 0) {return [];}
 
     return [
       {

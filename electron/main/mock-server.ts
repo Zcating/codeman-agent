@@ -293,13 +293,13 @@ function extractFirstUserText(body: unknown): string {
  *  that produced a tool_use block leaves one assistant message in the next
  *  request, so this equals the next scripted turn index to serve. */
 function countAssistantMessages(body: unknown): number {
-  if (!body || typeof body !== "object") return 0;
+  if (!body || typeof body !== "object") {return 0;}
   const b = body as AnthropicMessagesBody;
   const msgs = b.messages;
-  if (!Array.isArray(msgs)) return 0;
+  if (!Array.isArray(msgs)) {return 0;}
   let n = 0;
   for (const m of msgs) {
-    if (m && m.role === "assistant") n++;
+    if (m && m.role === "assistant") {n++;}
   }
   return n;
 }
@@ -326,16 +326,16 @@ function countAssistantMessages(body: unknown): number {
  *    → 1 assistant → currentRunAsst=1
  */
 function countCurrentRunAssistants(body: unknown): number {
-  if (!body || typeof body !== "object") return 0;
+  if (!body || typeof body !== "object") {return 0;}
   const b = body as AnthropicMessagesBody;
   const msgs = b.messages;
-  if (!Array.isArray(msgs)) return 0;
+  if (!Array.isArray(msgs)) {return 0;}
 
   // Step 1: 找最后一条 plain user prompt (current run 起点)
   let lastPlainUserIdx = -1;
   for (let i = msgs.length - 1; i >= 0; i--) {
     const m = msgs[i];
-    if (!m || m.role !== "user") continue;
+    if (!m || m.role !== "user") {continue;}
     const c = m.content;
     // Anthropic format: tool_result 容器是 user role 但 content 是 tool_result blocks
     if (
@@ -353,13 +353,13 @@ function countCurrentRunAssistants(body: unknown): number {
     break;
   }
 
-  if (lastPlainUserIdx < 0) return 0;
+  if (lastPlainUserIdx < 0) {return 0;}
 
   // Step 2: 数 lastPlainUserIdx 之后的 assistant 数
   let n = 0;
   for (let i = lastPlainUserIdx + 1; i < msgs.length; i++) {
     const m = msgs[i];
-    if (m && m.role === "assistant") n++;
+    if (m && m.role === "assistant") {n++;}
   }
   return n;
 }

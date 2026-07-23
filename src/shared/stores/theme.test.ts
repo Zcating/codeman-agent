@@ -154,7 +154,6 @@ describe("startThemeSync — .dark 类应用", () => {
   // K2/K3: System theme change event triggers .dark class and theme$ update
   it("system theme change matches=true → 添加 .dark 类并更新 theme$", async () => {
     const listenerRegistry: Array<(e: MediaQueryListEvent) => void> = [];
-    let removeCallCount = 0;
 
     Object.defineProperty(window, "matchMedia", {
       writable: true,
@@ -164,9 +163,7 @@ describe("startThemeSync — .dark 类应用", () => {
         addEventListener: (_: string, listener: (e: MediaQueryListEvent) => void) => {
           listenerRegistry.push(listener);
         },
-        removeEventListener: (_: string) => {
-          removeCallCount++;
-        },
+        removeEventListener: (_: string) => {},
       }),
     });
 
@@ -226,7 +223,7 @@ describe("startThemeSync — .dark 类应用", () => {
         },
         removeEventListener: (_: string, listener: (e: MediaQueryListEvent) => void) => {
           const idx = listenerRegistry.indexOf(listener);
-          if (idx !== -1) listenerRegistry.splice(idx, 1);
+          if (idx !== -1) {listenerRegistry.splice(idx, 1);}
         },
       }),
     });

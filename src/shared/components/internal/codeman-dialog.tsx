@@ -113,7 +113,7 @@ export const Dialog = {
       };
 
       const handleClose = () => {
-        if (!wasOpened) return;
+        if (!wasOpened) {return;}
         resolve(false);
         setOpen(false);
         setTimeout(cleanupDialog, 300);
@@ -199,7 +199,7 @@ export const Dialog = {
       };
 
       const handleClose = () => {
-        if (!wasOpened) return;
+        if (!wasOpened) {return;}
         resolve(null as unknown as T);
         setOpen(false);
         setTimeout(cleanupDialog, 300);

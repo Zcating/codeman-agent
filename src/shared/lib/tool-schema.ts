@@ -181,7 +181,7 @@ export type SchemaToTypeBox<S extends Schema.Struct<any>> = S extends Schema.Sch
  */
 function stripUndefined(node: AST.Union): AST.AST {
   const nonUndef = node.types.filter((t) => t._tag !== "UndefinedKeyword");
-  if (nonUndef.length === 1) return nonUndef[0]!;
+  if (nonUndef.length === 1) {return nonUndef[0]!;}
   return AST.Union.make(nonUndef);
 }
 

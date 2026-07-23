@@ -56,7 +56,7 @@ describe("errors — Schema.TaggedError variants (ADR-0025 PR1)", () => {
       new SandboxViolation({ path: "/p", workspaceLabel: "w" }),
       new Unknown({ message: "a" }),
     ];
-    for (const e of all) expect(isAppError(e)).toBe(true);
+    for (const e of all) {expect(isAppError(e)).toBe(true);}
   });
 
   it("isAppError() is false for legacy {kind} objects and plain values", () => {

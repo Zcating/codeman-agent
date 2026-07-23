@@ -29,7 +29,7 @@ export function LlmSection(): JSX.Element {
 
   const onAddProvider = async (): Promise<void> => {
     const provider = await createProviderFormDialog();
-    if (!provider) return;
+    if (!provider) {return;}
     const current = appStore.state.value.providers ?? [];
     appStore.set({ providers: [...current, provider] });
     settingsSaver.scheduleSave();

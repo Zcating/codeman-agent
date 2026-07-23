@@ -113,7 +113,7 @@ async function waitForUrl(url: string, timeoutMs: number): Promise<void> {
   while (Date.now() < deadline) {
     try {
       const res = await fetch(url, { method: "GET" });
-      if (res.ok || res.status === 404) return;
+      if (res.ok || res.status === 404) {return;}
       lastErr = new Error(`status ${res.status}`);
     } catch (e) {
       lastErr = e;
@@ -159,7 +159,7 @@ export const test = base.extend<{}, { tauriEnv: ElectronEnv; electronEnv: Electr
       //    When using the local (non-packaged) Electron binary, pass the app entry
       //    point as the first non-flag argument.
       const args = [`--remote-debugging-port=${cdpPort}`];
-      if (APP_ENTRY) args.push(APP_ENTRY);
+      if (APP_ENTRY) {args.push(APP_ENTRY);}
 
       const child: ChildProcess = spawn(
         ELECTRON_BIN,

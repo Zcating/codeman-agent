@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * prepare-effect â€?ensure `.repos/effect` (the vendored Effect-TS source for
+ * prepare-effect â€” ensure `.repos/effect` (the vendored Effect-TS source for
  * the effect-ts skill) is cloned locally. Idempotent: no-op when already
  * present, clones shallow from the upstream repo otherwise.
  *

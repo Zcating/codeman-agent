@@ -126,7 +126,7 @@ function computeActive(
   isActiveFn: SidebarIsActiveFn | undefined,
 ): boolean {
   const value = item.value ?? item.label;
-  if (isActiveFn) return isActiveFn(value, currentValue);
+  if (isActiveFn) {return isActiveFn(value, currentValue);}
   return isEqual(value, currentValue);
 }
 
@@ -148,11 +148,11 @@ function renderLeaf(
   const active = (): boolean =>
     computeActive(item, props.currentValue, props.isActive);
   const handleClick = (): void => {
-    if (item.disabled) return;
+    if (item.disabled) {return;}
     props.onItemSelect?.(item.value ?? item.label);
   };
   const handleKeyDown = (e: KeyboardEvent): void => {
-    if (item.disabled) return;
+    if (item.disabled) {return;}
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       handleClick();

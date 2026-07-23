@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { initDatabase, getDatabase } from "./db/mod";
 // QA 路由由 electron/main/mock-server.ts 负责(POST /mock/anthropic/v1/messages
 // 经 qa-loader.ts 读 Q→A 文件);不再走 IPC。
-import { sanitize, type SettingsV15 } from "./settings-schema";
+import { sanitize, type Settings, type Provider } from "./settings-schema";
 import {
   validatePathInWorkspace,
   readFileInWorkspace,
@@ -23,7 +23,7 @@ import {
 
 // ─── Settings store (JSON file under app.getPath("userData")) ─────────
 
-let settingsCache: SettingsV15 | null = null;
+let settingsCache: Settings | null = null;
 
 // ADR-0024 D7: Map<requestId, AbortController> for aborting in-flight LLM requests
 const abortControllers = new Map<string, AbortController>();
@@ -33,8 +33,8 @@ function settingsPath(): string {
   return join(app.getPath("userData"), "settings.json");
 }
 
-function loadSettings(): SettingsV15 {
-  if (settingsCache) return settingsCache;
+function loadSettings(): Settings {
+  if (settingsCache) {return settingsCache;}
   const path = settingsPath();
   let raw: unknown = {};
   if (existsSync(path)) {
@@ -46,17 +46,17 @@ function loadSettings(): SettingsV15 {
   }
   // Load (or initialize) V1.5 camelCase settings from disk.
   // Schema.decodeUnknownEither inside sanitize() validates; malformed JSON → DEFAULT_SETTINGS.
-  settingsCache = sanitize(raw as Partial<SettingsV15>);
+  settingsCache = sanitize(raw as Partial<Settings>);
   saveSettings();
   return settingsCache;
 }
 
 function saveSettings(): void {
-  if (!settingsCache) return;
+  if (!settingsCache) {return;}
   writeFileSync(settingsPath(), JSON.stringify(settingsCache, null, 2), "utf-8");
 }
 
-function updateSettings(patch: Partial<SettingsV15>): SettingsV15 {
+function updateSettings(patch: Partial<Settings>): Settings {
   loadSettings();
   settingsCache = sanitize({ ...settingsCache!, ...patch });
   saveSettings();
@@ -166,13 +166,13 @@ async function searchFilesInWorkspace(
   const results: Array<{ path: string; line: number; text: string }> = [];
   await walkDir(root, async (relPath) => {
     const norm = relPath.replace(/\\/g, "/");
-    if (!matchGlob(norm, glob)) return;
+    if (!matchGlob(norm, glob)) {return;}
     if (contentPattern === null) {
       results.push({ path: norm, line: 0, text: "" });
       return;
     }
     const content = await readFile(join(root, relPath), "utf-8").catch(() => null);
-    if (!content) return;
+    if (!content) {return;}
     const lines = content.split("\n");
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].includes(contentPattern)) {
@@ -197,11 +197,11 @@ async function walkDir(root: string, visit: (relPath: string) => Promise<void>):
       continue;
     }
     for (const entry of entries) {
-      if (skip.has(entry)) continue;
+      if (skip.has(entry)) {continue;}
       const childRel = item.rel ? `${item.rel}/${entry}` : entry;
       const childAbs = join(root, childRel);
       const st = await stat(childAbs).catch(() => null);
-      if (!st) continue;
+      if (!st) {continue;}
       if (st.isDirectory()) {
         stack.push({ abs: childAbs, rel: childRel });
       } else if (st.isFile()) {
@@ -235,7 +235,7 @@ export function registerIpcHandlers(_deps: {
     // V2 spec convention: args may be { newSettings } OR just the patch object.
     const rawPatch =
       (args && typeof args === "object" && ("newSettings" in args ? (args as { newSettings: unknown }).newSettings : args)) ?? {};
-    const patch = rawPatch as Partial<SettingsV15>;
+    const patch = rawPatch as Partial<Settings>;
     return updateSettings(patch);
   });
   ipcMain.handle("clearAllHistory", () => {
@@ -251,7 +251,7 @@ export function registerIpcHandlers(_deps: {
   ipcMain.handle("getConversation", (_e, args: { id: string }) => {
     dbInit();
     const row = getDatabase().prepare("SELECT * FROM conversations WHERE id = ?").get(args.id) as RawConvRow | undefined;
-    if (!row) throw new Error(`Conversation not found: ${args.id}`);
+    if (!row) {throw new Error(`Conversation not found: ${args.id}`);}
     return toConversation(row);
   });
   ipcMain.handle("createConversation", (_e, args: { title?: string; workspaceId?: string; systemPrompt?: string | null }) => {
@@ -292,7 +292,7 @@ export function registerIpcHandlers(_deps: {
   ipcMain.handle("listMessages", (_e, args: { conversationId?: string }) => {
     dbInit();
     const convId = args.conversationId;
-    if (!convId) return [];
+    if (!convId) {return [];}
     const rows = getDatabase()
       .prepare("SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC")
       .all(convId) as RawMsgRow[];
@@ -490,7 +490,7 @@ export function registerIpcHandlers(_deps: {
     loadSettings();
     const next = {
       ...settingsCache!,
-      providers: settingsCache!.providers.filter((p) => p.id !== args.id),
+      providers: settingsCache!.providers.filter((p: Provider) => p.id !== args.id),
     };
     settingsCache = sanitize(next);
     saveSettings();

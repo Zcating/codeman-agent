@@ -11,20 +11,20 @@ describe("decodeAppError — bridge from {kind, _tag} payloads to Schema.TaggedE
   it("decodes legacy {kind, _tag, message} JSON shape to matching leaf class", () => {
     const decoded = decodeAppError({ _tag: "NotFound", message: "x" });
     expect(isAppError(decoded)).toBe(true);
-    if (isAppError(decoded)) expect(decoded._tag).toBe("NotFound");
+    if (isAppError(decoded)) {expect(decoded._tag).toBe("NotFound");}
   });
 
   it("falls back to Unknown for unrecognised shapes", () => {
     const decoded = decodeAppError({ totally: "bogus" });
     expect(isAppError(decoded)).toBe(true);
-    if (isAppError(decoded)) expect(decoded._tag).toBe("Unknown");
+    if (isAppError(decoded)) {expect(decoded._tag).toBe("Unknown");}
   });
 
   it("returns Unknown for primitives", () => {
     for (const v of [null, undefined, "string", 42, true]) {
       const decoded = decodeAppError(v);
       expect(isAppError(decoded)).toBe(true);
-      if (isAppError(decoded)) expect(decoded._tag).toBe("Unknown");
+      if (isAppError(decoded)) {expect(decoded._tag).toBe("Unknown");}
     }
   });
 
@@ -42,7 +42,7 @@ describe("decodeAppError — bridge from {kind, _tag} payloads to Schema.TaggedE
     for (const { input, expectedTag } of cases) {
       const decoded = decodeAppError(input);
       expect(isAppError(decoded)).toBe(true);
-      if (isAppError(decoded)) expect(decoded._tag).toBe(expectedTag);
+      if (isAppError(decoded)) {expect(decoded._tag).toBe(expectedTag);}
     }
   });
 });

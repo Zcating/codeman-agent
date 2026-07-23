@@ -81,9 +81,9 @@ export interface NavResult {
  */
 export function navigateInputHistoryPrev(): NavResult | null {
   const e = inputHistory$();
-  if (e.length === 0) return null;
+  if (e.length === 0) {return null;}
   const c = inputHistoryCursor$();
-  if (c === e.length - 1) return null;
+  if (c === e.length - 1) {return null;}
   const next = c + 1;
   setCursor(next);
   return { value: e[next]! };
@@ -97,9 +97,9 @@ export function navigateInputHistoryPrev(): NavResult | null {
  */
 export function navigateInputHistoryNext(): NavResult | null {
   const e = inputHistory$();
-  if (e.length === 0) return null;
+  if (e.length === 0) {return null;}
   const c = inputHistoryCursor$();
-  if (c === -1) return null;
+  if (c === -1) {return null;}
   if (c === 0) {
     setCursor(-1);
     return { value: "" };
@@ -131,11 +131,11 @@ export function handleArrowUp(
 ): boolean {
   const cursorVal = inputHistoryCursor$();
   if (cursorVal === -1) {
-    if (getInput().trim() !== "") return false;
-    if (inputHistory$().length === 0) return false;
+    if (getInput().trim() !== "") {return false;}
+    if (inputHistory$().length === 0) {return false;}
   }
   const result = navigateInputHistoryPrev();
-  if (result !== null) setInput(result.value);
+  if (result !== null) {setInput(result.value);}
   return true;
 }
 
@@ -145,9 +145,9 @@ export function handleArrowUp(
  * 仅在 cursor !== -1 时响应；其它情况让原生 caret 行为接管（返回 false）。
  */
 export function handleArrowDown(setInput: (value: string) => void): boolean {
-  if (inputHistoryCursor$() === -1) return false;
+  if (inputHistoryCursor$() === -1) {return false;}
   const result = navigateInputHistoryNext();
-  if (result !== null) setInput(result.value);
+  if (result !== null) {setInput(result.value);}
   return true;
 }
 

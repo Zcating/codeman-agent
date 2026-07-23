@@ -362,7 +362,7 @@ describe("workspaceIdField — single source of truth (Phase-3 review + ADR-0013
   it("decodeUnknown: present string value parses Right", () => {
     const out = Schema.decodeUnknownEither(wrap)({ workspaceId: "ws-1" });
     expect(out._tag).toBe("Right");
-    if (out._tag === "Right") expect(out.right.workspaceId).toBe("ws-1");
+    if (out._tag === "Right") {expect(out.right.workspaceId).toBe("ws-1");}
   });
 
   it("decodeUnknown: missing key parses Right (proves field is optional)", () => {

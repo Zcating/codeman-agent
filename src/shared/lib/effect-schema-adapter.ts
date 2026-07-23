@@ -127,10 +127,10 @@ export function effectSchema<A, I, R>(
  */
 export function firstErrorMessage(errors: ReadonlyArray<unknown>): string | undefined {
   const first = errors[0];
-  if (typeof first === "string") return first;
+  if (typeof first === "string") {return first;}
   if (first && typeof first === "object" && "message" in first) {
     const m = (first as StandardSchemaV1Issue).message;
-    if (typeof m === "string") return m;
+    if (typeof m === "string") {return m;}
   }
   return undefined;
 }
@@ -146,13 +146,13 @@ const evalAnnotation = (
   annotation: unknown,
   issue: ParseIssue,
 ): string | undefined => {
-  if (typeof annotation === "string") return annotation;
-  if (typeof annotation !== "function") return undefined;
+  if (typeof annotation === "string") {return annotation;}
+  if (typeof annotation !== "function") {return undefined;}
   const result = annotation(issue);
-  if (typeof result === "string") return result;
+  if (typeof result === "string") {return result;}
   if (typeof result === "object" && result !== null && "message" in result) {
     const m = (result as { message: unknown }).message;
-    if (typeof m === "string") return m;
+    if (typeof m === "string") {return m;}
   }
   return undefined;
 };
@@ -186,7 +186,7 @@ function resolveMessage(issue: ParseIssue): string {
     const annotation = Option.getOrUndefined(SchemaAST.getMessageAnnotation(ast));
     if (annotation !== undefined) {
       const evaluated = evalAnnotation(annotation, issue);
-      if (evaluated !== undefined) return evaluated;
+      if (evaluated !== undefined) {return evaluated;}
     }
   }
   // 2. Issue's own message field

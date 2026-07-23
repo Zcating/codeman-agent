@@ -145,7 +145,7 @@ vi.mock("@ark-ui/solid", async () => {
     ...actual,
     Select: {
       Root: (props: any) => {
-        if (props.onValueChange) sharedOnValueChanges.push(props.onValueChange);
+        if (props.onValueChange) {sharedOnValueChanges.push(props.onValueChange);}
         return <>{props.children}</>;
       },
       Control: (props: any) => <>{props.children}</>,

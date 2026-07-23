@@ -126,7 +126,7 @@ function candidateSeedPaths(): string[] {
 
 /** Resolves Q→A entries per priority: env var → dev seed (multi-path) → []. Caches once. */
 export function loadQaTable(): QaEntry[] {
-  if (cache !== null) return cache;
+  if (cache !== null) {return cache;}
 
   // Priority 1: e2e env var path
   const envPath = process.env["CODEMAN_TEST_QA_TABLE"];
@@ -243,7 +243,7 @@ function normalizeQaEntries(raw: unknown[]): QaEntry[] {
 /** Normalize a single turn from a `turns[]` entry. Returns null if the input is
  *  not a usable object (skipped by filter()). */
 function normalizeTurn(t: unknown): QaTurn | null {
-  if (!t || typeof t !== "object" || Array.isArray(t)) return null;
+  if (!t || typeof t !== "object" || Array.isArray(t)) {return null;}
   const tr = t as Record<string, unknown>;
   const text = typeof tr.text === "string"
     ? tr.text
