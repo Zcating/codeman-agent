@@ -8,7 +8,7 @@ import { PassThrough } from "node:stream";
 import { Schema } from "effect";
 import { JsonRpcConnection } from "./jsonrpc";
 import { logger } from "./logger";
-import { JsonRpcProtocolError } from "../../src/shared/lib/errors";
+import { JsonRpcProtocolError } from "../renderer/shared/lib/errors";
 
 // ─── Config & Types (ADR-0032 D1-D3) ─────────────────────────────────────────
 

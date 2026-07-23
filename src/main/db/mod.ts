@@ -22,7 +22,7 @@ function migrationsDir(): string {
   // In dev: relative to source.
   const distPath = join(__dirname, "db", "migrations");
   if (existsSync(distPath)) {return distPath;}
-  return join(__dirname, "..", "..", "electron", "main", "db", "migrations");
+  return join(__dirname, "..", "..", "src", "main", "db", "migrations");
 }
 
 function applyMigrations(db: DB): void {

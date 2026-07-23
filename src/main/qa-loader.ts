@@ -110,13 +110,13 @@ function candidateSeedPaths(): string[] {
   const path = require("node:path") as typeof import("node:path");
   const candidates = [
     // 1) CWD-based: works for `vp run dev` where Electron is spawned from repo root.
-    path.join(process.cwd(), "electron", "assets", "qa.dev.json"),
+    path.join(process.cwd(), "src", "assets", "qa.dev.json"),
     // 2) Bundled main: `dist-electron/main/index.js` → `../assets/qa.dev.json`
     path.join(__dirname, "..", "assets", "qa.dev.json"),
     // 3) Up one more level: e.g. tsc output or nested layouts
-    path.join(__dirname, "..", "..", "electron", "assets", "qa.dev.json"),
+    path.join(__dirname, "..", "..", "src", "assets", "qa.dev.json"),
     // 4) Asar-style: packaged app where assets live next to main bundle
-    path.join(__dirname, "..", "..", "..", "electron", "assets", "qa.dev.json"),
+    path.join(__dirname, "..", "..", "..", "src", "assets", "qa.dev.json"),
   ];
   // Deduplicate while preserving order
   return Array.from(new Set(candidates));

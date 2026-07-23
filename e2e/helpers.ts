@@ -11,7 +11,7 @@
 //! 但调用语法 跟 Playwright 一致,spec 文件改动最小。
 
 import { assert, ElectronLocator, ElectronPage } from "./cdp-driver";
-import type { Workspace } from "../src/shared/lib/types";
+import type { Workspace } from "../src/renderer/shared/lib/types";
 import * as path from "node:path";
 import * as os from "node:os";
 

@@ -11,7 +11,7 @@
 //! 我们用假 key — 只测写入路径，不测真实 LLM 网络。
 
 import { test, expect, assert, invoke } from "./fixtures";
-import type { Settings } from "../src/shared/lib/types";
+import type { Settings } from "../src/renderer/shared/lib/types";
 
 const FAKE_KEY = "sk-e2e-fake-key-not-real-do-not-use-12345";
 

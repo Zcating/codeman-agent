@@ -4,7 +4,7 @@
 //! Mock 队列由 e2e mock LLM 消费,确定性返回 tool call + text,不依赖网络。
 
 import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
-import type { Workspace } from "../src/shared/lib/types";
+import type { Workspace } from "../src/renderer/shared/lib/types";
 import { useMockProvider } from "./mock-provider";
 import * as fs from "node:fs";
 import * as path from "node:path";

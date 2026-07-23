@@ -12,7 +12,7 @@
 //! 这些测试是确定性的,跟 05-file-tools 不同,它们不依赖真实 LLM。
 
 import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
-import type { Workspace } from "../src/shared/lib/types";
+import type { Workspace } from "../src/renderer/shared/lib/types";
 import { useMockProvider } from "./mock-provider";
 import * as fs from "node:fs";
 import * as path from "node:path";

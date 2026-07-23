@@ -12,7 +12,7 @@
 //! coupling to a specific layout.
 
 import { test, assert, expect, invoke } from "./fixtures";
-import type { Workspace } from "../src/shared/lib/types";
+import type { Workspace } from "../src/renderer/shared/lib/types";
 
 test.describe("01 — application launch", () => {
   let consoleErrors: string[] = [];

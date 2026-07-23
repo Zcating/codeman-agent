@@ -13,7 +13,7 @@ import { Effect, Exit } from "effect";
 import { logger } from "./logger";
 import { McpStdioServer, type McpServerConfig, type McpServerStatus, type McpTool, type McpCallResult } from "./mcp-host";
 import { MCP_CONFIG_PATH, readMcpConfig, writeMcpConfig } from "./mcp-config";
-import { InvalidConfig, JsonRpcProtocolError, NotFound } from "../../src/shared/lib/errors";
+import { InvalidConfig, JsonRpcProtocolError, NotFound } from "../renderer/shared/lib/errors";
 
 export interface McpServerInfo {
   config: McpServerConfig;

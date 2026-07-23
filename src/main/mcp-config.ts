@@ -18,7 +18,7 @@ import { Effect, Schema } from "effect";
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { app } from "electron";
-import { InvalidConfig } from "../../src/shared/lib/errors";
+import { InvalidConfig } from "../renderer/shared/lib/errors";
 import type { McpServerConfig } from "./mcp-host";
 
 const HOME = (): string => app.getPath("home");
