@@ -22,7 +22,7 @@ src/plugins/mcp/
 ## 数据流
 
 ```
-electron/main/mcp-manager.ts  ←IPC→  McpService (shared/lib/ipc.ts)
+src/main/mcp-manager.ts  ←IPC→  McpService (shared/lib/ipc.ts)
                                       ↓
                               mcpServers$ / mcpAllTools$ (stores/store.ts)
                                       ↓
@@ -64,7 +64,7 @@ electron/main/mcp-manager.ts  ←IPC→  McpService (shared/lib/ipc.ts)
 }
 ```
 
-工具名格式 (`mcp_<server-slug>_<tool-slug>`) 由 `electron/main/mcp-manager.ts::McpManager.startAll()` 保证唯一性；冲突时第二个 server 被标记 `protocol_error` 并停止（per ADR-0032 D3）。
+工具名格式 (`mcp_<server-slug>_<tool-slug>`) 由 `src/main/mcp-manager.ts::McpManager.startAll()` 保证唯一性；冲突时第二个 server 被标记 `protocol_error` 并停止（per ADR-0032 D3）。
 
 ## ADR 参考
 

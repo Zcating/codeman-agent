@@ -76,7 +76,7 @@ Vite 单页应用，渲染到单个 Electron BrowserWindow。路由走 TanStack 
 ## 模式
 
 - **TanStack Router 处理路由。** 路由文件在 `src/features/<feature>/routes/`, `index.tsx` mount `<RouterProvider>`, `__root.tsx` 提供根布局, 跳设置用 `<A href="/settings">`。`ChatView` 不再监听 hash。
-- **main 窗口 = 唯一 BrowserWindow。** Electron 窗口配置在 `electron/main/index.ts`，800×600 起步。不用 hash 路由，用 browser history（`createBrowserHistory`）。
+- **main 窗口 = 唯一 BrowserWindow。** Electron 窗口配置在 `src/main/index.ts`，800×600 起步。不用 hash 路由，用 browser history（`createBrowserHistory`）。
 - **Effect → Solid 桥接。** 逻辑层返回 `Effect.Effect<T, AppError>` / `Stream.Stream<T, E>`，桥接层在 stores 里 `Effect.runPromiseExit()` 后写入 `createSignal`，UI 读 `Accessor`。
 - **服务对象通过 `Context.Tag` 注入。** `ConversationService` / `MessageService` / `BillingService` / `SettingsService` 在 `shared/lib/ipc.ts` 定义 Tag + Live Layer；测试用 `Layer.succeed` 提供 mock。
 - **错误上抛是 `AppError` 判别联合。** UI 不 catch Effect-typed error；桥接层用 `Exit.isSuccess` 过滤，失败的 Effect 转成空数据 / 错误 toast。
@@ -88,14 +88,14 @@ Vite 单页应用，渲染到单个 Electron BrowserWindow。路由走 TanStack 
 
 | 任务                              | 文件                                                                                                                               |
 | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| 新增 IPC channel                   | `electron/main/ipc.ts`（加 `ipcMain.handle`）+ `electron/preload/index.ts`（暴露到 `window.codeman`）；前端类型在 `src/shared/lib/types.ts` |
-| 新增跨域类型                      | `shared/lib/types.ts`（Electron 侧类型在 `electron/types.ts`）                                                                     |
-| 新增设置项                        | 改 `electron/main/settings-schema.ts`（schema 定义），然后同步 `src/shared/lib/types.ts` 的 TS 镜像
+| 新增 IPC channel                   | `src/main/ipc.ts`（加 `ipcMain.handle`）+ `src/preload/index.ts`（暴露到 `window.codeman`）；前端类型在 `src/renderer/shared/lib/types.ts` |
+| 新增跨域类型                      | `shared/lib/types.ts`（Electron 侧类型在 `src/main/types.ts`）                                                                     |
+| 新增设置项                        | 改 `src/main/settings-schema.ts`（schema 定义），然后同步 `src/renderer/shared/lib/types.ts` 的 TS 镜像
 | 新增 sidebar 组件                 | 改 `shared/components/ui/sidebar.tsx`（primitive） + `shared/components/internal/codeman-sidebar.tsx`（业务组合），遵循 [ADR-0022](../docs/adr/0022-internal-components-and-design-tokens.md) + [ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md)（codeman-* namespace） |
 | 改 Home 布局 / Codex form         | 改 `src/features/chat/routes/index.tsx`（状态机）+ `src/features/chat/components/home.tsx`（Codex form）                            |
-| 改 `Conversation.workspace_id`    | 改 `electron/main/db/conversations.ts` + `src/shared/lib/types.ts`（TS 镜像）+ SQLite migration 在 `electron/main/db/migrations/` |
-| 改 `last_used_workspace_id`       | 改 `WorkspaceService`（`src/shared/lib/workspace-service.ts`，V3+ 从 features/chat/lib 提升）+ `src/features/chat/stores/chat.store.ts`（chatStore reactive 状态）。**不再**是 Settings 字段，**不再**走 `appStore`（ADR-0023 D8-W）。|
-| 新增 Workspace CRUD               | `electron/main/db/workspaces.ts`（Electron SQLite）+ `electron/main/ipc.ts`（IPC handler）+ `src/shared/lib/workspace-service.ts`（Effect Context.Tag + Live Layer）+ `src/features/chat/stores/chat.store.ts`（reactive bridge）。遵循 [ADR-0023 D8-W](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md）。|
+| 改 `Conversation.workspace_id`    | 改 `src/main/db/conversations.ts` + `src/renderer/shared/lib/types.ts`（TS 镜像）+ SQLite migration 在 `src/main/db/migrations/` |
+| 改 `last_used_workspace_id`       | 改 `WorkspaceService`（`src/renderer/shared/lib/workspace-service.ts`，V3+ 从 features/chat/lib 提升）+ `src/features/chat/stores/chat.store.ts`（chatStore reactive 状态）。**不再**是 Settings 字段，**不再**走 `appStore`（ADR-0023 D8-W）。|
+| 新增 Workspace CRUD               | `src/main/db/workspaces.ts`（Electron SQLite）+ `src/main/ipc.ts`（IPC handler）+ `src/renderer/shared/lib/workspace-service.ts`（Effect Context.Tag + Live Layer）+ `src/features/chat/stores/chat.store.ts`（reactive bridge）。遵循 [ADR-0023 D8-W](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md）。|
 | 新增 Dialog 原子                  | `shared/components/ui/dialog.tsx`（@ark-ui/solid Dialog 包装，shadcn/ui 风格）+ `shared/components/internal/codeman-dialog.tsx`（命令式 alert / confirm / show）。遵循 [ADR-0023 D8-W6](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md)。|
 | 新增跨域设计系统原子              | `shared/components/ui/<Name>.tsx`（PascalCase）+ 同名 `<Name>.test.tsx`；Select primitive 走 @ark-ui/solid 包装（[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-S）            |
 | 新增跨域业务组件                  | `shared/components/internal/codeman-<Name>.tsx`（**ADR-0022** 首例 `codeman-sidebar`；[ADR-0023](../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-N codeman-* prefix 锁定；新组件须严格 prop-driven）      |

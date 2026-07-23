@@ -3,9 +3,9 @@
 **Status**: accepted · **Date**: 2026-07-12
 
 **Scope**:
-- `electron/main/ipc.ts` — 24 个 `ipcMain.handle("snake_name", ...)` 字符串 → camelCase + drop dual-form arg types in 8 handlers (cluster C)
-- `electron/main/ipc.test.ts` — `EXPECTED_CHANNELS` 数组字符串 → camelCase
-- `electron/preload/index.ts` — 24 个 `ipcRenderer.invoke("snake_name", ...)` 字符串 → camelCase
+- `src/main/ipc.ts` — 24 个 `ipcMain.handle("snake_name", ...)` 字符串 → camelCase + drop dual-form arg types in 8 handlers (cluster C)
+- `src/main/ipc.test.ts` — `EXPECTED_CHANNELS` 数组字符串 → camelCase
+- `src/preload/index.ts` — 24 个 `ipcRenderer.invoke("snake_name", ...)` 字符串 → camelCase
 - `src/__mocks__/ipc-mock.ts` — 24 个 `methodToCmd.cmd` 字符串 → camelCase
 - `CONTEXT.md` — Provider.llm / Settings / Domain shape / Settings interface 同步 camelCase + drive-by `src-tauri/*` 路径 references 移除(current-state docs only)
 
@@ -26,9 +26,9 @@ ADR-0024 + D10 (in fd36f6207) 已把 settings-schema 字段全量 camelCase + �
 
 **当下 (2026-07-12) 现状的三处不对称**:
 
-1. **24 个 IPC channel name 字符串仍是 snake_case**:`electron/main/ipc.ts` 的 `ipcMain.handle("get_settings", ...)` / `"update_settings"` / `"create_conversation"` / `"read_file"` 等 24 个 channel name 字符串。`electron/preload/index.ts` 把它们 `invoke("snake", ...)` 出去;`src/__mocks__/ipc-mock.ts:453-487` 的 `methodToCmd.cmd` 反查;`electron/main/ipc.test.ts:34-58` 的 `EXPECTED_CHANNELS` 数组。channel name 是 Electron 内部 transport layer 标识符,不暴露给 LLM(LLM 看到的是 tool `name` = `"edit_file"` snake 由 Anthropic 协议锁定,per ADR-0013/0013.1)。
+1. **24 个 IPC channel name 字符串仍是 snake_case**:`src/main/ipc.ts` 的 `ipcMain.handle("get_settings", ...)` / `"update_settings"` / `"create_conversation"` / `"read_file"` 等 24 个 channel name 字符串。`src/preload/index.ts` 把它们 `invoke("snake", ...)` 出去;`src/renderer/__mocks__/ipc-mock.ts:453-487` 的 `methodToCmd.cmd` 反查;`src/main/ipc.test.ts:34-58` 的 `EXPECTED_CHANNELS` 数组。channel name 是 Electron 内部 transport layer 标识符,不暴露给 LLM(LLM 看到的是 tool `name` = `"edit_file"` snake 由 Anthropic 协议锁定,per ADR-0013/0013.1)。
 
-2. **`electron/main/ipc.ts` arg 类型保留 dual-form V2 兼容桥**:`create_conversation` handler 接 `{ workspaceId | workspace_id }` / `{ systemPrompt | system_prompt }`;`add_workspace` 接 `{ rootPath | root_path }`;`list_messages` 接 `{ conversationId | conversation_id }`;`append_message` 接 `{ toolCalls | tool_calls }` / `{ toolResults | tool_results }`;5 个 file tools handler 接 `{ workspaceId | workspace_id }`。V3 V15-camel 已经是 strict camelCase (per D10 schema rename),dual-form bridge 是 V2 Tauri 时代残留 dead code。
+2. **`src/main/ipc.ts` arg 类型保留 dual-form V2 兼容桥**:`create_conversation` handler 接 `{ workspaceId | workspace_id }` / `{ systemPrompt | system_prompt }`;`add_workspace` 接 `{ rootPath | root_path }`;`list_messages` 接 `{ conversationId | conversation_id }`;`append_message` 接 `{ toolCalls | tool_calls }` / `{ toolResults | tool_results }`;5 个 file tools handler 接 `{ workspaceId | workspace_id }`。V3 V15-camel 已经是 strict camelCase (per D10 schema rename),dual-form bridge 是 V2 Tauri 时代残留 dead code。
 
 3. **CONTEXT.md prose 仍是旧 snake 形态**:`Settings` interface code 块 (`api_key` / `base_url` / `api_type` 等)、Provider.llm gloss (`{ defaultModel, base_url, api_type, ... }`)、Settings gloss 字段列表 (`system_prompt / conversations / user_language / start_at_login`)、Settings::Default prose (`base_url: "..."` / `api_type: "..."`)、`src-tauri/src/lib.rs` + `src-tauri/src/settings.rs` 路径引用 —— 全是 V3 pre-D10 快照,需要 sync 到 V3.1+ canonical camelCase 现状。
 
@@ -39,7 +39,7 @@ ADR-0024 + D10 (in fd36f6207) 已把 settings-schema 字段全量 camelCase + �
 - "顺带移除所有 src-tauri 的所有描述" (drive-by,current-state docs only)
 
 **Out of scope (master 已落地,不重复)**:
-- `electron/main/settings-schema.ts` interface field rename (per fd36f6207)
+- `src/main/settings-schema.ts` interface field rename (per fd36f6207)
 - `migrateV15SnakeToCamel()` 函数 (per fd36f6207)
 - `ipc.ts loadSettings()` eager 调用 migration 的 wiring (per fd36f6207)
 - ADR-0024 D10 文字 (per fd36f6207)
@@ -85,10 +85,10 @@ ADR-0024 + D10 (in fd36f6207) 已把 settings-schema 字段全量 camelCase + �
 | `get_log_path`            | `getLogPath`             |
 
 **4 个文件同步改**:
-- `electron/main/ipc.ts` — 24 个 `ipcMain.handle("...", ...)` 字符串
-- `electron/preload/index.ts` — 24 个 `ipcRenderer.invoke("...", ...)` 字符串 (`add_workspace` 调用点同步 `root_path: rootPath` → `rootPath: rootPath`)
-- `src/__mocks__/ipc-mock.ts` line 453-487 — 24 个 `methodToCmd.cmd` 字符串 (mockState 单一源,测试基础设施)
-- `electron/main/ipc.test.ts` line 34-58 — `EXPECTED_CHANNELS` 数组 (channel registration 测试)
+- `src/main/ipc.ts` — 24 个 `ipcMain.handle("...", ...)` 字符串
+- `src/preload/index.ts` — 24 个 `ipcRenderer.invoke("...", ...)` 字符串 (`add_workspace` 调用点同步 `root_path: rootPath` → `rootPath: rootPath`)
+- `src/renderer/__mocks__/ipc-mock.ts` line 453-487 — 24 个 `methodToCmd.cmd` 字符串 (mockState 单一源,测试基础设施)
+- `src/main/ipc.test.ts` line 34-58 — `EXPECTED_CHANNELS` 数组 (channel registration 测试)
 
 **`src/shared/lib/ipc.ts` Service Tag 完全封装** channel name 字符串,**不接触** —— 无需改。
 
@@ -98,7 +98,7 @@ ADR-0024 + D10 (in fd36f6207) 已把 settings-schema 字段全量 camelCase + �
 - File Tool 的 LLM-facing tool name (`read_file` / `write_file` / `edit_file` / `search_files` / `delete_file`) 仍是 snake_case,Anthropic tool dispatch protocol 锁定 (per ADR-0013 + ADR-0013.1)
 - 内部 IPC channel 是 camelCase (`readFile` / `writeFile` / `editFile` / `searchFiles` / `deleteFile`) —— 这是 TS-side transport layer 用 camelCase 跟其它 IPC channel 对齐
 
-### D2 — Drop dual-form arg types in `electron/main/ipc.ts` (Cluster C)
+### D2 — Drop dual-form arg types in `src/main/ipc.ts` (Cluster C)
 
 V2 caller 兼容桥(`{ workspaceId | workspace_id }` 双形态接收)在 V3 V15-camel 时代是 dead code —— schema 字段已 strict camelCase + 所有真实 caller 已 camelCase (`src/__mocks__/ipc-mock.ts` line 469-473 已经 camelCase,V2 caller 已无 caller 路径)。全 drop:
 
@@ -128,7 +128,7 @@ V2 caller 兼容桥(`{ workspaceId | workspace_id }` 双形态接收)在 V3 V15-
 - Line 65 (Settings gloss fields):`systemPrompt / conversations / userLanguage / startAtLogin`
 - Line 99 (Fake LLM Provider gloss):`baseUrl`、llm 子 shape、`ipcMain.handle('updateSettings', ...)`
 - Line 100 (Mock Server term):`baseUrl` 都受理
-- Line 101 (Q→A Table term):移除 `src-tauri/src/lib.rs` 历史 reference;只用 `electron/main/index.ts`
+- Line 101 (Q→A Table term):移除 `src-tauri/src/lib.rs` 历史 reference;只用 `src/main/index.ts`
 - Line 103 (Add Provider Dialog Mock Template):pre-fill 值 shape (`baseUrl` / `apiType` / `modelsEndpoint`) + `updateSettings` IPC channel
 - Line 125 (User Language term):`Settings.userLanguage`
 - Line 128 (UI String term):`userLanguage`
@@ -140,8 +140,8 @@ V2 caller 兼容桥(`{ workspaceId | workspace_id }` 双形态接收)在 V3 V15-
 - Line 237 (Settings::Default prose):`baseUrl` / `apiType` 字面量
 
 **Drive-by src-tauri cleanup (current-state docs only)**:
-- Line 101 `src-tauri/src/lib.rs` → 删除 (V3 启动钩子在 `electron/main/index.ts`)
-- Line 171 `src-tauri/src/settings.rs` → 删除 (V3 schema 在 `electron/main/settings-schema.ts`)
+- Line 101 `src-tauri/src/lib.rs` → 删除 (V3 启动钩子在 `src/main/index.ts`)
+- Line 171 `src-tauri/src/settings.rs` → 删除 (V3 schema 在 `src/main/settings-schema.ts`)
 - `src/AGENTS.md` 和 `docs/translation-rules.md` 已 clean (无 stale `src-tauri/*`)
 - Historical ADRs (0001..0025 + 0013.1) 不动 —— ADR 是历史 record,retain `src-tauri/*` references 是为了"为什么这样决策"的完整性
 
@@ -217,10 +217,10 @@ V2 caller 兼容桥(`{ workspaceId | workspace_id }` 双形态接收)在 V3 V15-
 feat(electron): IPC channel rename snake_case → camelCase + drop dual-form (ADR-0026)
 
 IPC channel name (24 channels × 4 files):
-- electron/main/ipc.ts: 24 ipcMain.handle("...", ...) strings snake → camel
-- electron/preload/index.ts: 24 invoke("...", ...) strings snake → camel
-- src/__mocks__/ipc-mock.ts (line 453-487): 24 methodToCmd.cmd snake → camel
-- electron/main/ipc.test.ts (line 34-58): EXPECTED_CHANNELS array snake → camel
+- src/main/ipc.ts: 24 ipcMain.handle("...", ...) strings snake → camel
+- src/preload/index.ts: 24 invoke("...", ...) strings snake → camel
+- src/renderer/__mocks__/ipc-mock.ts (line 453-487): 24 methodToCmd.cmd snake → camel
+- src/main/ipc.test.ts (line 34-58): EXPECTED_CHANNELS array snake → camel
 
 Drop dual-form V2 caller bridges (ipc.ts):
 - 9 handlers: createConversation / listMessages / appendMessage / addWorkspace /

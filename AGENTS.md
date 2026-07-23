@@ -139,9 +139,14 @@ codeman-agent/
 │           ├── index.ts
 │           └── lib/               # file-tools.ts + file-tools.test.ts
 │
-├── electron/                      # Electron 后端（main + preload）
+├── src/
+│   ├── main/                      # Electron 主进程（原 electron/main/）
+│   ├── preload/                   # Electron preload（原 electron/preload/）
+│   ├── renderer/                  # 前端 SPA（原 src/）
+│   ├── resources/                 # Skills 捆绑包（原 electron/resources/）
+│   └── assets/                    # QA 数据等（原 electron/assets/）
 ├── docs/adr/                      # 25 个 ADR（0001-0024，见下方索引）
-├── (mocks 改在 src/__mocks__/ — 详见 src/AGENTS.md)
+├── (mocks 改在 src/renderer/__mocks__/ — 详见 src/renderer/AGENTS.md)
 ├── docs/                          # 治理文档（translation-rules 等）
 └── .agents/                       # 本地 agent skills
 ```

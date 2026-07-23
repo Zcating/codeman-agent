@@ -105,5 +105,5 @@ import { cn } from "@/shared/lib/cn";
 
 1. 改动 `shared/` 下的基础设施前，确认没有 feature 会意外破坏
 2. `cn.ts` 改动需要独立测试全量通过
-3. 新增 shared 类型需要同步 Electron backend（`electron/types.ts` 或 IPC handler 参数）
+3. 新增 shared 类型需要同步 Electron backend（`src/main/types.ts` 或 IPC handler 参数）
 4. 新增 `components/internal/` 首例组件前，开新 ADR 跟进（命名 / 数量上限 / 维护者）
