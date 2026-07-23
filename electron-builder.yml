@@ -28,8 +28,8 @@ files:
   - "!docs/**"
 asarUnpack:
   - "**/*.node"
-extraResources:
-  - from: "electron/resources"
+  extraResources:
+  - from: "src/resources"
     to: "skills"
     filter: ["**/*"]
 win:

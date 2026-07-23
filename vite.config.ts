@@ -38,7 +38,7 @@ export default defineConfig(async () => ({
         test: {
           name: "web",
           environment: "jsdom",
-          include: ["src/**/*.{test,spec}.{ts,tsx}"],
+          include: ["src/renderer/**/*.{test,spec}.{ts,tsx}"],
           server: {
             deps: { inline: [/solid-js/, /solidjs/] },
           },
@@ -49,14 +49,14 @@ export default defineConfig(async () => ({
         test: {
           name: "main",
           environment: "node",
-          include: ["electron/main/**/*.{test,spec}.{ts,tsx}"],
+          include: ["src/main/**/*.{test,spec}.{ts,tsx}"],
         },
       },
     ],
     exclude: ["node_modules", "dist", "e2e", "playwright-report"],
     coverage: {
       provider: "v8",
-      include: ["src/**/*.{ts,tsx}"],
+      include: ["src/renderer/**/*.{ts,tsx}"],
       exclude: [
         "src/**/*.test.{ts,tsx}",
         "src/**/*.spec.{ts,tsx}",
@@ -68,11 +68,11 @@ export default defineConfig(async () => ({
         "src/features/**/routes/index.tsx",
         "e2e/**",
         "*.config.ts",
-        "electron/main/index.ts",
-        "electron/main/ipc.ts",
-        "electron/main/db/mod.ts",
-        "electron/main/file-sandbox.ts",
-        "electron/preload/index.ts",
+        "src/main/index.ts",
+        "src/main/ipc.ts",
+        "src/main/db/mod.ts",
+        "src/main/file-sandbox.ts",
+        "src/preload/index.ts",
         "src/shared/lib/ipc.ts",
         "src/shared/lib/tauri.ts",
       ],
