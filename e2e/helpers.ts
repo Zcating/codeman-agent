@@ -25,7 +25,7 @@ export type TauriPage = ElectronPage;
 /**
  * 调 V3 Electron IPC 命令。Spec 用它做端到端断言（不依赖 UI 反馈）。
  * 实际是在 webview 里跑 `window.codeman.invoke(channel, args)` — 由
- * electron/preload/index.ts 通过 contextBridge 暴露的通用 escape hatch。
+ * src/preload/index.ts 通过 contextBridge 暴露的通用 escape hatch。
  *
  * 实现注意：内层函数必须是 `async`,以便在调用方视角把 invoke promise 的
  * rejection 包装成同步的 throw。`await` + `try/catch` + `throw new Error`

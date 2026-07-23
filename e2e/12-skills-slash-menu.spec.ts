@@ -9,7 +9,7 @@
 //! 实际插入 textarea — 这是 by design(`use-slash-trigger.ts:55-56`)。
 //! 所以测试不能用 `page.fill("/xxx")` 这种方式,必须 dispatch KeyboardEvent。
 //!
-//! Preinstalled skills 来自 `electron/resources/skills/`(由 `electron-builder`
+//! Preinstalled skills 来自 `src/resources/skills/`(由 `electron-builder`
 //! 打包进 release)。e2e harness 走 LOCAL_BIN fallback 路径
 //! (`fixtures.ts:89-95`),不打包这些资源 → 测试只断言 settings tab 能 mount + refresh
 //! 按钮 + toggle 流程,不依赖发现具体 preinstalled skill。
@@ -33,7 +33,7 @@ test.describe("12 — Skills", () => {
     await gotoSkillsSettings(page);
 
     // Click refresh — 触发 IPC `skillsScan`,扫描 ~/.agents/skills/
-    // + electron/resources/skills/ (packaged path)。LOCAL_BIN fallback 下
+    // + src/resources/skills/ (packaged path)。LOCAL_BIN fallback 下
     // resources 目录在 Electron cwd 中不一定存在,所以我们只断言:
     //   a. 按钮 click 不抛
     //   b. 页面要么渲染 skills-list,要么显示 empty state
