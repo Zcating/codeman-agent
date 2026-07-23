@@ -48,13 +48,31 @@ export default defineConfig({
     },
   },
   renderer: {
-    root: ".",
+    // Vite dev server root MUST point at the renderer source so that the
+    // SPA fallback (`/`) can serve `index.html`. With `root: "."` the dev
+    // server tried to fall back to the repo root, where no `index.html`
+    // exists, so `http://127.0.0.1:1420/` returned 404 and the Electron
+    // renderer loaded a blank page (E2E works because it builds first and
+    // loads via `app://./`, bypassing vite dev entirely).
+    root: "src/renderer",
     build: {
-      outDir: "dist",
+      // outDir is relative to the new root, so go up one level to keep the
+      // build artifact at the repo-root `dist/` that E2E's globalSetup
+      // expects (`dist-electron/` already lives there).
+      outDir: "../dist",
+      emptyOutDir: true,
+      // rollupOptions.input must be an absolute path. With the relative
+      // form `"index.html"`, vite's dependency-scan phase resolves it
+      // against its own CWD (the repo root after root change), fails with
+      // `failed to resolve rolldownOptions.input value: "index.html"`, and
+      // skips pre-bundling — which leaves Solid + pi-ai un-bundled in dev
+      // and the renderer renders a blank page.
       rollupOptions: { input: { index: r("src/renderer/index.html") } },
     },
     plugins: [solid(), tailwindcss()],
     resolve: {
+      // alias must stay absolute — Vite's resolve.alias is a full path
+      // substitution, not a root-relative one.
       alias: [{ find: "@", replacement: r("src/renderer") }],
     },
     server: { port: 1420, strictPort: true, host: "127.0.0.1" },
