@@ -1,4 +1,4 @@
-// T3 — electron/preload/index.ts: contextBridge IPC bridge.
+// T3 — src/preload/index.ts: contextBridge IPC bridge.
 //
 // Exposes the 24 ipcMain.handle channels + onStreamChunk subscription to
 // the renderer as `window.codeman`. Renderer never imports 'electron' directly;
@@ -58,7 +58,7 @@ const codeman = {
   pickWorkspacePath: () => ipcRenderer.invoke("pickWorkspacePath"),
 
   // Provider CRUD (V3+ ADR-0023 D8-W). ADR-0026 D1 mandates this channel;
-  // main handler at electron/main/ipc.ts (deleteProvider handler).
+  // main handler at src/main/ipc.ts (deleteProvider handler).
   deleteProvider: (id: string) => ipcRenderer.invoke("deleteProvider", { id }),
 
   // ADR-0024 D7: abort in-flight LLM request by requestId

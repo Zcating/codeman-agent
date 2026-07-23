@@ -475,7 +475,7 @@ export default { invoke };
 
 // ─── V3: window.codeman Mock ───────────────────────────────────
 //
-// ipc.ts dispatches via `window.codeman.<method>` (set by electron/preload).
+// ipc.ts dispatches via `window.codeman.<method>` (set by src/preload).
 // This mock mirrors every command in `commandHandlers` as a method on
 // `window.codeman`, so V3 ipc.ts finds the mock at runtime in jsdom tests.
 

@@ -1,4 +1,4 @@
-// T3 — electron/main/index.ts: Electron main entry.
+// T3 — src/main/index.ts: Electron main entry.
 //
 // Per V3 consensus 1.6: app.setPath('userData', LOCALAPPDATA/codeman-agent)
 // MUST be the first executable statement (before any other runtime import

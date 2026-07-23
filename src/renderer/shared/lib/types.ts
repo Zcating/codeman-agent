@@ -1,5 +1,5 @@
 //! TS-side data structures. Field names use camelCase in TS; the IPC layer
-//! (`electron/main/ipc.ts`) translates to/from snake_case at the SQLite/Rust
+//! (`src/main/ipc.ts`) translates to/from snake_case at the SQLite/Rust
 //! boundary so DB column names stay snake_case. New fields added here MUST
 //! use camelCase.
 

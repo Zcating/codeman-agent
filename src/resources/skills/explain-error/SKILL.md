@@ -82,7 +82,7 @@ Error: Error invoking remote method 'skillsScan': Error: ...
 ```
 SqliteError: no such column: workspace_id
 ```
-→ Root cause: migration not applied OR field name mismatch. Fix: check `electron/main/db/migrations/` and re-run migrations.
+→ Root cause: migration not applied OR field name mismatch. Fix: check `src/main/db/migrations/` and re-run migrations.
 
 ## Tone
 

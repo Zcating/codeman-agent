@@ -42,7 +42,7 @@ Where:
    - Refactor without behavior change → `refactor`
    - Test-only changes → `test`
    - Docs / comments → `docs`
-3. Identify the **scope** by looking at which directory is most affected (e.g. `chat/lib/`, `shared/`, `electron/main/`)
+3. Identify the **scope** by looking at which directory is most affected (e.g. `chat/lib/`, `shared/`, `src/main/`)
 4. Write a **subject** that summarizes the diff in one line. Use imperative mood ("add", not "added").
 5. Write a **body** with bullets (`-`) if there are 2+ logical changes. Keep it terse.
 6. Suggest a **footer** if there are breaking changes (`BREAKING CHANGE: <desc>`) or related issues.
@@ -54,7 +54,7 @@ Where:
 feat(skills): add 4 ship-with-app Skills
 
 - commit-helper, explain-error, code-review, summarize
-- each ships as SKILL.md under electron/resources/skills/
+- each ships as SKILL.md under src/resources/skills/
 - electron-builder extraResources copies to ~/.agents/skills/.preinstalled/ on first launch
 ```
 

@@ -6,7 +6,7 @@
 //!
 //! T5 changes from tauri.ts:
 //! - `invoke<T>()` no longer calls `@tauri-apps/api/core` `invoke`
-//! - It dispatches to `window.codeman.<method>` (set by electron/preload)
+//! - It dispatches to `window.codeman.<method>` (set by src/preload)
 //! - On test/jsdom, vitest's mock at `src/__mocks__/@tauri-apps/api/core.ts`
 //!   populates `window.codeman` with vi.fn()s; the dispatch routes to those.
 
@@ -39,7 +39,7 @@ export const TauriError = {
   IPC: (message: string): TauriError => ({ kind: "IPC" as const, message }),
 };
 
-/** Shape of preload-exposed API (mirrors electron/preload/index.ts) */
+/** Shape of preload-exposed API (mirrors src/preload/index.ts) */
 export interface CodemanApi {
   getSettings: () => Promise<unknown>;
   updateSettings: (newSettings: unknown) => Promise<unknown>;
@@ -114,7 +114,7 @@ function api(): CodemanApi {
 
 /**
  * Dispatch IPC command to the appropriate window.codeman method.
- * Mirrors the channel name → method mapping in electron/main/ipc.ts.
+ * Mirrors the channel name → method mapping in src/main/ipc.ts.
  */
 async function dispatchInvoke<T>(
   name: string,
@@ -217,7 +217,7 @@ export const invoke = <T>(
     try: () => dispatchInvoke<T>(name, args),
     catch: (e) => {
       // AppError from main process is encoded as JSON in Error.message
-      // (electron/main/ipc.ts sandboxHandler wraps AppError plain objects).
+      // (src/main/ipc.ts sandboxHandler wraps AppError plain objects).
       // However, Electron's ipcMain.handle re-wraps the Error, so the renderer
       // sees: `Error: Error invoking remote method 'X': Error: {"kind":"...","message":"..."}`.
       // We need to extract the JSON from the doubly-wrapped message.

@@ -1,4 +1,4 @@
-// T4b — electron/main/db/mod.ts: better-sqlite3 connection + migration runner.
+// T4b — src/main/db/mod.ts: better-sqlite3 connection + migration runner.
 //
 // Per ADR-0024 D1: schema verbatim from src-tauri/src/db/migrations/.
 // Per V3 consensus 1.4: better-sqlite3 (Node 22 ABI) for V3 (Node 22.18+).
@@ -17,7 +17,7 @@ function dbPath(): string {
 }
 
 function migrationsDir(): string {
-  // Migrations are bundled with main process at electron/main/db/migrations/*.sql
+  // Migrations are bundled with main process at src/main/db/migrations/*.sql
   // After electron-vite build: dist-electron/main/db/migrations/*.sql
   // In dev: relative to source.
   const distPath = join(__dirname, "db", "migrations");

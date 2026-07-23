@@ -1,7 +1,7 @@
 //! V3.1 MCP — IPC handler registration (ADR-0032 D3-D4).
 //!
 //! Exposes McpManager operations to the renderer over 7 IPC channels.
-//! Wired in electron/main/index.ts (per ADR-0024 D10 channel-name convention).
+//! Wired in src/main/index.ts (per ADR-0024 D10 channel-name convention).
 
 import { ipcMain } from "electron";
 import type { McpManager } from "./mcp-manager";

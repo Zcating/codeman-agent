@@ -1,4 +1,4 @@
-//! mock-server.test.ts — Node-side unit tests for electron/main/mock-server.ts.
+//! mock-server.test.ts — Node-side unit tests for src/main/mock-server.ts.
 //!
 //! Strategy: stub `node:http` via a real server (startMockServer actually starts
 //! the server, then we hit it via fetch). For substring-match / miss-warning

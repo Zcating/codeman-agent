@@ -1,4 +1,4 @@
-//! electron/main/mock-server.ts — 本地 mock LLM HTTP 服务器。
+//! src/main/mock-server.ts — 本地 mock LLM HTTP 服务器。
 //!
 //! 监听 `127.0.0.1:50000`(`CODEMAN_MOCK_PORT` 可覆盖)。POST `/mock/anthropic/v1/messages`
 //! 收到 `AnthropicTransport` 的 fetch 请求,按 user message 末条做 substring match
@@ -13,7 +13,7 @@
 //! (如 "three-blocks")也能命中对应的 canned response,无需开新会话。
 //! scripted 多 turn 本身仍按 `asstCount` 顺序推进(同一 entry 内 turn 切换不依赖 lookup)。
 //!
-//! 启动由 `electron/main/index.ts` 的 `app.whenReady()` 钩入。
+//! 启动由 `src/main/index.ts` 的 `app.whenReady()` 钩入。
 //!
 //! 设计要点(per CONTEXT.md 「Mock Server」):
 //! - Stateless HTTP responder — 不接 provider record / settings / IPC

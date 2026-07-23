@@ -3,7 +3,7 @@
 //! Resolution priority (first match wins):
 //!   1. `CODEMAN_TEST_QA_TABLE` env var (path) — used by Playwright e2e to inject
 //!      per-worker fixture file (deleted per ADR-0027 D2 — single seed now).
-//!   2. Dev seed `qa.dev.json`. The seed lives at `electron/assets/qa.dev.json` in
+//!   2. Dev seed `qa.dev.json`. The seed lives at `src/assets/qa.dev.json` in
 //!      the source tree, but where Electron actually runs from depends on the
 //!      runner — `electron-vite` builds the main bundle to `dist-electron/main/`
 //!      and `__dirname` does NOT have an `assets/` sibling, so we try multiple

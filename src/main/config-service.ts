@@ -1,4 +1,4 @@
-//! electron/main/config-service.ts — 类型化的 env 配置访问层。
+//! src/main/config-service.ts — 类型化的 env 配置访问层。
 //!
 //! mock-server 的所有 `process.env` 读取统一收敛到这里。设计目标:
 //! - 类型安全:每个字段强类型 + 数值/布尔强制转换 + 范围校验 + 越界 fallback

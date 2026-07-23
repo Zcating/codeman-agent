@@ -1,6 +1,6 @@
 //! V3.1 MCP — JSON-RPC 2.0 client over newline-delimited JSON (ADR-0032 Phase B).
 //!
-//! Used by `electron/main/mcp-host.ts` for stdio transport to MCP server subprocesses.
+//! Used by `src/main/mcp-host.ts` for stdio transport to MCP server subprocesses.
 //! No external SDK dependency — hand-rolled ~150 lines.
 //!
 //! Frame format: each JSON-RPC message = one JSON object + one `\n`.

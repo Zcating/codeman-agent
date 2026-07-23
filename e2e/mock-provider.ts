@@ -2,8 +2,8 @@
 //!
 //! Registers a Provider record whose `baseUrl` points at the Electron Main
 //! started local mock server (`http://127.0.0.1:50000/mock/anthropic`, per
-//! CONTEXT.md 「Fake LLM Provider」). The mock server (`electron/main/mock-server.ts`)
-//! reads Q→A entries from the shared dev seed `electron/assets/qa.dev.json`
+//! CONTEXT.md 「Fake LLM Provider」). The mock server (`src/main/mock-server.ts`)
+//! reads Q→A entries from the shared dev seed `src/assets/qa.dev.json`
 //! (per ADR-0027) — a single source of truth shared between dev mode and
 //! e2e tests. Tests send user messages whose substring matches a `question:`
 //! field in that file (e2e spec keys like "04::hello-intro" / "08::sandbox"
@@ -21,7 +21,7 @@
 //! overlap is impossible by construction.
 //!
 //! Field-name policy: e2e fixture writes camelCase to match V15 Settings JSON
-//! wire format (per ADR-0024 D10). See `electron/main/settings-schema.ts:5`.
+//! wire format (per ADR-0024 D10). See `src/main/settings-schema.ts:5`.
 
 import { TauriPage } from "./cdp-driver";
 import { invoke } from "./helpers";

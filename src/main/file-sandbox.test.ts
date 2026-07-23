@@ -19,7 +19,7 @@ afterEach(() => {
   rmSync(workspace, { recursive: true, force: true });
 });
 
-describe("T4b — electron/main/file-sandbox.ts", () => {
+describe("T4b — src/main/file-sandbox.ts", () => {
   describe("validatePathInWorkspace — happy path", () => {
     it("accepts a file inside the workspace", async () => {
       const file = join(workspace, "hello.txt");

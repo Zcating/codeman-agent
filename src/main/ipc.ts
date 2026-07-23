@@ -1,4 +1,4 @@
-// T4 — electron/main/ipc.ts: 24 ipcMain.handle channels wired to settings/db/files.
+// T4 — src/main/ipc.ts: 24 ipcMain.handle channels wired to settings/db/files.
 //
 // T3 was stubs; T4 wires real handlers backed by:
 //   - settings-schema.ts (sanitize + V0→V1.5 migration)
@@ -12,7 +12,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 import { initDatabase, getDatabase } from "./db/mod";
-// QA 路由由 electron/main/mock-server.ts 负责(POST /mock/anthropic/v1/messages
+// QA 路由由 src/main/mock-server.ts 负责(POST /mock/anthropic/v1/messages
 // 经 qa-loader.ts 读 Q→A 文件);不再走 IPC。
 import { sanitize, type Settings, type Provider } from "./settings-schema";
 import {
@@ -465,7 +465,7 @@ export function registerIpcHandlers(_deps: {
     await unlink(abs);
   }));
 
-  // QA 路由由 electron/main/mock-server.ts 负责(POST /mock/anthropic/v1/messages
+  // QA 路由由 src/main/mock-server.ts 负责(POST /mock/anthropic/v1/messages
   // 经 qa-loader.ts 读 Q→A 文件);不再走 IPC。
 
   // Native shims

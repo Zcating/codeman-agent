@@ -37,7 +37,7 @@ const V15: Settings = {
   conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
 };
 
-describe("T4a — electron/main/settings-schema.ts", () => {
+describe("T4a — src/main/settings-schema.ts", () => {
   describe("sanitize() invariants", () => {
     it("clamps autoArchiveAfterDays to >= 1", () => {
       const r = sanitize({ ...V15, conversations: { autoArchiveAfterDays: 0, maxHistory: 1000 } });

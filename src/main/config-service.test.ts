@@ -1,4 +1,4 @@
-//! config-service.test.ts — 单测 electron/main/config-service.ts.
+//! config-service.test.ts — 单测 src/main/config-service.ts.
 //!
 //! Strategy: 用 in-memory `EnvReader` mock(不 mutate process.env),验证:
 //! - 默认值(空 env)

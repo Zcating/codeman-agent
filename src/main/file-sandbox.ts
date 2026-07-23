@@ -1,4 +1,4 @@
-// T4b — electron/main/file-sandbox.ts: workspace-bounded file access.
+// T4b — src/main/file-sandbox.ts: workspace-bounded file access.
 //
 // Per V3 consensus 1.2 + ADR-0013 amendment D2:
 // - realpath.native resolves symlinks + absolute path (Rust std::fs::canonicalize

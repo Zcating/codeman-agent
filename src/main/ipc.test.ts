@@ -88,7 +88,7 @@ const EXPECTED_CHANNELS = [
   "deleteProvider",
   // Abort
   "abortRequest",
-  // QA 表由 electron/main/mock-server.ts 直接经 qa-loader.ts 读,不暴露 IPC
+  // QA 表由 src/main/mock-server.ts 直接经 qa-loader.ts 读,不暴露 IPC
   // MCP plugin (ADR-0032)
   "mcp:list-servers",
   "mcp:get-tools",
@@ -99,7 +99,7 @@ const EXPECTED_CHANNELS = [
   "mcp:open-config-dir",
 ];
 
-describe("T3 — electron/main/ipc.ts", () => {
+describe("T3 — src/main/ipc.ts", () => {
   beforeEach(() => {
     fakeIpcMain.handle.mockClear();
     fakeWin.webContents.send.mockClear();

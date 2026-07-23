@@ -1,4 +1,4 @@
-// T4a — electron/main/settings-schema.ts: Settings schema (canonical V1.5 / camelCase) + sanitize.
+// T4a — src/main/settings-schema.ts: Settings schema (canonical V1.5 / camelCase) + sanitize.
 //
 // Ports src-tauri/src/settings.rs to TypeScript. Settings persist via
 // electron-store (T3 wires readSettings/writeSettings to IPC). Per
