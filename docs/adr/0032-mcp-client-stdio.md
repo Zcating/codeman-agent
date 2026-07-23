@@ -1,6 +1,6 @@
 # 0032 — MCP Client (stdio-only, tools scope, mcp_servers.json config)
 
-**Status**: accepted · **Date**: 2026-07-21 · **Scope**: src/features/mcp/ (新增) + electron/main/mcp-host.ts (新增) + src/features/chat/lib/runtime.ts (改 — MCP tools 注入) + src/features/settings/components/mcp-tab.tsx (新增) + src/shared/lib/ipc.ts (改 — McpService Tag) + src/shared/lib/types.ts (改 — McpServerConfig) + electron-builder.yml (不改 — 无 electron 侧二进制)
+**Status**: accepted · **Date**: 2026-07-21 · **Scope**: src/plugins/mcp/ (新增) + electron/main/mcp-host.ts (新增) + src/features/chat/lib/runtime.ts (改 — MCP tools 注入) + src/features/settings/components/mcp-tab.tsx (新增) + src/shared/lib/ipc.ts (改 — McpService Tag) + src/shared/lib/types.ts (改 — McpServerConfig) + electron-builder.yml (不改 — 无 electron 侧二进制)
 
 **Related**: ADR-0003 (Effect-TS logic layer), ADR-0010 (5+1 feature whitelist — mcp 是第 5 个 feature), ADR-0019 (per-run transient agent — MCP tools 在 run() 入口注入 tools[]), ADR-0025 (effect/Schema), ADR-0031 (Skills 是正交能力)
 
@@ -41,7 +41,7 @@ Skills 部分在 [ADR-0031](./0031-skills-system.md) 锁定。本 ADR 处理 MCP
 与 Skills 同根（per ADR-0031 D-storage）。Schema：
 
 ```ts
-// src/features/mcp/lib/mcp-config-schema.ts
+// src/plugins/mcp/lib/mcp-config-schema.ts
 const McpServerConfigStruct = Schema.Struct({
   name: Schema.String,                                    // 唯一 ID (in user's filesystem)
   command: Schema.String,                                  // e.g. "npx"
@@ -134,8 +134,9 @@ LLM emit `tool_call` for `mcp_github_create_issue`:
 
 | Channel | Direction | Payload |
 |---|---|---|
-| `mcp:list-servers` | renderer → main | void → `McpServerStatus[]` |
-| `mcp:get-tools` | renderer → main | `{ serverName }` → `McpTool[]` |
+| `mcp:list-servers` | renderer → main | void → `McpServerInfo[]` |
+| `mcp:get-tools` | renderer → main | `{ serverName }` → `McpTool[]` (per-server) |
+| `mcp:get-all-tools` | renderer → main | void → `McpToolEntry[]` (flat across all servers; renderer uses for `buildMcpTools`) |
 | `mcp:enable` | renderer → main | `{ serverName, enabled }` → void |
 | `mcp:restart` | renderer → main | `{ serverName }` → void |
 | `mcp:call-tool` | renderer → main | `{ serverName, toolName, args }` → `McpToolResult` |
@@ -218,15 +219,15 @@ const tools = [loadSkillTool, ...createFileTools(provider.workspaceId), ...mcpTo
 
 | 文件 | 改动 |
 |---|---|
-| `src/features/mcp/index.ts` | 新增 barrel |
-| `src/features/mcp/AGENTS.md` | 新增 |
-| `src/features/mcp/lib/mcp-config-schema.ts` | 新增 — McpServerConfig / McpConfigFile schemas |
-| `src/features/mcp/lib/mcp-config.ts` | 新增 — 读 + parse mcp_servers.json |
-| `src/features/mcp/lib/mcp-config.test.ts` | 新增 |
-| `src/features/mcp/lib/mcp-tool-builder.ts` | 新增 — McpToolDefinition → AgentTool 转换 + `mcp_<name>_<tool>` 命名 |
-| `src/features/mcp/lib/mcp-tool-builder.test.ts` | 新增 |
-| `src/features/mcp/stores/mcp.store.ts` | 新增 — server status + tools signal |
-| `src/features/mcp/stores/mcp.store.test.ts` | 新增 |
+| `src/plugins/mcp/index.ts` | 新增 barrel |
+| `src/plugins/mcp/AGENTS.md` | 新增 |
+| `src/plugins/mcp/lib/mcp-config-schema.ts` | 新增 — McpServerConfig / McpConfigFile schemas |
+| `src/plugins/mcp/lib/mcp-config.ts` | 新增 — 读 + parse mcp_servers.json |
+| `src/plugins/mcp/lib/mcp-config.test.ts` | 新增 |
+| `src/plugins/mcp/lib/mcp-tool-builder.ts` | 新增 — McpToolDefinition → AgentTool 转换 + `mcp_<name>_<tool>` 命名 |
+| `src/plugins/mcp/lib/mcp-tool-builder.test.ts` | 新增 |
+| `src/plugins/mcp/stores/mcp.store.ts` | 新增 — server status + tools signal |
+| `src/plugins/mcp/stores/mcp.store.test.ts` | 新增 |
 | `electron/main/mcp-host.ts` | 新增 — McpStdioServer + McpManager |
 | `electron/main/mcp-host.test.ts` | 新增 — mocked spawn, JSON-RPC framing, error paths |
 | `electron/main/jsonrpc.ts` | 新增 — 轻量 JSON-RPC 2.0 client (~150 行) |
@@ -245,7 +246,7 @@ const tools = [loadSkillTool, ...createFileTools(provider.workspaceId), ...mcpTo
 
 ### 不可逆性
 推翻本 ADR 需:
-- 删 `src/features/mcp/` + `electron/main/mcp-host.ts` + `electron/main/jsonrpc.ts`
+- 删 `src/plugins/mcp/` + `electron/main/mcp-host.ts` + `electron/main/jsonrpc.ts`
 - 回退 runtime.ts tools[] 注入
 - 回退 ipc.ts 6 个 mcp:* handlers
 - 删 mcp-tab UI

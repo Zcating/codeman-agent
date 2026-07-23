@@ -37,6 +37,8 @@ Vite 单页应用，渲染到单个 Electron BrowserWindow。路由走 TanStack 
 
 **Feature 根级只允许 2 个文件**：`index.ts`（barrel）+ `AGENTS.md`（规则）。其它文件（runtime、service、tool schema、bridge）必须落在 5 个子目录之一。
 
+**`plugins/`**（V3.1 新增，与 `features/` 同级）：用户可加载的扩展/集成点（区别于 features = 产品核心域）。子目录白名单与 features 相同（lib / stores / components / routes / hooks）。Plugin 根级只允许 2 个文件（index.ts + AGENTS.md）。Plugin 不能反向依赖 feature；feature 可消费 plugin。详细规则见 [`src/plugins/AGENTS.md`](./plugins/AGENTS.md)。当前已落地：`skills/`（[ADR-0031](../docs/adr/0031-skills-system.md)）、`mcp/`（[ADR-0032](../docs/adr/0032-mcp-client-stdio.md)）。
+
 ## 硬性规则
 
 - **文件命名 kebab-case，导出组件 PascalCase。** `message-bubble.tsx` 导出 `MessageBubble`。单词文件保持小写（`index.tsx` 不写 `Index.tsx`）。

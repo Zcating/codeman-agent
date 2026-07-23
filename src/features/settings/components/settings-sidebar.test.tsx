@@ -86,20 +86,24 @@ beforeEach(() => {
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
 describe("SettingsSidebar", () => {
-  it("renders 4 nav items: LLM, App, Window, Advanced", () => {
+  it("renders 6 nav items: LLM, App, Window, Skills, Advanced, MCP", () => {
     render(() => <SettingsSidebar />);
     const opts = F.capturedProps.options;
-    expect(opts.length).toBe(4);
+    expect(opts.length).toBe(6);
     expect(opts.map((o: any) => o.label)).toEqual([
       "LLM",
       "App",
       "Window",
+      "Skills",
+      "MCP",
       "Advanced",
     ]);
     expect(opts.map((o: any) => o.value)).toEqual([
       "llm",
       "app",
       "window",
+      "skills",
+      "mcp",
       "advanced",
     ]);
   });

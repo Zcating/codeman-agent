@@ -14,15 +14,26 @@
 //!   - `model.reasoning: true` (跟 thinkingLevel 联动,Claude 等推理模型才能产出 thinking blocks)
 //!   - `subscribe((evt) => ...)` → `subscribe((evt, signal) => ...)`
 //!   - 旧 anthropic-transport.ts 的 agent loop 全部删除(由 Agent 内部处理)
+//!
+//! V3.1 Skills integration (ADR-0031):
+//!   - ProviderConfig.enabledSkills: SkillManifest[] — caller (chat.store) 提供
+//!   - systemPrompt 自动追加 `<available_skills>...</available_skills>` 段
+//!   - tools[] 数组添加 `_load_skill` meta-tool (LLM 主动调用拉全文)
 
-import { Effect, Stream } from "effect";
+import { Effect, Exit, Stream } from "effect";
 import { match } from "ts-pattern";
 import type { Message } from "../../../shared/lib/types";
+import type { SkillManifest } from "../../../shared/lib/types";
 import { logger } from "../../../shared/lib/logger";
 import { anthropicStream } from "./anthropic-transport";
-import { Agent, type AgentEvent } from "@earendil-works/pi-agent-core";
+import { Agent, type AgentEvent, type AgentTool } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai";
 import { createFileTools } from "../../file-tools/lib/file-tools";
+import { formatSkillsManifestSection } from "../../../plugins/skills/lib/skill-injector";
+import { loadSkillTool } from "../../../plugins/skills/lib/skill-meta-tool";
+import { mcpAllTools$ } from "../../../plugins/mcp/stores/store";
+import type { McpToolEntry } from "../../../shared/lib/types";
+import { McpService, McpServiceLive } from "../../../shared/lib/ipc";
 import {
   isTextBlock,
   isThinkingBlock,
@@ -32,6 +43,54 @@ import {
 import { validateProvider } from "./runtime-validate-provider";
 import { extractToolErrorText } from "./runtime-tool-error";
 import { toPiMessages } from "./runtime-to-pi-messages";
+import { AppError } from "../../../shared/lib/errors";
+import type { TSchema } from "@sinclair/typebox";
+
+// ─── MCP tools builder (ADR-0032 D4) ────────────────────────────────────────
+
+/** Convert MCP tool entries to pi-agent AgentTool definitions. */
+function buildMcpTools(entries: readonly McpToolEntry[]): AgentTool<TSchema, unknown>[] {
+  return entries.map((entry) => ({
+    label: entry.agentName,
+    name: entry.agentName,
+    description: entry.description,
+    parameters: entry.inputSchema as TSchema,
+    execute: async (_toolCallId: string, args: unknown): Promise<{ content: Array<{ type: "text"; text: string }>; details: unknown }> => {
+      const callToolEffect = Effect.gen(function* () {
+        const svc = yield* McpService;
+        return yield* svc.callTool(entry.serverName, entry.toolName, args as Record<string, unknown>);
+      }).pipe(Effect.provide(McpServiceLive));
+
+      const exit = await Effect.runPromiseExit(callToolEffect);
+      if (Exit.isFailure(exit)) {
+        const cause = exit.cause;
+        const err: AppError =
+          cause._tag === "Fail"
+            ? (cause.error as AppError)
+            : ({ _tag: "Unknown", message: String(cause) } as AppError);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `MCP tool error (${err._tag}): ${"message" in err ? err.message : JSON.stringify(err)}`,
+            },
+          ],
+          details: err,
+        };
+      }
+      const result = exit.value as { content: Array<{ type: string; text?: string; [k: string]: unknown }> };
+      return {
+        content: result.content.map((block) => {
+          if (block.type === "text" && block.text !== undefined) {
+            return { type: "text" as const, text: block.text };
+          }
+          return { type: "text" as const, text: JSON.stringify(block) };
+        }),
+        details: result,
+      };
+    },
+  }));
+}
 
 // ─── Runtime event types (6 variants,ADR-0017 + thinking) ──────────────────
 
@@ -67,6 +126,12 @@ export interface ProviderConfig {
    * 但 LLM 没传时,`createFileTools()` 自动注入。空 = 不注入(保留 LLM 传的或让工具报错)。
    */
   workspaceId?: string;
+  /**
+   * V3.1 ADR-0031: 已启用的 skill manifest 列表。Runtime 在每次 run() 入口自动
+   * 拼成 `<available_skills>...</available_skills>` 段追加到 system prompt。
+   * 空 / undefined = 不注入该段。
+   */
+  enabledSkills?: readonly SkillManifest[];
 }
 
 // ─── Run options ────────────────────────────────────────────────
@@ -327,11 +392,21 @@ export function createAgentRuntime(): AgentRuntime {
           maxTokens: 8192,
         };
 
-        const tools = createFileTools(provider.workspaceId);
+        const fileTools = createFileTools(provider.workspaceId);
+        const mcpTools = buildMcpTools(mcpAllTools$());
+        // 顺序: file tools 先, MCP tools 中, skills meta-tool 末 (便于 LLM 先看到主要工具)
+        const tools = [...fileTools, ...mcpTools, loadSkillTool];
+
+        // V3.1 ADR-0031 D3: 拼接 enabled skills manifest 到 system prompt。
+        // 空数组 → formatSkillsManifestSection 返回 "" → 原 systemPrompt 不变。
+        const skillsSection = formatSkillsManifestSection(provider.enabledSkills ?? []);
+        const finalSystemPrompt = skillsSection
+          ? `${provider.systemPrompt}\n\n${skillsSection}`
+          : provider.systemPrompt;
 
         const agent = new Agent({
           initialState: {
-            systemPrompt: provider.systemPrompt,
+            systemPrompt: finalSystemPrompt,
             model,
             // 默认 medium:显示完整思考过程。reasoning:true 的模型产出 thinking_delta
             // → chat.store 累积到 stub.thinking → done 时合并到 final message.thinking

@@ -16,6 +16,8 @@ import {
   SlidersHorizontal,
   AppWindow,
   Terminal,
+  Sparkles,
+  Server,
 } from "lucide-solid";
 import {
   CodemanSidebar,
@@ -23,11 +25,13 @@ import {
 } from "../../../shared/components/internal/codeman-sidebar";
 
 /**
- * Static config for the 4 settings nav items.
+ * Static config for the 6 settings nav items.
  * Tab icons chosen per V2.5 design:
  * - LLM       → Brain       (mental model: AI configuration)
  * - App       → SlidersHorizontal (behavior toggles)
  * - Window    → AppWindow   (window sizing)
+ * - Skills    → Sparkles    (V3.1 ADR-0031 Skills plugin)
+ * - MCP       → Server      (V3.1 ADR-0032 MCP client)
  * - Advanced  → Terminal    (danger zone, low-level)
  */
 const SETTINGS_NAV: readonly SidebarOption[] = [
@@ -41,6 +45,16 @@ const SETTINGS_NAV: readonly SidebarOption[] = [
     label: "Window",
     value: "window",
     icon: <AppWindow class="h-4 w-4" aria-hidden="true" />,
+  },
+  {
+    label: "Skills",
+    value: "skills",
+    icon: <Sparkles class="h-4 w-4" aria-hidden="true" />,
+  },
+  {
+    label: "MCP",
+    value: "mcp",
+    icon: <Server class="h-4 w-4" aria-hidden="true" />,
   },
   {
     label: "Advanced",

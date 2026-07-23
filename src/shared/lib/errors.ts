@@ -54,6 +54,27 @@ export class Unknown extends Schema.TaggedError<Unknown>()("Unknown", {
   message: Schema.String,
 }) {}
 
+// V3.1 MCP — JSON-RPC client errors (ADR-0032 Phase B).
+// jsonrpc codes follow the JSON-RPC 2.0 spec: -32700 (parse), -32600
+// (invalid request), -32601 (method not found), -32602 (invalid params),
+// -32603 (internal error). See https://www.jsonrpc.org/specification.
+export class JsonRpcProtocolError extends Schema.TaggedError<JsonRpcProtocolError>()(
+  "JsonRpcProtocolError",
+  {
+    message: Schema.String,
+    code: Schema.Number,
+  },
+) {}
+
+export class JsonRpcTimeoutError extends Schema.TaggedError<JsonRpcTimeoutError>()(
+  "JsonRpcTimeoutError",
+  {
+    message: Schema.String,
+    method: Schema.String,
+    timeoutMs: Schema.Number,
+  },
+) {}
+
 /** New Schema-based application error union (ADR-0025). Discriminate via `_tag`. */
 export type AppError =
   | NotFound
@@ -63,11 +84,13 @@ export type AppError =
   | Database
   | ToolCall
   | SandboxViolation
-  | Unknown;
+  | Unknown
+  | JsonRpcProtocolError
+  | JsonRpcTimeoutError;
 
 /**
  * Runtime type guard replacing the (impossible) `instanceof AppError` base-class
- * check. True iff `u` is one of the eight `Schema.TaggedError` variant instances.
+ * check. True iff `u` is one of the `Schema.TaggedError` variant instances.
  */
 export const isAppError = (u: unknown): u is AppError =>
   u instanceof NotFound ||
@@ -77,4 +100,6 @@ export const isAppError = (u: unknown): u is AppError =>
   u instanceof Database ||
   u instanceof ToolCall ||
   u instanceof SandboxViolation ||
-  u instanceof Unknown;
+  u instanceof Unknown ||
+  u instanceof JsonRpcProtocolError ||
+  u instanceof JsonRpcTimeoutError;

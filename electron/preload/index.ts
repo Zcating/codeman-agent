@@ -98,12 +98,27 @@ const codeman = {
     ipcRenderer.invoke("deleteFile", { workspaceId, path }),
 
   // Native shims
-  notify: (title: string, body: string) =>
+notify: (title: string, body: string) =>
     ipcRenderer.invoke("notify", { title, body }),
   openExternal: (url: string) => ipcRenderer.invoke("openExternal", { url }),
-  setLoginItem: (enabled: boolean) =>
-    ipcRenderer.invoke("setLoginItem", { enabled }),
+  setLoginItem: (enabled: boolean) => ipcRenderer.invoke("setLoginItem", { enabled }),
   getLogPath: () => ipcRenderer.invoke("getLogPath"),
+
+  // Skills plugin (ADR-0031)
+  skillsScan: () => ipcRenderer.invoke("skillsScan"),
+  skillsLoad: (name: string) => ipcRenderer.invoke("skillsLoad", { name }),
+
+  // MCP plugin (ADR-0032)
+  mcpListServers: () => ipcRenderer.invoke("mcp:list-servers"),
+  mcpGetTools: (args: { serverName: string }) => ipcRenderer.invoke("mcp:get-tools", args),
+  mcpGetAllTools: () => ipcRenderer.invoke("mcp:get-all-tools"),
+  mcpEnable: (args: { serverName: string; enabled: boolean }) =>
+    ipcRenderer.invoke("mcp:enable", args),
+  mcpRestart: (args: { serverName: string }) =>
+    ipcRenderer.invoke("mcp:restart", args),
+  mcpCallTool: (args: { serverName: string; toolName: string; args: unknown }) =>
+    ipcRenderer.invoke("mcp:call-tool", args),
+  mcpOpenConfigDir: () => ipcRenderer.invoke("mcp:open-config-dir"),
 
   // Streaming: preload exposes a callback registration API; main calls
   // webContents.send('stream-chunk', evt). Renderer wraps onStreamChunk

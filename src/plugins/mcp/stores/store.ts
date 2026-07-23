@@ -1,0 +1,73 @@
+//! MCP store — Solid signal bridge layer (ADR-0032 Phase B mini-4).
+//!
+//! Exposes Accessors for UI consumption, bridges Effect-TS results to Solid signals.
+//! UI components import from this file only — no direct Effect imports in components.
+
+import { createSignal, type Accessor } from "solid-js";
+import { Effect } from "effect";
+import { McpService, McpServiceLive } from "../../../shared/lib/ipc";
+import type {
+  McpServerInfo,
+  McpToolEntry,
+} from "../../../shared/lib/types";
+
+// ─── Signals ────────────────────────────────────────────────────
+
+const [mcpServersInternal, setMcpServersInternal] = createSignal<McpServerInfo[]>([]);
+const [mcpAllToolsInternal, setMcpAllToolsInternal] = createSignal<McpToolEntry[]>([]);
+
+/** All MCP servers with their config, status, and tools. */
+export const mcpServers$: Accessor<McpServerInfo[]> = mcpServersInternal;
+
+/** All available MCP tools flattened from all connected servers. */
+export const mcpAllTools$: Accessor<McpToolEntry[]> = mcpAllToolsInternal;
+
+// ─── Actions ────────────────────────────────────────────────────
+
+/** Load servers + tools from main process into signals. */
+export const refresh = (() => {
+  const program = Effect.gen(function* () {
+    const svc = yield* McpService;
+    const servers = yield* svc.listServers();
+    const tools = yield* svc.getAllTools();
+    setMcpServersInternal(servers);
+    setMcpAllToolsInternal(tools);
+    return { servers, tools };
+  });
+  return program.pipe(Effect.provide(McpServiceLive));
+})();
+
+/** Enable or disable an MCP server. */
+export function enable(serverName: string, enabled: boolean) {
+  const program = Effect.gen(function* () {
+    const svc = yield* McpService;
+    yield* svc.enable(serverName, enabled);
+  });
+  return program.pipe(Effect.provide(McpServiceLive));
+}
+
+/** Restart a running MCP server. */
+export function restart(serverName: string) {
+  const program = Effect.gen(function* () {
+    const svc = yield* McpService;
+    yield* svc.restart(serverName);
+  });
+  return program.pipe(Effect.provide(McpServiceLive));
+}
+
+/** Open the MCP config directory in the system file explorer. */
+export function openConfigDir() {
+  const program = Effect.gen(function* () {
+    const svc = yield* McpService;
+    yield* svc.openConfigDir();
+  });
+  return program.pipe(Effect.provide(McpServiceLive));
+}
+
+// ─── Test helpers ───────────────────────────────────────────────
+
+/** Reset signals to initial state (for tests). */
+export function _resetMcpStoreForTest(): void {
+  setMcpServersInternal([]);
+  setMcpAllToolsInternal([]);
+}

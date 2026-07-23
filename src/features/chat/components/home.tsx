@@ -50,6 +50,11 @@ import {
   HomeFormSchema,
   type HomeFormValue,
 } from "../lib/schemas";
+// Wave A7: Slash menu integration
+import { useSlashTrigger } from "../../../plugins/skills/lib/use-slash-trigger";
+import { SlashMenu } from "../../../plugins/skills/components/slash-menu";
+import { skillsManifests$ } from "../../../plugins/skills/stores/skills.store";
+import type { SkillManifest } from "../../../shared/lib/types";
 
 // ─── LlmPicker (D6-H5) ─────────────────────────────────────────────────────────
 
@@ -107,6 +112,10 @@ export function HomeAgentForm(): JSX.Element {
 
   const navigate = useNavigate();
 
+  // Wave A7: textarea ref for slash trigger
+  let textareaEl: HTMLTextAreaElement | null = null;
+  const textareaRef = () => textareaEl;
+
   // ─── Form ──────────────────────────────────────────────────────────────────
   const form = createForm(() => ({
     defaultValues: {
@@ -158,6 +167,41 @@ export function HomeAgentForm(): JSX.Element {
       void Effect.runPromiseExit(sendMessage(convId, text, provider));
     },
   }));
+
+  // Wave A7: Slash trigger + skills
+  const slashTrigger = useSlashTrigger({
+    textareaRef,
+    getValue: () => form.getFieldValue("draft") ?? "",
+  });
+
+  /** Enabled skills = manifests ∩ appStore.enabledSkills */
+  const enabledSkills = createMemo((): readonly SkillManifest[] => {
+    const all = skillsManifests$();
+    const enabledNames = new Set(appStore.state.value.enabledSkills ?? []);
+    return all.filter((s) => enabledNames.has(s.name));
+  });
+
+  /** Handle skill selection: replace /<query> with /<skill-name> + space */
+  const handleSkillSelect = (skill: SkillManifest) => {
+    const trigger = slashTrigger();
+    if (!trigger) return;
+
+    const currentValue = form.getFieldValue("draft") ?? "";
+    const triggerPos = trigger.cursorPosition;
+
+    // Replace everything from triggerPos to end with /<skill-name>
+    const newValue =
+      currentValue.slice(0, triggerPos) + `/${skill.name} ` + currentValue.slice(triggerPos);
+
+    form.setFieldValue("draft", newValue);
+    // Blur the textarea so the cursor moves to the end of the inserted text
+    textareaEl?.focus();
+    // Move cursor to after the inserted skill name
+    const newCursorPos = triggerPos + skill.name.length + 2; // "/" + name + " "
+    queueMicrotask(() => {
+      textareaEl?.setSelectionRange(newCursorPos, newCursorPos);
+    });
+  };
 
   // Sync workspace ID from store signal to form field when async load resolves.
   // Without this, the form field stays "" (captured at createForm time before
@@ -218,6 +262,9 @@ export function HomeAgentForm(): JSX.Element {
                   value={field().state.value}
                   onValueChange={(v) => field().handleChange(v)}
                   onBlur={() => field().handleBlur()}
+                  ref={(el) => {
+                    textareaEl = el;
+                  }}
                   onKeyDown={(e) => {
                     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
                       e.preventDefault();
@@ -352,6 +399,22 @@ export function HomeAgentForm(): JSX.Element {
             </form.Subscribe>
           </div>
         </form>
+
+        {/* Wave A7: SlashMenu popup */}
+        <SlashMenu
+          trigger={slashTrigger()}
+          candidates={enabledSkills()}
+          query={slashTrigger()?.query ?? ""}
+          onSelect={handleSkillSelect}
+          onClose={() => {
+            const trigger = slashTrigger();
+            if (trigger?.rect) {
+              // Focus back to textarea and reset selection
+              textareaEl?.focus();
+            }
+          }}
+          anchorRect={slashTrigger()?.rect ?? null}
+        />
       </div>
     </div>
   );

@@ -48,6 +48,8 @@ export interface Settings {
   window: WindowSettings;
   systemPrompt: SystemPromptSettings;
   conversations: ConversationSettings;
+  /** V3.1 ADR-0031: 已启用的 skill 名字列表。空 = 不在 system prompt 注入 skills。 */
+  enabledSkills?: string[];
   /** @deprecated Use providers instead. Kept for V1 consumer backward-compatibility. */
   llmProviders: LLMProvider[];
 }
@@ -166,4 +168,72 @@ export interface QaEntry {
   question: string;
   answer: string;
   default?: boolean;
+}
+
+// ============================================================================
+// V3.1 Skills Plugin (ADR-0031)
+// ============================================================================
+
+/** Skill 来源标识 — preinstalled (ship-with-app) 或 user (用户添加)。 */
+export type SkillSource = "preinstalled" | "user";
+
+/** SKILL.md 顶部 YAML frontmatter block 的形状。 */
+export interface SkillFrontmatter {
+  name: string;
+  description: string;
+}
+
+/** 单个 skill 的运行时元数据 (从 ~/.agents/skills/<name>/SKILL.md 解析)。 */
+export interface SkillManifest {
+  name: string;
+  description: string;
+  source: SkillSource;
+  /** 绝对路径指向 SKILL.md 文件, 供 IPC handler 读全文用 */
+  path: string;
+}
+
+// ============================================================================
+// V3.1 MCP Client (ADR-0032)
+// ============================================================================
+
+export type McpServerStatus =
+  | { kind: "disabled" }
+  | { kind: "starting" }
+  | { kind: "connected"; toolCount: number }
+  | { kind: "spawn_failed"; error: string }
+  | { kind: "protocol_error"; error: string }
+  | { kind: "crashed"; exitCode: number | null; signal: NodeJS.Signals | null; error: string };
+
+export interface McpServerConfig {
+  name: string;
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+  enabled: boolean;
+}
+
+export interface McpTool {
+  name: string;
+  description: string;
+  inputSchema: unknown;
+}
+
+export interface McpCallResult {
+  content: Array<{ type: string; text?: string; [k: string]: unknown }>;
+  isError?: boolean;
+}
+
+export interface McpServerInfo {
+  config: McpServerConfig;
+  status: McpServerStatus;
+  tools: McpTool[];
+}
+
+export interface McpToolEntry {
+  serverName: string;
+  agentName: string;
+  /** Original tool name (before slugification), e.g. "create_issue". */
+  toolName: string;
+  description: string;
+  inputSchema: unknown;
 }

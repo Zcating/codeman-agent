@@ -10,6 +10,10 @@ files:
   - package.json
 asarUnpack:
   - "**/*.node"
+extraResources:
+  - from: "electron/resources"
+    to: "skills"
+    filter: ["**/*"]
 win:
   target:
     - target: nsis

@@ -389,6 +389,44 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
   qaGetTable(_args?: IPCArgs): unknown {
     return mockState.qaTable ?? [];
   },
+
+  // ─── Skills plugin IPC (ADR-0031) ──────────────────────────────────
+  skillsScan(_args?: IPCArgs): unknown {
+    return mockState.resolved ?? [];
+  },
+
+  skillsLoad(_args?: IPCArgs): unknown {
+    return mockState.resolved ?? "";
+  },
+
+  // ─── MCP plugin IPC (ADR-0032) ─────────────────────────────────────
+  "mcp:list-servers"(_args?: IPCArgs): unknown {
+    return mockState.resolved ?? [];
+  },
+
+  "mcp:get-all-tools"(_args?: IPCArgs): unknown {
+    return mockState.resolved ?? [];
+  },
+
+  "mcp:get-tools"(_args?: IPCArgs): unknown {
+    return mockState.resolved ?? [];
+  },
+
+  "mcp:enable"(_args?: IPCArgs): unknown {
+    return undefined;
+  },
+
+  "mcp:restart"(_args?: IPCArgs): unknown {
+    return undefined;
+  },
+
+  "mcp:call-tool"(_args?: IPCArgs): unknown {
+    return { content: [{ type: "text", text: "mock tool result" }], isError: false };
+  },
+
+  "mcp:open-config-dir"(_args?: IPCArgs): unknown {
+    return undefined;
+  },
 };
 
 // ─── Invoke Mock ────────────────────────────────────────────────
@@ -471,6 +509,15 @@ function buildCodemanMock(): Record<string, unknown> {
     editFile: { cmd: "editFile", build: (wid, p, ot, nt, ra) => ({ workspaceId: wid, path: p, oldText: ot, newText: nt, replaceAll: ra }) },
     searchFiles: { cmd: "searchFiles", build: (wid, g, cp) => ({ workspaceId: wid, glob: g, contentPattern: cp }) },
     deleteFile: { cmd: "deleteFile", build: (wid, p) => ({ workspaceId: wid, path: p }) },
+    skillsScan: { cmd: "skillsScan", build: () => ({}) },
+    skillsLoad: { cmd: "skillsLoad", build: (n) => ({ name: n }) },
+    mcpListServers: { cmd: "mcp:list-servers", build: () => ({}) },
+    mcpGetTools: { cmd: "mcp:get-tools", build: (a) => a as Record<string, unknown> },
+    mcpGetAllTools: { cmd: "mcp:get-all-tools", build: () => ({}) },
+    mcpEnable: { cmd: "mcp:enable", build: (a) => a as Record<string, unknown> },
+    mcpRestart: { cmd: "mcp:restart", build: (sn) => ({ serverName: sn }) },
+    mcpCallTool: { cmd: "mcp:call-tool", build: (sn, tn, a) => ({ serverName: sn, toolName: tn, args: a }) },
+    mcpOpenConfigDir: { cmd: "mcp:open-config-dir", build: () => ({}) },
   };
 
   const codeman: Record<string, unknown> = {};
