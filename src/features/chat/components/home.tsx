@@ -228,7 +228,11 @@ export function HomeAgentForm(): JSX.Element {
 
   const placeholder = createMemo(() => {
     if (wsCount() === 0) {return "Add a workspace to start";}
-    if (form.state.values.workspaceId === "") {return "Select a workspace above";}
+    // Read workspaceId via form.useSelector so the memo subscribes to form
+    // state changes — the previous form.state.values read was a non-reactive
+    // snapshot, which kept placeholder stuck at "Select a workspace above"
+    // after the async createEffect synced workspaceId from chat.store.
+    if (form.useSelector((s) => s.values.workspaceId)() === "") {return "Select a workspace above";}
     return "发条消息…";
   });
 

@@ -148,27 +148,34 @@ vi.mock("../../../shared/stores/app.store", () => ({
 }));
 
 // ─── Mock chat.store ────────────────────────────────────────────────────
-const mockWorkspaces = vi.hoisted(() => [] as Array<{ id: string; label: string; rootPath: string }>);
-let mockSelectedWsId: string | null = null;
+const mockWorkspaces: { current: Array<{ id: string; label: string; rootPath: string }> } = vi.hoisted(() => ({ current: [] }));
+const mockSelectedWsId: { current: string | null } = vi.hoisted(() => ({ current: null }));
 
-vi.mock("../stores/chat.store", () => ({
-  workspaces$: vi.fn(() => mockWorkspaces),
-  selectedWorkspaceId$: vi.fn(() => mockSelectedWsId),
-  setSelectedWorkspaceId: vi.fn((id: string) => { mockSelectedWsId = id; }),
-  addWorkspace: vi.fn(() => Effect.succeed({ id: "new-id", label: "New Workspace", rootPath: "/new/path", createdAt: Date.now() })),
-  store: { byId: {} },
-  activeId$: vi.fn<() => string | null>(),
-  conversations$: vi.fn<() => never[]>(),
-  selectConversation: vi.fn<(id: string) => void>(),
-  sendMessage: vi.fn<(id: string, content: string, provider: ProviderConfig) => Effect.Effect<void, never, never>>(() => Effect.succeed(undefined)),
-  createConversation: vi.fn<(workspaceId: string, title: string, systemPrompt?: string) => Effect.Effect<string, { _tag: "SomeError" }, never>>(() => Effect.succeed("new-conv-id")),
-  deleteConversation: vi.fn(),
-  archiveConversation: vi.fn(),
-  setupConvState: vi.fn(),
-  cancel: vi.fn(),
-  loadConversations: vi.fn(),
-  clearActiveConversation: vi.fn(),
-}));
+vi.mock("../stores/chat.store", () => {
+  // Back to plain accessors — Solid signal indirection in earlier iteration
+  // conflicted with @solidjs/testing-library's own bundled solid-js (see
+  // "multiple instances of Solid" warning), causing component memos to never
+  // re-run. Tests keep the pre-mount synchronous setup pattern (set mock
+  // holders before render) which matches all existing assertions.
+  return {
+    workspaces$: vi.fn(() => mockWorkspaces.current),
+    selectedWorkspaceId$: vi.fn(() => mockSelectedWsId.current),
+    setSelectedWorkspaceId: vi.fn((id: string) => { mockSelectedWsId.current = id; }),
+    addWorkspace: vi.fn(() => Effect.succeed({ id: "new-id", label: "New Workspace", rootPath: "/new/path", createdAt: Date.now() })),
+    store: { byId: {} },
+    activeId$: vi.fn<() => string | null>(),
+    conversations$: vi.fn<() => never[]>(),
+    selectConversation: vi.fn<(id: string) => void>(),
+    sendMessage: vi.fn<(id: string, content: string, provider: ProviderConfig) => Effect.Effect<void, never, never>>(() => Effect.succeed(undefined)),
+    createConversation: vi.fn<(workspaceId: string, title: string, systemPrompt?: string) => Effect.Effect<string, { _tag: "SomeError" }, never>>(() => Effect.succeed("new-conv-id")),
+    deleteConversation: vi.fn(),
+    archiveConversation: vi.fn(),
+    setupConvState: vi.fn(),
+    cancel: vi.fn(),
+    loadConversations: vi.fn(),
+    clearActiveConversation: vi.fn(),
+  };
+});
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
@@ -177,8 +184,8 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
     vi.clearAllMocks();
     mockIsOpen = false;
     sharedOnValueChanges = [];
-    mockWorkspaces.length = 0;
-    mockSelectedWsId = null;
+    mockWorkspaces.current = [];
+    mockSelectedWsId.current = null;
   });
 
   afterEach(() => {
@@ -223,8 +230,8 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
   });
 
   it("T4.1.2: 1 workspace → input immediately enabled (draftWorkspaceId auto-set)", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
-    mockSelectedWsId = "ws-1";
+    mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockSelectedWsId.current = "ws-1";
 
     const { getByTestId } = render(() => <HomeAgentForm />);
 
@@ -235,7 +242,7 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
   });
 
   it("T4.1.3: 2+ workspaces → input disabled until user picks", async () => {
-    mockWorkspaces.push(
+    mockWorkspaces.current.push(
       { id: "ws-1", label: "Project A", rootPath: "C:\\a" },
       { id: "ws-2", label: "Project B", rootPath: "C:\\b" },
     );
@@ -255,11 +262,11 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
   // → effect-schema-adapter fallback "Invalid value (Type)" → 渲染到 textarea 下方。
   // 修复：home.tsx line 226 用 `field().state.meta.isTouched` gate 错误显示。
   it("Bug: 输入框下方不应常驻 generic 'Invalid value (Type)' 提示", async () => {
-    mockWorkspaces.push(
+    mockWorkspaces.current.push(
       { id: "ws-1", label: "Project A", rootPath: "C:\\a" },
       { id: "ws-2", label: "Project B", rootPath: "C:\\b" },
     );
-    mockSelectedWsId = null;
+    mockSelectedWsId.current = null;
 
     const { container } = render(() => <HomeAgentForm />);
 
@@ -280,7 +287,7 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
   });
 
   it("T4.1.4: 2+ workspaces → no pre-select; clicking workspace Select option enables input + calls setSelectedWorkspaceId", async () => {
-    mockWorkspaces.push(
+    mockWorkspaces.current.push(
       { id: "ws-1", label: "Project A", rootPath: "C:\\a" },
       { id: "ws-2", label: "Project B", rootPath: "C:\\b" },
     );
@@ -302,14 +309,14 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
     fireEvent.click(firstOption);
 
     // After selection: setSelectedWorkspaceId was called → mockSelectedWsId updated
-    expect(mockSelectedWsId).toBe("ws-1");
+    expect(mockSelectedWsId.current).toBe("ws-1");
     // Note: textarea.disabled check omitted because selectedWorkspaceId$ is a vi.fn mock (not a real Solid signal),
     // so the component doesn't reactively re-render. The mockSelectedWsId value change proves the handler fired.
   });
 
   it("T4.1.5: Send button disabled when input is empty", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "My Project", rootPath: "C:\\projects\\my-project" });
-    mockSelectedWsId = "ws-1";
+    mockWorkspaces.current.push({ id: "ws-1", label: "My Project", rootPath: "C:\\projects\\my-project" });
+    mockSelectedWsId.current = "ws-1";
 
     const { getByTestId } = render(() => <HomeAgentForm />);
 
@@ -324,10 +331,33 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
     expect(sendButton.disabled).toBe(false);
   });
 
+// Bug regression: 异步仅 1 个 workspace 自动选中时,Send 按钮必须立即可提交。
+  // 根因(推测):home.tsx 的 `placeholder = createMemo(() => form.state.values.workspaceId ...)`
+  // 直接读 `form.state.values.workspaceId`,这是 non-reactive snapshot,即使 createEffect 已
+  // 调用 form.setFieldValue("workspaceId", wsId),UI 仍看不到更新。Send 按钮的 canSubmit 也因
+  // form-level onMount validator 报 draft="" 失败 + isTouched 未翻转 → disabled。
+  // 期望:1 个 workspace 时自动选中 → placeholder = "发条消息…",textarea 一填字 Send 立即可点。
+  it("Bug: 1 个 workspace 自动选中时,textarea 填字后 Send 立即可点击 (canSubmit=true)", async () => {
+    mockWorkspaces.current.push({ id: "ws-1", label: "Sole Project", rootPath: "C:\\sole" });
+    mockSelectedWsId.current = "ws-1";
+
+    const { container } = render(() => <HomeAgentForm />);
+
+    const textarea = container.querySelector("[data-testid='codex-input']") as HTMLTextAreaElement;
+    expect(textarea.disabled).toBe(false);
+    expect(textarea.placeholder).toBe("发条消息…");
+
+    // 模拟用户键入
+    fireEvent.input(textarea, { target: { value: "Hello there" } });
+
+    const sendButton = container.querySelector("[data-testid='codex-send']") as HTMLButtonElement;
+    expect(sendButton.disabled).toBe(false);
+  });
+
   it("T4.1.6: send button click triggers createConversation then sendMessage", async () => {
     const { appStore } = await import("../../../shared/stores/app.store");
-    mockWorkspaces.push({ id: "ws-1", label: "Frontend", rootPath: "/p" });
-    mockSelectedWsId = "ws-1";
+    mockWorkspaces.current.push({ id: "ws-1", label: "Frontend", rootPath: "/p" });
+    mockSelectedWsId.current = "ws-1";
     mockDefaultLlmProvider.id = "minimax";
     appStore.state.value.providers = [
       {
@@ -370,8 +400,8 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
   });
 
   it("T4.1.7: send with empty input does not call createConversation or sendMessage", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Frontend", rootPath: "/p" });
-    mockSelectedWsId = "ws-1";
+    mockWorkspaces.current.push({ id: "ws-1", label: "Frontend", rootPath: "/p" });
+    mockSelectedWsId.current = "ws-1";
 
     const { container } = render(() => <HomeAgentForm />);
 
@@ -385,7 +415,7 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
 
   it("T4.1.8: send with no workspace selected (2+ workspaces) does not call createConversation or sendMessage", async () => {
     // 2 workspaces, user hasn't picked yet
-    mockWorkspaces.push(
+    mockWorkspaces.current.push(
       { id: "ws-1", label: "A", rootPath: "/a" },
       { id: "ws-2", label: "B", rootPath: "/b" },
     );
@@ -401,7 +431,7 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
   });
 
   it("T4.1.9: workspace Select renders all workspaces as options", async () => {
-    mockWorkspaces.push(
+    mockWorkspaces.current.push(
       { id: "ws-1", label: "Alpha", rootPath: "/a" },
       { id: "ws-2", label: "Beta", rootPath: "/b" },
     );
@@ -428,8 +458,8 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
 
   // ADR-0029 D5: silent-drop bug fix — createConversation 失败 → codemanToast.error 被调
   it("ADR-0029 D5: createConversation 失败 → codemanToast.error 被调 (替代 silent return)", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Frontend", rootPath: "/p" });
-    mockSelectedWsId = "ws-1";
+    mockWorkspaces.current.push({ id: "ws-1", label: "Frontend", rootPath: "/p" });
+    mockSelectedWsId.current = "ws-1";
 
     // Override createConversation to return failure (simulate DB error)
     vi.mocked(createConversation).mockReturnValueOnce(
@@ -462,8 +492,8 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
     vi.clearAllMocks();
     mockIsOpen = false;
     sharedOnValueChanges = [];
-    mockWorkspaces.length = 0;
-    mockSelectedWsId = "ws-1"; // default: 1 pre-selected workspace
+    mockWorkspaces.current.length = 0;
+    mockSelectedWsId.current = "ws-1"; // default: 1 pre-selected workspace
     // Reset providers to default mock state to avoid test isolation issues
     const { appStore } = await import("../../../shared/stores/app.store");
     appStore.state.value.providers = [
@@ -491,7 +521,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
 
   // T4.2.1
   it("T4.2.1: 新布局 — textarea 在 workspace picker 之前 (DOM 顺序)", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
     // mockSelectedWsId = "ws-1" from beforeEach
 
     const { container } = render(() => <HomeAgentForm />);
@@ -513,7 +543,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
 
   // T4.2.2
   it("T4.2.2: workspace picker 200px 固定宽度", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
     // mockSelectedWsId = "ws-1" from beforeEach
 
     const { container } = render(() => <HomeAgentForm />);
@@ -557,7 +587,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
 
   // T4.2.4
   it("T4.2.4: Action slot onClick 调 addWorkspace (chat.store)", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
     // mockSelectedWsId = "ws-1" from beforeEach
 
     const { getByTestId } = render(() => <HomeAgentForm />);
@@ -576,10 +606,10 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
 
   // T4.2.5
   it("T4.2.5: Picker 返回 path → addWorkspace adds + sets draftWorkspaceId + textarea enabled", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
     // Override addWorkspace mock to also update mockSelectedWsId (mimics production behavior)
     vi.mocked(addWorkspaceFromStore).mockImplementation(() => {
-      mockSelectedWsId = "new-id";
+      mockSelectedWsId.current = "new-id";
       return Effect.succeed({ id: "new-id", label: "New Workspace", rootPath: "/new/path", createdAt: Date.now() });
     });
 
@@ -603,7 +633,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
 
   // T4.2.6
   it("T4.2.6: addWorkspace 返回 null 时 textarea 保持 disabled", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
     // Override addWorkspace mock to return null (picker cancelled)
     vi.mocked(addWorkspaceFromStore).mockReturnValueOnce(Effect.succeed(null as unknown as any));
 
@@ -814,8 +844,8 @@ describe("HomeAgentForm — Ctrl+Enter / Cmd+Enter send shortcut (T4.3)", () => 
     vi.clearAllMocks();
     mockIsOpen = false;
     sharedOnValueChanges = [];
-    mockWorkspaces.length = 0;
-    mockSelectedWsId = "ws-1";
+    mockWorkspaces.current.length = 0;
+    mockSelectedWsId.current = "ws-1";
     const { appStore } = await import("../../../shared/stores/app.store");
     appStore.state.value.providers = [
       {
@@ -843,7 +873,7 @@ describe("HomeAgentForm — Ctrl+Enter / Cmd+Enter send shortcut (T4.3)", () => 
   });
 
   it("T4.3.1: Ctrl+Enter on textarea triggers form submit → createConversation + sendMessage called", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
 
     const { container } = render(() => <HomeAgentForm />);
 
@@ -866,7 +896,7 @@ describe("HomeAgentForm — Ctrl+Enter / Cmd+Enter send shortcut (T4.3)", () => 
   });
 
   it("T4.3.2: Cmd+Enter on textarea (Mac) triggers form submit → createConversation + sendMessage called", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
 
     const { container } = render(() => <HomeAgentForm />);
 
@@ -889,7 +919,7 @@ describe("HomeAgentForm — Ctrl+Enter / Cmd+Enter send shortcut (T4.3)", () => 
   });
 
   it("T4.3.3: Enter without modifier does NOT trigger send", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
 
     const { container } = render(() => <HomeAgentForm />);
 
@@ -904,7 +934,7 @@ describe("HomeAgentForm — Ctrl+Enter / Cmd+Enter send shortcut (T4.3)", () => 
   });
 
   it("T4.3.4: Ctrl+Enter with empty input does not trigger send", async () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
 
     const { container } = render(() => <HomeAgentForm />);
 
@@ -920,8 +950,8 @@ describe("HomeAgentForm — Ctrl+Enter / Cmd+Enter send shortcut (T4.3)", () => 
 
   // ─── IME 兼容性 (Regression: 与 chat-view.tsx 同一根因) ────────────────
   it("T4.4.1: 中文 IME composition 期间 onInput 不写 signal — send 按钮保持 disabled", () => {
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
-    mockSelectedWsId = "ws-1";
+    mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockSelectedWsId.current = "ws-1";
 
     const { container } = render(() => <HomeAgentForm />);
     const textarea = container.querySelector("[data-testid='codex-input']") as HTMLTextAreaElement;
@@ -957,8 +987,8 @@ describe("HomeAgentForm Bug regression: Invalid value (Type) on blur", () => {
     vi.clearAllMocks();
     mockIsOpen = false;
     sharedOnValueChanges = [];
-    mockWorkspaces.length = 0;
-    mockSelectedWsId = null;
+    mockWorkspaces.current.length = 0;
+    mockSelectedWsId.current = null;
   });
 
   afterEach(() => {
@@ -967,8 +997,8 @@ describe("HomeAgentForm Bug regression: Invalid value (Type) on blur", () => {
 
   it("Bug: 输入框 blur 后不应出现 generic 'Invalid value (Type)' 提示", async () => {
     // 1 workspace → input enabled
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
-    mockSelectedWsId = "ws-1";
+    mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockSelectedWsId.current = "ws-1";
 
     const { container } = render(() => <HomeAgentForm />);
     const textarea = container.querySelector(
@@ -1009,8 +1039,8 @@ describe("HomeAgentForm Bug regression: '请输入消息内容' on blur (submit-
     vi.clearAllMocks();
     mockIsOpen = false;
     sharedOnValueChanges = [];
-    mockWorkspaces.length = 0;
-    mockSelectedWsId = null;
+    mockWorkspaces.current.length = 0;
+    mockSelectedWsId.current = null;
   });
 
   afterEach(() => {
@@ -1019,8 +1049,8 @@ describe("HomeAgentForm Bug regression: '请输入消息内容' on blur (submit-
 
   it("Bug: 输入框 blur 后不应出现 '请输入消息内容' (只有提交才校验)", async () => {
     // 1 workspace → input enabled
-    mockWorkspaces.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
-    mockSelectedWsId = "ws-1";
+    mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockSelectedWsId.current = "ws-1";
 
     const { container } = render(() => <HomeAgentForm />);
     const textarea = container.querySelector(
