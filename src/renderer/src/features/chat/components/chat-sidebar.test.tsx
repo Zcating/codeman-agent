@@ -271,5 +271,28 @@ describe("ChatSidebar (PR 2)", () => {
       renameBtn.click();
       expect(F.mockShowRenameDialog).toHaveBeenCalledWith("WS to Rename");
     });
+
+    it("renderItem button span shows opacity-100 on mouseEnter, opacity-0 on mouseLeave", async () => {
+      render(() => <ChatSidebar />);
+      const renderItem = F.capturedProps!.renderItem;
+      const { container } = render(() =>
+        renderItem({ label: "Test WS", value: "ws-test" }),
+      );
+      // The outer span is the row; the inner span (pointer-events-auto) holds the buttons
+      const buttonSpan = container.querySelector('[class*="pointer-events-auto"]') as HTMLElement;
+      // Default: hovering=false → button span has opacity-0
+      expect(buttonSpan.classList).toContain("opacity-0");
+      expect(buttonSpan.classList).not.toContain("opacity-100");
+      // Simulate mouseEnter on the outer row span
+      const rowSpan = container.querySelector('[class*="w-full items-center justify-between"]') as HTMLElement;
+      rowSpan.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+      // After mouseEnter: hovering=true → button span has opacity-100
+      expect(buttonSpan.classList).toContain("opacity-100");
+      expect(buttonSpan.classList).not.toContain("opacity-0");
+      // Simulate mouseLeave
+      rowSpan.dispatchEvent(new MouseEvent("mouseleave", { bubbles: true }));
+      expect(buttonSpan.classList).toContain("opacity-0");
+      expect(buttonSpan.classList).not.toContain("opacity-100");
+    });
   });
 });
