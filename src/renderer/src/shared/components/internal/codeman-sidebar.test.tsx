@@ -11,7 +11,7 @@
 //!  17. onItemSelect — click workspace triggers onItemSelect(value)
 //!  18. onSubItemSelect — click conv triggers onSubItemSelect(value)
 //!  19. Accordion defaultExpanded — group starts open
-//!  20. data-workspace-id / data-conv-id — e2e compat attributes
+//!  20. data-value — e2e compat attributes
 //!
 //! Chat-domain-specific seams (hover delete, streaming badge) are tested
 //! in chat-sidebar.test.tsx, NOT here (per ADR-0030 D6).
@@ -223,7 +223,7 @@ describe("CodemanSidebar (PR 2)", () => {
       const onItemSelect = vi.fn();
       const opts = makeOptions();
       const { container } = renderSidebar({ options: opts, onItemSelect });
-      const wsButton = container.querySelector("[data-workspace-id='ws-1']") as HTMLButtonElement;
+      const wsButton = container.querySelector("[data-value='ws-1']") as HTMLButtonElement;
       wsButton.click();
       expect(onItemSelect).toHaveBeenCalledWith("ws-1");
     });
@@ -232,7 +232,7 @@ describe("CodemanSidebar (PR 2)", () => {
       const onItemSelect = vi.fn();
       const opts = makeOptions();
       const { container } = renderSidebar({ options: opts, onItemSelect });
-      const wsButton = container.querySelector("[data-workspace-id='ws-2']") as HTMLButtonElement;
+      const wsButton = container.querySelector("[data-value='ws-2']") as HTMLButtonElement;
       wsButton.click();
       expect(onItemSelect).toHaveBeenCalledWith("ws-2");
     });
@@ -244,7 +244,7 @@ describe("CodemanSidebar (PR 2)", () => {
       const onSubItemSelect = vi.fn();
       const opts = makeOptions();
       const { container } = renderSidebar({ options: opts, onSubItemSelect });
-      const convButton = container.querySelector("[data-conv-id='c-1']") as HTMLAnchorElement;
+      const convButton = container.querySelector("[data-value='c-1']") as HTMLAnchorElement;
       convButton.click();
       expect(onSubItemSelect).toHaveBeenCalledWith("c-1");
     });
@@ -253,7 +253,7 @@ describe("CodemanSidebar (PR 2)", () => {
       const onSubItemSelect = vi.fn();
       const opts = makeOptions();
       const { container } = renderSidebar({ options: opts, onSubItemSelect });
-      const convButton = container.querySelector("[data-conv-id='c-3']") as HTMLAnchorElement;
+      const convButton = container.querySelector("[data-value='c-3']") as HTMLAnchorElement;
       convButton.click();
       expect(onSubItemSelect).toHaveBeenCalledWith("c-3");
     });
@@ -295,43 +295,43 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
-  // ─── Slice 20: data-workspace-id / data-conv-id ─────────────────────────
-  describe("data-workspace-id / data-conv-id (e2e compat)", () => {
-    it("SidebarMenuItem has data-workspace-id attribute", () => {
+  // ─── Slice 20: data-value ─────────────────────────────────────────────
+  describe("data-value (e2e compat)", () => {
+    it("SidebarMenuItem has data-value attribute", () => {
       const opts = makeOptions();
       const { container } = renderSidebar({ options: opts });
-      const ws1 = container.querySelector("[data-workspace-id='ws-1']");
-      const ws2 = container.querySelector("[data-workspace-id='ws-2']");
+      const ws1 = container.querySelector("[data-value='ws-1']");
+      const ws2 = container.querySelector("[data-value='ws-2']");
       expect(ws1).toBeTruthy();
       expect(ws2).toBeTruthy();
     });
 
-    it("SidebarMenuSubItem has data-conv-id attribute", () => {
+    it("SidebarMenuSubItem has data-value attribute", () => {
       const opts = makeOptions();
       const { container } = renderSidebar({ options: opts });
-      const c1 = container.querySelector("[data-conv-id='c-1']");
-      const c2 = container.querySelector("[data-conv-id='c-2']");
-      const c3 = container.querySelector("[data-conv-id='c-3']");
+      const c1 = container.querySelector("[data-value='c-1']");
+      const c2 = container.querySelector("[data-value='c-2']");
+      const c3 = container.querySelector("[data-value='c-3']");
       expect(c1).toBeTruthy();
       expect(c2).toBeTruthy();
       expect(c3).toBeTruthy();
     });
 
-    it("data-workspace-id matches workspace value", () => {
+    it("data-value matches workspace value", () => {
       const opts = makeOptions();
       const { container } = renderSidebar({ options: opts });
       for (const ws of opts[0].children) {
-        const el = container.querySelector(`[data-workspace-id='${ws.value}']`);
+        const el = container.querySelector(`[data-value='${ws.value}']`);
         expect(el).toBeTruthy();
       }
     });
 
-    it("data-conv-id matches conv value", () => {
+    it("data-value matches conv value", () => {
       const opts = makeOptions();
       const { container } = renderSidebar({ options: opts });
       for (const ws of opts[0].children) {
         for (const sub of ws.subItems ?? []) {
-          const el = container.querySelector(`[data-conv-id='${sub.value}']`);
+          const el = container.querySelector(`[data-value='${sub.value}']`);
           expect(el).toBeTruthy();
         }
       }
