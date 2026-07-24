@@ -82,6 +82,28 @@ SidebarGroupOption    — project 组（Accordion 控制）
 **拒绝**：
 - A — workspace 也用 Accordion 控制展开 — 与 shadcn tree 语义不符，workspace 应该永远可见
 
+### D7 (续) — CodemanSidebarProps 关键 API
+
+`CodemanSidebar` 接受 3 类 props:
+
+1. **数据 props**:
+   - `options: SidebarGroupOption[]` (3 层嵌套)
+   - `renderItem: (item: SidebarOption) => JSX.Element` (per ADR-0030 D2)
+   - `renderGroupHeader?: (group: SidebarGroupOption) => JSX.Element`
+   - `currentValue?: string` + `isActive?: (value, currentValue) => boolean` (per ADR-0030 D4)
+   - `onItemSelect?: (value: string) => void`
+   - `onSubItemSelect?: (value: string) => void` (新增，conv click)
+   - `onEmptyGroupClick?: (groupValue: string) => void`
+
+2. **3 slots**:
+   - `header?: JSX.Element` (sidebar 内顶部)
+   - `footer?: JSX.Element` (sidebar 内底部)
+   - `children?: JSX.Element` (SidebarInset 主内容)
+
+3. **辅助 props**:
+   - `emptyMessage?: string` (0 options 时显示)
+   - `class?: string` (注入 root aside)
+
 ### D8 — e2e selectors 迁移到 `[data-value="..."]`
 
 e2e 测试选择器从 `[data-workspace-id]` / `[data-conv-id]` 统一迁移到 `[data-value="..."]`（与 shadcn 命名一致）。
@@ -97,7 +119,7 @@ Layer 1 SidebarGroup / SidebarMenuItem / SidebarMenuSubItem 全部暴露 `data-v
 
 ## Status
 
-accepted
+accepted · 2026-07-25
 
 ## Considered Options
 
@@ -205,9 +227,11 @@ accepted
 | Q30 | e2e selectors 统一          | `[data-value="..."]` 与 shadcn 命名一致                    |
 
 ## References
-
-- `.omo/plans/sidebar-reshim.md` (30-round grill record)
-- ADR-0022 (`internal/` 首例 + design tokens)
-- ADR-0023 (codeman-* naming + @ark-ui/solid precedent)
-- ADR-0030 (CodemanSidebar 通用化 renderItem contract)
-- shadcn sidebar: `.repos/shadcn/sidebar.tsx`
+- `.repos/shadcn/sidebar.tsx` — 外部参考实现 (shadcn/ui sidebar，2025+ 版本基于 @base-ui/react)
+- `.repos/shadcn/accordion.tsx` — 外部参考实现 (shadcn/ui Accordion)
+- `.repos/shadcn/tooltip.tsx` — 外部参考实现 (shadcn/ui Tooltip)
+- `.omo/plans/sidebar-reshim.md` — 30 轮 grilling 决策记录
+- ADR-0022 (internal components boundary)
+- ADR-0023 (codeman-* namespace + Ark UI 选择)
+- ADR-0030 (sidebar 通用化 renderItem 全权控制)
+- ADR-0025 (Effect Schema 优先)

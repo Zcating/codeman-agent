@@ -376,8 +376,8 @@ export async function nthConv(
         // SidebarMenuButton 承载 workspace item，data-value=workspaceId
         const ws = document.querySelector(`[data-value="${args.workspaceId}"]`);
         if (!ws) {return null;}
-        // conv 级别的 data-value 在 SidebarMenuSubButton 上
-        const convs = Array.from(ws.querySelectorAll("[data-value]"));
+        // conv 级别的 data-value 在 SidebarMenuSubButton (<a>) 上；用 a[data-value] 排除 SidebarMenuButton (<button>)
+        const convs = Array.from(ws.querySelectorAll('a[data-value]'));
         const el = convs[args.n];
         if (!el) {return null;}
         // conv 的 data-value 就是 convId
