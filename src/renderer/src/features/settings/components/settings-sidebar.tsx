@@ -1,6 +1,6 @@
 //! SettingsSidebar — settings-domain wrapper for the universal CodemanSidebar.
 //!
-//! 4 flat nav items: LLM / App / Window / Advanced. URL is single source of
+//! 6 flat nav items: LLM / App / Window / Skills / MCP / Advanced. URL is single source of
 //! truth: `currentValue` derived from `/settings/$tab` route param.
 //! `onItemSelect` navigates to `/settings/{value}`.
 //!
@@ -21,6 +21,7 @@ import {
 } from "lucide-solid";
 import {
   CodemanSidebar,
+  type SidebarGroupOption,
   type SidebarOption,
 } from "../../../shared/components/internal/codeman-sidebar";
 
@@ -98,9 +99,22 @@ export function SettingsSidebar(): JSX.Element {
     navigate({ to: target });
   };
 
+  const options: SidebarGroupOption[] = [
+    {
+      label: "Settings",
+      value: "settings",
+      defaultExpanded: true,
+      children: SETTINGS_NAV.map(tab => ({
+        label: tab.label,
+        value: tab.value,
+        icon: tab.icon,
+      })),
+    },
+  ];
+
   return (
     <CodemanSidebar
-      options={[...SETTINGS_NAV]}
+      options={options}
       renderItem={renderItem}
       currentValue={currentTab()}
       onItemSelect={handleSelect}

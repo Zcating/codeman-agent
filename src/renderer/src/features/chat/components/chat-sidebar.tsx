@@ -8,7 +8,8 @@
 //!
 //! Data flow:
 //! - Reads `workspaces$()` + `conversations$()` from chat.store (Solid Accessors)
-//! - Builds `SidebarOption[]` tree (workspaces as groups, conversations as leaves)
+//! - Builds `SidebarGroupOption[]` tree (one project group with workspaces as items,
+//!   conversations as subItems)
 //! - Wires all chat-domain handlers (select / delete / rename / new conv / empty ws)
 //! - Passes URL-derived `selectedConvId` as `currentValue` for active highlight
 //!
@@ -20,7 +21,9 @@ import { Outlet, useLocation, useNavigate, useParams, Link } from "@tanstack/sol
 import { Settings as SettingsIcon } from "lucide-solid";
 import {
   CodemanSidebar,
+  type SidebarGroupOption,
   type SidebarOption,
+  type SidebarSubOption,
 } from "../../../shared/components/internal/codeman-sidebar";
 import { Dialog } from "../../../shared/components/internal/codeman-dialog";
 import { logger } from "../../../shared/lib/logger";
@@ -52,9 +55,6 @@ export function ChatSidebar(): JSX.Element {
     (params() as { convId?: string }).convId ?? null;
 
   const wsList = (): Workspace[] => workspaces$() ?? [];
-  const convList = (): { id: string; title: string; workspaceId: string; updatedAt: number }[] =>
-    conversations$() ?? [];
-  const firstWsId = (): string | undefined => wsList()[0]?.id;
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
@@ -119,7 +119,7 @@ export function ChatSidebar(): JSX.Element {
 
   // ─── Sidebar tree builders ───────────────────────────────────────────────
 
-  const options = (): SidebarOption[] => {
+  const options = (): SidebarGroupOption[] => {
     if (wsList().length === 0) {return [];}
 
     return [
@@ -127,14 +127,13 @@ export function ChatSidebar(): JSX.Element {
         label: "项目",
         value: "workspace",
         defaultExpanded: true,
-        children: wsList().map((ws) => ({
+        children: wsList().map((ws): SidebarOption => ({
           label: ws.label,
           value: ws.id,
-          defaultExpanded: ws.id === firstWsId(),
-          children: convList()
-            .filter((c) => c.workspaceId === ws.id)
+          subItems: conversations$()
+            ?.filter((c) => c.workspaceId === ws.id)
             .sort((a, b) => b.updatedAt - a.updatedAt)
-            .map((c): SidebarOption => ({
+            .map((c): SidebarSubOption => ({
               label: c.title,
               value: c.id,
             })),
@@ -143,7 +142,7 @@ export function ChatSidebar(): JSX.Element {
     ];
   };
 
-  const renderLeaf = (item: SidebarOption): JSX.Element => {
+  const renderItem = (item: SidebarOption): JSX.Element => {
     const convId = item.value ?? item.label;
     const isStreaming = (): boolean =>
       store.byId[convId]?.streamingMessageId != null;
@@ -157,7 +156,7 @@ export function ChatSidebar(): JSX.Element {
     );
   };
 
-  const renderGroupHeader = (group: SidebarOption): JSX.Element => {
+  const renderGroupHeader = (group: SidebarGroupOption): JSX.Element => {
     // Top-level "项目" category group — no rename/delete actions.
     if (group.value === "workspace") {
       return (
@@ -186,10 +185,11 @@ export function ChatSidebar(): JSX.Element {
   return (
     <CodemanSidebar
       options={options()}
-      renderItem={renderLeaf}
+      renderItem={renderItem}
       renderGroupHeader={renderGroupHeader}
       currentValue={selectedConvId() ?? undefined}
       onItemSelect={handleSelectConv}
+      onSubItemSelect={handleSelectConv}
       onEmptyGroupClick={handleEmptyWorkspaceClick}
       header={
         <NewChatButton onClick={handleNewConversation} />

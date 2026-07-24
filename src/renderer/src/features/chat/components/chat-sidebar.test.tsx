@@ -1,4 +1,4 @@
-//! ChatSidebar — chat-domain wrapper tests.
+//! ChatSidebar — chat-domain wrapper tests (PR 2).
 //!
 //! Strategy: mock CodemanSidebar to capture the props ChatSidebar passes.
 //! Verify ChatSidebar's CONTRACT (what it passes to CodemanSidebar) rather
@@ -19,6 +19,7 @@ interface CapturedProps {
   renderGroupHeader?: (group: any) => any;
   currentValue?: string;
   onItemSelect?: (value: string) => void;
+  onSubItemSelect?: (value: string) => void;
   onEmptyGroupClick?: (groupValue: string) => void;
   header?: any;
   footer?: any;
@@ -104,6 +105,7 @@ vi.mock("../../../shared/components/internal/codeman-sidebar", () => ({
       renderGroupHeader: props.renderGroupHeader,
       currentValue: props.currentValue,
       onItemSelect: props.onItemSelect,
+      onSubItemSelect: props.onSubItemSelect,
       onEmptyGroupClick: props.onEmptyGroupClick,
       header: props.header,
       footer: props.footer,
@@ -136,33 +138,36 @@ beforeEach(() => {
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
-describe("ChatSidebar", () => {
-  it("builds 3-level options from workspaces + conversations", () => {
+describe("ChatSidebar (PR 2)", () => {
+  it("builds SidebarGroupOption[] with workspace items and conv subItems", () => {
     render(() => <ChatSidebar />);
     expect(F.capturedProps).toBeTruthy();
     const opts = F.capturedProps!.options;
     expect(opts.length).toBe(1);
+    // Top-level project group
     expect(opts[0]).toMatchObject({
       label: "项目",
       value: "workspace",
       defaultExpanded: true,
     });
+    // Two workspaces as children
     expect(opts[0].children.length).toBe(2);
     expect(opts[0].children[0]).toMatchObject({
       label: "Frontend",
       value: "ws-1",
-      defaultExpanded: true,
     });
-    expect(opts[0].children[0].children).toEqual([
+    // Convs as subItems (not children)
+    expect(opts[0].children[0].subItems).toEqual([
       { label: "Chat 1", value: "c-1" },
       { label: "Chat 2", value: "c-2" },
     ]);
     expect(opts[0].children[1]).toMatchObject({
       label: "Backend",
       value: "ws-2",
-      defaultExpanded: false,
     });
-    expect(opts[0].children[1].children).toEqual([{ label: "Chat 3", value: "c-3" }]);
+    expect(opts[0].children[1].subItems).toEqual([
+      { label: "Chat 3", value: "c-3" },
+    ]);
   });
 
   it("passes emptyMessage='No workspaces' to CodemanSidebar", () => {
@@ -170,11 +175,16 @@ describe("ChatSidebar", () => {
     expect(F.capturedProps?.emptyMessage).toBe("No workspaces");
   });
 
-  it("first workspace has defaultExpanded=true; second false", () => {
+  it("onSubItemSelect navigates to /conversation/{value}", () => {
     render(() => <ChatSidebar />);
-    const children = F.capturedProps!.options[0].children;
-    expect(children[0].defaultExpanded).toBe(true);
-    expect(children[1].defaultExpanded).toBe(false);
+    F.capturedProps!.onSubItemSelect!("c-1");
+    expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/conversation/c-1" });
+  });
+
+  it("onItemSelect also navigates (for workspace click, though chat uses onSubItemSelect)", () => {
+    render(() => <ChatSidebar />);
+    F.capturedProps!.onItemSelect!("c-1");
+    expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/conversation/c-1" });
   });
 
   it("currentValue comes from URL params (convId)", () => {
@@ -186,12 +196,6 @@ describe("ChatSidebar", () => {
   it("currentValue undefined when URL has no convId", () => {
     render(() => <ChatSidebar />);
     expect(F.capturedProps?.currentValue).toBeUndefined();
-  });
-
-  it("onItemSelect navigates to /conversation/{value}", () => {
-    render(() => <ChatSidebar />);
-    F.capturedProps!.onItemSelect!("c-1");
-    expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/conversation/c-1" });
   });
 
   it("onEmptyGroupClick calls setSelectedWorkspaceId", () => {
@@ -218,5 +222,13 @@ describe("ChatSidebar", () => {
   it("class prop sets border-r for sidebar layout", () => {
     render(() => <ChatSidebar />);
     expect(F.capturedProps?.class).toBe("border-r border-sidebar-border");
+  });
+
+  it("conversations are sorted by updatedAt descending", () => {
+    render(() => <ChatSidebar />);
+    const subItems = F.capturedProps!.options[0].children[0].subItems;
+    // c-1 has updatedAt=200, c-2 has updatedAt=100
+    expect(subItems[0].label).toBe("Chat 1");
+    expect(subItems[1].label).toBe("Chat 2");
   });
 });

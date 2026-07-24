@@ -1,8 +1,8 @@
-//! SettingsSidebar — settings-domain wrapper tests.
+//! SettingsSidebar — settings-domain wrapper tests (PR 2).
 //!
 //! Strategy: mock CodemanSidebar to capture the props SettingsSidebar passes.
 //! Verify SettingsSidebar's CONTRACT (what it passes to CodemanSidebar) +
-//! the 4 nav items + URL-driven currentValue + click → navigate behavior.
+//! the 6 nav items + URL-driven currentValue + click → navigate behavior.
 
 import { render } from "@solidjs/testing-library";
 import { describe, expect, it, vi, beforeEach } from "vitest";
@@ -31,10 +31,6 @@ vi.mock("@tanstack/solid-router", async () => {
     ...actual,
     useNavigate: () => F.mockNavigate,
     useParams: () => F.mockParams,
-    // useLocation must return the accessor (a function), NOT a pre-invoked
-    // location object. `() => F.mockLocation()` would call the vi.fn once
-    // and hand back the object — then `location()` in settings-sidebar would
-    // hit `object.state` and always be undefined.
     useLocation: () => F.mockLocation,
     Outlet: () => <div data-testid="outlet" />,
   };
@@ -52,9 +48,6 @@ vi.mock("../../../shared/components/internal/codeman-sidebar", () => ({
       class: props.class,
       children: props.children,
     };
-    // Render header / footer / children into a real DOM subtree so click
-    // events on the Back button (a JSX element in props.footer) actually
-    // fire. The mock is otherwise a stub `<div>` and the JSX is never mounted.
     return (
       <div data-testid="codeman-sidebar-stub">
         <div data-testid="mock-header">{props.header}</div>
@@ -85,12 +78,20 @@ beforeEach(() => {
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
-describe("SettingsSidebar", () => {
-  it("renders 6 nav items: LLM, App, Window, Skills, Advanced, MCP", () => {
+describe("SettingsSidebar (PR 2)", () => {
+  it("builds options as SidebarGroupOption[] with 6 nav items in children", () => {
     render(() => <SettingsSidebar />);
     const opts = F.capturedProps.options;
-    expect(opts.length).toBe(6);
-    expect(opts.map((o: any) => o.label)).toEqual([
+    // options is SidebarGroupOption[] — one group
+    expect(opts.length).toBe(1);
+    expect(opts[0]).toMatchObject({
+      label: "Settings",
+      value: "settings",
+      defaultExpanded: true,
+    });
+    // 6 nav items as children
+    expect(opts[0].children.length).toBe(6);
+    expect(opts[0].children.map((c: any) => c.label)).toEqual([
       "LLM",
       "App",
       "Window",
@@ -98,7 +99,7 @@ describe("SettingsSidebar", () => {
       "MCP",
       "Advanced",
     ]);
-    expect(opts.map((o: any) => o.value)).toEqual([
+    expect(opts[0].children.map((c: any) => c.value)).toEqual([
       "llm",
       "app",
       "window",
@@ -110,8 +111,8 @@ describe("SettingsSidebar", () => {
 
   it("each nav item has an icon (lucide-solid element)", () => {
     render(() => <SettingsSidebar />);
-    for (const opt of F.capturedProps.options) {
-      expect(opt.icon).toBeTruthy();
+    for (const child of F.capturedProps.options[0].children) {
+      expect(child.icon).toBeTruthy();
     }
   });
 
@@ -147,8 +148,6 @@ describe("SettingsSidebar", () => {
     expect(F.capturedProps.class).toBe("border-r border-sidebar-border");
   });
 
-  // ─── Back button: navigate to entry URL, not history.back() ──────────────
-
   it("footer Back button navigates to location.state.from (the page user came from before settings)", () => {
     F.mockLocation.mockImplementation(() => ({
       pathname: "/settings/app",
@@ -157,12 +156,7 @@ describe("SettingsSidebar", () => {
     const { getByTestId } = render(() => <SettingsSidebar />);
     const backButton = getByTestId("mock-footer").querySelector("button");
     expect(backButton).toBeTruthy();
-    console.log("[diag] button:", backButton?.outerHTML);
-    console.log("[diag] F.mockLocation mock.calls:", F.mockLocation.mock.calls.length);
-    console.log("[diag] F.mockNavigate.mock.calls before click:", F.mockNavigate.mock.calls);
     backButton!.click();
-    console.log("[diag] F.mockNavigate.mock.calls after click:", F.mockNavigate.mock.calls);
-    console.log("[diag] F.mockLocation mock.calls after click:", F.mockLocation.mock.calls.length);
     expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/conversation/c-1" });
   });
 
