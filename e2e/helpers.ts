@@ -328,30 +328,38 @@ export async function ensureWorkspaceByPath(
 }
 
 /**
- * 在 sidebar 中通过 data-workspace-id 找到该 workspace 的 header 并点击展开。
+ * 在 sidebar 中通过 data-value 找到该 workspace 的 header 并点击展开。
  * 若已展开则 no-op。
+ * D8: codeman-sidebar.tsx 在 SidebarGroup 上暴露 data-value="workspace"（组级别），
+ * SidebarMenuButton 上暴露 data-value={item.value}（workspace 级别）。
+ * expandWorkspace 使用 workspaceId 直接匹配 SidebarMenuButton 的 data-value。
  */
 export async function expandWorkspace(p: TauriPage, workspaceId: string): Promise<void> {
   // D8-W: CodemanSidebar expands the first workspace by default (defaultValue in Accordion.Root).
   // This is a no-op for the first workspace. For non-first workspaces, click the trigger.
   const isOpen = await p.evaluate((id: string) => {
-    const item = document.querySelector(`[data-workspace-id="${id}"]`);
+    // SidebarMenuButton 承载 workspace item，data-value=workspaceId
+    const item = document.querySelector(`[data-value="${id}"]`);
     return item?.getAttribute("data-state") === "open";
   }, workspaceId);
   if (!isOpen) {
-    await p.locator(`[data-workspace-id="${workspaceId}"] button`).first().click();
+    await p.locator(`[data-value="${workspaceId}"] button`).first().click();
   }
 }
 
 /**
- * 通过 data-conv-id 点击 sidebar 中某个 conv。
+ * 通过 data-value 点击 sidebar 中某个 conv。
+ * D8: codeman-sidebar.tsx SidebarMenuSubButton 暴露 data-value={sub.value}。
  */
 export async function clickConv(p: TauriPage, convId: string): Promise<void> {
-  await p.locator(`[data-conv-id="${convId}"]`).click();
+  await p.locator(`[data-value="${convId}"]`).click();
 }
 
 /**
  * 在 sidebar 中按 DOM 顺序取第 N 个 conv（per-workspace 或全局）。
+ * D8: codeman-sidebar.tsx SidebarGroup 有 data-value="workspace"（组级别），
+ * SidebarMenuButton 有 data-value={item.value}（workspace 级别），
+ * SidebarMenuSubButton 有 data-value={sub.value}（conv 级别）。
  * @param p  TauriPage
  * @param n  0-based index
  * @param scope.workspaceId  可选，限定在某个 workspace 内
@@ -365,23 +373,28 @@ export async function nthConv(
   const result = await p.evaluate(
     (args: { n: number; workspaceId?: string }) => {
       if (args.workspaceId) {
-        const ws = document.querySelector(`[data-workspace-id="${args.workspaceId}"]`);
+        // SidebarMenuButton 承载 workspace item，data-value=workspaceId
+        const ws = document.querySelector(`[data-value="${args.workspaceId}"]`);
         if (!ws) {return null;}
-        const convs = Array.from(ws.querySelectorAll("[data-conv-id]"));
+        // conv 级别的 data-value 在 SidebarMenuSubButton 上
+        const convs = Array.from(ws.querySelectorAll("[data-value]"));
         const el = convs[args.n];
         if (!el) {return null;}
+        // conv 的 data-value 就是 convId
         return {
-          convId: el.getAttribute("data-conv-id")!,
+          convId: el.getAttribute("data-value")!,
           workspaceId: args.workspaceId,
         };
       } else {
-        const convs = Array.from(document.querySelectorAll(`aside [data-conv-id]`));
+        // 全局：在 aside 内找所有 conv 级别的 data-value
+        const convs = Array.from(document.querySelectorAll(`aside [data-value]`));
         const el = convs[args.n];
         if (!el) {return null;}
-        const parentWs = el.closest("[data-workspace-id]");
+        // 找 parent workspace（SidebarMenuButton，data-value=workspaceId）
+        const parentWs = el.closest("[data-value]");
         return {
-          convId: el.getAttribute("data-conv-id")!,
-          workspaceId: parentWs?.getAttribute("data-workspace-id") ?? "",
+          convId: el.getAttribute("data-value")!,
+          workspaceId: parentWs?.getAttribute("data-value") ?? "",
         };
       }
     },
