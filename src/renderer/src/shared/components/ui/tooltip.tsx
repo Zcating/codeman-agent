@@ -1,4 +1,6 @@
 //! tooltip.tsx — shadcn-style Tooltip primitive wrapping @ark-ui/solid Tooltip.
+//! Per ADR-0023 D8-W6 precedent (Dialog): ui/ atoms MAY wrap @ark-ui/solid
+//! when the wrapper is a shadcn/ui-style primitive (not a feature composition).
 //! Per plan: Q10=B — 建 ui/tooltip.tsx 包 @ark-ui/solid Tooltip;
 //! SidebarMenuButton 接受 tooltip? prop.
 

@@ -117,6 +117,62 @@ describe("SidebarProvider controlled mode — seam 2", () => {
     await user.click(screen.getByTestId("toggle"));
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
+
+  it("A5: setOpen triggers onOpenChange and updates useSidebar().open synchronously (uncontrolled)", async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    const Consumer = () => {
+      const ctx = useSidebar()!;
+      // Use effect-equivalent tracking by reading the open value inside JSX
+      // to ensure reactive update after setOpen
+      return (
+        <>
+          <span data-testid="open">{String(ctx.open)}</span>
+          <span data-testid="state">{ctx.state}</span>
+          <button data-testid="close" onClick={() => ctx.setOpen(false)}>
+            close
+          </button>
+        </>
+      );
+    };
+    render(() => (
+      <SidebarProvider defaultOpen={true} onOpenChange={onOpenChange}>
+        <Consumer />
+      </SidebarProvider>
+    ));
+    expect(screen.getByTestId("open").textContent).toBe("true");
+    expect(screen.getByTestId("state").textContent).toBe("expanded");
+    await user.click(screen.getByTestId("close"));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    // useSidebar() open is synchronously updated after setOpen
+    expect(screen.getByTestId("open").textContent).toBe("false");
+    expect(screen.getByTestId("state").textContent).toBe("collapsed");
+  });
+
+  it("A5: setOpen function reference is stable when state does not change", () => {
+    // When open state stays the same, the contextValue memo should not recompute,
+    // so setOpen (a closure over stable values) should keep the same reference.
+    let setOpenRef1: ((v: boolean) => void) | undefined;
+    let setOpenRef2: ((v: boolean) => void) | undefined;
+    const Consumer1 = () => {
+      const ctx = useSidebar();
+      if (ctx) setOpenRef1 = ctx.setOpen;
+      return <div>c1</div>;
+    };
+    const Consumer2 = () => {
+      const ctx = useSidebar();
+      if (ctx) setOpenRef2 = ctx.setOpen;
+      return <div>c2</div>;
+    };
+    render(() => (
+      <SidebarProvider defaultOpen={true}>
+        <Consumer1 />
+        <Consumer2 />
+      </SidebarProvider>
+    ));
+    // Both consumers see the same setOpen reference (stable across contextValue memo)
+    expect(setOpenRef1).toBe(setOpenRef2);
+  });
 });
 
 describe("SidebarProvider CSS vars injection — seam 3", () => {

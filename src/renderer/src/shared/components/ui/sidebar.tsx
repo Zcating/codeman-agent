@@ -1,5 +1,7 @@
 //! sidebar.tsx — Layer 1 shadcn-style sidebar primitive.
 //! Pure layout, ZERO business logic. Wraps @ark-ui/solid for Accordion/Tooltip.
+//! Per ADR-0023 D8-W6 precedent (Dialog): ui/ atoms MAY wrap @ark-ui/solid
+//! when the wrapper is a shadcn/ui-style primitive (not a feature composition).
 //! Per ADR-0022 D3: Layer 1 = this file; Layer 2 = internal/codeman-sidebar.tsx.
 
 import type { JSX } from "solid-js";
@@ -50,20 +52,28 @@ export function SidebarProvider(props: SidebarProviderProps): JSX.Element {
     }
   };
 
-  const state = () => (open() ? "expanded" : "collapsed");
-
   const toggleSidebar = () => setOpen(!open());
 
-  const contextValue: SidebarContextValue = {
-    state: state(),
-    open: open(),
-    setOpen,
-    isMobile: false,
-    toggleSidebar,
-  };
+  // isMobile is an intentional stub — plan Q6=A deferred mobile Sheet support.
+  // If mobile support is added later: createMemo(() => matchMedia('(max-width: 768px)').matches)
+  // + effect to sync on media change.
 
   return (
-    <SidebarContext.Provider value={contextValue}>
+    <SidebarContext.Provider
+      value={{
+        get state() {
+          return open() ? "expanded" : "collapsed";
+        },
+        get open() {
+          return open();
+        },
+        setOpen,
+        get isMobile() {
+          return false;
+        },
+        toggleSidebar,
+      }}
+    >
       {props.children}
     </SidebarContext.Provider>
   );

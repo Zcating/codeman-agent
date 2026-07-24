@@ -1,4 +1,6 @@
 //! accordion.tsx — shadcn-style Accordion primitive wrapping @ark-ui/solid Accordion.
+//! Per ADR-0023 D8-W6 precedent (Dialog): ui/ atoms MAY wrap @ark-ui/solid
+//! when the wrapper is a shadcn/ui-style primitive (not a feature composition).
 //! Per plan: Q28 v5=A —新建 ui/accordion.tsx + chat tree; 包 @ark-ui/solid Accordion.
 
 import type { Component, JSX } from "solid-js";
