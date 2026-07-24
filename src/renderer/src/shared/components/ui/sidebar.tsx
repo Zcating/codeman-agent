@@ -1,11 +1,75 @@
-//! Sidebar — shadcn-style layout primitive (Layer 1).
-//! Pure layout, ZERO business logic, ZERO feature imports.
-//! Per ADR-0022 D3: Layer 1 = this file, Layer 2 = internal/codeman-sidebar.tsx.
+//! sidebar.tsx — Layer 1 shadcn-style sidebar primitive.
+//! Pure layout, ZERO business logic. Wraps @ark-ui/solid for Accordion/Tooltip.
+//! Per ADR-0022 D3: Layer 1 = this file; Layer 2 = internal/codeman-sidebar.tsx.
 
-import { type JSX, type ParentProps, mergeProps, splitProps } from "solid-js";
+import type { JSX } from "solid-js";
+import { createSignal, createContext, useContext, mergeProps, splitProps, Show } from "solid-js";
 import { cn } from "../../lib/cn";
+import { Tooltip as TooltipRoot, TooltipTrigger, TooltipContent } from "./tooltip";
 
-// ─── Root container ────────────────────────────────────────────────────────────
+// ─── SidebarContext & SidebarProvider ─────────────────────────────────────────
+
+interface SidebarContextValue {
+  state: "expanded" | "collapsed";
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  isMobile: boolean;
+  toggleSidebar: () => void;
+}
+
+const SidebarContext = createContext<SidebarContextValue | null>(null);
+
+export function useSidebar(): SidebarContextValue | null {
+  return useContext(SidebarContext);
+}
+
+export interface SidebarProviderProps {
+  defaultOpen?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  class?: string;
+  children?: JSX.Element;
+}
+
+export function SidebarProvider(props: SidebarProviderProps): JSX.Element {
+  const merged = mergeProps({ defaultOpen: true }, props);
+
+  // Internal state for uncontrolled mode
+  const [internalOpen, setInternalOpen] = createSignal(merged.defaultOpen);
+
+  // Controlled: use props.open if provided, otherwise use internal
+  const isControlled = () => props.open !== undefined;
+  const open = () => (isControlled() ? props.open! : internalOpen());
+
+  const setOpen = (value: boolean) => {
+    // Always notify if onOpenChange is provided
+    props.onOpenChange?.(value);
+    // Only update internal state if not controlled
+    if (!isControlled()) {
+      setInternalOpen(value);
+    }
+  };
+
+  const state = () => (open() ? "expanded" : "collapsed");
+
+  const toggleSidebar = () => setOpen(!open());
+
+  const contextValue: SidebarContextValue = {
+    state: state(),
+    open: open(),
+    setOpen,
+    isMobile: false,
+    toggleSidebar,
+  };
+
+  return (
+    <SidebarContext.Provider value={contextValue}>
+      {props.children}
+    </SidebarContext.Provider>
+  );
+}
+
+// ─── Shell ────────────────────────────────────────────────────────────────────
 
 export interface SidebarProps {
   side?: "left" | "right";
@@ -16,120 +80,141 @@ export interface SidebarProps {
 }
 
 export function Sidebar(props: SidebarProps): JSX.Element {
-  const merged = mergeProps(
-    { side: "left" as const, variant: "sidebar" as const, collapsible: "offcanvas" as const },
-    props,
-  );
+  const merged = mergeProps({ side: "left" as const, variant: "sidebar" as const, collapsible: "offcanvas" as const }, props);
+
+  if (merged.collapsible === "none" || props.collapsible === "none") {
+    return (
+      <aside
+        data-slot="sidebar"
+        class={cn(
+          "flex h-full w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground",
+          merged.class,
+        )}
+        aria-label="Sidebar"
+      >
+        {merged.children}
+      </aside>
+    );
+  }
+
   return (
-    <aside
-      class={cn(
-        "flex h-full flex-col bg-sidebar text-sidebar-foreground border-sidebar-border",
-        merged.collapsible === "offcanvas" && "w-60 transition-[width] duration-200",
-        merged.class,
-      )}
-      aria-label="Sidebar"
+    <div
+      data-slot="sidebar"
+      data-state={useSidebar()?.state}
+      data-variant={merged.variant}
+      data-side={merged.side}
+      data-collapsible={merged.collapsible}
     >
-      {merged.children}
-    </aside>
+      <div
+        data-slot="sidebar-gap"
+        class={cn(
+          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
+          merged.variant === "floating" || merged.variant === "inset"
+            ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]"
+            : "group-data-[collapsible=icon]:w-(--sidebar-width-icon)",
+        )}
+      />
+      <aside
+        data-sidebar="sidebar"
+        data-slot="sidebar-inner"
+        class={cn(
+          "flex h-full flex-col bg-sidebar text-sidebar-foreground transition-[width] duration-200 ease-linear",
+          merged.variant === "floating" || merged.variant === "inset" ? "p-2" : "group-data-[side=left]:border-r group-data-[side=right]:border-l",
+          merged.variant === "floating" ? "rounded-lg shadow-sm ring-1 ring-sidebar-border" : "",
+          merged.variant === "inset" ? "rounded-xl" : "",
+          merged.class,
+        )}
+        aria-label="Sidebar"
+      >
+        {merged.children}
+      </aside>
+    </div>
   );
 }
 
-// ─── Header / Content / Footer ────────────────────────────────────────────────
-
-export function SidebarHeader(props: ParentProps<{ class?: string }>): JSX.Element {
+export function SidebarHeader(props: { class?: string; children?: JSX.Element }): JSX.Element {
   const [local, rest] = splitProps(props, ["class", "children"]);
   return (
-    <div class={cn("flex flex-col gap-1 p-2 border-b border-sidebar-border", local.class)} {...rest}>
+    <div data-slot="sidebar-header" data-sidebar="header" class={cn("flex flex-col gap-2 p-2", local.class)} {...rest}>
       {local.children}
     </div>
   );
 }
 
-export function SidebarContent(props: ParentProps<{ class?: string }>): JSX.Element {
+export function SidebarContent(props: { class?: string; children?: JSX.Element }): JSX.Element {
   const [local, rest] = splitProps(props, ["class", "children"]);
   return (
-    <div class={cn("flex-1 overflow-y-auto p-2", local.class)} {...rest}>
+    <div data-slot="sidebar-content" data-sidebar="content" class={cn("flex min-h-0 flex-1 flex-col gap-0 overflow-auto", local.class)} {...rest}>
       {local.children}
     </div>
   );
 }
 
-export function SidebarFooter(props: ParentProps<{ class?: string }>): JSX.Element {
+export function SidebarFooter(props: { class?: string; children?: JSX.Element }): JSX.Element {
   const [local, rest] = splitProps(props, ["class", "children"]);
   return (
-    <div class={cn("flex flex-col gap-1 p-2 border-t border-sidebar-border", local.class)} {...rest}>
+    <div data-slot="sidebar-footer" data-sidebar="footer" class={cn("flex flex-col gap-2 p-2", local.class)} {...rest}>
       {local.children}
     </div>
   );
 }
 
-// ─── Group (section with title) ───────────────────────────────────────────────
+export function SidebarSeparator(props: { class?: string; children?: JSX.Element }): JSX.Element {
+  const [local] = splitProps(props, ["class"]);
+  return (
+    <div
+      data-slot="sidebar-separator"
+      data-sidebar="separator"
+      class={cn("mx-2 w-auto bg-sidebar-border", local.class)}
+      role="separator"
+    />
+  );
+}
 
-export function SidebarGroup(props: ParentProps<{ class?: string }>): JSX.Element {
+// ─── Group ─────────────────────────────────────────────────────────────────────
+
+export function SidebarGroup(props: { class?: string; children?: JSX.Element }): JSX.Element {
   const [local, rest] = splitProps(props, ["class", "children"]);
   return (
-    <div class={cn("flex flex-col gap-1", local.class)} {...rest}>
+    <div data-slot="sidebar-group" data-sidebar="group" class={cn("relative flex w-full min-w-0 flex-col p-2", local.class)} {...rest}>
       {local.children}
     </div>
   );
 }
 
-export function SidebarGroupLabel(props: ParentProps<{ class?: string }>): JSX.Element {
+export function SidebarGroupLabel(props: { class?: string; children?: JSX.Element }): JSX.Element {
   const [local, rest] = splitProps(props, ["class", "children"]);
   return (
-    <div class={cn("px-2 py-1 text-xs font-medium text-muted-foreground uppercase tracking-wide", local.class)} {...rest}>
+    <div
+      data-slot="sidebar-group-label"
+      data-sidebar="group-label"
+      class={cn("flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 ring-sidebar-ring outline-hidden transition-[margin,opacity] duration-200 ease-linear", local.class)}
+      {...rest}
+    >
       {local.children}
     </div>
   );
 }
 
-export function SidebarGroupContent(props: ParentProps<{ class?: string }>): JSX.Element {
+export function SidebarGroupContent(props: { class?: string; children?: JSX.Element }): JSX.Element {
   const [local, rest] = splitProps(props, ["class", "children"]);
   return (
-    <div class={cn("flex flex-col gap-0.5", local.class)} {...rest}>
+    <div data-slot="sidebar-group-content" data-sidebar="group-content" class={cn("w-full text-sm", local.class)} {...rest}>
       {local.children}
     </div>
   );
 }
 
-// ─── Menu (interactive list) ───────────────────────────────────────────────────
-
-export function SidebarMenu(props: ParentProps<{ class?: string }>): JSX.Element {
-  const [local, rest] = splitProps(props, ["class", "children"]);
-  return (
-    <ul class={cn("flex flex-col gap-0.5 list-none p-0 m-0", local.class)} role="menu" {...rest}>
-      {local.children}
-    </ul>
-  );
-}
-
-export function SidebarMenuItem(props: ParentProps<{ class?: string }>): JSX.Element {
-  const [local, rest] = splitProps(props, ["class", "children"]);
-  return (
-    <li class={cn("flex items-center gap-1", local.class)} role="none" {...rest}>
-      {local.children}
-    </li>
-  );
-}
-
-export interface SidebarMenuButtonProps extends JSX.ButtonHTMLAttributes<HTMLButtonElement> {
-  isActive?: boolean;
-  size?: "sm" | "md";
-}
-
-export function SidebarMenuButton(props: SidebarMenuButtonProps): JSX.Element {
-  const [local, rest] = splitProps(props, ["class", "isActive", "size", "children"]);
+export function SidebarGroupAction(props: { class?: string; children?: JSX.Element; "aria-label"?: string }): JSX.Element {
+  const [local, rest] = splitProps(props, ["class", "children", "aria-label"]);
   return (
     <button
       type="button"
-      role="menuitem"
+      data-slot="sidebar-group-action"
+      data-sidebar="group-action"
+      aria-label={local["aria-label"]}
       class={cn(
-        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors outline-none",
-        "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-        local.isActive
-          ? "bg-sidebar-primary text-sidebar-primary-foreground"
-          : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-        local.size === "sm" ? "h-7 px-2 text-xs" : "h-9",
+        "absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2",
         local.class,
       )}
       {...rest}
@@ -139,7 +224,84 @@ export function SidebarMenuButton(props: SidebarMenuButtonProps): JSX.Element {
   );
 }
 
-// ─── Action inside menu item (e.g., delete button) ────────────────────────────
+// ─── Menu ──────────────────────────────────────────────────────────────────────
+
+export function SidebarMenu(props: { class?: string; children?: JSX.Element }): JSX.Element {
+  const [local, rest] = splitProps(props, ["class", "children"]);
+  return (
+    <ul data-slot="sidebar-menu" data-sidebar="menu" class={cn("flex w-full min-w-0 flex-col gap-0", local.class)} role="menu" {...rest}>
+      {local.children}
+    </ul>
+  );
+}
+
+export function SidebarMenuItem(props: { class?: string; children?: JSX.Element }): JSX.Element {
+  const [local, rest] = splitProps(props, ["class", "children"]);
+  return (
+    <li data-slot="sidebar-menu-item" data-sidebar="menu-item" class={cn("group/menu-item relative", local.class)} role="none" {...rest}>
+      {local.children}
+    </li>
+  );
+}
+
+export interface SidebarMenuButtonProps {
+  isActive?: boolean;
+  variant?: "default" | "outline";
+  size?: "default" | "sm" | "lg";
+  tooltip?: string;
+  class?: string;
+  children?: JSX.Element;
+  onClick?: (e: MouseEvent) => void;
+}
+
+export function SidebarMenuButton(props: SidebarMenuButtonProps): JSX.Element {
+  const [local, rest] = splitProps(props, ["isActive", "variant", "size", "tooltip", "class", "children", "onClick"]);
+
+  const variant = () => local.variant ?? "default";
+  const size = () => local.size ?? "default";
+
+  const buttonClasses = () =>
+    cn(
+      "peer/menu-button group/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md ring-sidebar-ring outline-hidden transition-[width,height,padding] aria-disabled:pointer-events-none aria-disabled:opacity-50",
+      !local.isActive ? "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" : "",
+      "focus-visible:ring-2",
+      "data-active:bg-sidebar-accent data-active:font-medium data-active:text-sidebar-accent-foreground",
+      "data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground",
+      variant() === "default" ? "p-2 text-sm" : "",
+      variant() === "outline" ? "bg-background shadow-[0_0_0_1px_var(--sidebar-border)] hover:shadow-[0_0_0_1px_var(--sidebar-accent)]" : "",
+      size() === "default" ? "h-8 text-sm" : "",
+      size() === "sm" ? "h-7 text-xs" : "",
+      size() === "lg" ? "h-12 text-sm" : "",
+      local.isActive ? "bg-sidebar-primary font-medium text-sidebar-primary-foreground" : "",
+      local.class,
+    );
+
+  const buttonContent = (
+    <button
+      type="button"
+      role="menuitem"
+      class={buttonClasses()}
+      onClick={local.onClick}
+      {...rest}
+    >
+      {local.children}
+    </button>
+  );
+
+  return (
+    <Show
+      when={local.tooltip}
+      fallback={buttonContent}
+    >
+      <TooltipRoot>
+        <TooltipTrigger>{buttonContent}</TooltipTrigger>
+        <TooltipContent>
+          {local.tooltip}
+        </TooltipContent>
+      </TooltipRoot>
+    </Show>
+  );
+}
 
 export interface SidebarMenuActionProps {
   showOnHover?: boolean;
@@ -150,14 +312,22 @@ export interface SidebarMenuActionProps {
 }
 
 export function SidebarMenuAction(props: SidebarMenuActionProps): JSX.Element {
-  const [local, rest] = splitProps(props, ["class", "showOnHover", "children", "onClick"]);
+  const [local, rest] = splitProps(props, ["showOnHover", "onClick", "class", "children"]);
   return (
     <button
       type="button"
+      data-slot="sidebar-menu-action"
+      data-sidebar="menu-action"
+      aria-label={props["aria-label"]}
       class={cn(
-        "ml-auto flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground outline-none",
-        "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-        local.showOnHover && "opacity-0 group-hover:opacity-100",
+        "absolute top-1.5 right-1 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground ring-sidebar-ring outline-hidden transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2",
+        "peer-hover/menu-button:text-sidebar-accent-foreground",
+        "peer-data-[size=default]/menu-button:top-1.5",
+        "peer-data-[size=lg]/menu-button:top-2.5",
+        "peer-data-[size=sm]/menu-button:top-1",
+        local.showOnHover
+          ? "opacity-0 group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 peer-data-active/menu-button:text-sidebar-accent-foreground md:opacity-0"
+          : "",
         local.class,
       )}
       onClick={(e: MouseEvent) => {
@@ -171,50 +341,183 @@ export function SidebarMenuAction(props: SidebarMenuActionProps): JSX.Element {
   );
 }
 
-// ─── Badge (e.g., streaming indicator) ───────────────────────────────────────
-
-export function SidebarMenuBadge(props: ParentProps<{ class?: string }>): JSX.Element {
+export function SidebarMenuBadge(props: { class?: string; children?: JSX.Element }): JSX.Element {
   const [local, rest] = splitProps(props, ["class", "children"]);
   return (
-    <span class={cn("ml-auto flex h-5 items-center text-xs", local.class)} aria-live="polite" {...rest}>
+    <span
+      data-slot="sidebar-menu-badge"
+      data-sidebar="menu-badge"
+      class={cn(
+        "pointer-events-none absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium text-sidebar-foreground tabular-nums select-none",
+        "group-data-[collapsible=icon]:hidden",
+        "peer-hover/menu-button:text-sidebar-accent-foreground",
+        "peer-data-[size=default]/menu-button:top-1.5",
+        "peer-data-[size=lg]/menu-button:top-2.5",
+        "peer-data-[size=sm]/menu-button:top-1",
+        "peer-data-active/menu-button:text-sidebar-accent-foreground",
+        local.class,
+      )}
+      aria-live="polite"
+      {...rest}
+    >
       {local.children}
     </span>
   );
 }
 
-// ─── Rail (resize handle, optional) ────────────────────────────────────────────
-
-export function SidebarRail(props: { class?: string }): JSX.Element {
-  const [local, rest] = splitProps(props, ["class"]);
+export function SidebarMenuSkeleton(props: { showIcon?: boolean; class?: string }): JSX.Element {
+  const [local] = splitProps(props, ["showIcon", "class"]);
   return (
-    <div
-      class={cn("flex h-full w-1 cursor-col-resize bg-transparent", local.class)}
-      role="separator"
-      aria-orientation="vertical"
+    <div data-slot="sidebar-menu-skeleton" data-sidebar="menu-skeleton" class={cn("flex h-8 items-center gap-2 rounded-md px-2", local.class)}>
+      <Show when={local.showIcon}>
+        <div class="size-4 rounded-md bg-sidebar-ring/30" />
+      </Show>
+      <div class="h-4 flex-1 rounded bg-sidebar-ring/30" style={{ "max-width": "calc(var(--skeleton-width, 75%))" }} />
+    </div>
+  );
+}
+
+// ─── Sub ───────────────────────────────────────────────────────────────────────
+
+export function SidebarMenuSub(props: { class?: string; children?: JSX.Element }): JSX.Element {
+  const [local, rest] = splitProps(props, ["class", "children"]);
+  return (
+    <ul
+      data-slot="sidebar-menu-sub"
+      data-sidebar="menu-sub"
+      class={cn(
+        "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5",
+        "group-data-[collapsible=icon]:hidden",
+        local.class,
+      )}
+      role="menu"
+      {...rest}
+    >
+      {local.children}
+    </ul>
+  );
+}
+
+export function SidebarMenuSubItem(props: { class?: string; children?: JSX.Element }): JSX.Element {
+  const [local, rest] = splitProps(props, ["class", "children"]);
+  return (
+    <li data-slot="sidebar-menu-sub-item" data-sidebar="menu-sub-item" class={cn("group/menu-sub-item relative", local.class)} role="none" {...rest}>
+      {local.children}
+    </li>
+  );
+}
+
+export interface SidebarMenuSubButtonProps {
+  isActive?: boolean;
+  size?: "sm" | "md";
+  class?: string;
+  children?: JSX.Element;
+  onClick?: (e: MouseEvent) => void;
+}
+
+export function SidebarMenuSubButton(props: SidebarMenuSubButtonProps): JSX.Element {
+  const [local, rest] = splitProps(props, ["isActive", "size", "class", "children", "onClick"]);
+
+  return (
+    <a
+      role="menuitem"
+      class={cn(
+        "flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden",
+        "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        "focus-visible:ring-2",
+        "active:bg-sidebar-accent active:text-sidebar-accent-foreground",
+        "aria-disabled:pointer-events-none aria-disabled:opacity-50",
+        "data-[size=md]:text-sm",
+        "data-[size=sm]:text-xs",
+        "data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground",
+        "group-data-[collapsible=icon]:hidden",
+        local.size === "sm" ? "text-xs" : "text-sm",
+        local.isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "",
+        local.class,
+      )}
+      onClick={local.onClick}
+      {...rest}
+    >
+      {local.children}
+    </a>
+  );
+}
+
+// ─── Inset + Input + Rail + Trigger ───────────────────────────────────────────
+
+export function SidebarInset(props: { class?: string; children?: JSX.Element }): JSX.Element {
+  const [local, rest] = splitProps(props, ["class", "children"]);
+  return (
+    <main
+      data-slot="sidebar-inset"
+      class={cn(
+        "relative flex w-full flex-1 flex-col bg-background",
+        "peer-data-[variant=inset]:m-2 peer-data-[variant=inset]:ml-0",
+        "peer-data-[variant=inset]:rounded-xl peer-data-[variant=inset]:shadow-sm",
+        "peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2",
+        local.class,
+      )}
+      {...rest}
+    >
+      {local.children}
+    </main>
+  );
+}
+
+export function SidebarInput(props: { class?: string; placeholder?: string }): JSX.Element {
+  const [local, rest] = splitProps(props, ["class", "placeholder"]);
+  return (
+    <input
+      type="text"
+      data-slot="sidebar-input"
+      data-sidebar="input"
+      placeholder={local.placeholder}
+      class={cn("flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm shadow-none ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50", local.class)}
       {...rest}
     />
   );
 }
 
-// ─── Trigger (collapse button, optional) ──────────────────────────────────────
-
-export function SidebarTrigger(props: {
-  onClick?: (e: MouseEvent) => void;
-  class?: string;
-  children?: JSX.Element;
-  "aria-label"?: string;
-}): JSX.Element {
-  const [local, rest] = splitProps(props, ["class", "children", "onClick", "aria-label"]);
+export function SidebarRail(props: { class?: string; onClick?: (e: MouseEvent) => void }): JSX.Element {
+  const [local, rest] = splitProps(props, ["class", "onClick"]);
   return (
     <button
       type="button"
-      aria-label={local["aria-label"] ?? "Toggle sidebar"}
-      onClick={(e: MouseEvent) => local.onClick?.(e)}
+      data-sidebar="rail"
+      data-slot="sidebar-rail"
+      aria-label="Toggle Sidebar"
+      tabIndex={-1}
+      onClick={local.onClick}
       class={cn(
-        "flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground outline-none",
-        "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+        "absolute inset-y-0 z-20 hidden w-4 cursor-col-resize items-center bg-transparent transition-all ease-linear",
+        "hover:bg-sidebar-border/50",
+        "group-data-[side=left]:-right-4 group-data-[side=right]:left-0",
+        "sm:flex",
         local.class,
       )}
+      {...rest}
+    />
+  );
+}
+
+export function SidebarTrigger(props: { class?: string; children?: JSX.Element; "aria-label"?: string; onClick?: (e: MouseEvent) => void }): JSX.Element {
+  const [local, rest] = splitProps(props, ["class", "children", "aria-label", "onClick"]);
+  const ctx = useSidebar();
+
+  return (
+    <button
+      type="button"
+      data-sidebar="trigger"
+      data-slot="sidebar-trigger"
+      aria-label={local["aria-label"] ?? "Toggle sidebar"}
+      class={cn(
+        "flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+        local.class,
+      )}
+      onClick={(e: MouseEvent) => {
+        local.onClick?.(e);
+        ctx?.toggleSidebar();
+      }}
       {...rest}
     >
       {local.children}
