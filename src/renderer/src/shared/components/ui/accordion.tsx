@@ -1,6 +1,5 @@
 //! accordion.tsx — shadcn-style Accordion primitive wrapping @ark-ui/solid Accordion.
-//! Per ADR-0023 D8-W6 precedent (Dialog): ui/ atoms MAY wrap @ark-ui/solid
-//! when the wrapper is a shadcn/ui-style primitive (not a feature composition).
+//! Per ADR-0023 D8-W6 Dialog case precedent (single authorized instance) and `.omo/plans/sidebar-reshim.md` Q10=B / Q28 v5=A decisions (plan-driven authorization for sidebar/accordion/tooltip wrapper atoms): ui/ atoms MAY wrap @ark-ui/solid when the wrapper is a shadcn/ui-style primitive (per codeman-agent project context).
 //! Per plan: Q28 v5=A —新建 ui/accordion.tsx + chat tree; 包 @ark-ui/solid Accordion.
 
 import type { Component, JSX } from "solid-js";
