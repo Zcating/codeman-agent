@@ -17,135 +17,12 @@
 //! in chat-sidebar.test.tsx, NOT here (per ADR-0030 D6).
 
 import { render, cleanup } from "@solidjs/testing-library";
-import { onMount } from "solid-js";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   CodemanSidebar,
   type SidebarGroupOption,
   type SidebarOption,
 } from "./codeman-sidebar";
-
-// ─── Ark UI Accordion mock ─────────────────────────────────────────────────
-//
-// Mirrors the old test mock behavior but targets the new 3-level tree.
-// Tracks expanded group values; defaultValue seeds initial open state.
-
-let openValues: Set<string> = new Set();
-let sharedOnValueChange: ((details: { value: string[] }) => void) | null = null;
-
-function refreshDomForItems() {
-  document.querySelectorAll("[data-part='item']").forEach((itemEl) => {
-    const wsId = itemEl.getAttribute("data-value")!;
-    const isOpen = openValues.has(wsId);
-    itemEl.setAttribute("data-state", isOpen ? "open" : "closed");
-    const trigger = itemEl.querySelector("[data-part='item-trigger']") as HTMLElement | null;
-    if (trigger) {
-      trigger.setAttribute("data-state", isOpen ? "open" : "closed");
-      trigger.setAttribute("aria-expanded", isOpen ? "true" : "false");
-    }
-    const content = itemEl.querySelector("[data-part='item-content']") as HTMLElement | null;
-    if (content) {
-      content.setAttribute("data-state", isOpen ? "open" : "closed");
-      if (isOpen) {
-        content.removeAttribute("hidden");
-        content.style.display = "";
-      } else {
-        content.setAttribute("hidden", "");
-        content.style.display = "none";
-      }
-    }
-    itemEl.querySelectorAll("[data-part='item-indicator']").forEach((ind) => {
-      ind.setAttribute("data-state", isOpen ? "open" : "closed");
-    });
-  });
-}
-
-vi.mock("@ark-ui/solid", async () => {
-  const actual = await vi.importActual<typeof import("@ark-ui/solid")>("@ark-ui/solid");
-  return {
-    ...actual,
-    Accordion: {
-      Root: (props: any) => {
-        sharedOnValueChange = props.onValueChange ?? null;
-        if (Array.isArray(props.defaultValue)) {
-          for (const v of props.defaultValue) {
-            openValues.add(v);
-          }
-        }
-        onMount(() => {
-          refreshDomForItems();
-        });
-        return <>{props.children}</>;
-      },
-      Item: (props: any) => {
-        const wsId: string = props.value;
-        const isOpen = openValues.has(wsId);
-        return (
-          <div
-            data-part="item"
-            data-state={isOpen ? "open" : "closed"}
-            data-value={wsId}
-            class={props.class}
-          >
-            {props.children}
-          </div>
-        );
-      },
-      ItemTrigger: (props: any) => (
-        <button
-          type="button"
-          data-part="item-trigger"
-          data-state="closed"
-          aria-expanded="false"
-          class={props.class}
-          onClick={(e: MouseEvent) => {
-            let el = e.currentTarget as HTMLElement | null;
-            while (el && el.getAttribute("data-part") !== "item") {
-              el = el.parentElement;
-            }
-            const wsId = el?.getAttribute("data-value") ?? "";
-            if (openValues.has(wsId)) {
-              openValues.delete(wsId);
-            } else {
-              openValues.clear();
-              openValues.add(wsId);
-            }
-            if (sharedOnValueChange) {
-              sharedOnValueChange({ value: Array.from(openValues) });
-            }
-            refreshDomForItems();
-          }}
-        >
-          {props.children}
-        </button>
-      ),
-      ItemContent: (props: any) => {
-        const wsId = props.value as string;
-        const isOpen = openValues.has(wsId);
-        return (
-          <div
-            data-part="item-content"
-            data-state={isOpen ? "open" : "closed"}
-            hidden={!isOpen}
-            style={{ display: isOpen ? "" : "none" }}
-            class={props.class}
-          >
-            {props.children}
-          </div>
-        );
-      },
-      ItemIndicator: (props: any) => {
-        const onRef = (el: HTMLSpanElement) => {
-          if (!el) {return;}
-          const itemEl = el.closest("[data-part='item']");
-          const isOpen = itemEl?.getAttribute("data-state") === "open";
-          el.setAttribute("data-state", isOpen ? "open" : "closed");
-        };
-        return <span ref={onRef} data-part="item-indicator">{props.children}</span>;
-      },
-    },
-  };
-});
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -220,10 +97,6 @@ function renderSidebar(
 
 describe("CodemanSidebar (PR 2)", () => {
   afterEach(() => cleanup());
-  beforeEach(() => {
-    openValues = new Set();
-    sharedOnValueChange = null;
-  });
 
   // ─── Slice 13: full tree renders ──────────────────────────────────────
   describe("options: SidebarGroupOption[]", () => {

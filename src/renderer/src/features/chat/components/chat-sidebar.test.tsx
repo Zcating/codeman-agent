@@ -231,4 +231,45 @@ describe("ChatSidebar (PR 2)", () => {
     expect(subItems[0].label).toBe("Chat 1");
     expect(subItems[1].label).toBe("Chat 2");
   });
+
+  // ─── Seam 20: workspace hover rename + delete ─────────────────────────────
+  describe("Seam 20: workspace hover rename+delete via renderItem", () => {
+    it("renderItem returns JSX containing rename and delete buttons", () => {
+      render(() => <ChatSidebar />);
+      expect(F.capturedProps).toBeTruthy();
+      const renderItem = F.capturedProps!.renderItem;
+      const { container } = render(() =>
+        renderItem({ label: "Test WS", value: "ws-test" }),
+      );
+      expect(container.querySelector('[aria-label="Rename Test WS"]')).toBeTruthy();
+      expect(container.querySelector('[aria-label="Delete Test WS"]')).toBeTruthy();
+    });
+
+    it("renderItem delete button triggers Dialog.confirm", async () => {
+      render(() => <ChatSidebar />);
+      const renderItem = F.capturedProps!.renderItem;
+      const { container } = render(() =>
+        renderItem({ label: "WS to Delete", value: "ws-del" }),
+      );
+      const deleteBtn = container.querySelector('[aria-label="Delete WS to Delete"]') as HTMLButtonElement;
+      deleteBtn.click();
+      expect(F.mockDialogConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Delete workspace",
+          destructive: true,
+        }),
+      );
+    });
+
+    it("renderItem rename button triggers showRenameDialog", async () => {
+      render(() => <ChatSidebar />);
+      const renderItem = F.capturedProps!.renderItem;
+      const { container } = render(() =>
+        renderItem({ label: "WS to Rename", value: "ws-ren" }),
+      );
+      const renameBtn = container.querySelector('[aria-label="Rename WS to Rename"]') as HTMLButtonElement;
+      renameBtn.click();
+      expect(F.mockShowRenameDialog).toHaveBeenCalledWith("WS to Rename");
+    });
+  });
 });

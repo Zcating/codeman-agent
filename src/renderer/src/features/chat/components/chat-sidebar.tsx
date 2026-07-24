@@ -3,8 +3,8 @@
 //! Per ADR-0030 D7: chat feature owns workspace/conversation data mapping
 //! + chat-domain actions (delete, rename, new conv, settings link). The
 //! universal CodemanSidebar stays generic — chat-specific features
-//! (ConvDeleteAction / WorkspaceActions / NewChatButton) are rendered as
-//! `renderItem` / `renderGroupHeader` / slots.
+//! (ConvDeleteAction / hover rename+delete / NewChatButton) are rendered as
+//! `renderItem` / slots.
 //!
 //! Data flow:
 //! - Reads `workspaces$()` + `conversations$()` from chat.store (Solid Accessors)
@@ -16,7 +16,8 @@
 //! Layout: ChatSidebar wraps CodemanSidebar which owns the two-column
 //! (sidebar + main) shell. Children slot is `<Outlet />` from TanStack Router.
 
-import type { JSX } from "solid-js";
+import { createSignal, type JSX } from "solid-js";
+import { Pencil, Trash2 } from "lucide-solid";
 import { Outlet, useLocation, useNavigate, useParams, Link } from "@tanstack/solid-router";
 import { Settings as SettingsIcon } from "lucide-solid";
 import {
@@ -37,7 +38,6 @@ import {
 import { chatSidebarActions } from "../lib/chat-sidebar-actions";
 import { showRenameDialog } from "./workspace-rename-dialog";
 import { ConvDeleteAction } from "./conv-delete-action";
-import { WorkspaceActions } from "./workspace-actions";
 import { NewChatButton } from "./new-chat-button";
 
 // ─── ChatSidebar ───────────────────────────────────────────────────────────
@@ -143,40 +143,51 @@ export function ChatSidebar(): JSX.Element {
   };
 
   const renderItem = (item: SidebarOption): JSX.Element => {
+    const [hovering, setHovering] = createSignal(false);
     const convId = item.value ?? item.label;
     const isStreaming = (): boolean =>
       store.byId[convId]?.streamingMessageId != null;
     return (
-      <ConvDeleteAction
-        convId={convId}
-        label={item.label}
-        isStreaming={isStreaming()}
-        onDelete={handleConvDelete}
-      />
-    );
-  };
-
-  const renderGroupHeader = (group: SidebarGroupOption): JSX.Element => {
-    // Top-level "项目" category group — no rename/delete actions.
-    if (group.value === "workspace") {
-      return (
-        <div class="flex w-full items-center gap-2 min-w-0">
-          <span class="truncate font-semibold">{group.label}</span>
-        </div>
-      );
-    }
-    // Workspace-level group — rename + delete actions.
-    return (
-      <WorkspaceActions
-        wsId={group.value ?? group.label}
-        label={group.label}
-        onRename={(id, label) => {
-          void handleRenameWorkspace(id, label);
-        }}
-        onDelete={(id, label) => {
-          void handleDeleteWorkspace(id, label);
-        }}
-      />
+      <span
+        class="flex w-full items-center justify-between gap-2 min-w-0"
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
+      >
+        <ConvDeleteAction
+          convId={convId}
+          label={item.label}
+          isStreaming={isStreaming()}
+          onDelete={handleConvDelete}
+        />
+        <span
+          class="pointer-events-auto flex items-center gap-1 transition-opacity"
+          classList={{ "opacity-0": !hovering(), "opacity-100": hovering() }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            class="flex h-5 w-5 items-center justify-center rounded-md hover:bg-accent outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={(e) => {
+              e.stopPropagation();
+              void handleRenameWorkspace(item.value, item.label);
+            }}
+            aria-label={`Rename ${item.label}`}
+          >
+            <Pencil class="h-3 w-3" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            class="flex h-5 w-5 items-center justify-center rounded-md hover:bg-accent hover:text-destructive outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={(e) => {
+              e.stopPropagation();
+              void handleDeleteWorkspace(item.value, item.label);
+            }}
+            aria-label={`Delete ${item.label}`}
+          >
+            <Trash2 class="h-3 w-3" aria-hidden="true" />
+          </button>
+        </span>
+      </span>
     );
   };
 
@@ -186,7 +197,6 @@ export function ChatSidebar(): JSX.Element {
     <CodemanSidebar
       options={options()}
       renderItem={renderItem}
-      renderGroupHeader={renderGroupHeader}
       currentValue={selectedConvId() ?? undefined}
       onItemSelect={handleSelectConv}
       onSubItemSelect={handleSelectConv}
