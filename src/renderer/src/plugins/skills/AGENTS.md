@@ -52,7 +52,7 @@ vp run test src/plugins/skills
 
 ## ADR 参考
 
-- [ADR-0031](../../docs/adr/0031-skills-system.md) — Skills System 设计决策
-- [ADR-0010](../../docs/adr/0010-frontend-5-1-folder-whitelist.md) — features/ 5+1 whitelist (plugins/ 是新的同级目录, 见 src/plugins/AGENTS.md)
-- [ADR-0003](../../docs/adr/0003-effect-ts-logic-layer.md) — Effect-TS 逻辑层
-- [ADR-0025](../../docs/adr/0025-effect-schema-as-default-schema-library.md) — effect/Schema 默认
+- [ADR-0031](../../../docs/adr/0031-skills-system.md) — Skills System 设计决策
+- [ADR-0010](../../../docs/adr/0010-frontend-5-1-folder-whitelist.md) — features/ 5+1 whitelist (plugins/ 是新的同级目录, 见 src/plugins/AGENTS.md)
+- [ADR-0003](../../../docs/adr/0003-effect-ts-logic-layer.md) — Effect-TS 逻辑层
+- [ADR-0025](../../../docs/adr/0025-effect-schema-as-default-schema-library.md) — effect/Schema 默认

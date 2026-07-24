@@ -8,7 +8,7 @@
 //! connection's lifetime). Notifications (no `id` field) are delivered to
 //! `onNotification` handlers synchronously.
 
-import { JsonRpcProtocolError, JsonRpcTimeoutError } from "../renderer/shared/lib/errors";
+import { JsonRpcProtocolError, JsonRpcTimeoutError } from "../renderer/src/shared/lib/errors";
 
 // ─── JSON-RPC 2.0 message types ──────────────────────────────
 

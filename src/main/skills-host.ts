@@ -13,8 +13,8 @@ import { Effect } from "effect";
 import {
 	loadSkillContent,
 	scanSkillsDir,
-} from "../renderer/plugins/skills/lib/skill-loader";
-import type { SkillManifest } from "../renderer/shared/lib/types";
+} from "../renderer/src/plugins/skills/lib/skill-loader";
+import type { SkillManifest } from "../renderer/src/shared/lib/types";
 
 // ─── Paths ──────────────────────────────────────────────
 

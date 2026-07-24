@@ -1,7 +1,7 @@
 # src/features/chat/ — Chat Feature (聊天域)
 
 > **chat feature** = lib (`createAgentRuntime`) + stores (`chat.store` Solid createStore) + components (4 UI 原子 + 2 workspace dialogs) + routes。
-> 本目录结构遵循 [ADR-0010](../../docs/adr/0010-frontend-5-1-folder-whitelist.md) 的 5 子目录白名单（`stores` / `components` / `routes` / `hooks` / `lib`）。
+> 本目录结构遵循 [ADR-0010](../../../docs/adr/0010-frontend-5-1-folder-whitelist.md) 的 5 子目录白名单（`stores` / `components` / `routes` / `hooks` / `lib`）。
 > WorkspaceService **V3+ 提升到 `src/shared/lib/workspace-service.ts`**（共享基础设施）。因 appStore.pickWorkspacePath()（ADR-0016 D4）需要 Effect service 注入，shared/ 不能 import features/，违反 src/shared/AGENTS.md line 52 单向依赖规则。
 > File tools（`src/features/file-tools/lib/file-tools.ts`）由本 feature 的 `lib/runtime.ts` 引用注册。
 > **注意**：`src/features/billing/` 目录从未落地（ADR-0012 V2 反转时合并到 file-tools 工具 schema 模式）。billing tools 概念已并入 file-tools 的统一 tools 数组。
@@ -67,7 +67,7 @@ src/features/chat/
 ## 硬性规则
 
 - **UI 组件（`components/*.tsx`）禁止导入 `effect`。** 它们是纯 Solid signal / createStore 消费者。逻辑层在 `stores/*.ts` 和 `lib/*.ts` 中。
-- **`createAgentRuntime` 工厂函数，无 `Context.Tag` / Layer DI / Map**（V2 起，按 [ADR-0019](../../docs/adr/0019-per-run-transient-agent.md) supersede [ADR-0014](../../docs/adr/0014-per-conversation-agent.md) D1 + D4）。
+- **`createAgentRuntime` 工厂函数，无 `Context.Tag` / Layer DI / Map**（V2 起，按 [ADR-0019](../../../docs/adr/0019-per-run-transient-agent.md) supersede [ADR-0014](../../docs/adr/0014-per-conversation-agent.md) D1 + D4）。
   - 每个 Conversation 对应一个 `createAgentRuntime()` 产物，存放在 `ConversationState.runtime`（在 `conversations.store.ts` inline 定义）。
   - `run({ context, provider })`：`context: Message[]` 是 store messages 浅拷贝（含最新 user msg）；`provider: ProviderConfig` 包含 `apiKey` / `baseUrl` / `defaultModel` / `systemPrompt` / `tools`。每次 run 新建 pi-mono `Agent` + `Queue.unbounded<RuntimeEvent>` + `Effect.fork` fiber。
   - `cancel()`：调 closure 内 `AbortController.abort()` 触发 fetch abort。in-flight partial 保留在 store（stream 订阅实时写）。
@@ -79,8 +79,8 @@ src/features/chat/
   - UI 读 `store.byId[activeId()]?.messages`，Solid proxy 自动按路径细粒度反应式，跨 conv streaming 不互相重算。
   - ADR-0016 D4-D5-D6 的"组件不直接 import runtime"约束保留：组件调 `conversations.store.sendMessage(...)` / `conversations.store.cancel(convId)` / `conversations.store.archiveConversation(convId)`，不直接 import `lib/runtime.ts`。
 - **组件不调 IPC。** 所有 IPC 走 `src/shared/lib/ipc.ts` Service Tags（由 preload contextBridge 暴露的 `window.codeman.invoke`），在 `conversations.store.ts` 内 `yield*` 使用。
-- ~~**`Sidebar` 用 `createSignal` 做局部状态。**~~（V1.x sidebar 移除 — 由 `shared/components/internal/codeman-sidebar` 替代，详见 [ADR-0022](../../docs/adr/0022-internal-components-and-design-tokens.md) D1 + D3）
-- **CodemanSidebar 是 accordion 模式嵌套 tree**（[ADR-0023 D7-CS](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md)）：`CodemanSidebar` 内部维护 `expandedWorkspaceId` signal，workspace 永远不 active，只有 conv 可以 active。Sidebar 不调用任何 `last_used_workspace_id` 相关 API——该字段已删除（D8-W）。
+- ~~**`Sidebar` 用 `createSignal` 做局部状态。**~~（V1.x sidebar 移除 — 由 `shared/components/internal/codeman-sidebar` 替代，详见 [ADR-0022](../../../docs/adr/0022-internal-components-and-design-tokens.md) D1 + D3）
+- **CodemanSidebar 是 accordion 模式嵌套 tree**（[ADR-0023 D7-CS](../../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md)）：`CodemanSidebar` 内部维护 `expandedWorkspaceId` signal，workspace 永远不 active，只有 conv 可以 active。Sidebar 不调用任何 `last_used_workspace_id` 相关 API——该字段已删除（D8-W）。
 - **Home（无 active conv 时）渲染 CodemanSidebar + HomeAgentForm 两栏布局。** Home 是 `/` 路由在 `activeId === null` 时的形态。`CodemanSidebar` 由 chat feature 喂数据（workspaces + items + handlers），不直接 import `conversations.store`；`HomeAgentForm` 包含 input box（disabled until workspace 选中）+ workspace picker（必选解锁 input）。详见下方 "Home 路由 + Codex form" section。
 - **ChatView（有 active conv 时）满屏单页布局，** 顶部加 "← 返回首页" 按钮调 `navigate({ to: "/" })` 清空 `activeId$()`。chat-view 自身不变（消息列表 + input + provider select + send/cancel）。
 - **Home → ChatView 切换 = `selectConversation(id)` 设 activeId。** MainContent 切到 ChatView。Home 的 workspace 预选走 `Settings.last_used_workspace_id`（如果存在；D8-W 后该字段已删除，Home 总是要求用户选 workspace）。

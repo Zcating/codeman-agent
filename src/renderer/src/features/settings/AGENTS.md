@@ -1,6 +1,6 @@
 # src/features/settings — Settings Feature
 
-> 本目录结构遵循 [ADR-0010](../../docs/adr/0010-frontend-5-1-folder-whitelist.md) 的 5 子目录白名单。V1.5（2026-06-15）将旧 `subsystems/` 合并到 `lib/`，并将 `llm_providers.ts` 重命名为 `llm-providers.ts`（snake_case → kebab-case，对齐项目约定）。
+> 本目录结构遵循 [ADR-0010](../../../docs/adr/0010-frontend-5-1-folder-whitelist.md) 的 5 子目录白名单。V1.5（2026-06-15）将旧 `subsystems/` 合并到 `lib/`，并将 `llm_providers.ts` 重命名为 `llm-providers.ts`（snake_case → kebab-case，对齐项目约定）。
 
 ## 目录布局（ADR-0010 V1.5）
 

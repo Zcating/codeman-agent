@@ -1,6 +1,6 @@
 # src/shared — 跨 Feature 共享规范（5+1 白名单）
 
-> 本目录是**只读的跨域基础设施**，所有 feature 均可 import，但任何 feature 均不可被 shared 依赖。完整决策见 [ADR-0010](../../docs/adr/0010-frontend-5-1-folder-whitelist.md)。
+> 本目录是**只读的跨域基础设施**，所有 feature 均可 import，但任何 feature 均不可被 shared 依赖。完整决策见 [ADR-0010](../../../docs/adr/0010-frontend-5-1-folder-whitelist.md)。
 
 ## 5+1 子目录职责
 
@@ -10,7 +10,7 @@
 | `stores/`              | 跨域 Solid signal                                                                                       | `theme.ts`（从 `state/` 迁，ADR-0010）                                                                        |
 | `hooks/`               | 跨域 composable（`use-` 前缀）                                                                          | 空，V1 预留                                                                                                   |
 | `components/ui/`       | 跨域**设计系统原子**                                                                                    | 5 原子（Button / Card / Checkbox / Input / Textarea）+ **Dialog**（`dialog.tsx`，@ark-ui/solid 包装，ADR-0023 D8-W6）+ `AGENTS.md` |
-| `components/internal/` | 跨域**业务组件**——跟本应用业务绑定但被多个 feature 复用  | `codeman-sidebar`（ADR-0022 首例）+ `codeman-dialog`（ADR-0023 D8-W6，命令式 Modal：`alert` / `confirm` / `show`）+ **`codeman-input.tsx` / `codeman-textarea.tsx`**（USE `ui/Input` / `ui/Textarea` atom + IME-safe onValueChange + 手动 label/helperText/error，shadcn/ui 风格）+ **`codeman-select.tsx` / `codeman-group-select.tsx`**（@ark-ui/solid Select 包装，flat / ItemGroup）；命名规则由 [ADR-0023 D4-N](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) 锁定 |
+| `components/internal/` | 跨域**业务组件**——跟本应用业务绑定但被多个 feature 复用  | `codeman-sidebar`（ADR-0022 首例）+ `codeman-dialog`（ADR-0023 D8-W6，命令式 Modal：`alert` / `confirm` / `show`）+ **`codeman-input.tsx` / `codeman-textarea.tsx`**（USE `ui/Input` / `ui/Textarea` atom + IME-safe onValueChange + 手动 label/helperText/error，shadcn/ui 风格）+ **`codeman-select.tsx` / `codeman-group-select.tsx`**（@ark-ui/solid Select 包装，flat / ItemGroup）；命名规则由 [ADR-0023 D4-N](../../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) 锁定 |
 
 **`shared/` 不允许**的子目录（旧命名已废弃，违反 ADR-0010 一律删除）：
 
@@ -28,11 +28,11 @@
 | `components/internal/` | **跨域业务组件**——跟本应用业务绑定但被多个 feature 复用 | ErrorBoundary / LoadingSpinner / Toast / Provider wrappers / Layout atoms / AppShell / **codeman-sidebar** / **codeman-dialog**（命令式 confirm/alert/show，ADR-0023 D8-W6）/ **codeman-input / codeman-textarea**（USE `ui/Input` / `ui/Textarea` + IME-safe `value` + `onValueChange` + 手动 label/helperText/error）/ **codeman-select / codeman-group-select**（@ark-ui/solid Select 包装，ADR-0023 D4-S） |
 | `components/internal/` | **跨域业务组件**——跟本应用业务绑定但被多个 feature 复用  | ErrorBoundary / LoadingSpinner / Toast / Provider wrappers / Layout atoms / AppShell / **codeman-sidebar** / **codeman-dialog**（命令式 confirm/alert/show，ADR-0023 D8-W6） |
 
-**为什么 `internal` 而不是 `app` 或 `feature-shared`**：与"设计系统（ui）"形成对照语义——"ui = 跨项目通用，internal = 跨 feature 通用但绑定本应用"。V1.5+ 开首例 `codeman-sidebar`（chat feature 消费；详见 [ADR-0022 D1](../docs/adr/0022-internal-components-and-design-tokens.md)）。后续新增 internal 组件须保持严格 prop-driven，不依赖任何 feature 的 store / 类型。
+**为什么 `internal` 而不是 `app` 或 `feature-shared`**：与"设计系统（ui）"形成对照语义——"ui = 跨项目通用，internal = 跨 feature 通用但绑定本应用"。V1.5+ 开首例 `codeman-sidebar`（chat feature 消费；详见 [ADR-0022 D1](../../docs/adr/0022-internal-components-and-design-tokens.md)）。后续新增 internal 组件须保持严格 prop-driven，不依赖任何 feature 的 store / 类型。
 
 ## Naming convention for internal/
 
-Per [ADR-0023](../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-N:
+Per [ADR-0023](../../../docs/adr/0023-codeman-prefix-and-ark-ui-select.md) D4-N:
 - All files in `components/internal/` MUST be prefixed with `codeman-` (e.g. `codeman-sidebar.tsx`).
 - Component export name MUST match file basename (e.g. `CodemanSidebar` from `codeman-sidebar.tsx`).
 - Type names exported from the file MUST use `Codeman*` prefix matching component name (e.g. `CodemanSidebarWorkspace`, `CodemanSidebarItem`, `CodemanSidebarProps`).

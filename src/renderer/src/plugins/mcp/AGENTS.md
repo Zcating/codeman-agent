@@ -68,7 +68,7 @@ src/main/mcp-manager.ts  ←IPC→  McpService (shared/lib/ipc.ts)
 
 ## ADR 参考
 
-- [ADR-0032](../../docs/adr/0032-mcp-client-stdio.md) — MCP Client 设计决策
-- [ADR-0010](../../docs/adr/0010-frontend-5-1-folder-whitelist.md) — plugins/ 5+1 whitelist
-- [ADR-0031](../../docs/adr/0031-skills-system.md) — Skills Plugin (参考模式)
-- [ADR-0003](../../docs/adr/0003-effect-ts-logic-layer.md) — Effect-TS 逻辑层
+- [ADR-0032](../../../docs/adr/0032-mcp-client-stdio.md) — MCP Client 设计决策
+- [ADR-0010](../../../docs/adr/0010-frontend-5-1-folder-whitelist.md) — plugins/ 5+1 whitelist
+- [ADR-0031](../../../docs/adr/0031-skills-system.md) — Skills Plugin (参考模式)
+- [ADR-0003](../../../docs/adr/0003-effect-ts-logic-layer.md) — Effect-TS 逻辑层

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { InvalidConfig, JsonRpcProtocolError } from "../renderer/shared/lib/errors";
+import { InvalidConfig, JsonRpcProtocolError } from "../renderer/src/shared/lib/errors";
 
 // Mock electron — shell.openPath is called by openConfigDir (not tested here)
 vi.mock("electron", () => ({

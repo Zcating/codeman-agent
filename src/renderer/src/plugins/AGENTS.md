@@ -59,6 +59,6 @@ vp run test src/plugins
 
 ## ADR 参考
 
-- [ADR-0010](../../docs/adr/0010-frontend-5-1-folder-whitelist.md) — features/ 5+1 whitelist (plugins/ 是其外的同级目录)
-- [ADR-0031](../../docs/adr/0031-skills-system.md) — Skills Plugin
-- [ADR-0032](../../docs/adr/0032-mcp-client-stdio.md) — MCP Plugin
+- [ADR-0010](../../../docs/adr/0010-frontend-5-1-folder-whitelist.md) — features/ 5+1 whitelist (plugins/ 是其外的同级目录)
+- [ADR-0031](../../../docs/adr/0031-skills-system.md) — Skills Plugin
+- [ADR-0032](../../../docs/adr/0032-mcp-client-stdio.md) — MCP Plugin

@@ -1,7 +1,7 @@
 # src/features/file-tools/ — File Tools Feature（文件工具域）
 
 > **Scope：** V2 文件工具 AgentTool schema + types。本目录无 UI，无 runtime 接入。
-> 本目录结构遵循 [ADR-0010](../../docs/adr/0010-frontend-5-1-folder-whitelist.md) 的 5 子目录白名单。
+> 本目录结构遵循 [ADR-0010](../../../docs/adr/0010-frontend-5-1-folder-whitelist.md) 的 5 子目录白名单。
 
 ## 目录布局（ADR-0013）
 

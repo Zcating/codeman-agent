@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { PassThrough, type Readable, type Writable } from "node:stream";
 import { JsonRpcConnection } from "./jsonrpc";
-import { JsonRpcProtocolError, JsonRpcTimeoutError } from "../renderer/shared/lib/errors";
+import { JsonRpcProtocolError, JsonRpcTimeoutError } from "../renderer/src/shared/lib/errors";
 
 interface Pair {
   readable: Readable;
