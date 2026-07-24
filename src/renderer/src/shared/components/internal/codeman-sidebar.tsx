@@ -209,7 +209,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
                                       <SidebarMenuButton
                                         isActive={isWorkspaceActive(item, props.currentValue, props.isActive)}
                                         onClick={() => handleSelect(item)}
-                                        data-workspace-id={item.value}
+                                        data-value={item.value}
                                       >
                                         {props.renderItem(item)}
                                       </SidebarMenuButton>
@@ -221,7 +221,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
                                                 <SidebarMenuSubButton
                                                   isActive={isSubActive(sub, props.currentValue, props.isActive)}
                                                   onClick={() => handleSubSelect(sub)}
-                                                  data-conv-id={sub.value}
+                                                  data-value={sub.value}
                                                 >
                                                   {sub.label}
                                                 </SidebarMenuSubButton>
