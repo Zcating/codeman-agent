@@ -11,61 +11,112 @@ import {
 } from "./card";
 
 describe("Card", () => {
-  it("渲染 rounded-lg 和 border", () => {
+  it("renders with shadcn-style classes", () => {
     const { container } = render(() => <Card>test</Card>);
-    const className = container.querySelector("div")?.className ?? "";
-    expect(className).toContain("rounded-lg");
-    expect(className).toContain("border");
+    const el = container.firstElementChild!;
+    expect(el.className).toContain("flex-col");
+    expect(el.className).toContain("rounded-xl");
+    expect(el.className).toContain("bg-card");
+  });
+
+  it("has data-slot=card", () => {
+    const { container } = render(() => <Card>test</Card>);
+    expect(container.firstElementChild!.getAttribute("data-slot")).toBe("card");
+  });
+
+  it("size=sm sets data-size=sm", () => {
+    const { container } = render(() => <Card size="sm">test</Card>);
+    expect(container.firstElementChild!.getAttribute("data-size")).toBe("sm");
+  });
+
+  it("size=default sets data-size=default", () => {
+    const { container } = render(() => <Card>test</Card>);
+    expect(container.firstElementChild!.getAttribute("data-size")).toBe("default");
   });
 });
 
 describe("CardHeader", () => {
-  it("渲染 p-6 和 flex flex-col", () => {
+  it("renders with grid classes", () => {
     const { container } = render(() => <CardHeader>test</CardHeader>);
-    const className = container.querySelector("div")?.className ?? "";
-    expect(className).toContain("p-6");
-    expect(className).toContain("flex flex-col");
+    const el = container.firstElementChild!;
+    expect(el.className).toContain("grid");
+    expect(el.className).toContain("rounded-t-xl");
+  });
+
+  it("has data-slot=card-header", () => {
+    const { container } = render(() => <CardHeader>test</CardHeader>);
+    expect(container.firstElementChild!.getAttribute("data-slot")).toBe("card-header");
   });
 });
 
 describe("CardTitle", () => {
-  it("渲染为 h3 且有 text-2xl", () => {
+  it("renders as div with cn-font-heading", () => {
     const { container } = render(() => <CardTitle>test</CardTitle>);
-    const el = container.querySelector("h3");
-    expect(el).not.toBeNull();
-    expect(el?.className).toContain("text-2xl");
+    const el = container.firstElementChild!;
+    expect(el.tagName).toBe("DIV");
+    expect(el.className).toContain("cn-font-heading");
+    expect(el.className).toContain("font-medium");
+  });
+
+  it("has data-slot=card-title", () => {
+    const { container } = render(() => <CardTitle>test</CardTitle>);
+    expect(container.firstElementChild!.getAttribute("data-slot")).toBe("card-title");
   });
 });
 
 describe("CardDescription", () => {
-  it("渲染为 p 且有 text-muted-foreground", () => {
+  it("renders as div with text-muted-foreground", () => {
     const { container } = render(() => <CardDescription>test</CardDescription>);
-    const el = container.querySelector("p");
-    expect(el).not.toBeNull();
-    expect(el?.className).toContain("text-muted-foreground");
+    const el = container.firstElementChild!;
+    expect(el.tagName).toBe("DIV");
+    expect(el.className).toContain("text-muted-foreground");
   });
-});
 
-describe("CardContent", () => {
-  it("渲染且有 pt-0", () => {
-    const { container } = render(() => <CardContent>test</CardContent>);
-    const className = container.querySelector("div")?.className ?? "";
-    expect(className).toContain("pt-0");
-  });
-});
-
-describe("CardFooter", () => {
-  it("渲染且有 items-center", () => {
-    const { container } = render(() => <CardFooter>test</CardFooter>);
-    const className = container.querySelector("div")?.className ?? "";
-    expect(className).toContain("items-center");
+  it("has data-slot=card-description", () => {
+    const { container } = render(() => <CardDescription>test</CardDescription>);
+    expect(container.firstElementChild!.getAttribute("data-slot")).toBe("card-description");
   });
 });
 
 describe("CardAction", () => {
-  it("渲染且有 items-center", () => {
+  it("renders with grid helpers", () => {
     const { container } = render(() => <CardAction>test</CardAction>);
-    const className = container.querySelector("div")?.className ?? "";
-    expect(className).toContain("items-center");
+    const el = container.firstElementChild!;
+    expect(el.className).toContain("col-start-2");
+    expect(el.className).toContain("justify-self-end");
+  });
+
+  it("has data-slot=card-action", () => {
+    const { container } = render(() => <CardAction>test</CardAction>);
+    expect(container.firstElementChild!.getAttribute("data-slot")).toBe("card-action");
+  });
+});
+
+describe("CardContent", () => {
+  it("renders with px class", () => {
+    const { container } = render(() => <CardContent>test</CardContent>);
+    const el = container.firstElementChild!;
+    expect(el.className).toContain("px-(");
+    expect(el.className).toContain("card-spacing");
+  });
+
+  it("has data-slot=card-content", () => {
+    const { container } = render(() => <CardContent>test</CardContent>);
+    expect(container.firstElementChild!.getAttribute("data-slot")).toBe("card-content");
+  });
+});
+
+describe("CardFooter", () => {
+  it("renders with border-t and bg-muted", () => {
+    const { container } = render(() => <CardFooter>test</CardFooter>);
+    const el = container.firstElementChild!;
+    expect(el.className).toContain("border-t");
+    expect(el.className).toContain("bg-muted/50");
+    expect(el.className).toContain("rounded-b-xl");
+  });
+
+  it("has data-slot=card-footer", () => {
+    const { container } = render(() => <CardFooter>test</CardFooter>);
+    expect(container.firstElementChild!.getAttribute("data-slot")).toBe("card-footer");
   });
 });

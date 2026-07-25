@@ -1,50 +1,99 @@
-//! Card — 复合容器原子组件（7 个子组件）。
-//! 纯 cn，单文件多导出。Pattern from solidcn-ui/solidcn。
+//! Card — 7 子件 via cn, 1:1 .repos/shadcn.
 
-import type { Component, JSX } from "solid-js";
-import { splitProps } from "solid-js";
 import { cn } from "../../lib/cn";
 
-const Card: Component<JSX.HTMLAttributes<HTMLDivElement>> = (props) => {
-  const [local, rest] = splitProps(props, ["class"]);
+function Card({
+  size = "default",
+  class: className,
+  ...props
+}: {
+  size?: "default" | "sm";
+  class?: string;
+  children?: any;
+}) {
   return (
     <div
-      class={cn("rounded-lg border bg-card text-card-foreground shadow-sm", local.class)}
-      {...rest}
+      data-slot="card"
+      data-size={size}
+      class={cn(
+        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground ring-1 ring-foreground/10 [--card-spacing:--spacing(4)] has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(3)] data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        className,
+      )}
+      {...props}
     />
   );
-};
+}
 
-const CardHeader: Component<JSX.HTMLAttributes<HTMLDivElement>> = (props) => {
-  const [local, rest] = splitProps(props, ["class"]);
-  return <div class={cn("flex flex-col space-y-1.5 p-6", local.class)} {...rest} />;
-};
-
-const CardTitle: Component<JSX.HTMLAttributes<HTMLHeadingElement>> = (props) => {
-  const [local, rest] = splitProps(props, ["class"]);
+function CardHeader({ class: className, ...props }: { class?: string; children?: any }) {
   return (
-    <h3 class={cn("text-2xl font-semibold leading-none tracking-tight", local.class)} {...rest} />
+    <div
+      data-slot="card-header"
+      class={cn(
+        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-t-xl px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-(--card-spacing)",
+        className,
+      )}
+      {...props}
+    />
   );
-};
+}
 
-const CardDescription: Component<JSX.HTMLAttributes<HTMLParagraphElement>> = (props) => {
-  const [local, rest] = splitProps(props, ["class"]);
-  return <p class={cn("text-sm text-muted-foreground", local.class)} {...rest} />;
-};
+function CardTitle({ class: className, ...props }: { class?: string; children?: any }) {
+  return (
+    <div
+      data-slot="card-title"
+      class={cn(
+        "cn-font-heading text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
 
-const CardContent: Component<JSX.HTMLAttributes<HTMLDivElement>> = (props) => {
-  const [local, rest] = splitProps(props, ["class"]);
-  return <div class={cn("p-6 pt-0", local.class)} {...rest} />;
-};
+function CardDescription({ class: className, ...props }: { class?: string; children?: any }) {
+  return (
+    <div
+      data-slot="card-description"
+      class={cn("text-sm text-muted-foreground", className)}
+      {...props}
+    />
+  );
+}
 
-const CardFooter: Component<JSX.HTMLAttributes<HTMLDivElement>> = (props) => {
-  const [local, rest] = splitProps(props, ["class"]);
-  return <div class={cn("flex items-center p-6 pt-0", local.class)} {...rest} />;
-};
+function CardAction({ class: className, ...props }: { class?: string; children?: any }) {
+  return (
+    <div
+      data-slot="card-action"
+      class={cn(
+        "col-start-2 row-span-2 row-start-1 self-start justify-self-end",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
 
-const CardAction: Component<JSX.HTMLAttributes<HTMLDivElement>> = (props) => {
-  const [local, rest] = splitProps(props, ["class"]);
-  return <div class={cn("flex items-center p-6 pt-0", local.class)} {...rest} />;
-};
+function CardContent({ class: className, ...props }: { class?: string; children?: any }) {
+  return (
+    <div
+      data-slot="card-content"
+      class={cn("px-(--card-spacing)", className)}
+      {...props}
+    />
+  );
+}
 
-export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, CardAction };
+function CardFooter({ class: className, ...props }: { class?: string; children?: any }) {
+  return (
+    <div
+      data-slot="card-footer"
+      class={cn(
+        "flex items-center rounded-b-xl border-t bg-muted/50 p-(--card-spacing)",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export { Card, CardHeader, CardTitle, CardDescription, CardAction, CardContent, CardFooter };

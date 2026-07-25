@@ -69,6 +69,11 @@
   --sidebar-width-mobile: 18rem;
 }
 
+/* T2 shadcn-replica-rewrite: cn-font-heading utility per .repos/shadcn/card.tsx */
+@utility cn-font-heading {
+  font-family: var(--font-heading, var(--font-sans));
+}
+
 @layer base {
   html,
   body,
