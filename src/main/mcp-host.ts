@@ -3,9 +3,8 @@
 //! McpStdioServer: spawn → initialize → tools/list → ready → tools/call.
 //! All communication over stdio JSON-RPC. No McpManager here (mini-3).
 
-import { spawn, type ChildProcess, type Readable, type Writable } from "node:child_process";
-import { PassThrough } from "node:stream";
-import { Schema } from "effect";
+import { spawn, type ChildProcess } from "node:child_process";
+import { PassThrough, type Readable, type Writable } from "node:stream";
 import { JsonRpcConnection } from "./jsonrpc";
 import { logger } from "./logger";
 import { JsonRpcProtocolError } from "../renderer/src/shared/lib/errors";
@@ -257,7 +256,7 @@ export class FakeChildProcess {
   }
 
   /** Simulate child exit. */
-  emitExit(code: number | null, signal: NodeJS.Signals | null): void {
+  emitExit(_code: number | null, _signal: NodeJS.Signals | null): void {
     this.stdout.destroy();
     this.stdin.destroy();
     // Simulate exit by calling any registered exit handler
@@ -265,7 +264,7 @@ export class FakeChildProcess {
   }
 
   /** Simulate child error. */
-  emitError(err: Error): void {
+  emitError(_err: Error): void {
     // Would emit 'error' event
   }
 }

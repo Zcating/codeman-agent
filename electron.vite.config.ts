@@ -73,7 +73,7 @@ export default defineConfig({
     resolve: {
       // alias must stay absolute — Vite's resolve.alias is a full path
       // substitution, not a root-relative one.
-      alias: [{ find: "@", replacement: r("src/renderer/src") }],
+      alias: [{ find: "@codeman-frontend", replacement: r("src/renderer/src") }],
     },
     server: { port: 1420, strictPort: true, host: "127.0.0.1" },
   },

@@ -15,7 +15,7 @@ files:
   - "!oxlint.config.ts"
   - "!oxfmt.config.ts"
   - "!vitest.setup.ts"
-  - "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json,tsconfig.electron.json,tsconfig.e2e.json}"
+  - "!{tsconfig.json,tsconfig.node.json,tsconfig.web.json,tsconfig.e2e.json}"
   - "!{.env,.env.*,!.env.example}"
   - "!.npmrc"
   - "!pnpm-lock.yaml"

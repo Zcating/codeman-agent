@@ -41,7 +41,7 @@ describe("McpStdioServer (minimal)", () => {
   it("spawn throwing synchronously → status=spawn_failed", async () => {
     const failingSpawn = (() => {
       throw new Error("ENOENT: command not found");
-    }) as unknown as Parameters<typeof McpStdioServer>[1];
+    }) as unknown as ConstructorParameters<typeof McpStdioServer>[1];
     const server = new McpStdioServer(ENABLED_CONFIG, failingSpawn);
     await server.start();
     expect(server.getStatus().kind).toBe("spawn_failed");

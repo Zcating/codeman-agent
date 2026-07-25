@@ -25,6 +25,10 @@ export default defineConfig(async () => ({
         find: "solid-js/web",
         replacement: resolve(__dirname, "node_modules/solid-js/web/dist/web.js"),
       },
+      {
+        find: "@codeman-frontend",
+        replacement: resolve(__dirname, "src/renderer/src"),
+      },
     ],
   },
   test: {

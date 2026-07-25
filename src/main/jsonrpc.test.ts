@@ -3,14 +3,14 @@
 //! Uses Node `stream.PassThrough` for in-memory Readable + Writable simulation
 //! (no real child process spawning — that's tested separately in mcp-host.test.ts).
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { PassThrough, type Readable, type Writable } from "node:stream";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { PassThrough } from "node:stream";
 import { JsonRpcConnection } from "./jsonrpc";
 import { JsonRpcProtocolError, JsonRpcTimeoutError } from "../renderer/src/shared/lib/errors";
 
 interface Pair {
-  readable: Readable;
-  writable: Writable;
+  readable: PassThrough;
+  writable: PassThrough;
   conn: JsonRpcConnection;
 }
 

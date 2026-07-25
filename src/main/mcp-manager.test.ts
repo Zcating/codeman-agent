@@ -28,7 +28,7 @@ describe("McpManager", () => {
 
   it("callTool throws JsonRpcProtocolError for invalid agent name", async () => {
     const manager = new McpManager();
-    await expect(manager.callTool("invalid", {})).rejects.toThrow(JsonRpcProtocolError);
+    await expect(manager.callTool("invalid", "someTool", {})).rejects.toThrow(JsonRpcProtocolError);
   });
 
   it("restart throws InvalidConfig for nonexistent server", async () => {

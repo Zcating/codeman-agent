@@ -87,6 +87,9 @@ importers:
       '@effect/vitest':
         specifier: ^0.25.0
         version: 0.25.1(effect@3.21.4)(vitest@4.1.9)
+      '@electron-toolkit/tsconfig':
+        specifier: ^2.0.0
+        version: 2.0.0(@types/node@22.19.21)
       '@electron/rebuild':
         specifier: ~4.0.6
         version: 4.0.6
@@ -433,6 +436,11 @@ packages:
     resolution: {integrity: sha512-TWWPToXd8qPRfSXwzf5KVhpXMfONaUuRAZJHsKthKgZR/+LqX1dZVSSClQ8OTAEduvLGdecljCsoT2jSshfoUg==}
     peerDependencies:
       electron: '>=13.0.0'
+
+  '@electron-toolkit/tsconfig@2.0.0':
+    resolution: {integrity: sha512-AdPsP770WhW7b260h13SHMdmjEEHJL6xFtgi3jwgdsSQbJOkJLeNnnpZW9qxTPCvmRI6vmdzWz5K3gibFS6SNg==}
+    peerDependencies:
+      '@types/node': '*'
 
   '@electron-toolkit/utils@4.0.0':
     resolution: {integrity: sha512-qXSntwEzluSzKl4z5yFNBknmPGjPa3zFhE4mp9+h0cgokY5ornAeP+CJQDBhKsL1S58aOQfcwkD3NwLZCl+64g==}
@@ -4824,6 +4832,10 @@ snapshots:
   '@electron-toolkit/preload@3.0.2(electron@39.8.10)':
     dependencies:
       electron: 39.8.10
+
+  '@electron-toolkit/tsconfig@2.0.0(@types/node@22.19.21)':
+    dependencies:
+      '@types/node': 22.19.21
 
   '@electron-toolkit/utils@4.0.0(electron@39.8.10)':
     dependencies:

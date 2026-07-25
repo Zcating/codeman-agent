@@ -24,6 +24,7 @@ export interface McpServerInfo {
 export interface McpToolEntry {
   serverName: string;
   agentName: string; // mcp_<server>_<tool>
+  toolName: string;
   description: string;
   inputSchema: unknown;
 }

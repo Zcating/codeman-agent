@@ -23,7 +23,6 @@ import type { McpServerConfig } from "./mcp-host";
 
 const HOME = (): string => app.getPath("home");
 export const MCP_CONFIG_PATH = (): string => join(HOME(), ".agents", "mcp_servers.json");
-const MCP_CONFIG_DIR = (): string => join(HOME(), ".agents");
 
 const McpConfigFileSchema = Schema.Struct({
   version: Schema.Literal(1),
