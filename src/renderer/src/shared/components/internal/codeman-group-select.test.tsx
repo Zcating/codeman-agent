@@ -242,10 +242,10 @@ describe("CodemanGroupSelect", () => {
     expect(items.length).toBe(0);
   });
 
-  // 7. regression: visual chrome (border / shadow / bg) must live on Content,
+  // 7. regression: visual chrome (border / ring / shadow) must live on Content,
   //    not Positioner. Otherwise Positioner's always-mounted div leaves a ghost
-  //    bordered box on the page when the select is closed.
-  it("places visual chrome on Content, not Positioner (no ghost border when closed)", () => {
+  //    outlined box on the page when the select is closed.
+  it("places visual chrome on Content, not Positioner (no ghost chrome when closed)", () => {
     render(() => (
       <CodemanGroupSelect
         groups={defaultGroups}
@@ -261,11 +261,10 @@ describe("CodemanGroupSelect", () => {
     expect(content).toBeInTheDocument();
 
     // Positioner is always mounted — it must not carry visual chrome.
-    expect(positioner.className).not.toMatch(/\bborder\b/);
-    expect(positioner.className).not.toMatch(/\bshadow\b/);
+    const chrome = /\b(border|ring|shadow)\b/;
+    expect(positioner.className).not.toMatch(chrome);
 
     // Content (the part that toggles data-state + hidden) owns the visible chrome.
-    expect(content.className).toMatch(/\bborder\b/);
-    expect(content.className).toMatch(/\bshadow\b/);
+    expect(content.className).toMatch(chrome);
   });
 });
