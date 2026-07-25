@@ -246,6 +246,20 @@ describe("ChatSidebar (PR 2)", () => {
       expect(container.querySelector('[aria-label="Delete Test WS"]')).toBeTruthy();
     });
 
+    it("renderItem workspace row does NOT render ConvDeleteAction (no 'Delete conversation' button)", () => {
+      // Workspace rows must not include the conv-style trash button — it was
+      // historically misplaced here, calling handleConvDelete(wsId) which
+      // invoked chatSidebarActions.deleteConversation(wsId) on a non-existent
+      // conv id. Workspace rows now show only label + (right) rename+delete
+      // (with delete using inline-confirm).
+      render(() => <ChatSidebar />);
+      const renderItem = F.capturedProps!.renderItem;
+      const { container } = render(() =>
+        renderItem({ label: "Test WS", value: "ws-test" }),
+      );
+      expect(container.querySelector('[aria-label="Delete conversation"]')).toBeFalsy();
+    });
+
     it("renderItem delete button shows inline-confirm overlay IN PLACE — does NOT open any dialog", async () => {
       render(() => <ChatSidebar />);
       const renderItem = F.capturedProps!.renderItem;

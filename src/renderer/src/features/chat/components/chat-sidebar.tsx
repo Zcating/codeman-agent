@@ -36,7 +36,6 @@ import {
 } from "../stores/chat.store";
 import { chatSidebarActions } from "../lib/chat-sidebar-actions";
 import { showRenameDialog } from "./workspace-rename-dialog";
-import { ConvDeleteAction } from "./conv-delete-action";
 import { NewChatButton } from "./new-chat-button";
 
 // ─── ChatSidebar ───────────────────────────────────────────────────────────
@@ -79,10 +78,6 @@ export function ChatSidebar(): JSX.Element {
 
   const handleNewConversation = (): void => {
     navigate({ to: "/" });
-  };
-
-  const handleConvDelete = (convId: string): void => {
-    void chatSidebarActions.deleteConversation(convId);
   };
 
   const handleRenameWorkspace = async (
@@ -157,9 +152,6 @@ export function ChatSidebar(): JSX.Element {
 
   const renderItem = (item: SidebarOption): JSX.Element => {
     const [hovering, setHovering] = createSignal(false);
-    const convId = item.value ?? item.label;
-    const isStreaming = (): boolean =>
-      store.byId[convId]?.streamingMessageId != null;
     const isConfirming = (): boolean =>
       confirmingWorkspaceId() === item.value;
     return (
@@ -168,12 +160,12 @@ export function ChatSidebar(): JSX.Element {
         onMouseEnter={() => setHovering(true)}
         onMouseLeave={() => setHovering(false)}
       >
-        <ConvDeleteAction
-          convId={convId}
-          label={item.label}
-          isStreaming={isStreaming()}
-          onDelete={handleConvDelete}
-        />
+        <span
+          class="truncate flex-1 text-sm"
+          title={item.label}
+        >
+          {item.label}
+        </span>
         <Show
           when={isConfirming()}
           fallback={
