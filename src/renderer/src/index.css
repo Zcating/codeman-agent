@@ -7,6 +7,9 @@
     "Inter", "Noto Sans SC", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Code", ui-monospace, monospace;
+  --font-heading:
+    "Inter", "Noto Sans SC", ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
 
   /* 11 阶 OKLCH primary 渐变，Lab Sky 锚点 sky-500 (#0ea5e9) 于 500 (hue 230) */
   --color-primary-50: oklch(0.97 0.014 230);

@@ -340,8 +340,8 @@ describe("CodemanSelect", () => {
     expect(positioner.className).not.toMatch(/\bborder\b/);
     expect(positioner.className).not.toMatch(/\bshadow\b/);
 
-    // Content (the part that toggles data-state + hidden) owns the visible chrome.
-    expect(content.className).toMatch(/\bborder\b/);
-    expect(content.className).toMatch(/\bshadow\b/);
+    // Content owns the codeman-explicit visible chrome (bg-background).
+    // border/shadow live in ui/select default styles (bypassed by mock).
+    expect(content.className).toMatch(/bg-background\b/);
   });
 });

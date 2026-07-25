@@ -1,5 +1,5 @@
 //! select.test.tsx — Contract tests for Select primitive
-import { render, screen } from "@solidjs/testing-library";
+import { render, screen, fireEvent, waitFor } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
 import { createListCollection } from "@ark-ui/solid";
 import {
@@ -126,5 +126,26 @@ describe("SelectScrollDownButton", () => {
   it("renders with data-slot=select-scroll-down-button", () => {
     render(() => <SelectScrollDownButton data-testid="down" />);
     expect(screen.getByTestId("down")).toHaveAttribute("data-slot", "select-scroll-down-button");
+  });
+});
+
+describe("SelectRoot interaction", () => {
+  it("trigger toggles content on click", async () => {
+    const collection = createListCollection({ items: [{ label: "A", value: "a" }] });
+    render(() => (
+      <SelectRoot collection={collection}>
+        <SelectTrigger data-testid="trigger">Open</SelectTrigger>
+        <SelectContent data-testid="content">
+          <SelectItem item={collection.items[0]}>A</SelectItem>
+        </SelectContent>
+      </SelectRoot>
+    ));
+    const trigger = screen.getByTestId("trigger");
+    const content = screen.getByTestId("content");
+    expect(content).toHaveAttribute("data-state", "closed");
+    fireEvent.click(trigger);
+    await waitFor(() => {
+      expect(screen.getByTestId("content")).toHaveAttribute("data-state", "open");
+    });
   });
 });

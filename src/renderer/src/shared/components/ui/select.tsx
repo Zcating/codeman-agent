@@ -4,6 +4,7 @@ import type { JSX } from "solid-js";
 import { splitProps } from "solid-js";
 import {
   Select as SelectPrimitive,
+  useSelectContext,
 } from "@ark-ui/solid";
 import { Check, ChevronDown, ChevronUp } from "lucide-solid";
 import { cn } from "../../lib/cn";
@@ -57,17 +58,13 @@ export function SelectTrigger(props: SelectTriggerProps) {
 }
 
 export interface SelectContentProps extends SelectPrimitive.ContentProps {
-  side?: string;
-  sideOffset?: number;
-  align?: string;
-  alignOffset?: number;
   alignItemWithTrigger?: boolean;
 }
 
 export function SelectContent(props: SelectContentProps) {
   const [local, rest] = splitProps(props, [
     "class", "children",
-    "side", "sideOffset", "align", "alignOffset", "alignItemWithTrigger",
+    "alignItemWithTrigger",
   ]);
   return (
     <SelectPrimitive.Positioner class="isolate z-50">
@@ -170,4 +167,14 @@ export function SelectScrollDownButton(props: JSX.HTMLAttributes<HTMLDivElement>
   );
 }
 
-export { createListCollection, useSelectContext } from "@ark-ui/solid";
+export function SelectAction(props: { children?: JSX.Element }) {
+  const ctx = useSelectContext();
+  return (
+    <>
+      <hr role="separator" class="my-2 border-border" />
+      <div onClick={() => ctx().setOpen(false)}>{props.children}</div>
+    </>
+  );
+}
+
+export { createListCollection } from "@ark-ui/solid";
