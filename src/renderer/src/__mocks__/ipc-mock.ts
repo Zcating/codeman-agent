@@ -367,6 +367,10 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
     return mockState.resolved ?? undefined;
   },
 
+  renameConversation(): unknown {
+    return mockState.resolved ?? undefined;
+  },
+
   // ─── Message IPC (ADR-0013) ─────────────────────────────────────
   listMessages(_args?: IPCArgs): unknown {
     return mockState.resolved ?? [];
@@ -494,8 +498,9 @@ function buildCodemanMock(): Record<string, unknown> {
     listConversations: { cmd: "listConversations", build: (ia) => ({ includeArchived: ia }) },
     getConversation: { cmd: "getConversation", build: (id) => ({ id }) },
     createConversation: { cmd: "createConversation", build: (a) => a as Record<string, unknown> },
-    archiveConversation: { cmd: "archiveConversation", build: (id) => ({ id }) },
-    deleteConversation: { cmd: "deleteConversation", build: (id) => ({ id }) },
+  archiveConversation: { cmd: "archiveConversation", build: (id) => ({ id }) },
+  deleteConversation: { cmd: "deleteConversation", build: (id) => ({ id }) },
+  renameConversation: { cmd: "renameConversation", build: (id, title) => ({ id, title }) },
     listMessages: { cmd: "listMessages", build: (cid) => ({ conversationId: cid }) },
     appendMessage: { cmd: "appendMessage", build: (a) => a as Record<string, unknown> },
     searchMessages: { cmd: "searchMessages", build: (q, l) => ({ query: q, limit: l }) },

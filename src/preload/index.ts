@@ -30,6 +30,8 @@ const codeman = {
     ipcRenderer.invoke("archiveConversation", { id }),
   deleteConversation: (id: string) =>
     ipcRenderer.invoke("deleteConversation", { id }),
+  renameConversation: (id: string, title: string) =>
+    ipcRenderer.invoke("renameConversation", { id, title }),
 
   // Messages
   listMessages: (conversationId: string) =>

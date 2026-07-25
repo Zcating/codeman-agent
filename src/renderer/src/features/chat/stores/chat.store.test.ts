@@ -20,6 +20,7 @@ import {
   addWorkspace,
   removeWorkspace,
   renameWorkspace,
+  renameConversation,
   pickWorkspacePath,
   loadWorkspaces,
   type ConversationState,
@@ -96,6 +97,7 @@ vi.mock("../../../shared/lib/ipc", async () => {
         } as Conversation),
       archive: () => E.void,
       delete: () => E.void,
+      rename: () => E.void,
     }),
     // V3.1 ADR-0031 + ADR-0016: appStore reads these — provide minimal stubs
     ProviderServiceLive: Layer.succeed(ProviderService, {
@@ -1141,6 +1143,29 @@ describe("deleteConversation — G15: 从 byId 移除 + 调用 runtime.cancel()"
       await Effect.runPromise(deleteConversation("c1"));
       expect(spy).toHaveBeenCalled();
       expect(store.byId["c1"]).toBeUndefined();
+      dispose();
+    });
+  });
+});
+
+// ─── New tests: renameConversation ────────────────────────────────
+
+describe("renameConversation — G14: 更新 byId[convId].title + 刷新 conversations$", () => {
+  it("renameConversation() 更新 conv title + 刷新 conversations$", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, []);
+      // Verify initial title
+      expect(store.byId["c1"]?.title).toBe("测试");
+      // Verify initial conversations$ has the conv
+      expect(conversations$().some((c) => c.id === "c1")).toBe(true);
+
+      await Effect.runPromise(renameConversation("c1", "new-title"));
+
+      // Check store.byId[convId].title updated
+      expect(store.byId["c1"]?.title).toBe("new-title");
+      // Check conversations$ reflects the new title
+      const updatedConv = conversations$().find((c) => c.id === "c1");
+      expect(updatedConv?.title).toBe("new-title");
       dispose();
     });
   });

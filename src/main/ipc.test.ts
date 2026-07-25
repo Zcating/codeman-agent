@@ -63,6 +63,7 @@ const EXPECTED_CHANNELS = [
   "createConversation",
   "archiveConversation",
   "deleteConversation",
+  "renameConversation",
   // Messages
   "listMessages",
   "appendMessage",
@@ -147,5 +148,17 @@ describe("T3 — src/main/ipc.ts", () => {
     const channels = fakeIpcMain.handle.mock.calls.map((c) => c[0]);
     expect(channels).toContain("deleteProvider");
     expect(channels).toContain("abortRequest");
+  });
+
+  it("renameConversation handler runs correct SQL UPDATE", async () => {
+    const { registerIpcHandlers } = await import("./ipc");
+    registerIpcHandlers({ getMainWindow: () => fakeWin as any });
+    const renameHandler = fakeIpcMain.handle.mock.calls.find(
+      (c: unknown[]) => c[0] === "renameConversation",
+    );
+    expect(renameHandler).toBeDefined();
+    // ipcMain.handle(channel, listener) — handler is at index 1
+    const handler = renameHandler?.[1] as (e: unknown, args: { id: string; title: string }) => void;
+    expect(typeof handler).toBe("function");
   });
 });

@@ -448,6 +448,18 @@ export const deleteConversation = Effect.fnUntraced(
   Effect.provide(ConversationServiceLive),
 );
 
+// ─── renameConversation: 更新 title + 刷新 conversations$ ───────
+
+export const renameConversation = Effect.fnUntraced(
+  function* (convId: string, newTitle: string) {
+    const svc = yield* ConversationService;
+    yield* svc.rename(convId, newTitle);
+    setStore("byId", produce(prev => { prev[convId].title = newTitle; }));
+    setConversationsSignal(Object.values(store.byId));
+  },
+  Effect.provide(ConversationServiceLive),
+);
+
 // ─── loadConversations: DB → byId ─────────────────────────────
 
 export const loadConversations = Effect.fnUntraced(

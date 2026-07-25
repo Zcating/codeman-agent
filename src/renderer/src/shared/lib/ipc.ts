@@ -49,6 +49,7 @@ export interface CodemanApi {
   createConversation: (args: unknown) => Promise<unknown>;
   archiveConversation: (id: string) => Promise<unknown>;
   deleteConversation: (id: string) => Promise<unknown>;
+  renameConversation: (id: string, title: string) => Promise<unknown>;
   listMessages: (conversationId: string) => Promise<unknown>;
   appendMessage: (args: unknown) => Promise<unknown>;
   searchMessages: (query: string, limit: number) => Promise<unknown>;
@@ -139,6 +140,8 @@ async function dispatchInvoke<T>(
       return (await a.archiveConversation(arg("id") as string)) as T;
     case "deleteConversation":
       return (await a.deleteConversation(arg("id") as string)) as T;
+    case "renameConversation":
+      return (await a.renameConversation(arg("id") as string, arg("title") as string)) as T;
     case "listMessages":
       return (await a.listMessages(arg("conversationId") as string)) as T;
     case "appendMessage":
@@ -277,6 +280,7 @@ export class ConversationService extends Context.Tag("ConversationService")<
     ) => Effect.Effect<Conversation, AppError>;
     readonly archive: (id: string) => Effect.Effect<void, AppError>;
     readonly delete: (id: string) => Effect.Effect<void, AppError>;
+    readonly rename: (id: string, title: string) => Effect.Effect<void, AppError>;
   }
 >() {}
 
@@ -377,6 +381,7 @@ export const ConversationServiceLive = Layer.succeed(ConversationService, {
     invoke<Conversation>("createConversation", { title, systemPrompt, workspaceId }),
   archive: (id) => invoke<void>("archiveConversation", { id }),
   delete: (id) => invoke<void>("deleteConversation", { id }),
+  rename: (id, title) => invoke<void>("renameConversation", { id, title }),
 });
 
 export const MessageServiceLive = Layer.succeed(MessageService, {
