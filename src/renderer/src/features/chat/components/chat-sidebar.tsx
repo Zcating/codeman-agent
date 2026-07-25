@@ -16,8 +16,7 @@
 //! Layout: ChatSidebar wraps CodemanSidebar which owns the two-column
 //! (sidebar + main) shell. Children slot is `<Outlet />` from TanStack Router.
 
-import { createSignal, Show, type JSX } from "solid-js";
-import { Pencil, Trash2 } from "lucide-solid";
+import { type JSX } from "solid-js";
 import { Outlet, useLocation, useNavigate, useParams, Link } from "@tanstack/solid-router";
 import { Settings as SettingsIcon } from "lucide-solid";
 import {
@@ -35,7 +34,7 @@ import {
   setSelectedWorkspaceId,
 } from "../stores/chat.store";
 import { chatSidebarActions } from "../lib/chat-sidebar-actions";
-import { showRenameDialog } from "./workspace-rename-dialog";
+import { RowActions } from "./row-actions";
 import { NewChatButton } from "./new-chat-button";
 
 // ─── ChatSidebar ───────────────────────────────────────────────────────────
@@ -54,18 +53,6 @@ export function ChatSidebar(): JSX.Element {
 
   const wsList = (): Workspace[] => workspaces$() ?? [];
 
-  // ─── Inline-confirm state for workspace delete ───────────────────────────
-  //
-  // Per user requirement (2026-07-25): clicking delete on a workspace row
-  // must NOT open a modal — instead, the row swaps its hover-revealed
-  // rename+delete buttons for an inline 删除 / 取消 overlay at the original
-  // row position. Only one row can be in this state at a time; clicking
-  // delete on another row implicitly cancels the previous one (the value
-  // simply changes to the new workspace id).
-  const [confirmingWorkspaceId, setConfirmingWorkspaceId] = createSignal<
-    string | null
-  >(null);
-
   // ─── Handlers ────────────────────────────────────────────────────────────
 
   const handleSelectConv = (id: string): void => {
@@ -80,38 +67,28 @@ export function ChatSidebar(): JSX.Element {
     navigate({ to: "/" });
   };
 
-  const handleRenameWorkspace = async (
+  // Simplified workspace rename — directly calls chatSidebarActions.renameWorkspace
+  // (no showRenameDialog modal; inline edit is handled by RowActions)
+  const handleRenameWorkspaceSimple = async (
     workspaceId: string,
-    currentLabel: string,
+    newLabel: string,
   ): Promise<void> => {
-    const newLabel = await showRenameDialog(currentLabel);
-    if (!newLabel || newLabel === currentLabel) {return;}
-    const ok = await chatSidebarActions.renameWorkspace(
-      workspaceId,
-      newLabel,
-    );
+    const ok = await chatSidebarActions.renameWorkspace(workspaceId, newLabel);
     if (!ok) {
       logger.error("[chat-sidebar] rename failed for", workspaceId);
     }
   };
 
-  const handleDeleteWorkspace = (workspaceId: string): void => {
-    // Enter inline-confirm state — the row's hover-buttons swap to a
-    // 删除 / 取消 overlay at the original row position (per user request:
-    // no modal popup). The actual deletion only happens after the user
-    // confirms via `handleConfirmDeleteWorkspace`.
-    setConfirmingWorkspaceId(workspaceId);
-  };
-
-  const handleConfirmDeleteWorkspace = async (
-    workspaceId: string,
-  ): Promise<void> => {
+  // Workspace delete — directly calls chatSidebarActions.removeWorkspace.
+  // RowActions manages the inline-confirm UI; this handler performs the
+  // deletion and handles navigation side effect (if deleting the workspace
+  // that owns the currently-viewed conversation, navigate home).
+  const handleDeleteWorkspace = async (workspaceId: string): Promise<void> => {
     const ok = await chatSidebarActions.removeWorkspace(workspaceId);
     if (!ok) {
       logger.error("[chat-sidebar] delete failed for", workspaceId);
       return;
     }
-    // If the current URL's conv belongs to the deleted workspace, navigate home.
     const currentConvId = selectedConvId();
     if (
       currentConvId &&
@@ -119,6 +96,29 @@ export function ChatSidebar(): JSX.Element {
     ) {
       navigate({ to: "/" });
     }
+  };
+
+  // Conversation delete — calls chatSidebarActions.deleteConversation.
+  // If deleting the currently-viewed conversation, navigates home to avoid
+  // staying on a deleted conv view.
+  const handleConvDelete = async (convId: string): Promise<void> => {
+    await chatSidebarActions.deleteConversation(convId);
+    const currentConvId = selectedConvId();
+    if (currentConvId === convId) {
+      navigate({ to: "/" });
+    }
+  };
+
+  // Conversation rename — calls chatSidebarActions.renameConversation.
+  // Mirrors handleRenameWorkspaceSimple error-handling pattern.
+  const handleConvRename = async (
+    convId: string,
+    newTitle: string,
+  ): Promise<void> => {
+    await chatSidebarActions.renameConversation(convId, newTitle);
+    // Note: chatSidebarActions.renameConversation swallows errors internally
+    // (runEffect pattern). If failure notification is needed in future,
+    // mirror the logger.error pattern from handleRenameWorkspaceSimple.
   };
 
   // ─── Sidebar tree builders ───────────────────────────────────────────────
@@ -150,91 +150,26 @@ export function ChatSidebar(): JSX.Element {
     ];
   };
 
-  const renderItem = (item: SidebarOption): JSX.Element => {
-    const [hovering, setHovering] = createSignal(false);
-    const isConfirming = (): boolean =>
-      confirmingWorkspaceId() === item.value;
-    return (
-      <span
-        class="flex w-full items-center justify-between gap-2 min-w-0"
-        onMouseEnter={() => setHovering(true)}
-        onMouseLeave={() => setHovering(false)}
-      >
-        <span
-          class="truncate flex-1 text-sm"
-          title={item.label}
-        >
-          {item.label}
-        </span>
-        <Show
-          when={isConfirming()}
-          fallback={
-            <span
-              class="pointer-events-auto flex items-center gap-1 transition-opacity"
-              classList={{
-                "opacity-0": !hovering(),
-                "opacity-100": hovering(),
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                type="button"
-                class="flex h-5 w-5 items-center justify-center rounded-md hover:bg-accent outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void handleRenameWorkspace(item.value, item.label);
-                }}
-                aria-label={`Rename ${item.label}`}
-              >
-                <Pencil class="h-3 w-3" aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                class="flex h-5 w-5 items-center justify-center rounded-md hover:bg-accent hover:text-destructive outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteWorkspace(item.value);
-                }}
-                aria-label={`Delete ${item.label}`}
-              >
-                <Trash2 class="h-3 w-3" aria-hidden="true" />
-              </button>
-            </span>
-          }
-        >
-          <span
-            data-state="confirming"
-            class="pointer-events-auto flex items-center gap-1"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              class="h-7 px-2 text-xs bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
-              onClick={(e) => {
-                e.stopPropagation();
-                setConfirmingWorkspaceId(null);
-                void handleConfirmDeleteWorkspace(item.value);
-              }}
-              aria-label="确认删除"
-            >
-              删除
-            </button>
-            <button
-              type="button"
-              class="h-7 px-2 text-xs rounded-md border border-input text-foreground hover:bg-accent"
-              onClick={(e) => {
-                e.stopPropagation();
-                setConfirmingWorkspaceId(null);
-              }}
-              aria-label="取消删除"
-            >
-              取消
-            </button>
-          </span>
-        </Show>
-      </span>
-    );
-  };
+  const renderItem = (item: SidebarOption): JSX.Element => (
+    <RowActions
+      kind="workspace"
+      id={item.value}
+      label={item.label}
+      onDelete={(id) => { void handleDeleteWorkspace(id); }}
+      onRename={(id, newLabel) => { void handleRenameWorkspaceSimple(id, newLabel); }}
+    />
+  );
+
+  const renderSubItem = (sub: SidebarSubOption): JSX.Element => (
+    <RowActions
+      kind="conv"
+      id={sub.value}
+      label={sub.label}
+      isStreaming={store.byId[sub.value]?.streamingMessageId != null}
+      onDelete={(id) => { void handleConvDelete(id); }}
+      onRename={(id, newTitle) => { void handleConvRename(id, newTitle); }}
+    />
+  );
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
@@ -242,6 +177,7 @@ export function ChatSidebar(): JSX.Element {
     <CodemanSidebar
       options={options()}
       renderItem={renderItem}
+      renderSubItem={renderSubItem}
       currentValue={selectedConvId() ?? undefined}
       onItemSelect={handleSelectConv}
       onSubItemSelect={handleSelectConv}

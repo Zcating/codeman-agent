@@ -84,6 +84,12 @@ export interface CodemanSidebarProps {
    */
   renderItem: (item: SidebarOption) => JSX.Element;
   /**
+   * Render function for conversation sub-item internal visual.
+   * Called once per conv with a SidebarSubOption. Falls back to `{sub.label}` when omitted.
+   * Mirrors `renderItem` (workspace-level).
+   */
+  renderSubItem?: (sub: SidebarSubOption) => JSX.Element;
+  /**
    * Optional override for the group (project) header content.
    * Called once per group with a SidebarGroupOption.
    */
@@ -278,7 +284,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
                                                   onClick={() => handleSubSelect(sub)}
                                                   data-value={sub.value}
                                                 >
-                                                  {sub.label}
+                                                  {props.renderSubItem ? props.renderSubItem(sub) : sub.label}
                                                 </SidebarMenuSubButton>
                                               </SidebarMenuSubItem>
                                             )}

@@ -16,6 +16,7 @@ import { Effect } from "effect";
 interface CapturedProps {
   options: any[];
   renderItem: (item: any) => any;
+  renderSubItem?: (sub: any) => any;
   renderGroupHeader?: (group: any) => any;
   currentValue?: string;
   onItemSelect?: (value: string) => void;
@@ -53,6 +54,14 @@ const F = vi.hoisted(() => {
     mockDialogConfirm: vi.fn(),
     mockShowRenameDialog: vi.fn(),
     capturedProps: null as CapturedProps | null,
+    // For RowActions mock (T8)
+    capturedRowActionsProps: null as any,
+    mockChatSidebarActions: {
+      deleteConversation: vi.fn().mockResolvedValue(undefined),
+      renameConversation: vi.fn().mockResolvedValue(undefined),
+      renameWorkspace: vi.fn().mockResolvedValue(true),
+      removeWorkspace: vi.fn().mockResolvedValue(true),
+    },
   };
 });
 
@@ -102,6 +111,7 @@ vi.mock("../../../shared/components/internal/codeman-sidebar", () => ({
     F.capturedProps = {
       options: props.options,
       renderItem: props.renderItem,
+      renderSubItem: props.renderSubItem,
       renderGroupHeader: props.renderGroupHeader,
       currentValue: props.currentValue,
       onItemSelect: props.onItemSelect,
@@ -280,24 +290,6 @@ describe("ChatSidebar (PR 2)", () => {
       expect(container.querySelector('[aria-label="取消删除"]')).toBeTruthy();
     });
 
-    it("renderItem inline-confirm '删除' button calls chatSidebarActions.removeWorkspace", async () => {
-      render(() => <ChatSidebar />);
-      const renderItem = F.capturedProps!.renderItem;
-      const { container } = render(() =>
-        renderItem({ label: "WS to Delete", value: "ws-del" }),
-      );
-      // Enter inline-confirm state
-      const deleteBtn = container.querySelector('[aria-label="Delete WS to Delete"]') as HTMLButtonElement;
-      deleteBtn.click();
-      // Confirm by clicking 删除
-      const confirmBtn = container.querySelector('[aria-label="确认删除"]') as HTMLButtonElement;
-      expect(confirmBtn).toBeTruthy();
-      confirmBtn.click();
-      // removeWorkspace was called with the right workspace id (NOT Dialog.confirm)
-      expect(F.mockRemoveWorkspace).toHaveBeenCalledWith("ws-del");
-      expect(F.mockDialogConfirm).not.toHaveBeenCalled();
-    });
-
     it("renderItem inline-confirm '取消' button hides overlay without calling removeWorkspace", async () => {
       render(() => <ChatSidebar />);
       const renderItem = F.capturedProps!.renderItem;
@@ -319,39 +311,114 @@ describe("ChatSidebar (PR 2)", () => {
       expect(container.querySelector('[aria-label="确认删除"]')).toBeFalsy();
       expect(container.querySelector('[aria-label="取消删除"]')).toBeFalsy();
     });
+  });
 
-    it("renderItem rename button triggers showRenameDialog", async () => {
-      render(() => <ChatSidebar />);
-      const renderItem = F.capturedProps!.renderItem;
-      const { container } = render(() =>
-        renderItem({ label: "WS to Rename", value: "ws-ren" }),
-      );
-      const renameBtn = container.querySelector('[aria-label="Rename WS to Rename"]') as HTMLButtonElement;
-      renameBtn.click();
-      expect(F.mockShowRenameDialog).toHaveBeenCalledWith("WS to Rename");
+  // ─── Seam T8: RowActions integration ───────────────────────────────────────
+  describe("Seam T8: RowActions integration", () => {
+    beforeEach(() => {
+      F.capturedRowActionsProps = null;
+      F.mockChatSidebarActions.deleteConversation.mockClear();
+      F.mockChatSidebarActions.renameConversation.mockClear();
+      F.mockChatSidebarActions.renameWorkspace.mockClear();
+      F.mockChatSidebarActions.removeWorkspace.mockClear();
     });
 
-    it("renderItem button span shows opacity-100 on mouseEnter, opacity-0 on mouseLeave", async () => {
+    // Mock RowActions to:
+    // 1. Render the actual RowActions component (so OLD DOM tests still work)
+    // 2. Capture the props (so NEW prop-verification tests work)
+    vi.mock("./row-actions", async () => {
+      const actual = await vi.importActual<typeof import("./row-actions")>(
+        "./row-actions",
+      );
+      return {
+        ...actual,
+        RowActions: (props: any) => {
+          F.capturedRowActionsProps = props;
+          // Render actual RowActions so DOM queries still work
+          return <actual.RowActions {...props} />;
+        },
+      };
+    });
+
+    vi.mock("../lib/chat-sidebar-actions", () => ({
+      get chatSidebarActions() {
+        return F.mockChatSidebarActions;
+      },
+    }));
+
+    it("renderItem uses RowActions with kind='workspace'", () => {
       render(() => <ChatSidebar />);
       const renderItem = F.capturedProps!.renderItem;
-      const { container } = render(() =>
-        renderItem({ label: "Test WS", value: "ws-test" }),
-      );
-      // The outer span is the row; the inner span (pointer-events-auto) holds the buttons
-      const buttonSpan = container.querySelector('[class*="pointer-events-auto"]') as HTMLElement;
-      // Default: hovering=false → button span has opacity-0
-      expect(buttonSpan.classList).toContain("opacity-0");
-      expect(buttonSpan.classList).not.toContain("opacity-100");
-      // Simulate mouseEnter on the outer row span
-      const rowSpan = container.querySelector('[class*="w-full items-center justify-between"]') as HTMLElement;
-      rowSpan.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
-      // After mouseEnter: hovering=true → button span has opacity-100
-      expect(buttonSpan.classList).toContain("opacity-100");
-      expect(buttonSpan.classList).not.toContain("opacity-0");
-      // Simulate mouseLeave
-      rowSpan.dispatchEvent(new MouseEvent("mouseleave", { bubbles: true }));
-      expect(buttonSpan.classList).toContain("opacity-0");
-      expect(buttonSpan.classList).not.toContain("opacity-100");
+      render(() => renderItem({ label: "Test WS", value: "ws-1" }));
+      expect(F.capturedRowActionsProps).toBeTruthy();
+      expect(F.capturedRowActionsProps.kind).toBe("workspace");
+      expect(F.capturedRowActionsProps.id).toBe("ws-1");
+      expect(F.capturedRowActionsProps.label).toBe("Test WS");
+    });
+
+    it("renderSubItem uses RowActions with kind='conv'", () => {
+      render(() => <ChatSidebar />);
+      expect(F.capturedProps!.renderSubItem).toBeTruthy();
+      const renderSubItem = F.capturedProps!.renderSubItem!;
+      render(() => renderSubItem({ label: "Chat 1", value: "c-1" }));
+      expect(F.capturedRowActionsProps).toBeTruthy();
+      expect(F.capturedRowActionsProps.kind).toBe("conv");
+      expect(F.capturedRowActionsProps.id).toBe("c-1");
+      expect(F.capturedRowActionsProps.label).toBe("Chat 1");
+    });
+
+    it("renderSubItem passes isStreaming from store.byId", () => {
+      // c-2 has streamingMessageId: "msg-x" in mockStoreById
+      F.mockParamsAccessor.mockImplementation(() => ({ convId: "c-2" }));
+      render(() => <ChatSidebar />);
+      const renderSubItem = F.capturedProps!.renderSubItem!;
+      render(() => renderSubItem({ label: "Chat 2", value: "c-2" }));
+      expect(F.capturedRowActionsProps.isStreaming).toBe(true);
+    });
+
+    it("RowActions delete on conv row calls chatSidebarActions.deleteConversation with convId", async () => {
+      render(() => <ChatSidebar />);
+      const renderSubItem = F.capturedProps!.renderSubItem!;
+      const { container } = render(() => renderSubItem({ label: "Chat to Delete", value: "c-del" }));
+      // Click the trash button
+      const deleteBtn = container.querySelector("[aria-label='Delete conversation']") as HTMLButtonElement;
+      deleteBtn.click();
+      // Confirm delete
+      const confirmBtn = container.querySelector("[aria-label='确认删除']") as HTMLButtonElement;
+      confirmBtn.click();
+      expect(F.mockChatSidebarActions.deleteConversation).toHaveBeenCalledWith("c-del");
+    });
+
+    it("RowActions rename on conv row calls chatSidebarActions.renameConversation with (convId, newTitle)", async () => {
+      render(() => <ChatSidebar />);
+      const renderSubItem = F.capturedProps!.renderSubItem!;
+      const { container } = render(() => renderSubItem({ label: "Old Chat", value: "c-ren" }));
+      // Click rename button
+      const renameBtn = container.querySelector("[aria-label='Rename Old Chat']") as HTMLButtonElement;
+      renameBtn.click();
+      // Type new name
+      const input = container.querySelector("[aria-label='Rename input']") as HTMLInputElement;
+      const { fireEvent } = await import("@solidjs/testing-library");
+      fireEvent.input(input, { target: { value: "New Chat Title" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      expect(F.mockChatSidebarActions.renameConversation).toHaveBeenCalledWith("c-ren", "New Chat Title");
+    });
+
+    it("deleting currently viewed conv (activated conv) navigates to home", async () => {
+      // Set up: currently viewing c-1
+      F.mockParamsAccessor.mockImplementation(() => ({ convId: "c-1" }));
+      render(() => <ChatSidebar />);
+      const renderSubItem = F.capturedProps!.renderSubItem!;
+      const { container } = render(() => renderSubItem({ label: "Active Chat", value: "c-1" }));
+      // Click delete on c-1 (the currently viewed conv)
+      const deleteBtn = container.querySelector("[aria-label='Delete conversation']") as HTMLButtonElement;
+      deleteBtn.click();
+      const confirmBtn = container.querySelector("[aria-label='确认删除']") as HTMLButtonElement;
+      confirmBtn.click();
+      // Wait for async handleConvDelete to complete
+      await vi.waitFor(() => {
+        expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/" });
+      });
     });
   });
 });

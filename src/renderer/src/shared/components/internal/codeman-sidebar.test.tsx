@@ -23,6 +23,7 @@ import {
   CodemanSidebar,
   type SidebarGroupOption,
   type SidebarOption,
+  type SidebarSubOption,
 } from "./codeman-sidebar";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -59,6 +60,7 @@ function renderSidebar(
   overrides: Partial<{
     options: SidebarGroupOption[];
     renderItem: (item: SidebarOption) => any;
+    renderSubItem?: (sub: SidebarSubOption) => any;
     renderGroupHeader?: (group: SidebarGroupOption) => any;
     currentValue?: string;
     isActive?: (value: string | undefined, currentValue: string | undefined) => boolean;
@@ -79,6 +81,7 @@ function renderSidebar(
     <CodemanSidebar
       options={opts}
       renderItem={renderItem}
+      renderSubItem={overrides.renderSubItem}
       renderGroupHeader={overrides.renderGroupHeader}
       currentValue={overrides.currentValue}
       isActive={overrides.isActive}
@@ -169,6 +172,57 @@ describe("CodemanSidebar (PR 2)", () => {
       const { container } = renderSidebar({ options: opts, renderItem });
       expect(container.querySelector("[data-ws='ws-1']")?.textContent).toContain("Frontend (custom)");
       expect(container.querySelector("[data-ws='ws-2']")?.textContent).toContain("Backend (custom)");
+    });
+  });
+
+  // ─── Slice 14b: renderSubItem ────────────────────────────────────────────
+  describe("renderSubItem", () => {
+    it("renderSubItem is called once per conv (once per subItem)", () => {
+      const renderSubItem = vi.fn((sub: SidebarSubOption) => <span data-testid="conv-item">{sub.label}</span>);
+      const opts = makeOptions();
+      renderSidebar({ options: opts, renderSubItem });
+      // 3 convs across 2 workspaces: c-1, c-2 (ws-1) and c-3 (ws-2)
+      expect(renderSubItem).toHaveBeenCalledTimes(3);
+    });
+
+    it("renderSubItem receives correct SidebarSubOption props", () => {
+      const renderSubItem = vi.fn((sub: SidebarSubOption) => <span data-testid="conv-item">{sub.label}</span>);
+      const opts = makeOptions();
+      renderSidebar({ options: opts, renderSubItem });
+      expect(renderSubItem).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ label: "Chat 1", value: "c-1" }),
+      );
+      expect(renderSubItem).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ label: "Chat 2", value: "c-2" }),
+      );
+      expect(renderSubItem).toHaveBeenNthCalledWith(
+        3,
+        expect.objectContaining({ label: "Chat 3", value: "c-3" }),
+      );
+    });
+
+    it("renderSubItem result is rendered in DOM with correct aria-label", () => {
+      const renderSubItem = vi.fn((sub: SidebarSubOption) => (
+        <span data-testid="custom-conv" aria-label={`custom-${sub.value}`}>{sub.label} (custom)</span>
+      ));
+      const opts = makeOptions();
+      const { container } = renderSidebar({ options: opts, renderSubItem });
+      expect(container.querySelector("[data-testid='custom-conv']")?.textContent).toContain("Chat 1 (custom)");
+      expect(container.querySelector("[aria-label='custom-c-1']")?.textContent).toContain("Chat 1 (custom)");
+      expect(container.querySelector("[aria-label='custom-c-2']")?.textContent).toContain("Chat 2 (custom)");
+      expect(container.querySelector("[aria-label='custom-c-3']")?.textContent).toContain("Chat 3 (custom)");
+    });
+
+    it("without renderSubItem: conv row renders pure sub.label (backward compatible)", () => {
+      const opts = makeOptions();
+      const { container } = renderSidebar({ options: opts });
+      // Each conv button should just show its label text
+      const c1 = container.querySelector("[data-value='c-1']");
+      expect(c1?.textContent).toBe("Chat 1");
+      const c2 = container.querySelector("[data-value='c-2']");
+      expect(c2?.textContent).toBe("Chat 2");
     });
   });
 
