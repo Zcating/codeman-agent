@@ -88,7 +88,7 @@ export const CodemanInput: Component<CodemanInputProps> = (props) => {
       <Input
         type={local.type ?? "text"}
         value={local.value ?? ""}
-        class={local.inputClass}
+        class={cn("h-10", local.inputClass)}
         ref={local.ref}
         aria-invalid={local.error ? true : undefined}
         disabled={local.disabled}

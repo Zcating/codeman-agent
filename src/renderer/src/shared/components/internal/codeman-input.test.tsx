@@ -52,6 +52,31 @@ describe("CodemanInput", () => {
     expect(input.className).toContain("extra-class");
   });
 
+  it("透传 data-slot=input from underlying Input", () => {
+    const { container } = render(() => (
+      <CodemanInput value="" onValueChange={() => undefined} />
+    ));
+    const input = container.querySelector("input") as HTMLInputElement;
+    expect(input.getAttribute("data-slot")).toBe("input");
+  });
+
+  it("aria-invalid=true when error is set", () => {
+    const { container } = render(() => (
+      <CodemanInput value="" onValueChange={() => undefined} error="必填" />
+    ));
+    const input = container.querySelector("input") as HTMLInputElement;
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+  });
+
+  it("error 文本渲染在 codeman-input 内", () => {
+    const { container } = render(() => (
+      <CodemanInput value="" onValueChange={() => undefined} error="必填" />
+    ));
+    expect(container.textContent).toContain("必填");
+    const errorEl = container.querySelector(".text-destructive");
+    expect(errorEl).toBeInTheDocument();
+  });
+
   // ─── IME 安全 (Bug Fix regression) ────────────────────────────────────
   it("IME composition 期间 onInput 不触发 onValueChange", () => {
     const onChange = vi.fn();
