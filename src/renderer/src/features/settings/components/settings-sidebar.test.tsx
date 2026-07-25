@@ -40,9 +40,9 @@ vi.mock("../../../shared/components/internal/codeman-sidebar", () => ({
   CodemanSidebar: (props: any) => {
     F.capturedProps = {
       options: props.options,
-      renderItem: props.renderItem,
+      renderMenuGroup: props.renderMenuGroup,
       currentValue: props.currentValue,
-      onItemSelect: props.onItemSelect,
+      onMenuSelect: props.onMenuSelect,
       header: props.header,
       footer: props.footer,
       class: props.class,
@@ -79,10 +79,10 @@ beforeEach(() => {
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
 describe("SettingsSidebar (PR 2)", () => {
-it("builds options as SidebarGroupOption[] with 6 nav items in children", () => {
+  it("builds options as CodemanSidebarGroupOption[] with 6 nav items in children", () => {
       render(() => <SettingsSidebar />);
       const opts = F.capturedProps.options;
-      // options is SidebarGroupOption[] — one group (always visible per Q28 reversal)
+      // options is CodemanSidebarGroupOption[] — one group (always visible per Q28 reversal)
       expect(opts.length).toBe(1);
       expect(opts[0]).toMatchObject({
         label: "Settings",
@@ -126,9 +126,9 @@ it("builds options as SidebarGroupOption[] with 6 nav items in children", () => 
     expect(F.capturedProps.currentValue).toBeUndefined();
   });
 
-  it("onItemSelect navigates to /settings/{value}", () => {
+  it("onMenuSelect navigates to /settings/{value}", () => {
     render(() => <SettingsSidebar />);
-    F.capturedProps.onItemSelect("advanced");
+    F.capturedProps.onMenuSelect("advanced");
     expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/settings/advanced" });
   });
 

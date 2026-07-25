@@ -1,146 +1,78 @@
-//! accordion.tsx — shadcn-style Accordion primitive wrapping @ark-ui/solid Accordion.
-//! Per ADR-0023 D8-W6 Dialog case precedent (single authorized instance) and `.omo/plans/sidebar-reshim.md` Q10=B / Q28 v5=A decisions (plan-driven authorization for sidebar/accordion/tooltip wrapper atoms): ui/ atoms MAY wrap @ark-ui/solid when the wrapper is a shadcn/ui-style primitive (per codeman-agent project context).
-//! Per plan: Q28 v5=A —新建 ui/accordion.tsx + chat tree; 包 @ark-ui/solid Accordion.
+//! accordion.tsx — shadcn-style Accordion primitive wrapping @ark-ui/solid.
 
-import type { Component, JSX } from "solid-js";
+import {
+  AccordionItem as ArkAccordionItem,
+  AccordionItemContent,
+  AccordionItemTrigger,
+  AccordionRoot,
+} from "@ark-ui/solid/accordion";
+import { ChevronRightIcon } from "lucide-solid";
+import type { Component, ComponentProps } from "solid-js";
 import { splitProps } from "solid-js";
-import { AccordionRoot, AccordionItem, AccordionItemTrigger, AccordionItemContent } from "@ark-ui/solid/accordion";
 import { cn } from "../../lib/cn";
 
-export interface AccordionProps {
-  /** Allow multiple items to be open simultaneously. Default: false */
-  multiple?: boolean;
-  /** Allow all items to be closed. Default: true */
-  collapsible?: boolean;
-  /** Uncontrolled: initial open items */
-  defaultValue?: string[];
-  /** Controlled: currently open items */
-  value?: string[];
-  /** Controlled: called when value changes */
-  onValueChange?: (details: { value: string[] }) => void;
-  class?: string;
-  children?: JSX.Element;
-}
-
-export const AccordionRootComp: Component<AccordionProps> = (props) => {
-  const [local, rest] = splitProps(props, ["multiple", "collapsible", "defaultValue", "value", "onValueChange", "class", "children"]);
-
+export const Accordion: Component<ComponentProps<typeof AccordionRoot>> = (props) => {
+  const [local, rest] = splitProps(props, ["class"]);
   return (
     <AccordionRoot
-      {...rest}
-      multiple={local.multiple}
-      collapsible={local.collapsible}
-      defaultValue={local.defaultValue}
-      value={local.value}
-      onValueChange={(details: { value: string[] }) => {
-        local.onValueChange?.(details);
-      }}
+      data-slot="accordion"
       class={cn("flex w-full flex-col", local.class)}
-    >
-      {local.children}
-    </AccordionRoot>
-  );
-};
-
-export interface AccordionItemProps {
-  value: string;
-  disabled?: boolean;
-  class?: string;
-  children?: JSX.Element;
-}
-
-export const AccordionItemComp: Component<AccordionItemProps> = (props) => {
-  const [local, rest] = splitProps(props, ["value", "disabled", "class", "children"]);
-  return (
-    <AccordionItem
       {...rest}
-      value={local.value}
-      disabled={local.disabled}
-      class={cn("not-last:border-b border-sidebar-border", local.class)}
-    >
-      {local.children}
-    </AccordionItem>
+    />
   );
 };
 
-export interface AccordionTriggerProps {
-  class?: string;
-  children?: JSX.Element;
-  /**
-   * Render as child element. Avoids nested `<button>` when wrapping another
-   * button (e.g. SidebarMenuButton inside SidebarMenuItem). Receives a
-   * props-merging function `propsFn(extra)` that combines Accordion's trigger
-   * props (onClick toggling open state, ARIA, ref) with caller-supplied
-   * class. The returned object should be spread onto the child element.
-   *
-   * Behavior note: `mergeProps` chains `on*` event handlers (both the
-   * accordion toggle and the caller's onClick fire), so existing
-   * select/click semantics are preserved.
-   */
-  asChild?: (propsFn: (extra: { class?: string }) => Record<string, unknown>) => JSX.Element;
-}
+export const AccordionItem: Component<
+  ComponentProps<typeof ArkAccordionItem>
+> = (props) => {
+  const [local, rest] = splitProps(props, ["class"]);
+  return (
+    <ArkAccordionItem
+      data-slot="accordion-item"
+      class={cn("not-last:border-b border-sidebar-border", local.class)}
+      {...rest}
+    />
+  );
+};
 
-const accordionTriggerClass =
+const triggerClasses =
   "group/accordion-trigger relative flex flex-1 items-start justify-between rounded-lg border border-transparent py-2.5 text-left text-sm font-medium transition-all outline-none hover:underline focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-disabled:pointer-events-none aria-disabled:opacity-50";
 
-export const AccordionTrigger: Component<AccordionTriggerProps> = (props) => {
-  const [local, rest] = splitProps(props, ["class", "children", "asChild"]);
-
-  if (local.asChild) {
-    // When asChild is used, the caller renders their own children inside the
-    // child element they return (e.g. <SidebarMenuButton>{renderItem(ws)}</SidebarMenuButton>).
-    // We do NOT forward `local.children` here because Ark UI's asChild runtime
-    // ignores `children` prop on the trigger and the caller-supplied JSX
-    // children win anyway.
-    return (
-      <AccordionItemTrigger
-        asChild={(triggerPropsFn) =>
-          local.asChild!((extra) => {
-            const merged = triggerPropsFn({});
-            return {
-              ...merged,
-              class: cn(accordionTriggerClass, extra.class),
-            };
-          })
-        }
-      />
-    );
-  }
-
+export const AccordionTrigger: Component<
+  ComponentProps<typeof AccordionItemTrigger>
+> = (props) => {
+  const [local, rest] = splitProps(props, ["class", "children"]);
   return (
     <AccordionItemTrigger
-      class={cn(accordionTriggerClass, local.class)}
+      data-slot="accordion-trigger"
+      class={cn(triggerClasses, local.class)}
       {...rest}
     >
       {local.children}
+      <ChevronRightIcon
+        data-slot="accordion-trigger-icon"
+        class="pointer-events-none shrink-0 size-4 text-muted-foreground transition-transform duration-200 group-aria-expanded/accordion-trigger:rotate-90"
+      />
     </AccordionItemTrigger>
   );
 };
 
-export interface AccordionContentProps {
-  class?: string;
-  children?: JSX.Element;
-}
+const contentClasses =
+  "overflow-hidden text-sm data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up";
+const contentInnerClasses =
+  "pt-0 pb-2.5 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4";
 
-export const AccordionContent: Component<AccordionContentProps> = (props) => {
+export const AccordionContent: Component<
+  ComponentProps<typeof AccordionItemContent>
+> = (props) => {
   const [local, rest] = splitProps(props, ["class", "children"]);
   return (
     <AccordionItemContent
-      class="overflow-hidden text-sm data-open:animate-accordion-down data-closed:animate-accordion-up"
+      data-slot="accordion-content"
+      class={cn(contentClasses, local.class)}
       {...rest}
     >
-      <div
-        class={cn(
-          "pt-0 pb-2.5 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4",
-          local.class,
-        )}
-      >
-        {local.children}
-      </div>
+      <div class={cn(contentInnerClasses, local.class)}>{local.children}</div>
     </AccordionItemContent>
   );
 };
-
-// Re-export with shadcn/ui-style names
-export const Accordion = AccordionRootComp;
-export { AccordionItemComp as AccordionItem };

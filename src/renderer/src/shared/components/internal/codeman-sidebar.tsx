@@ -1,27 +1,7 @@
-//! CodemanSidebar — universal render-driven sidebar (per ADR-0030 + ADR-0033).
-//!
-//! Layer 2 business composition (per ADR-0022 D3): strictly prop-driven,
-//! ZERO business logic, ZERO feature/store imports. Layer 1 primitives
-//! live in `ui/sidebar.tsx` + `ui/accordion.tsx`.
-//!
-//! Design (ADR-0030 + ADR-0033 Q26/Q27/Q30):
-//! - `options: SidebarGroupOption[]` — top-level groups (projects)
-//! - `options[].children: SidebarOption[]` — workspaces (SidebarMenuItem)
-//! - `options[].children[].subItems: SidebarSubOption[]` — convs (SidebarMenuSub)
-//! - `renderItem` renders workspace leaf internal visual (WorkspaceActions etc.)
-//! - `renderGroupHeader` renders project group header (NOT collapsible — sidebar-reshim Q28 reversal)
-//! - Accordion lives PER-WORKSPACE inside SidebarMenuItem (Q28 reversal: groups are
-//!   always visible; workspaces with subItems have their own accordion-controlled
-//!   conv list). The trigger is merged into the workspace button via `asChild` so
-//!   `[data-value=…]` and `data-state` live on the same DOM node (required by
-//!   e2e/helpers.ts::expandWorkspace). User-supplied onClick is manually chained
-//!   after the trigger's toggle handler.
-//!
-//! Note: WorkspaceActions (e.g. rename/delete buttons) inside renderItem already
-//! calls `e.stopPropagation()` to prevent the bubble to the accordion trigger —
-//! the chat AGENTS.md comment "parent Accordion.ItemTrigger (which would
-//! otherwise expand/collapse the parent project group)" applies analogously:
-//! clicking rename/delete should NOT toggle the workspace accordion.
+//! CodemanSidebar — universal render-driven sidebar (ADR-0030, ADR-0033).
+//! Layer 2 prop-driven composition over `ui/sidebar` + `ui/accordion` primitives.
+
+//! ADR-0022 D3: zero business logic, zero feature/store imports.
 
 import { For, Show, type JSX } from "solid-js";
 import {
@@ -30,6 +10,7 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from "../ui/accordion";
+import { cn } from "../../lib/cn";
 import {
   Sidebar,
   SidebarHeader,
@@ -49,60 +30,58 @@ import {
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
-/** Top-level group (project) — always visible (NOT collapsible per Q28 reversal). */
-export interface SidebarGroupOption {
+/** Top-level group. `children` is heterogeneous — MenuGroups (accordion-controlled) and Menus (flat) can coexist. */
+export interface CodemanSidebarGroupOption {
   label: string;
   value: string;
-  children: SidebarOption[];
+  children: (CodemanSidebarMenuGroupOption | CodemanSidebarMenuOption)[];
 }
 
-/** Workspace layer (SidebarMenuItem + optional SidebarMenuSub, accordion-controlled when subItems present). */
-export interface SidebarOption {
+/** Middle layer. Presence of `children` (vs Menu's flat leaf) drives the Accordion wrapper at render time. */
+export interface CodemanSidebarMenuGroupOption {
   label: string;
   value: string;
   icon?: JSX.Element;
   disabled?: boolean;
-  /** Conversation sub-items — rendered inside SidebarMenuSub (gated by per-workspace Accordion). */
-  subItems?: SidebarSubOption[];
-  /** Initial open state for the per-workspace Accordion. Default: false. */
+  /** Initial open state for the per-group Accordion. Default: false. */
   defaultExpanded?: boolean;
+  children: CodemanSidebarMenuOption[];
 }
 
-/** Conversation leaf layer (SidebarMenuSubItem + SidebarMenuSubButton) */
-export interface SidebarSubOption {
+/** Leaf layer. No `children` field — discriminated from MenuGroup by absence. */
+export interface CodemanSidebarMenuOption {
   label: string;
   value: string;
+  icon?: JSX.Element;
   disabled?: boolean;
 }
 
 export interface CodemanSidebarProps {
-  /** Tree of groups (projects) → workspaces → conversations */
-  options: SidebarGroupOption[];
+  options: CodemanSidebarGroupOption[];
   /**
-   * Render function for workspace item internal visual.
-   * Called once per workspace with a SidebarOption.
+   * Render function for MenuGroup item internal visual.
+   * Called once per MenuGroup with a CodemanSidebarMenuGroupOption.
    */
-  renderItem: (item: SidebarOption) => JSX.Element;
+  renderMenuGroup: (item: CodemanSidebarMenuGroupOption) => JSX.Element;
   /**
-   * Render function for conversation sub-item internal visual.
-   * Called once per conv with a SidebarSubOption. Falls back to `{sub.label}` when omitted.
-   * Mirrors `renderItem` (workspace-level).
+   * Render function for Menu leaf internal visual.
+   * Called once per Menu with a CodemanSidebarMenuOption. Falls back to `{menu.label}` when omitted.
    */
-  renderSubItem?: (sub: SidebarSubOption) => JSX.Element;
+  renderMenu?: (menu: CodemanSidebarMenuOption) => JSX.Element;
   /**
-   * Optional override for the group (project) header content.
-   * Called once per group with a SidebarGroupOption.
+   * Optional override for the group header content.
+   * Called once per group with a CodemanSidebarGroupOption.
    */
-  renderGroupHeader?: (group: SidebarGroupOption) => JSX.Element;
+  renderGroupHeader?: (group: CodemanSidebarGroupOption) => JSX.Element;
 
   /** Current active value for highlighting */
   currentValue?: string;
   /** Custom active predicate: (value, currentValue) => boolean */
   isActive?: (value: string | undefined, currentValue: string | undefined) => boolean;
-  /** Click handler for workspace items */
-  onItemSelect?: (value: string) => void;
-  /** Click handler for conversation sub-items (Q12 new) */
-  onSubItemSelect?: (value: string) => void;
+  /** Click handler for MenuGroup items */
+  onMenuGroupSelect?: (value: string) => void;
+  /** Click handler for Menu items */
+  onMenuSelect?: (value: string) => void;
   /** Called when an empty group is clicked (no children) */
   onEmptyGroupClick?: (groupValue: string) => void;
 
@@ -120,45 +99,251 @@ export interface CodemanSidebarProps {
   class?: string;
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
+// ─── Sub-component props (file-local, not exported) ────────────────────────
 
-const isEqual = (a: unknown, b: unknown): boolean => a === b;
+interface CodemanSidebarEmptyStateProps {
+  message?: string;
+}
+
+interface CodemanSidebarEmptyGroupButtonProps {
+  label: string;
+  value: string;
+  onClick?: ((groupValue: string) => void);
+}
+
+interface CodemanSidebarMenuGroupProps {
+  item: CodemanSidebarMenuGroupOption;
+  renderMenuGroup: (item: CodemanSidebarMenuGroupOption) => JSX.Element;
+  renderMenu?: (menu: CodemanSidebarMenuOption) => JSX.Element;
+  onMenuGroupSelect?: ((value: string) => void);
+  onMenuSelect?: ((value: string) => void);
+  isMenuActive: (menu: CodemanSidebarMenuOption) => boolean;
+}
+
+interface CodemanSidebarMenuViewProps {
+  menu: CodemanSidebarMenuOption;
+  onMenuSelect?: ((value: string) => void);
+  renderMenu?: (menu: CodemanSidebarMenuOption) => JSX.Element;
+  isActive: boolean;
+}
+
+interface CodemanSidebarGroupViewProps {
+  group: CodemanSidebarGroupOption;
+  renderMenuGroup: (item: CodemanSidebarMenuGroupOption) => JSX.Element;
+  renderMenu?: (menu: CodemanSidebarMenuOption) => JSX.Element;
+  renderGroupHeader?: (group: CodemanSidebarGroupOption) => JSX.Element;
+  onMenuGroupSelect?: ((value: string) => void);
+  onMenuSelect?: ((value: string) => void);
+  onEmptyGroupClick?: ((groupValue: string) => void);
+  isMenuActive: (menu: CodemanSidebarMenuOption) => boolean;
+}
+
+// ─── Internal sub-components (file-local, not exported) ────────────────────
+
+/** Empty-state placeholder when `options.length === 0`. */
+function CodemanSidebarEmptyState(
+  props: CodemanSidebarEmptyStateProps,
+): JSX.Element {
+  return (
+    <Show when={props.message}>
+      <div
+        data-testid="empty-state"
+        class="p-3 text-sm text-muted-foreground"
+      >
+        {props.message}
+      </div>
+    </Show>
+  );
+}
+
+/** Action button shown when a group has no children AND `onEmptyGroupClick` is provided. */
+function CodemanSidebarEmptyGroupButton(
+  props: CodemanSidebarEmptyGroupButtonProps,
+): JSX.Element {
+  const handleClick = (): void => props.onClick?.(props.value);
+  return (
+    <div class="pl-6 pr-3 pb-2">
+      <button
+        type="button"
+        class="w-full text-left px-2 py-1 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
+        onClick={handleClick}
+        data-empty-group-value={props.value}
+      >
+        {props.label} (empty)
+      </button>
+    </div>
+  );
+}
 
 /**
- * Compute whether a CONV is the active one.
- *
- * IMPORTANT: per chat AGENTS.md (ADR-0023 D7-CS), workspaces are NEVER active —
- * only convs can be active. The `isActive` prop therefore applies exclusively
- * to conversation items (SidebarSubOption); workspace buttons always render in
- * their inactive state regardless of currentValue or the consumer's predicate.
- *
- * Historical context: pre-fix, workspaces accepted `isActive` from the consumer,
- * which meant a workspace would receive the primary background whenever the
- * consumer's `currentValue` happened to match `ws.value` (e.g. after navigating
- * to `/conversation/{wsId}` via a workspace click — a UX regression that
- * contradicted the documented design intent).
+ * One MenuGroup row. Wraps its children in a per-group Accordion (each MenuGroup
+ * expands independently). The MenuGroup's trigger is always `isActive={false}`;
+ * only Menu leaves can be active.
  */
-function isSubActive(
-  sub: SidebarSubOption,
+function CodemanSidebarMenuGroup(
+  props: CodemanSidebarMenuGroupProps,
+): JSX.Element {
+  const { item } = props;
+  const handleSelect = (): void => {
+    if (item.disabled) {
+      return;
+    }
+    props.onMenuGroupSelect?.(item.value);
+  };
+
+  return (
+    <SidebarMenuItem>
+      <Accordion
+        multiple={false}
+        collapsible={true}
+        defaultValue={item.defaultExpanded ? [item.value] : []}
+      >
+        <AccordionItem value={item.value}>
+          <AccordionTrigger
+            class={cn(
+              "peer/menu-button group/menu-button group/row w-full items-center gap-2 overflow-hidden rounded-md outline-hidden transition-[width,height,padding]",
+              // `hover:no-underline` + `font-normal` override the shadcn
+              // trigger's `hover:underline` + `font-medium` defaults.
+              "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:no-underline",
+              "font-normal",
+              "focus-visible:ring-2",
+              "data-active:bg-sidebar-accent data-active:font-medium data-active:text-sidebar-accent-foreground",
+              "data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground",
+              "p-2 text-sm h-8",
+            )}
+            data-value={item.value}
+            onClick={handleSelect}
+          >
+            {props.renderMenuGroup(item)}
+          </AccordionTrigger>
+          <AccordionContent>
+            <SidebarMenuSub>
+              <For each={item.children}>
+                {(menu) => (
+                  <CodemanSidebarMenuView
+                    menu={menu}
+                    onMenuSelect={props.onMenuSelect}
+                    renderMenu={props.renderMenu}
+                    isActive={props.isMenuActive(menu)}
+                  />
+                )}
+              </For>
+            </SidebarMenuSub>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </SidebarMenuItem>
+  );
+}
+
+/** One Menu leaf row inside SidebarMenuSub. */
+function CodemanSidebarMenuView(
+  props: CodemanSidebarMenuViewProps,
+): JSX.Element {
+  const handleMenuSelect = (): void => {
+    if (props.menu.disabled) { return; }
+    props.onMenuSelect?.(props.menu.value);
+  };
+  return (
+    <SidebarMenuSubItem>
+      <SidebarMenuSubButton
+        isActive={props.isActive}
+        onClick={handleMenuSelect}
+        data-value={props.menu.value}
+      >
+        {props.renderMenu ? props.renderMenu(props.menu) : props.menu.label}
+      </SidebarMenuSubButton>
+    </SidebarMenuSubItem>
+  );
+}
+
+/**
+ * One group: header + heterogeneous children (MenuGroups or Menus).
+ * Discriminator: presence of `children` on the child decides Accordion wrapping.
+ */
+function CodemanSidebarGroupView(
+  props: CodemanSidebarGroupViewProps,
+): JSX.Element {
+  const { group } = props;
+  return (
+    <SidebarGroup data-value={group.value}>
+      <SidebarGroupLabel>
+        {props.renderGroupHeader
+          ? props.renderGroupHeader(group)
+          : <span>{group.label}</span>}
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        <Show
+          when={group.children.length > 0}
+          fallback={
+            <Show when={props.onEmptyGroupClick}>
+              <CodemanSidebarEmptyGroupButton
+                label={group.label}
+                value={group.value}
+                onClick={props.onEmptyGroupClick}
+              />
+            </Show>
+          }
+        >
+          <SidebarMenu>
+            <For each={group.children}>
+              {(child) => (
+                <Show
+                  when={"children" in child && Array.isArray(child.children)}
+                  fallback={
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        isActive={props.isMenuActive(child as CodemanSidebarMenuOption)}
+                        onClick={(): void => {
+                          const menu = child as CodemanSidebarMenuOption;
+                          if (!menu.disabled) {
+                            props.onMenuSelect?.(menu.value);
+                          }
+                        }}
+                        data-value={(child as CodemanSidebarMenuOption).value}
+                      >
+                        {props.renderMenu
+                          ? props.renderMenu(child as CodemanSidebarMenuOption)
+                          : (child as CodemanSidebarMenuOption).label}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  }
+                >
+                  <CodemanSidebarMenuGroup
+                    item={child as CodemanSidebarMenuGroupOption}
+                    renderMenuGroup={props.renderMenuGroup}
+                    renderMenu={props.renderMenu}
+                    onMenuGroupSelect={props.onMenuGroupSelect}
+                    onMenuSelect={props.onMenuSelect}
+                    isMenuActive={props.isMenuActive}
+                  />
+                </Show>
+              )}
+            </For>
+          </SidebarMenu>
+        </Show>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+/** Bound active predicate for Menu leaves (closes over currentValue + isActiveFn). */
+function makeIsMenuActive(
   currentValue: string | undefined,
   isActiveFn: CodemanSidebarProps["isActive"] | undefined,
-): boolean {
-  if (isActiveFn) {return isActiveFn(sub.value, currentValue);}
-  return isEqual(sub.value, currentValue);
+): (menu: CodemanSidebarMenuOption) => boolean {
+  if (isActiveFn) {
+    return (menu) => isActiveFn(menu.value, currentValue);
+  }
+  return (menu) => menu.value === currentValue;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
-  const handleSelect = (item: SidebarOption): void => {
-    if (item.disabled) {return;}
-    props.onItemSelect?.(item.value);
-  };
-
-  const handleSubSelect = (sub: SidebarSubOption): void => {
-    if (sub.disabled) {return;}
-    props.onSubItemSelect?.(sub.value);
-  };
+  const isMenuActive = makeIsMenuActive(props.currentValue, props.isActive);
 
   return (
     <div class="flex h-full w-full flex-col">
@@ -171,136 +356,20 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
           <SidebarContent>
             <Show
               when={props.options.length > 0}
-              fallback={
-                <Show when={props.emptyMessage}>
-                  <div
-                    data-testid="empty-state"
-                    class="p-3 text-sm text-muted-foreground"
-                  >
-                    {props.emptyMessage}
-                  </div>
-                </Show>
-              }
+              fallback={<CodemanSidebarEmptyState message={props.emptyMessage} />}
             >
               <For each={props.options}>
                 {(group) => (
-                  <SidebarGroup data-value={group.value}>
-                    <SidebarGroupLabel>
-                      {props.renderGroupHeader
-                        ? props.renderGroupHeader(group)
-                        : <span>{group.label}</span>}
-                    </SidebarGroupLabel>
-                    <SidebarGroupContent>
-                      <Show
-                        when={group.children.length > 0}
-                        fallback={
-                          <Show when={props.onEmptyGroupClick}>
-                            <div class="pl-6 pr-3 pb-2">
-                              <button
-                                type="button"
-                                class="w-full text-left px-2 py-1 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors"
-                                onClick={() => props.onEmptyGroupClick?.(group.value)}
-                                data-empty-group-value={group.value}
-                              >
-                                {group.label} (empty)
-                              </button>
-                            </div>
-                          </Show>
-                        }
-                      >
-                        <SidebarMenu>
-                          <For each={group.children}>
-                            {(item) => (
-                              <SidebarMenuItem>
-                                <Show
-                                  when={item.subItems && item.subItems.length > 0}
-                                  fallback={
-                                    <SidebarMenuButton
-                                      isActive={false}
-                                      onClick={() => handleSelect(item)}
-                                      data-value={item.value}
-                                    >
-                                      {props.renderItem(item)}
-                                    </SidebarMenuButton>
-                                  }
-                                >
-                                  <Accordion
-                                    multiple={false}
-                                    collapsible={true}
-                                    defaultValue={item.defaultExpanded ? [item.value] : []}
-                                  >
-                                    <AccordionItem value={item.value}>
-                                      <AccordionTrigger
-                                        asChild={(propsFn) => {
-                                          // @ark-ui/solid's trigger onClick (sends
-                                          // TRIGGER.CLICK → accordion machine →
-                                          // toggles this workspace's open state) must
-                                          // NOT be overwritten by the user-supplied
-                                          // onClick. JS spread would override the
-                                          // trigger's onClick, so we manually chain
-                                          // both handlers here: toggle the accordion
-                                          // first, then fire `handleSelect` (navigate
-                                          // / select).
-                                          //
-                                          // NOTE: jsdom does not propagate Solid's
-                                          // delegated click handlers through direct
-                                          // `trigger.click()` invocations — this is a
-                                          // known limitation (e2e/helpers.ts relies on
-                                          // real browser behaviour). The asChild +
-                                          // single-element shape is REQUIRED so that
-                                          // `[data-value=…]` and `data-state` live on
-                                          // the SAME DOM node, which the e2e helpers
-                                          // assume (expandWorkspace, helpers.ts:341).
-                                          //
-                                          // isActive={false} (ADR-0023 D7-CS):
-                                          // workspaces are NEVER active, only convs.
-                                          const triggerProps = propsFn({});
-                                          const triggerOnClick =
-                                            triggerProps.onClick as
-                                              | ((e: MouseEvent) => void)
-                                              | undefined;
-                                          return (
-                                            <SidebarMenuButton
-                                              {...triggerProps}
-                                              isActive={false}
-                                              data-value={item.value}
-                                              onClick={(e) => {
-                                                triggerOnClick?.(e);
-                                                handleSelect(item);
-                                              }}
-                                            >
-                                              {props.renderItem(item)}
-                                            </SidebarMenuButton>
-                                          );
-                                        }}
-                                      />
-                                      <AccordionContent>
-                                        <SidebarMenuSub>
-                                          <For each={item.subItems!}>
-                                            {(sub) => (
-                                              <SidebarMenuSubItem>
-                                                <SidebarMenuSubButton
-                                                  isActive={isSubActive(sub, props.currentValue, props.isActive)}
-                                                  onClick={() => handleSubSelect(sub)}
-                                                  data-value={sub.value}
-                                                >
-                                                  {props.renderSubItem ? props.renderSubItem(sub) : sub.label}
-                                                </SidebarMenuSubButton>
-                                              </SidebarMenuSubItem>
-                                            )}
-                                          </For>
-                                        </SidebarMenuSub>
-                                      </AccordionContent>
-                                    </AccordionItem>
-                                  </Accordion>
-                                </Show>
-                              </SidebarMenuItem>
-                            )}
-                          </For>
-                        </SidebarMenu>
-                      </Show>
-                    </SidebarGroupContent>
-                  </SidebarGroup>
+                  <CodemanSidebarGroupView
+                    group={group}
+                    renderMenuGroup={props.renderMenuGroup}
+                    renderMenu={props.renderMenu}
+                    renderGroupHeader={props.renderGroupHeader}
+                    onMenuGroupSelect={props.onMenuGroupSelect}
+                    onMenuSelect={props.onMenuSelect}
+                    onEmptyGroupClick={props.onEmptyGroupClick}
+                    isMenuActive={isMenuActive}
+                  />
                 )}
               </For>
             </Show>
