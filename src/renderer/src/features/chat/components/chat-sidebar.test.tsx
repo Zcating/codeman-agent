@@ -4,8 +4,8 @@
 //! Verify ChatSidebar's CONTRACT (what it passes to CodemanSidebar) rather
 //! than the rendered DOM. Chat-sidebar.test.tsx verifies chat-specific
 //! wiring; codeman-sidebar.test.tsx verifies the universal sidebar's
-//! rendering; workspace-actions.test.tsx + conv-delete-action.test.tsx
-//! verify the leaf components.
+//! rendering; row-actions.test.tsx verifies the leaf component (delete +
+//! rename + inline-confirm + inline edit-in-place).
 
 import { render } from "@solidjs/testing-library";
 import { describe, expect, it, vi, beforeEach } from "vitest";
@@ -52,7 +52,6 @@ const F = vi.hoisted(() => {
     mockRenameWorkspace: vi.fn(() => Effect.succeed(undefined)),
     mockRemoveWorkspace: vi.fn(() => Effect.succeed(undefined)),
     mockDialogConfirm: vi.fn(),
-    mockShowRenameDialog: vi.fn(),
     capturedProps: null as CapturedProps | null,
     // For RowActions mock (T8)
     capturedRowActionsProps: null as any,
@@ -102,10 +101,6 @@ vi.mock("../../../shared/components/internal/codeman-dialog", () => ({
   },
 }));
 
-vi.mock("./workspace-rename-dialog", () => ({
-  showRenameDialog: (...args: unknown[]) => F.mockShowRenameDialog(...args),
-}));
-
 vi.mock("../../../shared/components/internal/codeman-sidebar", () => ({
   CodemanSidebar: (props: any) => {
     F.capturedProps = {
@@ -143,7 +138,6 @@ beforeEach(() => {
   F.mockRenameWorkspace.mockClear();
   F.mockRemoveWorkspace.mockClear();
   F.mockDialogConfirm.mockReset();
-  F.mockShowRenameDialog.mockReset();
 });
 
 // ─── Tests ─────────────────────────────────────────────────────────────────

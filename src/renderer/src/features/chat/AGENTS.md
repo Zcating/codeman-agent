@@ -35,13 +35,13 @@ src/features/chat/
 │   ├── tool-call-card.test.tsx
 │   ├── chat-view.tsx     # Main chat UI（用 chat.store，不再 import messages.store / agent.store）
 │   ├── chat-view.test.tsx
-│   ├── workspace-rename-dialog.tsx  # Sidebar hover → rename modal (calls chatStore.renameWorkspace)
-│   └── workspace-rename-dialog.test.tsx
+│   ├── row-actions.tsx   # Sidebar 行操作（delete inline-confirm + rename inline edit-in-place，三状态机 idle | confirming-delete | editing）
 │ # 注意：delete workspace 走 **inline-confirm**（点 trash 按钮 → 在原行位置上显示
-│ # `删除` / `取消` overlay, 不弹模态）。实现：chat-sidebar.tsx::renderItem
-│ # 用 `confirmingWorkspaceId` signal, 取代之前的 `Dialog.confirm()` modal（per
-│ # 用户 2026-07-25 反馈）。`workspace-actions.tsx`（group-header 用）和
-│ # `conv-delete-action.tsx` 早已是 inline 模式；这次把 row-level 也对齐。
+│ # `删除` / `取消` overlay, 不弹模态）。rename workspace 同样走 **inline edit-in-place**
+│ #（点 pencil 按钮 → 行内出现 input 框，回车确认）。两者均由 RowActions 组件承载，
+│ # `idle | confirming-delete | editing` 三状态机，所有 sidebar 行操作（workspace + conv）
+│ # 均过 RowActions，取代已删除的 `Dialog.confirm()` modal + `workspace-rename-dialog.tsx` +
+│ # `workspace-actions.tsx` + `conv-delete-action.tsx`（per 用户 2026-07-25 反馈）。
 │
 └── routes/
     └── index.tsx         # ChatLayout — Sidebar + ChatView + Settings link
@@ -202,6 +202,7 @@ billing-only / disabled / 无 llm 的 provider 不显示。
 - **Wave V2.2**（2026-06-28，ADR-0023 D8-W）：`conversations.store.ts` → `chat.store.ts` 重命名；Workspace 所有权从 appStore 迁入 chat domain（WorkspaceService Effect Context.Tag + Electron SQLite + IPC）；`Settings.workspaces[]` + `enabled` 字段删除；`WorkspaceCard` 删除；sidebar hover rename/delete dialog 落地；`shared/components/ui/dialog.tsx` + `internal/codeman-dialog.tsx` 新增。
 - **Wave V2.3**（2026-07-04）：Sidebar always-show — 删除 `chat-layout.tsx` 中 `<Show when={workspacesExist()}>` 包裹，sidebar 在 0 workspace 时也渲染（此前仅 workspace>0 时显示）。CodemanSidebar 自身处理 0 workspace 空态。
 - **Wave V2.4+ 输入历史**（2026-07-12，feature request）：新增输入历史栈（最多 100 条,localStorage 持久化）。两输入框 (Home + ChatView) 共享同一份；↑/↓ 在空 input 上做历史导航（与 bash readline 同语义）。新增 `lib/input-history.ts` + `stores/input-history.store.ts`，chat-view.tsx / home.tsx 各加 `recordInputEntry(text)` 入 handleSend + ↑/↓ 键处理器。`store.ts` 是 chat 域自治 store，与 chat.store 同模块级 singleton 设计；UI 组件只 import signal 访问器 + handler 辅助函数。
+- **Wave V2.5**（2026-07-25，用户反转）：workspace rename 从 modal（`workspace-rename-dialog.tsx`）→ inline edit-in-place；workspace delete 同样是 inline-confirm overlay（取代 `Dialog.confirm()` modal）；统一由 `RowActions` 组件（`idle | confirming-delete | editing` 三状态机）承载。删除废弃组件：`workspace-rename-dialog.tsx` + `workspace-rename-dialog.test.tsx` + `workspace-actions.tsx` + `workspace-actions.test.tsx` + `conv-delete-action.tsx` + `conv-delete-action.test.tsx`。详见 [ADR-0023 D8-W6](./docs/adr/0023-codeman-prefix-and-ark-ui-select.md) 2026-07-25 反转记录。
 
 ## 输入历史 (Input History)
 
