@@ -76,8 +76,11 @@ export function RowActions(props: RowActionsProps): JSX.Element {
   return (
     <>
       {/* idle + editing: label row */}
+      {/* self-center: the parent SidebarMenuButton carries items-start (from
+          @ark-ui/solid AccordionTrigger className override); align-self:center
+          re-centers this row vertically within the parent flex button. */}
       <div
-        class="flex w-full items-center gap-2 min-w-0"
+        class="flex w-full self-center items-center gap-2 min-w-0"
         classList={{
           "invisible": isConfirming(),
         }}

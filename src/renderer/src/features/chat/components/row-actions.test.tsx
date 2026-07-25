@@ -399,3 +399,32 @@ describe("RowActions idle icon contrast", () => {
     expect(trashBtn.className).toContain("hover:bg-sidebar-accent");
   });
 });
+
+// ─── Vertical alignment (sidebar inner content centering) ──────────────────────
+//
+// Bug: CodemanSidebar wraps renderItem in <SidebarMenuButton asChild={...}/>
+// where @ark-ui/solid's AccordionTrigger className adds `items-start` to the
+// outer button, overriding SidebarMenuButton's own `items-center`. This
+// top-aligns RowActions' inner div against the button's content area.
+//
+// Per user 2026-07-25: "里面的元素存在问题,应该是垂直居中的才对".
+//
+// Fix: RowActions' outer div uses `self-center` (align-self: center) so it
+// stays vertically centered within the parent flex button regardless of
+// items-start / items-center on the parent.
+
+describe("RowActions vertical alignment", () => {
+  it("idle: outer row div has self-center so it centers within parent flex", () => {
+    const { container } = renderRowActions({ kind: "conv", id: "c-1", label: "Chat" });
+    // Find the top-level row container: it's a div that contains the label span
+    const labelSpan = container.querySelector("[aria-label='Rename Chat']")?.parentElement;
+    expect(labelSpan).toBeTruthy();
+    expect((labelSpan as HTMLElement).className).toContain("self-center");
+  });
+
+  it("workspace: outer row div also has self-center", () => {
+    const { container } = renderRowActions({ kind: "workspace", id: "ws-1", label: "WS" });
+    const labelSpan = container.querySelector("[aria-label='Rename WS']")?.parentElement;
+    expect((labelSpan as HTMLElement).className).toContain("self-center");
+  });
+});
