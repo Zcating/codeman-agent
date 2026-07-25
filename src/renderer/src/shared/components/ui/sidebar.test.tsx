@@ -472,6 +472,37 @@ describe("Shell slots — structural", () => {
     expect(container.querySelector("ul")).toBeTruthy();
   });
 
+  // ─── subItem right-edge alignment with Item (2026-07-25) ───────────────────
+  describe("subItem right-edge alignment", () => {
+    it("SidebarMenuSub ul has NO right-side indent (no mx-*, no pr-*)", () => {
+      const { container } = render(() => <SidebarMenuSub><li>sub</li></SidebarMenuSub>);
+      const ul = container.querySelector('[data-slot="sidebar-menu-sub"]') as HTMLElement;
+      expect(ul).toBeTruthy();
+      // No mx-* (would right-indent ul by 14px)
+      expect(ul.className).not.toMatch(/\bmx-/);
+      // No px-* (would right-pad ul content by 10px)
+      expect(ul.className).not.toMatch(/\bpx-/);
+      // No pr-* (any explicit right padding)
+      expect(ul.className).not.toMatch(/\bpr-/);
+    });
+
+    it("SidebarMenuSub ul KEEPS left-side indent (ml-3.5 + pl-2.5 + border-l)", () => {
+      const { container } = render(() => <SidebarMenuSub><li>sub</li></SidebarMenuSub>);
+      const ul = container.querySelector('[data-slot="sidebar-menu-sub"]') as HTMLElement;
+      expect(ul.className).toContain("ml-3.5");
+      expect(ul.className).toContain("pl-2.5");
+      expect(ul.className).toContain("border-l");
+      expect(ul.className).toContain("border-sidebar-border");
+    });
+
+    it("SidebarMenuSubButton a has NO -translate-x-px (would offset left by 1px)", () => {
+      const { container } = render(() => <SidebarMenuSubButton>x</SidebarMenuSubButton>);
+      const a = container.querySelector('[data-slot="sidebar-menu-sub-button"], a') as HTMLElement;
+      expect(a).toBeTruthy();
+      expect(a.className).not.toContain("-translate-x-px");
+    });
+  });
+
   it("SidebarMenuSubItem renders li", () => {
     const { container } = render(() => <SidebarMenuSubItem>subitem</SidebarMenuSubItem>);
     expect(container.querySelector("li")).toBeTruthy();

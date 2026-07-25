@@ -395,7 +395,10 @@ export function SidebarMenuSub(props: { class?: string; children?: JSX.Element }
       data-slot="sidebar-menu-sub"
       data-sidebar="menu-sub"
       class={cn(
-        "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5",
+        // Codeman override: left-only indent so subItem right edge aligns
+        // with Item buttons (Rename + Delete line up across rows). shadcn's
+        // default uses symmetric mx-3.5 + px-2.5.
+        "ml-3.5 flex min-w-0 flex-col gap-1 border-l border-sidebar-border pl-2.5 py-0.5",
         "group-data-[collapsible=icon]:hidden",
         local.class,
       )}
@@ -431,7 +434,7 @@ export function SidebarMenuSubButton(props: SidebarMenuSubButtonProps): JSX.Elem
     <a
       role="menuitem"
       class={cn(
-        "group/row flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden",
+        "group/row flex h-7 min-w-0 items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden",
         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         "focus-visible:ring-2",
         "active:bg-sidebar-accent active:text-sidebar-accent-foreground",
