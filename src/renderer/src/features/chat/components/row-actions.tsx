@@ -86,11 +86,12 @@ export function RowActions(props: RowActionsProps): JSX.Element {
         </Show>
         <span class="truncate flex-1 text-sm">{props.label}</span>
 
-        {/* idle: hover-revealed action buttons — classes on individual buttons (ConvDeleteAction pattern) */}
+        {/* idle: hover-revealed action buttons — text-muted-foreground base + hover:bg-sidebar-accent
+            (mirrors ConvDeleteAction pattern; ensures icon stays visible against sidebar bg/accent) */}
         <Show when={!isEditing()}>
           <button
             type="button"
-            class="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-md hover:bg-accent outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring opacity-0 group-hover/row:opacity-100 transition-opacity"
+            class="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring transition-opacity"
             onClick={handleRenameClick}
             aria-label={renameAriaLabel()}
           >
@@ -98,7 +99,7 @@ export function RowActions(props: RowActionsProps): JSX.Element {
           </button>
           <button
             type="button"
-            class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md hover:bg-accent hover:text-destructive outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring opacity-0 group-hover/row:opacity-100 transition-opacity"
+            class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:bg-sidebar-accent hover:text-destructive outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring transition-opacity"
             onClick={handleDeleteClick}
             aria-label={deleteAriaLabel()}
           >

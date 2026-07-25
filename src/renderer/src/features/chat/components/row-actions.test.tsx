@@ -354,3 +354,48 @@ describe("RowActions editing state", () => {
     // - blur cancels correctly
   });
 });
+
+// ─── Icon color contrast (sidebar visibility) ──────────────────────────────────
+//
+// Bug: RowActions idle buttons inherit text color from parent row, which can
+// match the row's hover background — icons become invisible when row is hovered.
+// Fix mirrors ConvDeleteAction: explicit text-muted-foreground base + hover
+// variants that contrast with bg-sidebar-accent.
+
+describe("RowActions idle icon contrast", () => {
+  it("Pencil button has text-muted-foreground base class", () => {
+    const { container } = renderRowActions({ kind: "conv", id: "c-1", label: "Chat" });
+    const pencilBtn = container.querySelector("[aria-label='Rename Chat']") as HTMLElement;
+    expect(pencilBtn.className).toContain("text-muted-foreground");
+  });
+
+  it("Pencil button uses hover:bg-sidebar-accent + hover:text-sidebar-accent-foreground", () => {
+    const { container } = renderRowActions({ kind: "conv", id: "c-1", label: "Chat" });
+    const pencilBtn = container.querySelector("[aria-label='Rename Chat']") as HTMLElement;
+    expect(pencilBtn.className).toContain("hover:bg-sidebar-accent");
+    expect(pencilBtn.className).toContain("hover:text-sidebar-accent-foreground");
+  });
+
+  it("Trash2 button has text-muted-foreground base class", () => {
+    const { container } = renderRowActions({ kind: "conv", id: "c-1", label: "Chat" });
+    const trashBtn = container.querySelector("[aria-label='Delete conversation']") as HTMLElement;
+    expect(trashBtn.className).toContain("text-muted-foreground");
+  });
+
+  it("Trash2 button uses hover:bg-sidebar-accent (icon: hover:text-destructive retained)", () => {
+    const { container } = renderRowActions({ kind: "conv", id: "c-1", label: "Chat" });
+    const trashBtn = container.querySelector("[aria-label='Delete conversation']") as HTMLElement;
+    expect(trashBtn.className).toContain("hover:bg-sidebar-accent");
+    expect(trashBtn.className).toContain("hover:text-destructive");
+  });
+
+  it("workspace variant: same icon contrast classes on both buttons", () => {
+    const { container } = renderRowActions({ kind: "workspace", id: "ws-1", label: "WS" });
+    const pencilBtn = container.querySelector("[aria-label='Rename WS']") as HTMLElement;
+    const trashBtn = container.querySelector("[aria-label='Delete WS']") as HTMLElement;
+    expect(pencilBtn.className).toContain("text-muted-foreground");
+    expect(pencilBtn.className).toContain("hover:bg-sidebar-accent");
+    expect(trashBtn.className).toContain("text-muted-foreground");
+    expect(trashBtn.className).toContain("hover:bg-sidebar-accent");
+  });
+});
