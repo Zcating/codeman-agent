@@ -11,7 +11,7 @@
 //! 可复用同一 hook。
 //!
 //! 注意:hook 不接管 value getter. value 由调用方直接绑定 (e.g. `value={local.value ?? ""}`),
-//! 这样保留 SolidJS 响应式追踪的直接依赖,避免通过 wrapper getter 的额外开销.
+//! 这样保留 SolidJS 响应式追踪的直接依赖,避免通过 wrapper getter 的额外开销。
 //!
 //! 跨域 composable (V1 首批 hook, AGENTS.md hooks/ 子目录启用).
 
@@ -20,8 +20,6 @@ import { type JSX } from "solid-js";
 type ImeSafeElement = HTMLInputElement | HTMLTextAreaElement;
 
 export interface UseImeSafeValueOptions {
-  /** 当前 controlled value. undefined 等同于空字符串. */
-  value: string | undefined;
   /** value 变化的回调。已经在 IME 安全窗口内聚合:用户最终 commit 字符 (中文 commit 后整字),不是拼音字母. */
   onValueChange: (value: string) => void;
 }

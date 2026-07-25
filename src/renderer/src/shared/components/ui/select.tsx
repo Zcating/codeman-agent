@@ -171,7 +171,7 @@ export function SelectAction(props: { children?: JSX.Element }) {
   const ctx = useSelectContext();
   return (
     <>
-      <hr role="separator" class="my-2 border-border" />
+      <hr role="separator" data-slot="select-separator" class="my-2 border-border" />
       <div onClick={() => ctx().setOpen(false)}>{props.children}</div>
     </>
   );

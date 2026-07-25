@@ -40,7 +40,6 @@ export const CodemanTextarea: Component<CodemanTextareaProps> = (props) => {
   ]);
 
   const ime = useImeSafeValue({
-    value: local.value,
     onValueChange: local.onValueChange,
   });
 

@@ -75,18 +75,14 @@ Card 是**静态子件聚合**，不走 cva（样式固定，不需要动态变�
 
 ## cn 导入路径
 
-> **ADR-0010 后路径变深**（从 `ui/` 到 `components/ui/` 深度 +1）。
-
 ```typescript
-// ADR-0010 后（当前）
-import { cn } from "../../../lib/cn";
-// 实际路径：从 components/ui/ 下的文件到 lib/cn.ts 是 ../../../lib/cn
-
-// ADR-0010 前（已废弃）
+// 当前 (从 components/ui/ 下的文件)
 import { cn } from "../../lib/cn";
-```
+// 实际路径：从 components/ui/select.tsx 到 lib/cn.ts 是 ../../lib/cn
 
-项目配置的 `@/` path alias（如有）优先使用，否则用相对路径。**不得硬编码 `/shared/lib/cn`**。
+// 项目配置的 @/ path alias（如有）优先使用，例如：
+// import { cn } from "@/shared/lib/cn";
+```
 
 ## 轻量契约测试约定
 

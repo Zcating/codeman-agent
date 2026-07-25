@@ -78,7 +78,6 @@ export const CodemanInput: Component<CodemanInputProps> = (props) => {
   ]);
 
   const ime = useImeSafeValue({
-    value: local.value,
     onValueChange: local.onValueChange,
   });
 

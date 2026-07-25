@@ -6,7 +6,7 @@ describe("useImeSafeValue", () => {
   it("普通 keystroke 直接触发 onValueChange", () => {
     const onValueChange = vi.fn();
     function Test() {
-      const ime = useImeSafeValue({ value: "", onValueChange });
+      const ime = useImeSafeValue({ onValueChange });
       return <input data-testid="input" value="" onInput={ime.onInput} />;
     }
     const { getByTestId } = render(() => <Test />);
@@ -19,7 +19,7 @@ describe("useImeSafeValue", () => {
   it("IME composition 期间 onInput 不触发 onValueChange", () => {
     const onValueChange = vi.fn();
     function Test() {
-      const ime = useImeSafeValue({ value: "", onValueChange });
+      const ime = useImeSafeValue({ onValueChange });
       return (
         <input
           data-testid="input"

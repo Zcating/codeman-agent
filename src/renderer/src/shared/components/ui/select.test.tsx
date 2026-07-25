@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
 import { createListCollection } from "@ark-ui/solid";
 import {
-  SelectContent, SelectGroup, SelectItem, SelectLabel,
+  SelectAction, SelectContent, SelectGroup, SelectItem, SelectLabel,
   SelectRoot, SelectSeparator, SelectScrollDownButton,
   SelectScrollUpButton, SelectTrigger, SelectValue,
 } from "./select";
@@ -126,6 +126,36 @@ describe("SelectScrollDownButton", () => {
   it("renders with data-slot=select-scroll-down-button", () => {
     render(() => <SelectScrollDownButton data-testid="down" />);
     expect(screen.getByTestId("down")).toHaveAttribute("data-slot", "select-scroll-down-button");
+  });
+});
+
+describe("SelectAction", () => {
+  it("renders hr separator with data-slot=select-separator", () => {
+    const collection = createListCollection({ items: [{ label: "A", value: "a" }] });
+    render(() => (
+      <SelectRoot collection={collection} open>
+        <SelectTrigger>Open</SelectTrigger>
+        <SelectContent>
+          <SelectItem item={collection.items[0]}>A</SelectItem>
+          <SelectAction>Custom</SelectAction>
+        </SelectContent>
+      </SelectRoot>
+    ));
+    expect(screen.getByRole("separator")).toHaveAttribute("data-slot", "select-separator");
+  });
+
+  it("renders children inside container div", () => {
+    const collection = createListCollection({ items: [{ label: "A", value: "a" }] });
+    render(() => (
+      <SelectRoot collection={collection} open>
+        <SelectTrigger>Open</SelectTrigger>
+        <SelectContent>
+          <SelectItem item={collection.items[0]}>A</SelectItem>
+          <SelectAction><span data-testid="custom">Custom</span></SelectAction>
+        </SelectContent>
+      </SelectRoot>
+    ));
+    expect(screen.getByTestId("custom")).toHaveTextContent("Custom");
   });
 });
 
