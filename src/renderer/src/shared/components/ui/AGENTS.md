@@ -7,7 +7,7 @@
 
 | 组件     | 文件           | 用途                                         | 变体方式                   |
 | -------- | -------------- | -------------------------------------------- | -------------------------- |
-| Button   | `button.tsx`   | 点击触发操作                                 | cva（6 变体 × 4 尺寸）     |
+| Button   | `button.tsx`   | 点击触发操作                                 | cva（6 变体 × 7 尺寸, 含 xs/icon-xs/icon-sm/icon-lg） |
 | Input    | `input.tsx`    | 文本输入                                     | cva（4 变体）              |
 | Textarea | `textarea.tsx` | 多行文本输入                                 | cva（2 变体）              |
 | Checkbox | `checkbox.tsx` | 受控勾选（native `<input type="checkbox">`） | cn（条件 class）           |
@@ -44,14 +44,18 @@
 
 尺寸（size）：
 
-| 尺寸      | 典型 class            |
-| --------- | --------------------- |
-| `default` | `h-10 px-4 py-2`      |
-| `sm`      | `h-9 px-3 text-sm`    |
-| `lg`      | `h-11 px-8 text-base` |
-| `icon`    | `h-10 w-10`           |
+| 尺寸      | 典型 class                                                            |
+| --------- | --------------------------------------------------------------------- |
+| `default` | `h-8 gap-1.5 px-2.5`                                                 |
+| `xs`      | `h-6 gap-1 rounded-[...] px-2 text-xs`                                |
+| `sm`      | `h-7 gap-1 rounded-[...] px-2.5 text-[0.8rem]`                       |
+| `lg`      | `h-9 gap-1.5 px-2.5`                                                  |
+| `icon`    | `size-8`                                                              |
+| `icon-xs` | `size-6 rounded-[...]`                                                |
+| `icon-sm` | `size-7 rounded-[...]`                                                |
+| `icon-lg` | `size-9`                                                              |
 
-6v × 4s = 24 个组合，全部通过 cva 静态分析，无运行时开销。
+6v × 7s = 42 个组合，全部通过 cva 静态分析，无运行时开销。
 
 ## Card 7 子件
 
