@@ -7,7 +7,7 @@ describe("useImeSafeValue", () => {
     const onValueChange = vi.fn();
     function Test() {
       const ime = useImeSafeValue({ value: "", onValueChange });
-      return <input data-testid="input" value={ime.value()} onInput={ime.onInput} />;
+      return <input data-testid="input" value="" onInput={ime.onInput} />;
     }
     const { getByTestId } = render(() => <Test />);
     const input = getByTestId("input") as HTMLInputElement;
@@ -23,7 +23,7 @@ describe("useImeSafeValue", () => {
       return (
         <input
           data-testid="input"
-          value={ime.value()}
+          value=""
           onCompositionStart={ime.onCompositionStart}
           onCompositionEnd={ime.onCompositionEnd}
           onInput={ime.onInput}
@@ -43,8 +43,4 @@ describe("useImeSafeValue", () => {
     expect(onValueChange).toHaveBeenCalledWith("你");
   });
 
-  it("value=undefined 解析为空字符串", () => {
-    const ime = useImeSafeValue({ value: undefined, onValueChange: vi.fn() });
-    expect(ime.value()).toBe("");
-  });
 });

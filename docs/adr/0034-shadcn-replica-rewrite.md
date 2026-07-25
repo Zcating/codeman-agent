@@ -113,7 +113,9 @@ export const SelectItem = ...;
 
 ### D7 — ui/select.tsx re-export helpers
 
-`createListCollection` + `useSelectContext` 从 `@ark-ui/solid` 重新导出. 让 `codeman-select.tsx` 改构时 `import { SelectRoot, SelectTrigger, ..., createListCollection } from "../ui/select"` 拿到全部依赖.
+`createListCollection` 从 `@ark-ui/solid` 重新导出. 让 `codeman-select.tsx` 改构时 `import { SelectRoot, SelectTrigger, ..., createListCollection } from "../ui/select"` 拿到辅助 API.
+
+`useSelectContext` 不再对外 re-export. T11 修改后, `SelectAction` 组件已封装 `useSelectContext().setOpen(false)` 逻辑, codeman-select 通过 `import { SelectAction } from "../ui/select"` 复用, 无需直接接触 `useSelectContext`. 减少 public API surface.
 
 `CodemanSelect` props API 不变, `createListCollection` 调用不变.
 
