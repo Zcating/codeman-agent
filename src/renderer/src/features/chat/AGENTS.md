@@ -37,8 +37,11 @@ src/features/chat/
 │   ├── chat-view.test.tsx
 │   ├── workspace-rename-dialog.tsx  # Sidebar hover → rename modal (calls chatStore.renameWorkspace)
 │   └── workspace-rename-dialog.test.tsx
-│ # 注意：delete workspace 走 `codeman-dialog` 命令式 `Dialog.confirm()` inline
-│ # 在 `routes/chat-layout.tsx` 的 `handleDeleteWorkspace` 中（per ADR-0023 D8-W6）。
+│ # 注意：delete workspace 走 **inline-confirm**（点 trash 按钮 → 在原行位置上显示
+│ # `删除` / `取消` overlay, 不弹模态）。实现：chat-sidebar.tsx::renderItem
+│ # 用 `confirmingWorkspaceId` signal, 取代之前的 `Dialog.confirm()` modal（per
+│ # 用户 2026-07-25 反馈）。`workspace-actions.tsx`（group-header 用）和
+│ # `conv-delete-action.tsx` 早已是 inline 模式；这次把 row-level 也对齐。
 │
 └── routes/
     └── index.tsx         # ChatLayout — Sidebar + ChatView + Settings link

@@ -246,20 +246,64 @@ describe("ChatSidebar (PR 2)", () => {
       expect(container.querySelector('[aria-label="Delete Test WS"]')).toBeTruthy();
     });
 
-    it("renderItem delete button triggers Dialog.confirm", async () => {
+    it("renderItem delete button shows inline-confirm overlay IN PLACE — does NOT open any dialog", async () => {
       render(() => <ChatSidebar />);
       const renderItem = F.capturedProps!.renderItem;
       const { container } = render(() =>
         renderItem({ label: "WS to Delete", value: "ws-del" }),
       );
+      // Initially: no confirming overlay, no dialog call
+      expect(container.querySelector('[data-state="confirming"]')).toBeFalsy();
+      expect(F.mockDialogConfirm).not.toHaveBeenCalled();
+      // Click the delete button — should switch the row into inline-confirm state
       const deleteBtn = container.querySelector('[aria-label="Delete WS to Delete"]') as HTMLButtonElement;
       deleteBtn.click();
-      expect(F.mockDialogConfirm).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: "Delete workspace",
-          destructive: true,
-        }),
+      // STILL no modal call (the entire point of the fix)
+      expect(F.mockDialogConfirm).not.toHaveBeenCalled();
+      // The inline overlay appears at the original row position with 删除 / 取消 buttons
+      expect(container.querySelector('[data-state="confirming"]')).toBeTruthy();
+      expect(container.querySelector('[aria-label="确认删除"]')).toBeTruthy();
+      expect(container.querySelector('[aria-label="取消删除"]')).toBeTruthy();
+    });
+
+    it("renderItem inline-confirm '删除' button calls chatSidebarActions.removeWorkspace", async () => {
+      render(() => <ChatSidebar />);
+      const renderItem = F.capturedProps!.renderItem;
+      const { container } = render(() =>
+        renderItem({ label: "WS to Delete", value: "ws-del" }),
       );
+      // Enter inline-confirm state
+      const deleteBtn = container.querySelector('[aria-label="Delete WS to Delete"]') as HTMLButtonElement;
+      deleteBtn.click();
+      // Confirm by clicking 删除
+      const confirmBtn = container.querySelector('[aria-label="确认删除"]') as HTMLButtonElement;
+      expect(confirmBtn).toBeTruthy();
+      confirmBtn.click();
+      // removeWorkspace was called with the right workspace id (NOT Dialog.confirm)
+      expect(F.mockRemoveWorkspace).toHaveBeenCalledWith("ws-del");
+      expect(F.mockDialogConfirm).not.toHaveBeenCalled();
+    });
+
+    it("renderItem inline-confirm '取消' button hides overlay without calling removeWorkspace", async () => {
+      render(() => <ChatSidebar />);
+      const renderItem = F.capturedProps!.renderItem;
+      const { container } = render(() =>
+        renderItem({ label: "WS to Delete", value: "ws-del" }),
+      );
+      // Enter inline-confirm state
+      const deleteBtn = container.querySelector('[aria-label="Delete WS to Delete"]') as HTMLButtonElement;
+      deleteBtn.click();
+      expect(container.querySelector('[data-state="confirming"]')).toBeTruthy();
+      // Cancel
+      const cancelBtn = container.querySelector('[aria-label="取消删除"]') as HTMLButtonElement;
+      expect(cancelBtn).toBeTruthy();
+      cancelBtn.click();
+      // removeWorkspace was NOT called
+      expect(F.mockRemoveWorkspace).not.toHaveBeenCalled();
+      // Overlay is gone — row returns to its hover/idle state
+      expect(container.querySelector('[data-state="confirming"]')).toBeFalsy();
+      expect(container.querySelector('[aria-label="确认删除"]')).toBeFalsy();
+      expect(container.querySelector('[aria-label="取消删除"]')).toBeFalsy();
     });
 
     it("renderItem rename button triggers showRenameDialog", async () => {

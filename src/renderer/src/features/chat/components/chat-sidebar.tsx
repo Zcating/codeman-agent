@@ -16,7 +16,7 @@
 //! Layout: ChatSidebar wraps CodemanSidebar which owns the two-column
 //! (sidebar + main) shell. Children slot is `<Outlet />` from TanStack Router.
 
-import { createSignal, type JSX } from "solid-js";
+import { createSignal, Show, type JSX } from "solid-js";
 import { Pencil, Trash2 } from "lucide-solid";
 import { Outlet, useLocation, useNavigate, useParams, Link } from "@tanstack/solid-router";
 import { Settings as SettingsIcon } from "lucide-solid";
@@ -26,7 +26,6 @@ import {
   type SidebarOption,
   type SidebarSubOption,
 } from "../../../shared/components/internal/codeman-sidebar";
-import { Dialog } from "../../../shared/components/internal/codeman-dialog";
 import { logger } from "../../../shared/lib/logger";
 import type { Workspace } from "../../../shared/lib/types";
 import {
@@ -55,6 +54,18 @@ export function ChatSidebar(): JSX.Element {
     (params() as { convId?: string }).convId ?? null;
 
   const wsList = (): Workspace[] => workspaces$() ?? [];
+
+  // ─── Inline-confirm state for workspace delete ───────────────────────────
+  //
+  // Per user requirement (2026-07-25): clicking delete on a workspace row
+  // must NOT open a modal — instead, the row swaps its hover-revealed
+  // rename+delete buttons for an inline 删除 / 取消 overlay at the original
+  // row position. Only one row can be in this state at a time; clicking
+  // delete on another row implicitly cancels the previous one (the value
+  // simply changes to the new workspace id).
+  const [confirmingWorkspaceId, setConfirmingWorkspaceId] = createSignal<
+    string | null
+  >(null);
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
@@ -89,19 +100,17 @@ export function ChatSidebar(): JSX.Element {
     }
   };
 
-  const handleDeleteWorkspace = async (
-    workspaceId: string,
-    label: string,
-  ): Promise<void> => {
-    const confirmed = await Dialog.confirm({
-      title: "Delete workspace",
-      content: `Are you sure you want to delete "${label}"? All conversations in this workspace will be permanently deleted.`,
-      confirmText: "Delete",
-      cancelText: "Cancel",
-      destructive: true,
-    });
-    if (!confirmed) {return;}
+  const handleDeleteWorkspace = (workspaceId: string): void => {
+    // Enter inline-confirm state — the row's hover-buttons swap to a
+    // 删除 / 取消 overlay at the original row position (per user request:
+    // no modal popup). The actual deletion only happens after the user
+    // confirms via `handleConfirmDeleteWorkspace`.
+    setConfirmingWorkspaceId(workspaceId);
+  };
 
+  const handleConfirmDeleteWorkspace = async (
+    workspaceId: string,
+  ): Promise<void> => {
     const ok = await chatSidebarActions.removeWorkspace(workspaceId);
     if (!ok) {
       logger.error("[chat-sidebar] delete failed for", workspaceId);
@@ -151,6 +160,8 @@ export function ChatSidebar(): JSX.Element {
     const convId = item.value ?? item.label;
     const isStreaming = (): boolean =>
       store.byId[convId]?.streamingMessageId != null;
+    const isConfirming = (): boolean =>
+      confirmingWorkspaceId() === item.value;
     return (
       <span
         class="flex w-full items-center justify-between gap-2 min-w-0"
@@ -163,34 +174,72 @@ export function ChatSidebar(): JSX.Element {
           isStreaming={isStreaming()}
           onDelete={handleConvDelete}
         />
-        <span
-          class="pointer-events-auto flex items-center gap-1 transition-opacity"
-          classList={{ "opacity-0": !hovering(), "opacity-100": hovering() }}
-          onClick={(e) => e.stopPropagation()}
+        <Show
+          when={isConfirming()}
+          fallback={
+            <span
+              class="pointer-events-auto flex items-center gap-1 transition-opacity"
+              classList={{
+                "opacity-0": !hovering(),
+                "opacity-100": hovering(),
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                class="flex h-5 w-5 items-center justify-center rounded-md hover:bg-accent outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleRenameWorkspace(item.value, item.label);
+                }}
+                aria-label={`Rename ${item.label}`}
+              >
+                <Pencil class="h-3 w-3" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="flex h-5 w-5 items-center justify-center rounded-md hover:bg-accent hover:text-destructive outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteWorkspace(item.value);
+                }}
+                aria-label={`Delete ${item.label}`}
+              >
+                <Trash2 class="h-3 w-3" aria-hidden="true" />
+              </button>
+            </span>
+          }
         >
-          <button
-            type="button"
-            class="flex h-5 w-5 items-center justify-center rounded-md hover:bg-accent outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
-            onClick={(e) => {
-              e.stopPropagation();
-              void handleRenameWorkspace(item.value, item.label);
-            }}
-            aria-label={`Rename ${item.label}`}
+          <span
+            data-state="confirming"
+            class="pointer-events-auto flex items-center gap-1"
+            onClick={(e) => e.stopPropagation()}
           >
-            <Pencil class="h-3 w-3" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            class="flex h-5 w-5 items-center justify-center rounded-md hover:bg-accent hover:text-destructive outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
-            onClick={(e) => {
-              e.stopPropagation();
-              void handleDeleteWorkspace(item.value, item.label);
-            }}
-            aria-label={`Delete ${item.label}`}
-          >
-            <Trash2 class="h-3 w-3" aria-hidden="true" />
-          </button>
-        </span>
+            <button
+              type="button"
+              class="h-7 px-2 text-xs bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
+              onClick={(e) => {
+                e.stopPropagation();
+                setConfirmingWorkspaceId(null);
+                void handleConfirmDeleteWorkspace(item.value);
+              }}
+              aria-label="确认删除"
+            >
+              删除
+            </button>
+            <button
+              type="button"
+              class="h-7 px-2 text-xs rounded-md border border-input text-foreground hover:bg-accent"
+              onClick={(e) => {
+                e.stopPropagation();
+                setConfirmingWorkspaceId(null);
+              }}
+              aria-label="取消删除"
+            >
+              取消
+            </button>
+          </span>
+        </Show>
       </span>
     );
   };
