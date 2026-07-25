@@ -3,26 +3,28 @@
 //! Per ADR-0030 D7: chat feature owns workspace/conversation data mapping
 //! + chat-domain actions (delete, rename, new conv, settings link). The
 //! universal CodemanSidebar stays generic — chat-specific features
-//! (ConvDeleteAction / WorkspaceActions / NewChatButton) are rendered as
-//! `renderItem` / `renderGroupHeader` / slots.
+//! (ConvDeleteAction / hover rename+delete / NewChatButton) are rendered as
+//! `renderItem` / slots.
 //!
 //! Data flow:
 //! - Reads `workspaces$()` + `conversations$()` from chat.store (Solid Accessors)
-//! - Builds `SidebarOption[]` tree (workspaces as groups, conversations as leaves)
+//! - Builds `SidebarGroupOption[]` tree (one project group with workspaces as items,
+//!   conversations as subItems)
 //! - Wires all chat-domain handlers (select / delete / rename / new conv / empty ws)
 //! - Passes URL-derived `selectedConvId` as `currentValue` for active highlight
 //!
 //! Layout: ChatSidebar wraps CodemanSidebar which owns the two-column
 //! (sidebar + main) shell. Children slot is `<Outlet />` from TanStack Router.
 
-import type { JSX } from "solid-js";
+import { type JSX } from "solid-js";
 import { Outlet, useLocation, useNavigate, useParams, Link } from "@tanstack/solid-router";
 import { Settings as SettingsIcon } from "lucide-solid";
 import {
   CodemanSidebar,
+  type SidebarGroupOption,
   type SidebarOption,
+  type SidebarSubOption,
 } from "../../../shared/components/internal/codeman-sidebar";
-import { Dialog } from "../../../shared/components/internal/codeman-dialog";
 import { logger } from "../../../shared/lib/logger";
 import type { Workspace } from "../../../shared/lib/types";
 import {
@@ -32,9 +34,7 @@ import {
   setSelectedWorkspaceId,
 } from "../stores/chat.store";
 import { chatSidebarActions } from "../lib/chat-sidebar-actions";
-import { showRenameDialog } from "./workspace-rename-dialog";
-import { ConvDeleteAction } from "./conv-delete-action";
-import { WorkspaceActions } from "./workspace-actions";
+import { RowActions } from "./row-actions";
 import { NewChatButton } from "./new-chat-button";
 
 // ─── ChatSidebar ───────────────────────────────────────────────────────────
@@ -52,9 +52,6 @@ export function ChatSidebar(): JSX.Element {
     (params() as { convId?: string }).convId ?? null;
 
   const wsList = (): Workspace[] => workspaces$() ?? [];
-  const convList = (): { id: string; title: string; workspaceId: string; updatedAt: number }[] =>
-    conversations$() ?? [];
-  const firstWsId = (): string | undefined => wsList()[0]?.id;
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
@@ -70,44 +67,28 @@ export function ChatSidebar(): JSX.Element {
     navigate({ to: "/" });
   };
 
-  const handleConvDelete = (convId: string): void => {
-    void chatSidebarActions.deleteConversation(convId);
-  };
-
-  const handleRenameWorkspace = async (
+  // Simplified workspace rename — directly calls chatSidebarActions.renameWorkspace
+  // (no showRenameDialog modal; inline edit is handled by RowActions)
+  const handleRenameWorkspaceSimple = async (
     workspaceId: string,
-    currentLabel: string,
+    newLabel: string,
   ): Promise<void> => {
-    const newLabel = await showRenameDialog(currentLabel);
-    if (!newLabel || newLabel === currentLabel) {return;}
-    const ok = await chatSidebarActions.renameWorkspace(
-      workspaceId,
-      newLabel,
-    );
+    const ok = await chatSidebarActions.renameWorkspace(workspaceId, newLabel);
     if (!ok) {
       logger.error("[chat-sidebar] rename failed for", workspaceId);
     }
   };
 
-  const handleDeleteWorkspace = async (
-    workspaceId: string,
-    label: string,
-  ): Promise<void> => {
-    const confirmed = await Dialog.confirm({
-      title: "Delete workspace",
-      content: `Are you sure you want to delete "${label}"? All conversations in this workspace will be permanently deleted.`,
-      confirmText: "Delete",
-      cancelText: "Cancel",
-      destructive: true,
-    });
-    if (!confirmed) {return;}
-
+  // Workspace delete — directly calls chatSidebarActions.removeWorkspace.
+  // RowActions manages the inline-confirm UI; this handler performs the
+  // deletion and handles navigation side effect (if deleting the workspace
+  // that owns the currently-viewed conversation, navigate home).
+  const handleDeleteWorkspace = async (workspaceId: string): Promise<void> => {
     const ok = await chatSidebarActions.removeWorkspace(workspaceId);
     if (!ok) {
       logger.error("[chat-sidebar] delete failed for", workspaceId);
       return;
     }
-    // If the current URL's conv belongs to the deleted workspace, navigate home.
     const currentConvId = selectedConvId();
     if (
       currentConvId &&
@@ -117,24 +98,50 @@ export function ChatSidebar(): JSX.Element {
     }
   };
 
+  // Conversation delete — calls chatSidebarActions.deleteConversation.
+  // If deleting the currently-viewed conversation, navigates home to avoid
+  // staying on a deleted conv view.
+  const handleConvDelete = async (convId: string): Promise<void> => {
+    await chatSidebarActions.deleteConversation(convId);
+    const currentConvId = selectedConvId();
+    if (currentConvId === convId) {
+      navigate({ to: "/" });
+    }
+  };
+
+  // Conversation rename — calls chatSidebarActions.renameConversation.
+  // Mirrors handleRenameWorkspaceSimple error-handling pattern.
+  const handleConvRename = async (
+    convId: string,
+    newTitle: string,
+  ): Promise<void> => {
+    await chatSidebarActions.renameConversation(convId, newTitle);
+    // Note: chatSidebarActions.renameConversation swallows errors internally
+    // (runEffect pattern). If failure notification is needed in future,
+    // mirror the logger.error pattern from handleRenameWorkspaceSimple.
+  };
+
   // ─── Sidebar tree builders ───────────────────────────────────────────────
 
-  const options = (): SidebarOption[] => {
+  const options = (): SidebarGroupOption[] => {
     if (wsList().length === 0) {return [];}
 
     return [
       {
         label: "项目",
         value: "workspace",
-        defaultExpanded: true,
-        children: wsList().map((ws) => ({
+        children: wsList().map((ws): SidebarOption => ({
           label: ws.label,
           value: ws.id,
-          defaultExpanded: ws.id === firstWsId(),
-          children: convList()
-            .filter((c) => c.workspaceId === ws.id)
+          // Per-workspace Accordion (sidebar-reshim Q28 reversal): default-expanded
+          // so all workspaces' conv lists are visible at first render (matches
+          // the previous per-group expanded-by-default behavior). Users can
+          // collapse individual workspaces by clicking them.
+          defaultExpanded: true,
+          subItems: conversations$()
+            ?.filter((c) => c.workspaceId === ws.id)
             .sort((a, b) => b.updatedAt - a.updatedAt)
-            .map((c): SidebarOption => ({
+            .map((c): SidebarSubOption => ({
               label: c.title,
               value: c.id,
             })),
@@ -143,53 +150,43 @@ export function ChatSidebar(): JSX.Element {
     ];
   };
 
-  const renderLeaf = (item: SidebarOption): JSX.Element => {
-    const convId = item.value ?? item.label;
-    const isStreaming = (): boolean =>
-      store.byId[convId]?.streamingMessageId != null;
-    return (
-      <ConvDeleteAction
-        convId={convId}
-        label={item.label}
-        isStreaming={isStreaming()}
-        onDelete={handleConvDelete}
-      />
-    );
-  };
+  const renderItem = (item: SidebarOption): JSX.Element => (
+    <RowActions
+      kind="workspace"
+      id={item.value}
+      label={item.label}
+      onDelete={(id) => { void handleDeleteWorkspace(id); }}
+      onRename={(id, newLabel) => { void handleRenameWorkspaceSimple(id, newLabel); }}
+    />
+  );
 
-  const renderGroupHeader = (group: SidebarOption): JSX.Element => {
-    // Top-level "项目" category group — no rename/delete actions.
-    if (group.value === "workspace") {
-      return (
-        <div class="flex w-full items-center gap-2 min-w-0">
-          <span class="truncate font-semibold">{group.label}</span>
-        </div>
-      );
-    }
-    // Workspace-level group — rename + delete actions.
-    return (
-      <WorkspaceActions
-        wsId={group.value ?? group.label}
-        label={group.label}
-        onRename={(id, label) => {
-          void handleRenameWorkspace(id, label);
-        }}
-        onDelete={(id, label) => {
-          void handleDeleteWorkspace(id, label);
-        }}
-      />
-    );
-  };
+  const renderSubItem = (sub: SidebarSubOption): JSX.Element => (
+    <RowActions
+      kind="conv"
+      id={sub.value}
+      label={sub.label}
+      isStreaming={store.byId[sub.value]?.streamingMessageId != null}
+      onDelete={(id) => { void handleConvDelete(id); }}
+      onRename={(id, newTitle) => { void handleConvRename(id, newTitle); }}
+    />
+  );
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
     <CodemanSidebar
       options={options()}
-      renderItem={renderLeaf}
-      renderGroupHeader={renderGroupHeader}
+      renderItem={renderItem}
+      renderSubItem={renderSubItem}
       currentValue={selectedConvId() ?? undefined}
-      onItemSelect={handleSelectConv}
+      // onItemSelect intentionally omitted: per chat AGENTS.md ADR-0023 D7-CS,
+      // workspaces are NEVER navigation targets — only convs are. Clicking a
+      // workspace label should ONLY toggle its accordion (handled by
+      // CodemanSidebar's triggerOnClick), NOT navigate to /conversation/{wsId}
+      // (which is a non-existent conv route and was a user-reported page-jump
+      // bug 2026-07-25). CodemanSidebar's `props.onItemSelect?.()` short-circuits
+      // to a no-op when undefined, so this is the contract for "pure toggle".
+      onSubItemSelect={handleSelectConv}
       onEmptyGroupClick={handleEmptyWorkspaceClick}
       header={
         <NewChatButton onClick={handleNewConversation} />

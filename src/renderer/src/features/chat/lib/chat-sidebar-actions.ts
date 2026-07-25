@@ -12,6 +12,7 @@
 import { Effect } from "effect";
 import {
   deleteConversation,
+  renameConversation,
   renameWorkspace,
   removeWorkspace,
 } from "../stores/chat.store";
@@ -27,6 +28,10 @@ async function runEffect<A, E>(
 export const chatSidebarActions = {
   deleteConversation: async (convId: string): Promise<void> => {
     await runEffect(deleteConversation(convId));
+  },
+
+  renameConversation: async (convId: string, newTitle: string): Promise<void> => {
+    await runEffect(renameConversation(convId, newTitle));
   },
 
   renameWorkspace: async (

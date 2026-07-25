@@ -63,6 +63,10 @@
   --color-sidebar-accent-foreground:   oklch(0.18 0.008 230);
   --color-sidebar-border:             oklch(0.92 0.005 230);
   --color-sidebar-ring:               oklch(0.685 0.169 230);
+  /* Layout width tokens */
+  --sidebar-width: 16rem;
+  --sidebar-width-icon: 3rem;
+  --sidebar-width-mobile: 18rem;
 }
 
 @layer base {

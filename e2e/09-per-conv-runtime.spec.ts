@@ -98,13 +98,15 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     test.setTimeout(60_000);
     const { page } = tauriEnv;
 
-    // 创建第二个 conv — capture its id so we can address it by data-conv-id
+    // 创建第二个 conv — capture its id for data-value selector
+    // D8: codeman-sidebar SidebarMenuSubButton 使用 data-value={sub.value}
     // selector. beforeEachConvId (captured in beforeEach) is the first conv.
     const { convId: newConvId } = await clickNewConversationAndWait(page);
 
     // convIdx0 = beforeEach 创建的 conv; convIdx1 = test body 创建的 conv
-    const convIdx0 = page.locator(`[data-conv-id="${beforeEachConvId}"]`);
-    const convIdx1 = page.locator(`[data-conv-id="${newConvId}"]`);
+    // D8: codeman-sidebar SidebarMenuSubButton 使用 data-value={sub.value}
+    const convIdx0 = page.locator(`[data-value="${beforeEachConvId}"]`);
+    const convIdx1 = page.locator(`[data-value="${newConvId}"]`);
 
     // Q→A: 09::msg-in-idx0 → TEXT_A, 09::msg-in-idx1 → TEXT_B
     // 切到 idx 0 发消息。后续断言: idx 0 的流式内容不 leak 到 idx 1 的 view。
@@ -266,11 +268,12 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     test.setTimeout(60_000);
     const { page } = tauriEnv;
 
-    // 创建第二个 conv — capture its id for data-conv-id selector
+    // 创建第二个 conv — capture its id for data-value selector
+    // D8: codeman-sidebar SidebarMenuSubButton 使用 data-value={sub.value}
     const { convId: newConvId } = await clickNewConversationAndWait(page);
 
-    const convIdx0 = page.locator(`[data-conv-id="${beforeEachConvId}"]`);
-    const convIdx1 = page.locator(`[data-conv-id="${newConvId}"]`);
+    const convIdx0 = page.locator(`[data-value="${beforeEachConvId}"]`);
+    const convIdx1 = page.locator(`[data-value="${newConvId}"]`);
 
     // Q→A: 09::msg-A → TEXT_A, 09::msg-B → TEXT_B
     // 切到 idx 0,发消息
@@ -293,10 +296,11 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     // convIdx0 还在 streaming(切 conv 不 cancel),sidebar 仍显示 ⏳
     // SidebarMenuBadge 和 SidebarMenuButton 是 siblings,用 li:has() 定位
     // Ark UI accordion 动画可能导致 badge 零尺寸,用 DOM 存在性而非可见性
+    // D8: codeman-sidebar SidebarMenuSubButton 使用 data-value={sub.value}
     await page.evaluate((convId: string) => {
       const deadline = Date.now() + 5_000;
       while (Date.now() < deadline) {
-        const li = document.querySelector(`li:has([data-conv-id="${convId}"])`);
+        const li = document.querySelector(`li:has([data-value="${convId}"])`);
         if (li?.querySelector('[aria-label="streaming"]')) {return;}
       }
       throw new Error(`streaming badge not found for conv ${convId} in li`);
@@ -314,10 +318,11 @@ test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
     });
 
     // 两个 conv 都应显示 ⏳(独立 runtime + per-conv streamingMessageId)
+    // D8: codeman-sidebar SidebarMenuSubButton 使用 data-value={sub.value}
     await page.evaluate((convId: string) => {
       const deadline = Date.now() + 5_000;
       while (Date.now() < deadline) {
-        const li = document.querySelector(`li:has([data-conv-id="${convId}"])`);
+        const li = document.querySelector(`li:has([data-value="${convId}"])`);
         if (li?.querySelector('[aria-label="streaming"]')) {return;}
       }
       throw new Error(`streaming badge not found for conv ${convId} in li`);

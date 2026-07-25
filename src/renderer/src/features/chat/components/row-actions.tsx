@@ -1,0 +1,216 @@
+//! RowActions — unified "row operation" component for workspace + conv rows.
+//!
+//! Encapsulates delete (inline-confirm) + rename (inline-edit-in-place).
+//! Mirrors ConvDeleteAction idle + confirming-delete visual patterns and
+//! WorkspaceActions rename + delete aria-label conventions.
+//!
+//! Hover-reveal relies on the parent SidebarMenuButton / SidebarMenuSubButton
+//! primitive carrying the `group/row` Tailwind v4 named-group class — that
+//! is what enables `group-hover/row:` selectors on the action buttons below.
+//!
+/*
+ * State machine:
+ * ───────────────────────────────────────────────────────────────────────────
+ *  Mode               │ Entry condition          │ Exit to idle        │ Exit to other
+ * ────────────────────┼──────────────────────────┼─────────────────────┼────────────────
+ *  idle               │ initial                 │ —                   │ click trash → confirming-delete
+ *                     │                          │                     │ click pencil → editing
+ * ────────────────────┼──────────────────────────┼─────────────────────┼────────────────
+ *  confirming-delete  │ click Trash2 button     │ click 取消 → idle   │ click 删除 → idle (calls onDelete)
+ *                     │                          │                     │ (no other exit)
+ * ────────────────────┼──────────────────────────┼─────────────────────┼────────────────
+ *  editing            │ click Pencil button     │ Enter (trim≠"")    │ click 取消 → idle
+ *                     │                          │   → idle (calls     │ Escape → idle
+ *                     │                          │   onRename)         │ blur → idle
+ *                     │                          │ Enter (trim==="")   │
+ *                     │                          │   → idle (no call)  │
+ * ───────────────────────────────────────────────────────────────────────────
+ */
+
+import { createSignal, Show, type JSX } from "solid-js";
+import { Loader2, Pencil, Trash2 } from "lucide-solid";
+
+export interface RowActionsProps {
+  kind: "workspace" | "conv";
+  id: string;
+  label: string;
+  isStreaming?: boolean;
+  onDelete: (id: string) => void | Promise<void>;
+  onRename: (id: string, newLabel: string) => void | Promise<void>;
+}
+
+type Mode = "idle" | "confirming-delete" | "editing";
+
+export function RowActions(props: RowActionsProps): JSX.Element {
+  const [mode, setMode] = createSignal<Mode>("idle");
+
+  const isConfirming = () => mode() === "confirming-delete";
+  const isEditing = () => mode() === "editing";
+
+  const handleDeleteClick = (e: MouseEvent) => {
+    e.stopPropagation();
+    setMode("confirming-delete");
+  };
+
+  const handleConfirmDelete = (e: MouseEvent) => {
+    e.stopPropagation();
+    setMode("idle");
+    props.onDelete(props.id);
+  };
+
+  const handleCancelDelete = (e: MouseEvent) => {
+    e.stopPropagation();
+    setMode("idle");
+  };
+
+  const handleRenameClick = (e: MouseEvent) => {
+    e.stopPropagation();
+    setMode("editing");
+  };
+
+  const deleteAriaLabel = () =>
+    props.kind === "workspace" ? `Delete ${props.label}` : "Delete conversation";
+
+  const renameAriaLabel = () => `Rename ${props.label}`;
+
+  return (
+    <>
+      {/* idle + editing: label row */}
+      {/* self-center: the parent SidebarMenuButton carries items-start (from
+          @ark-ui/solid AccordionTrigger className override); align-self:center
+          re-centers this row vertically within the parent flex button. */}
+      <div
+        class="flex w-full self-center items-center gap-2 min-w-0"
+        classList={{
+          "invisible": isConfirming(),
+        }}
+      >
+        <Show when={props.kind === "conv" && props.isStreaming}>
+          <Loader2
+            class="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground"
+            aria-label="streaming"
+          />
+        </Show>
+        {/* Label span is only shown in idle state — in editing mode the
+            InlineRenameInput replaces it (the input's initial value is the
+            label). Per user 2026-07-25: "点击 rename 后，只应该出现 <input>".
+            Without this guard the label and the input both render in the
+            same flex row, both with flex-1, competing for the same width
+            and showing the old label text behind/around the input. */}
+        <Show when={!isEditing()}>
+          <span class="truncate flex-1 text-sm">{props.label}</span>
+        </Show>
+
+        {/* idle: hover-revealed action buttons — text-muted-foreground base + hover:bg-sidebar-accent
+            (mirrors ConvDeleteAction pattern; ensures icon stays visible against sidebar bg/accent) */}
+        <Show when={!isEditing()}>
+          <button
+            type="button"
+            class="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring transition-opacity"
+            onClick={handleRenameClick}
+            aria-label={renameAriaLabel()}
+          >
+            <Pencil class="h-3 w-3" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover/row:opacity-100 hover:bg-sidebar-accent hover:text-destructive outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring transition-opacity"
+            onClick={handleDeleteClick}
+            aria-label={deleteAriaLabel()}
+          >
+            <Trash2 class="h-3 w-3" aria-hidden="true" />
+          </button>
+        </Show>
+
+        {/* editing: inline input */}
+        <Show when={isEditing()}>
+          <InlineRenameInput
+            initialLabel={props.label}
+            onSave={(newLabel) => {
+              setMode("idle");
+              props.onRename(props.id, newLabel);
+            }}
+            onCancel={() => setMode("idle")}
+          />
+        </Show>
+      </div>
+
+      {/* confirming-delete overlay */}
+      <Show when={isConfirming()}>
+        <div
+          data-state="confirming"
+          class="absolute inset-0 z-10 flex items-center justify-end gap-1 rounded-md bg-sidebar pr-2"
+        >
+          <button
+            type="button"
+            class="h-7 px-2 text-xs bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90"
+            onClick={handleConfirmDelete}
+            aria-label="确认删除"
+          >
+            删除
+          </button>
+          <button
+            type="button"
+            class="h-7 px-2 text-xs rounded-md border border-input hover:bg-accent"
+            onClick={handleCancelDelete}
+            aria-label="取消删除"
+          >
+            取消
+          </button>
+        </div>
+      </Show>
+    </>
+  );
+}
+
+// ─── InlineRenameInput ────────────────────────────────────────────────────────
+
+interface InlineRenameInputProps {
+  initialLabel: string;
+  onSave: (newLabel: string) => void;
+  onCancel: () => void;
+}
+
+function InlineRenameInput(props: InlineRenameInputProps): JSX.Element {
+  const [value, setValue] = createSignal(props.initialLabel);
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const trimmed = value().trim();
+      if (trimmed !== "") {
+        props.onSave(trimmed);
+      } else {
+        props.onCancel();
+      }
+    } else if (e.key === "Escape") {
+      props.onCancel();
+    }
+  };
+
+  const handleBlur = () => {
+    // blur cancels without saving
+    props.onCancel();
+  };
+
+  const handleInputRef = (el: HTMLInputElement) => {
+    el.focus();
+    el.setSelectionRange(0, el.value.length);
+    // Dispatch 'focus' event so jsdom picks up the selection
+    el.dispatchEvent(new Event("focus", { bubbles: true }));
+  };
+
+  return (
+    <input
+      ref={handleInputRef}
+      type="text"
+      class="flex-1 truncate text-sm bg-transparent outline-none focus:ring-2 focus:ring-sidebar-ring rounded-md px-1"
+      aria-label="Rename input"
+      maxLength={80}
+      value={value()}
+      onInput={(e) => setValue(e.currentTarget.value)}
+      onKeyDown={handleKeyDown}
+      onBlur={handleBlur}
+    />
+  );
+}

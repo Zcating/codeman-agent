@@ -172,6 +172,14 @@ D6-H established `addWorkspace` as an `appStore` sync method with `deriveLabelFr
 
 *Note (amended later)*: `Dialog.show<T>` 同样服务于 **form dialogs**（不限于 workspace rename/delete 等 confirm dialogs），如 settings 域 `createProviderFormDialog()`——renderFn 闭包内持 form signals，Add → `resolve(Provider)`，dismiss → `resolve(null)`。两类消费（confirm / form）共用同一 `@ark-ui/solid` Dialog 原语，互不冲突。
 
+### D8-W6 反转记录 (2026-07-25)
+
+**用户反馈**：sidebar 行操作应内联到行位置，不弹模态。本反转覆盖以下决策：
+- **delete**：从 `Dialog.confirm()` modal → `RowActions` inline-confirm overlay（原 commit `9f97d8f`）
+- **rename**：从 `Dialog.show()` modal（`workspace-rename-dialog.tsx`）→ `RowActions` inline edit-in-place（本轮 commit `646445d` + 清理 commit）
+- **统一实现**：新建 `RowActions` 组件（`src/features/chat/components/row-actions.tsx`）三状态机 `idle | confirming-delete | editing`，供 workspace + conv 行共用，取代 `WorkspaceActions` + `ConvDeleteAction` + `workspace-rename-dialog` 三件套。
+- 后续 wave 可能需要在其他 sidebar 行类型（future conversations-of-folder 等）扩展 RowActions 的 `kind` 枚举。
+
 **D8-W7 — chat.store.ts public API shape**
 - **Effect-returning methods** per ADR-0016 D4 + CONTEXT.md "Bridge":
   - `chatStore.addWorkspace(): Effect.Effect<Workspace | null, AppError, never>` — OS picker → `WorkspaceService.add` → `setStore`.

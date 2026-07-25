@@ -180,6 +180,17 @@ describe("ConversationService", () => {
       expect(Array.isArray(convos)).toBe(true);
     }).pipe(Effect.provide(ConversationServiceLive)),
   );
+
+  it.effect("rename forwards to window.codeman.renameConversation with correct args", () =>
+    Effect.gen(function* () {
+      const svc = yield* ConversationService;
+      mockState.invokeCalls = [];
+      yield* svc.rename("conv-123", "New Title");
+      const renameCall = mockState.invokeCalls.find((c) => c.name === "renameConversation");
+      expect(renameCall).toBeDefined();
+      expect(renameCall?.args).toEqual({ id: "conv-123", title: "New Title" });
+    }).pipe(Effect.provide(ConversationServiceLive)),
+  );
 });
 
 describe("MessageService", () => {

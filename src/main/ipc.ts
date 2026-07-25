@@ -287,6 +287,10 @@ export function registerIpcHandlers(_deps: {
     dbInit();
     getDatabase().prepare("DELETE FROM conversations WHERE id = ?").run(args.id);
   });
+  ipcMain.handle("renameConversation", (_e, args: { id: string; title: string }) => {
+    dbInit();
+    getDatabase().prepare("UPDATE conversations SET title = ? WHERE id = ?").run(args.title, args.id);
+  });
 
   // Messages
   ipcMain.handle("listMessages", (_e, args: { conversationId?: string }) => {

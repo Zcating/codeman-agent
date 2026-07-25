@@ -81,7 +81,8 @@ test.describe("05 — agent 页面输入 → 用户气泡", () => {
     // 3. Sidebar conv element check (best-effort with longer wait for accordion animation).
     //    `clickNewConversationAndWait` already guarantees the conv was created and activated;
     //    this confirms the sidebar rendered it.
-    const sidebarItem = page.locator(`[data-conv-id="${convId}"]`).first();
+    //    D8: codeman-sidebar SidebarMenuSubButton 使用 data-value={sub.value}
+    const sidebarItem = page.locator(`[data-value="${convId}"]`).first();
     try {
       await sidebarItem.waitFor({ state: "visible", timeout: 15_000 });
     } catch {
