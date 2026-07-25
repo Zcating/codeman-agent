@@ -1,7 +1,7 @@
 //! Select — 9 atoms 1:1 .repos/shadcn. Solid 适配.
 
 import type { JSX } from "solid-js";
-import { splitProps } from "solid-js";
+import { createSignal, onCleanup, onMount, splitProps } from "solid-js";
 import {
   Select as SelectPrimitive,
   useSelectContext,
@@ -72,7 +72,7 @@ export function SelectContent(props: SelectContentProps) {
         data-slot="select-content"
         data-align-trigger={local.alignItemWithTrigger}
         class={cn(
-          "relative isolate z-50 max-h-(--available-height) w-(--anchor-width) min-w-36 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[align-trigger=true]:animate-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "relative isolate z-50 max-h-(--available-height) w-(--anchor-width) min-w-36 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[align-trigger=true]:animate-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           local.class,
         )}
         {...rest}
@@ -137,11 +137,27 @@ export function SelectSeparator(props: JSX.HTMLAttributes<HTMLHRElement>) {
 
 export function SelectScrollUpButton(props: JSX.HTMLAttributes<HTMLDivElement>) {
   const [local, rest] = splitProps(props, ["class"]);
+  const [hidden, setHidden] = createSignal(false);
+  let btnRef: HTMLDivElement | undefined;
+
+  onMount(() => {
+    const content = btnRef?.closest<HTMLElement>('[data-part="content"]');
+    if (!content) return;
+    const update = () => setHidden(content.scrollTop <= 1);
+    update();
+    // Recheck after layout settles (size may not be stable on first mount).
+    requestAnimationFrame(update);
+    content.addEventListener("scroll", update, { passive: true });
+    onCleanup(() => content.removeEventListener("scroll", update));
+  });
+
   return (
     <div
+      ref={btnRef}
       data-slot="select-scroll-up-button"
+      data-hidden={hidden() || undefined}
       class={cn(
-        "top-0 z-10 flex w-full cursor-default items-center justify-center bg-popover py-1 [&_svg:not([class*='size-'])]:size-4",
+        "top-0 z-10 flex w-full cursor-default items-center justify-center bg-popover py-1 [&_svg:not([class*='size-'])]:size-4 data-[hidden]:hidden",
         local.class,
       )}
       {...rest}
@@ -153,11 +169,27 @@ export function SelectScrollUpButton(props: JSX.HTMLAttributes<HTMLDivElement>) 
 
 export function SelectScrollDownButton(props: JSX.HTMLAttributes<HTMLDivElement>) {
   const [local, rest] = splitProps(props, ["class"]);
+  const [hidden, setHidden] = createSignal(false);
+  let btnRef: HTMLDivElement | undefined;
+
+  onMount(() => {
+    const content = btnRef?.closest<HTMLElement>('[data-part="content"]');
+    if (!content) return;
+    const update = () =>
+      setHidden(content.scrollHeight - content.clientHeight - content.scrollTop <= 1);
+    update();
+    requestAnimationFrame(update);
+    content.addEventListener("scroll", update, { passive: true });
+    onCleanup(() => content.removeEventListener("scroll", update));
+  });
+
   return (
     <div
+      ref={btnRef}
       data-slot="select-scroll-down-button"
+      data-hidden={hidden() || undefined}
       class={cn(
-        "bottom-0 z-10 flex w-full cursor-default items-center justify-center bg-popover py-1 [&_svg:not([class*='size-'])]:size-4",
+        "bottom-0 z-10 flex w-full cursor-default items-center justify-center bg-popover py-1 [&_svg:not([class*='size-'])]:size-4 data-[hidden]:hidden",
         local.class,
       )}
       {...rest}

@@ -120,6 +120,83 @@ describe("SelectScrollUpButton", () => {
     render(() => <SelectScrollUpButton data-testid="up" />);
     expect(screen.getByTestId("up")).toHaveAttribute("data-slot", "select-scroll-up-button");
   });
+
+  it("hides via data-hidden when content is at top of scroll", async () => {
+    const items = Array.from({ length: 20 }, (_, i) => ({
+      label: `Item ${i}`,
+      value: `i${i}`,
+    }));
+    const collection = createListCollection({ items });
+    render(() => (
+      <SelectRoot collection={collection} open>
+        <SelectTrigger>Open</SelectTrigger>
+        <SelectContent data-testid="content">
+          <SelectScrollUpButton data-testid="up" />
+          <SelectItem item={items[0]}>{items[0].label}</SelectItem>
+          <SelectScrollDownButton data-testid="down" />
+        </SelectContent>
+      </SelectRoot>
+    ));
+    const content = screen.getByTestId("content");
+    // jsdom does not compute layout — mock overflow geometry.
+    Object.defineProperty(content, "scrollHeight", { configurable: true, value: 500 });
+    Object.defineProperty(content, "clientHeight", { configurable: true, value: 200 });
+    fireEvent.scroll(content);
+    await waitFor(() => {
+      // scrollTop=0 → up hidden, down visible
+      expect(screen.getByTestId("up")).toHaveAttribute("data-hidden");
+      expect(screen.getByTestId("down")).not.toHaveAttribute("data-hidden");
+    });
+  });
+
+  it("shows up button once content is scrolled past top", async () => {
+    const items = Array.from({ length: 20 }, (_, i) => ({
+      label: `Item ${i}`,
+      value: `i${i}`,
+    }));
+    const collection = createListCollection({ items });
+    render(() => (
+      <SelectRoot collection={collection} open>
+        <SelectTrigger>Open</SelectTrigger>
+        <SelectContent data-testid="content">
+          <SelectScrollUpButton data-testid="up" />
+          <SelectItem item={items[0]}>{items[0].label}</SelectItem>
+          <SelectScrollDownButton data-testid="down" />
+        </SelectContent>
+      </SelectRoot>
+    ));
+    const content = screen.getByTestId("content");
+    Object.defineProperty(content, "scrollHeight", { configurable: true, value: 500 });
+    Object.defineProperty(content, "clientHeight", { configurable: true, value: 200 });
+    Object.defineProperty(content, "scrollTop", { configurable: true, value: 50, writable: true });
+    fireEvent.scroll(content);
+    await waitFor(() => {
+      expect(screen.getByTestId("up")).not.toHaveAttribute("data-hidden");
+    });
+  });
+
+  it("hides both buttons when content fits without overflow", async () => {
+    const collection = createListCollection({ items: [{ label: "A", value: "a" }] });
+    render(() => (
+      <SelectRoot collection={collection} open>
+        <SelectTrigger>Open</SelectTrigger>
+        <SelectContent data-testid="content">
+          <SelectScrollUpButton data-testid="up" />
+          <SelectItem item={collection.items[0]}>A</SelectItem>
+          <SelectScrollDownButton data-testid="down" />
+        </SelectContent>
+      </SelectRoot>
+    ));
+    const content = screen.getByTestId("content");
+    // No overflow: scrollHeight === clientHeight
+    Object.defineProperty(content, "scrollHeight", { configurable: true, value: 200 });
+    Object.defineProperty(content, "clientHeight", { configurable: true, value: 200 });
+    fireEvent.scroll(content);
+    await waitFor(() => {
+      expect(screen.getByTestId("up")).toHaveAttribute("data-hidden");
+      expect(screen.getByTestId("down")).toHaveAttribute("data-hidden");
+    });
+  });
 });
 
 describe("SelectScrollDownButton", () => {
