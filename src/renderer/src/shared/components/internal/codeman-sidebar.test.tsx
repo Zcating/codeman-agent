@@ -191,21 +191,40 @@ describe("CodemanSidebar (PR 2)", () => {
   });
 
   // ─── Slice 16: currentValue + isActive ─────────────────────────────────
+  // Per chat AGENTS.md (ADR-0023 D7-CS): "workspace 永远不 active，只有 conv 可以 active".
+  // The isActive prop therefore applies ONLY to convs (SidebarSubOption),
+  // never to workspaces. Workspace buttons must never carry active styling
+  // regardless of currentValue or isActive predicate.
   describe("currentValue + isActive", () => {
-    it("isActive is called with workspace value and currentValue when workspace is rendered", () => {
-      const isActive = vi.fn(() => false);
+    it("workspace button is NEVER active even when isActive predicate returns true", () => {
+      // Bug repro: clicking a workspace used to navigate to /conversation/{wsId},
+      // making currentValue === ws.value and triggering bg-sidebar-primary. The
+      // design contract forbids this — workspaces must never look "selected".
+      const isActive = vi.fn(() => true);
       const opts = makeOptions();
-      renderSidebar({ options: opts, currentValue: "ws-1", isActive });
-      expect(isActive).toHaveBeenCalledWith("ws-1", "ws-1");
-      expect(isActive).toHaveBeenCalledWith("ws-2", "ws-1");
+      const { container } = renderSidebar({ options: opts, currentValue: "ws-1", isActive });
+      const ws1Btn = container.querySelector("[data-value='ws-1']") as HTMLElement;
+      expect(ws1Btn.className).not.toContain("bg-sidebar-primary");
+      expect(ws1Btn.className).not.toContain("text-sidebar-primary-foreground");
     });
 
-    it("isActive prop overrides default equality check", () => {
-      const isActive = vi.fn((value: string | undefined) => value === "ws-2");
+    it("workspace button is never active even without isActive prop and currentValue matches", () => {
+      // currentValue exactly matches ws.value — still no active styling.
+      const opts = makeOptions();
+      const { container } = renderSidebar({ options: opts, currentValue: "ws-1" });
+      const ws1Btn = container.querySelector("[data-value='ws-1']") as HTMLElement;
+      expect(ws1Btn.className).not.toContain("bg-sidebar-primary");
+    });
+
+    it("isActive is NOT called for workspaces (workspace-active is internally forbidden)", () => {
+      const isActive = vi.fn(() => true);
       const opts = makeOptions();
       renderSidebar({ options: opts, currentValue: "ws-1", isActive });
-      expect(isActive).toHaveBeenCalledWith("ws-1", "ws-1");
-      expect(isActive).toHaveBeenCalledWith("ws-2", "ws-1");
+      // isActive is only consulted for convs; workspaces never call it.
+      for (const call of isActive.mock.calls as unknown as Array<[string, string | undefined]>) {
+        const value = call[0];
+        expect(value.startsWith("ws-")).toBe(false);
+      }
     });
 
     it("isActive is called with conv value and currentValue when conv is rendered", () => {
@@ -215,6 +234,15 @@ describe("CodemanSidebar (PR 2)", () => {
       expect(isActive).toHaveBeenCalledWith("c-1", "c-2");
       expect(isActive).toHaveBeenCalledWith("c-2", "c-2");
       expect(isActive).toHaveBeenCalledWith("c-3", "c-2");
+    });
+
+    it("conv button carries bg-sidebar-accent when isActive returns true (sanity)", () => {
+      const isActive = vi.fn((value: string | undefined) => value === "c-2");
+      const opts = makeOptions();
+      const { container } = renderSidebar({ options: opts, currentValue: "c-2", isActive });
+      const convBtn = container.querySelector("[data-value='c-2']") as HTMLElement;
+      // Conv CAN be active (conv uses bg-sidebar-accent, workspace uses bg-sidebar-primary)
+      expect(convBtn.className).toContain("bg-sidebar-accent");
     });
   });
 

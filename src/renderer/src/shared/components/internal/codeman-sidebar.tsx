@@ -118,29 +118,27 @@ export interface CodemanSidebarProps {
 
 const isEqual = (a: unknown, b: unknown): boolean => a === b;
 
-function computeActive(
-  value: string | undefined,
-  currentValue: string | undefined,
-  isActiveFn: CodemanSidebarProps["isActive"] | undefined,
-): boolean {
-  if (isActiveFn) {return isActiveFn(value, currentValue);}
-  return isEqual(value, currentValue);
-}
-
-function isWorkspaceActive(
-  item: SidebarOption,
-  currentValue: string | undefined,
-  isActiveFn: CodemanSidebarProps["isActive"] | undefined,
-): boolean {
-  return computeActive(item.value, currentValue, isActiveFn);
-}
-
+/**
+ * Compute whether a CONV is the active one.
+ *
+ * IMPORTANT: per chat AGENTS.md (ADR-0023 D7-CS), workspaces are NEVER active —
+ * only convs can be active. The `isActive` prop therefore applies exclusively
+ * to conversation items (SidebarSubOption); workspace buttons always render in
+ * their inactive state regardless of currentValue or the consumer's predicate.
+ *
+ * Historical context: pre-fix, workspaces accepted `isActive` from the consumer,
+ * which meant a workspace would receive the primary background whenever the
+ * consumer's `currentValue` happened to match `ws.value` (e.g. after navigating
+ * to `/conversation/{wsId}` via a workspace click — a UX regression that
+ * contradicted the documented design intent).
+ */
 function isSubActive(
   sub: SidebarSubOption,
   currentValue: string | undefined,
   isActiveFn: CodemanSidebarProps["isActive"] | undefined,
 ): boolean {
-  return computeActive(sub.value, currentValue, isActiveFn);
+  if (isActiveFn) {return isActiveFn(sub.value, currentValue);}
+  return isEqual(sub.value, currentValue);
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────
@@ -212,7 +210,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
                                   when={item.subItems && item.subItems.length > 0}
                                   fallback={
                                     <SidebarMenuButton
-                                      isActive={isWorkspaceActive(item, props.currentValue, props.isActive)}
+                                      isActive={false}
                                       onClick={() => handleSelect(item)}
                                       data-value={item.value}
                                     >
@@ -247,6 +245,9 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
                                           // `[data-value=…]` and `data-state` live on
                                           // the SAME DOM node, which the e2e helpers
                                           // assume (expandWorkspace, helpers.ts:341).
+                                          //
+                                          // isActive={false} (ADR-0023 D7-CS):
+                                          // workspaces are NEVER active, only convs.
                                           const triggerProps = propsFn({});
                                           const triggerOnClick =
                                             triggerProps.onClick as
@@ -255,7 +256,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
                                           return (
                                             <SidebarMenuButton
                                               {...triggerProps}
-                                              isActive={isWorkspaceActive(item, props.currentValue, props.isActive)}
+                                              isActive={false}
                                               data-value={item.value}
                                               onClick={(e) => {
                                                 triggerOnClick?.(e);
