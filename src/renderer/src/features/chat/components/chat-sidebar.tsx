@@ -126,10 +126,14 @@ export function ChatSidebar(): JSX.Element {
       {
         label: "项目",
         value: "workspace",
-        defaultExpanded: true,
         children: wsList().map((ws): SidebarOption => ({
           label: ws.label,
           value: ws.id,
+          // Per-workspace Accordion (sidebar-reshim Q28 reversal): default-expanded
+          // so all workspaces' conv lists are visible at first render (matches
+          // the previous per-group expanded-by-default behavior). Users can
+          // collapse individual workspaces by clicking them.
+          defaultExpanded: true,
           subItems: conversations$()
             ?.filter((c) => c.workspaceId === ws.id)
             .sort((a, b) => b.updatedAt - a.updatedAt)

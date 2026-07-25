@@ -79,18 +79,17 @@ beforeEach(() => {
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
 describe("SettingsSidebar (PR 2)", () => {
-  it("builds options as SidebarGroupOption[] with 6 nav items in children", () => {
-    render(() => <SettingsSidebar />);
-    const opts = F.capturedProps.options;
-    // options is SidebarGroupOption[] — one group
-    expect(opts.length).toBe(1);
-    expect(opts[0]).toMatchObject({
-      label: "Settings",
-      value: "settings",
-      defaultExpanded: true,
-    });
-    // 6 nav items as children
-    expect(opts[0].children.length).toBe(6);
+it("builds options as SidebarGroupOption[] with 6 nav items in children", () => {
+      render(() => <SettingsSidebar />);
+      const opts = F.capturedProps.options;
+      // options is SidebarGroupOption[] — one group (always visible per Q28 reversal)
+      expect(opts.length).toBe(1);
+      expect(opts[0]).toMatchObject({
+        label: "Settings",
+        value: "settings",
+      });
+      // 6 nav items as children
+      expect(opts[0].children.length).toBe(6);
     expect(opts[0].children.map((c: any) => c.label)).toEqual([
       "LLM",
       "App",

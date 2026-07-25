@@ -144,17 +144,17 @@ describe("ChatSidebar (PR 2)", () => {
     expect(F.capturedProps).toBeTruthy();
     const opts = F.capturedProps!.options;
     expect(opts.length).toBe(1);
-    // Top-level project group
+    // Top-level project group — always visible (no defaultExpanded; sidebar-reshim Q28 reversal)
     expect(opts[0]).toMatchObject({
       label: "项目",
       value: "workspace",
-      defaultExpanded: true,
     });
-    // Two workspaces as children
+    // Two workspaces as children, each carrying per-workspace Accordion defaultExpanded
     expect(opts[0].children.length).toBe(2);
     expect(opts[0].children[0]).toMatchObject({
       label: "Frontend",
       value: "ws-1",
+      defaultExpanded: true,
     });
     // Convs as subItems (not children)
     expect(opts[0].children[0].subItems).toEqual([
@@ -164,6 +164,7 @@ describe("ChatSidebar (PR 2)", () => {
     expect(opts[0].children[1]).toMatchObject({
       label: "Backend",
       value: "ws-2",
+      defaultExpanded: true,
     });
     expect(opts[0].children[1].subItems).toEqual([
       { label: "Chat 3", value: "c-3" },

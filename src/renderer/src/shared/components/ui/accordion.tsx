@@ -66,16 +66,50 @@ export const AccordionItemComp: Component<AccordionItemProps> = (props) => {
 export interface AccordionTriggerProps {
   class?: string;
   children?: JSX.Element;
+  /**
+   * Render as child element. Avoids nested `<button>` when wrapping another
+   * button (e.g. SidebarMenuButton inside SidebarMenuItem). Receives a
+   * props-merging function `propsFn(extra)` that combines Accordion's trigger
+   * props (onClick toggling open state, ARIA, ref) with caller-supplied
+   * class. The returned object should be spread onto the child element.
+   *
+   * Behavior note: `mergeProps` chains `on*` event handlers (both the
+   * accordion toggle and the caller's onClick fire), so existing
+   * select/click semantics are preserved.
+   */
+  asChild?: (propsFn: (extra: { class?: string }) => Record<string, unknown>) => JSX.Element;
 }
 
+const accordionTriggerClass =
+  "group/accordion-trigger relative flex flex-1 items-start justify-between rounded-lg border border-transparent py-2.5 text-left text-sm font-medium transition-all outline-none hover:underline focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-disabled:pointer-events-none aria-disabled:opacity-50";
+
 export const AccordionTrigger: Component<AccordionTriggerProps> = (props) => {
-  const [local, rest] = splitProps(props, ["class", "children"]);
+  const [local, rest] = splitProps(props, ["class", "children", "asChild"]);
+
+  if (local.asChild) {
+    // When asChild is used, the caller renders their own children inside the
+    // child element they return (e.g. <SidebarMenuButton>{renderItem(ws)}</SidebarMenuButton>).
+    // We do NOT forward `local.children` here because Ark UI's asChild runtime
+    // ignores `children` prop on the trigger and the caller-supplied JSX
+    // children win anyway.
+    return (
+      <AccordionItemTrigger
+        asChild={(triggerPropsFn) =>
+          local.asChild!((extra) => {
+            const merged = triggerPropsFn({});
+            return {
+              ...merged,
+              class: cn(accordionTriggerClass, extra.class),
+            };
+          })
+        }
+      />
+    );
+  }
+
   return (
     <AccordionItemTrigger
-      class={cn(
-        "group/accordion-trigger relative flex flex-1 items-start justify-between rounded-lg border border-transparent py-2.5 text-left text-sm font-medium transition-all outline-none hover:underline focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-disabled:pointer-events-none aria-disabled:opacity-50",
-        local.class,
-      )}
+      class={cn(accordionTriggerClass, local.class)}
       {...rest}
     >
       {local.children}

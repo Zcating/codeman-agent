@@ -103,7 +103,9 @@ export function SettingsSidebar(): JSX.Element {
     {
       label: "Settings",
       value: "settings",
-      defaultExpanded: true,
+      // NOTE (sidebar-reshim Q28 reversal): SidebarGroup is always visible;
+      // per-workspace Accordion doesn't apply here because settings tabs have
+      // no subItems. `defaultExpanded` removed from SidebarGroupOption.
       children: SETTINGS_NAV.map(tab => ({
         label: tab.label,
         value: tab.value,

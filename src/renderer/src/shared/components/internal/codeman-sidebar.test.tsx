@@ -1,4 +1,4 @@
-//! CodemanSidebar tests (PR 2 — ADR-0033 Layer 2).
+//! CodemanSidebar tests (PR 2 — ADR-0033 Layer 2; Q28 reversal — per-workspace Accordion).
 //!
 //! Test strategy: vertical TDD slices per plan seams 13-20.
 //! Each seam: first write a failing test, then implement minimum to pass.
@@ -6,11 +6,12 @@
 //! Slices:
 //!  13. options: SidebarGroupOption[] — full tree renders
 //!  14. renderItem — called per workspace item
-//!  15. renderGroupHeader — replaces group trigger label
+//!  15. renderGroupHeader — replaces group header (NOT a trigger anymore)
 //!  16. currentValue + isActive — workspace isActive when value === currentValue
-//!  17. onItemSelect — click workspace triggers onItemSelect(value)
+//!  17. onItemSelect — click workspace triggers onItemSelect(value) AND toggles its accordion
 //!  18. onSubItemSelect — click conv triggers onSubItemSelect(value)
-//!  19. Accordion defaultExpanded — group starts open
+//!  19. Per-workspace Accordion (Q28 reversal) — each workspace has its own
+//!       accordion-controlled conv list; group is always visible
 //!  20. data-value — e2e compat attributes
 //!
 //! Chat-domain-specific seams (hover delete, streaming badge) are tested
@@ -31,11 +32,11 @@ function makeOptions(): SidebarGroupOption[] {
     {
       label: "项目",
       value: "workspace",
-      defaultExpanded: true,
       children: [
         {
           label: "Frontend",
           value: "ws-1",
+          defaultExpanded: true,
           subItems: [
             { label: "Chat 1", value: "c-1" },
             { label: "Chat 2", value: "c-2" },
@@ -44,6 +45,7 @@ function makeOptions(): SidebarGroupOption[] {
         {
           label: "Backend",
           value: "ws-2",
+          defaultExpanded: true,
           subItems: [
             { label: "Chat 3", value: "c-3" },
           ],
@@ -102,12 +104,12 @@ describe("CodemanSidebar (PR 2)", () => {
   describe("options: SidebarGroupOption[]", () => {
     it("renders full 3-level tree: group + workspaces + convs", () => {
       const { container } = renderSidebar();
-      // Group trigger rendered
+      // Group label rendered (always visible, NOT a trigger)
       expect(container.textContent).toContain("项目");
       // Workspaces rendered
       expect(container.textContent).toContain("Frontend");
       expect(container.textContent).toContain("Backend");
-      // Convs rendered
+      // Convs rendered (defaultExpanded=true on all workspaces)
       expect(container.textContent).toContain("Chat 1");
       expect(container.textContent).toContain("Chat 2");
       expect(container.textContent).toContain("Chat 3");
@@ -124,7 +126,6 @@ describe("CodemanSidebar (PR 2)", () => {
         {
           label: "EmptyGroup",
           value: "empty",
-          defaultExpanded: true,
           children: [],
         },
       ];
@@ -173,7 +174,7 @@ describe("CodemanSidebar (PR 2)", () => {
 
   // ─── Slice 15: renderGroupHeader ───────────────────────────────────────
   describe("renderGroupHeader", () => {
-    it("renderGroupHeader replaces group trigger label when provided", () => {
+    it("renderGroupHeader replaces group header label when provided", () => {
       const renderGroupHeader = vi.fn((group: SidebarGroupOption) => (
         <span data-testid="custom-group-header">{group.label} (custom header)</span>
       ));
@@ -259,39 +260,111 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
-  // ─── Slice 19: Accordion defaultExpanded ────────────────────────────────
-  describe("Accordion defaultExpanded", () => {
-    it("renders Accordion structure with group trigger and content", () => {
+  // ─── Slice 19: per-workspace Accordion (Q28 reversal) ──────────────────
+// NOTE: jsdom does NOT propagate Solid's delegated click handlers through
+// direct `.click()` invocations on Ark UI @zag-js components — this is a
+// known limitation (also why src/renderer/src/shared/components/ui/accordion.test.tsx
+// does NOT test click toggles). Runtime click behaviour is verified by
+// Playwright e2e (e2e/helpers.ts::expandWorkspace). Unit tests here focus
+// on structural correctness + initial-state wiring, which is what jsdom
+// can deterministically observe.
+  describe("per-workspace Accordion (Q28 reversal: group is always visible)", () => {
+    it("renders one AccordionItem per workspace with subItems", () => {
       const opts = makeOptions();
       const { container } = renderSidebar({ options: opts });
-      // Group trigger exists
-      const trigger = container.querySelector("[data-part='item-trigger']");
-      expect(trigger).toBeTruthy();
-      // Accordion content wrapper exists
-      const content = container.querySelector("[data-part='item-content']");
-      expect(content).toBeTruthy();
+      // Both ws-1 and ws-2 have subItems → 2 AccordionItems
+      const triggers = container.querySelectorAll("[data-part='item-trigger']");
+      expect(triggers.length).toBe(2);
+      const contents = container.querySelectorAll("[data-part='item-content']");
+      expect(contents.length).toBe(2);
     });
 
-    it("group trigger is clickable and toggles accordion state", () => {
+    it("workspace button carries BOTH data-value (SidebarMenuButton) AND data-state (trigger)", () => {
+      // e2e/helpers.ts::expandWorkspace depends on `[data-value=…]` exposing
+      // `data-state="open"` on the SAME element. asChild merge keeps the
+      // workspace value + accordion trigger attrs co-located.
       const opts = makeOptions();
       const { container } = renderSidebar({ options: opts });
-      const trigger = container.querySelector("[data-part='item-trigger']") as HTMLButtonElement;
-      expect(trigger).toBeTruthy();
-      // Click should not throw (accordion toggle)
-      expect(() => trigger.click()).not.toThrow();
+      const ws1Btn = container.querySelector("[data-value='ws-1']") as HTMLElement;
+      expect(ws1Btn.getAttribute("data-value")).toBe("ws-1");
+      expect(ws1Btn.getAttribute("data-state")).toBe("open");
+      expect(ws1Btn.getAttribute("data-part")).toBe("item-trigger");
     });
 
-    it("group without defaultExpanded still renders trigger and content", () => {
+    it("workspace with defaultExpanded=true starts in open state", () => {
+      const opts = makeOptions();
+      const { container } = renderSidebar({ options: opts });
+      const ws1Btn = container.querySelector(`[data-value='ws-1']`) as HTMLElement;
+      expect(ws1Btn.getAttribute("data-state")).toBe("open");
+      const ws2Btn = container.querySelector(`[data-value='ws-2']`) as HTMLElement;
+      expect(ws2Btn.getAttribute("data-state")).toBe("open");
+    });
+
+    it("workspace without defaultExpanded starts in closed state", () => {
       const opts: SidebarGroupOption[] = [
         {
-          label: "ClosedGroup",
-          value: "closed",
-          children: [],
+          label: "Project",
+          value: "proj",
+          children: [
+            {
+              label: "Ws",
+              value: "ws-collapsed",
+              subItems: [{ label: "C1", value: "c-1" }],
+            },
+          ],
         },
       ];
       const { container } = renderSidebar({ options: opts });
-      const trigger = container.querySelector("[data-part='item-trigger']");
-      expect(trigger).toBeTruthy();
+      const wsBtn = container.querySelector(`[data-value='ws-collapsed']`) as HTMLElement;
+      expect(wsBtn.getAttribute("data-state")).toBe("closed");
+    });
+
+    it("per-workspace Accordion isolation: 2 workspaces produce 2 independent triggers", () => {
+      const opts = makeOptions();
+      const { container } = renderSidebar({ options: opts });
+      const ws1Trigger = container.querySelector(`[data-value='ws-1']`) as HTMLElement;
+      const ws2Trigger = container.querySelector(`[data-value='ws-2']`) as HTMLElement;
+      // Each workspace is its own AccordionItem with its own trigger ID
+      expect(ws1Trigger.id).not.toBe(ws2Trigger.id);
+      // Both controls are independent `data-controls` targets
+      expect(ws1Trigger.getAttribute("data-controls")).toBeTruthy();
+      expect(ws2Trigger.getAttribute("data-controls")).toBeTruthy();
+      expect(ws1Trigger.getAttribute("data-controls")).not.toBe(
+        ws2Trigger.getAttribute("data-controls"),
+      );
+    });
+
+    it("workspace WITHOUT subItems has NO accordion (no item-trigger)", () => {
+      const opts: SidebarGroupOption[] = [
+        {
+          label: "Project",
+          value: "proj",
+          children: [
+            { label: "EmptyWs", value: "empty-ws" }, // no subItems
+            {
+              label: "PopulatedWs",
+              value: "pop-ws",
+              subItems: [{ label: "C1", value: "c-1" }],
+            },
+          ],
+        },
+      ];
+      const { container } = renderSidebar({ options: opts });
+      const triggers = container.querySelectorAll("[data-part='item-trigger']");
+      expect(triggers.length).toBe(1); // Only populated workspace has accordion
+    });
+
+    it("group label is directly visible (NOT inside an AccordionTrigger)", () => {
+      const opts = makeOptions();
+      const { container } = renderSidebar({ options: opts });
+      const label = container.querySelector("[data-slot='sidebar-group-label']");
+      expect(label).toBeTruthy();
+      expect(label?.tagName).toBe("DIV"); // SidebarGroupLabel is a div, not button
+      // Group label is NOT inside any item-trigger
+      const triggers = container.querySelectorAll("[data-part='item-trigger']");
+      for (const trigger of triggers) {
+        expect(trigger.contains(label!)).toBe(false);
+      }
     });
   });
 
