@@ -67,6 +67,35 @@
   --sidebar-width: 16rem;
   --sidebar-width-icon: 3rem;
   --sidebar-width-mobile: 18rem;
+
+  /* Accordion expand/collapse — 200ms ease-out。
+     高度由 @ark-ui/solid AccordionItemContent 在 data-state=open 时
+     setProperty("--height", scrollHeight + "px") 写入,keyframe 引用 var(--height)
+     做 0 → 自然高度的过渡。prefers-reduced-motion 由 @media 全局兜底。 */
+  --animate-accordion-down: accordion-down 200ms ease-out;
+  --animate-accordion-up: accordion-up 200ms ease-out;
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--height);
+    opacity: 1;
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
 }
 
 @layer base {
