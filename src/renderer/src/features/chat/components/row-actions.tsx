@@ -91,7 +91,15 @@ export function RowActions(props: RowActionsProps): JSX.Element {
             aria-label="streaming"
           />
         </Show>
-        <span class="truncate flex-1 text-sm">{props.label}</span>
+        {/* Label span is only shown in idle state — in editing mode the
+            InlineRenameInput replaces it (the input's initial value is the
+            label). Per user 2026-07-25: "点击 rename 后，只应该出现 <input>".
+            Without this guard the label and the input both render in the
+            same flex row, both with flex-1, competing for the same width
+            and showing the old label text behind/around the input. */}
+        <Show when={!isEditing()}>
+          <span class="truncate flex-1 text-sm">{props.label}</span>
+        </Show>
 
         {/* idle: hover-revealed action buttons — text-muted-foreground base + hover:bg-sidebar-accent
             (mirrors ConvDeleteAction pattern; ensures icon stays visible against sidebar bg/accent) */}

@@ -247,6 +247,42 @@ describe("RowActions editing state", () => {
     expect(container.querySelector("[aria-label='Rename input']")).toBeNull();
   });
 
+  it("editing: label span is NOT rendered (only input shows)", () => {
+    // Per user 2026-07-25: "点击 rename 后，只应该出现 <input>".
+    // Pre-fix: <span>{label}</span> was rendered unconditionally (alongside
+    // the input in editing mode). Both were flex-1 in the same flex container,
+    // competing for space and showing the label text behind/around the input.
+    const { container } = renderRowActions({ kind: "conv", id: "c-1", label: "Chat" });
+    fireEvent.click(container.querySelector("[aria-label='Rename Chat']") as HTMLElement);
+    // Input is present
+    expect(container.querySelector("[aria-label='Rename input']")).toBeTruthy();
+    // Label span is gone (was a <span class="truncate flex-1 text-sm"> wrapping the label text)
+    const labelSpans = Array.from(container.querySelectorAll("span")).filter(
+      (s) => s.textContent?.trim() === "Chat" && s.classList.contains("truncate"),
+    );
+    expect(labelSpans.length).toBe(0);
+  });
+
+  it("editing (workspace): label span is NOT rendered (only input shows)", () => {
+    const { container } = renderRowActions({ kind: "workspace", id: "ws-1", label: "zcat-blog-cms" });
+    fireEvent.click(container.querySelector("[aria-label='Rename zcat-blog-cms']") as HTMLElement);
+    expect(container.querySelector("[aria-label='Rename input']")).toBeTruthy();
+    const labelSpans = Array.from(container.querySelectorAll("span")).filter(
+      (s) => s.textContent?.trim() === "zcat-blog-cms" && s.classList.contains("truncate"),
+    );
+    expect(labelSpans.length).toBe(0);
+  });
+
+  it("idle: label span IS rendered (sanity — fix must not break idle state)", () => {
+    const { container } = renderRowActions({ kind: "conv", id: "c-1", label: "Chat" });
+    const labelSpans = Array.from(container.querySelectorAll("span")).filter(
+      (s) => s.textContent?.trim() === "Chat" && s.classList.contains("truncate"),
+    );
+    expect(labelSpans.length).toBe(1);
+    // No input in idle state
+    expect(container.querySelector("[aria-label='Rename input']")).toBeNull();
+  });
+
   it("workspace: Escape → does NOT call onRename + returns to idle", () => {
     const onRename = vi.fn();
     const { container } = renderRowActions({ kind: "workspace", id: "ws-1", label: "Old Name", onRename });
