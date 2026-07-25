@@ -4,6 +4,10 @@
 //! Mirrors ConvDeleteAction idle + confirming-delete visual patterns and
 //! WorkspaceActions rename + delete aria-label conventions.
 //!
+//! Hover-reveal relies on the parent SidebarMenuButton / SidebarMenuSubButton
+//! primitive carrying the `group/row` Tailwind v4 named-group class — that
+//! is what enables `group-hover/row:` selectors on the action buttons below.
+//!
 /*
  * State machine:
  * ───────────────────────────────────────────────────────────────────────────

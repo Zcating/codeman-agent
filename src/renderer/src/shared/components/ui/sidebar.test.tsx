@@ -339,6 +339,38 @@ describe("SidebarMenuSub nesting — seam 8", () => {
     const subItems = document.querySelectorAll("li");
     expect(subItems.length).toBeGreaterThanOrEqual(3); // 1 menuitem + 2 subitems
   });
+
+  it("SidebarMenuButton exposes 'group/row' so descendants can use group-hover/row:", () => {
+    const { container } = render(() => (
+      <SidebarProvider defaultOpen={true}>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton data-testid="ws-row">Workspace</SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarProvider>
+    ));
+    const btn = container.querySelector("[data-testid='ws-row']") as HTMLElement;
+    expect(btn.className).toContain("group/row");
+  });
+
+  it("SidebarMenuSubButton exposes 'group/row' so descendants can use group-hover/row:", () => {
+    const { container } = render(() => (
+      <SidebarProvider defaultOpen={true}>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuSub>
+              <SidebarMenuSubItem>
+                <SidebarMenuSubButton data-testid="conv-row">Conv</SidebarMenuSubButton>
+              </SidebarMenuSubItem>
+            </SidebarMenuSub>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarProvider>
+    ));
+    const link = container.querySelector("[data-testid='conv-row']") as HTMLElement;
+    expect(link.className).toContain("group/row");
+  });
 });
 
 describe("SidebarInset — seam 9", () => {

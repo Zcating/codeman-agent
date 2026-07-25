@@ -271,7 +271,7 @@ export function SidebarMenuButton(props: SidebarMenuButtonProps): JSX.Element {
 
   const buttonClasses = () =>
     cn(
-      "peer/menu-button group/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md ring-sidebar-ring outline-hidden transition-[width,height,padding] aria-disabled:pointer-events-none aria-disabled:opacity-50",
+      "peer/menu-button group/menu-button group/row flex w-full items-center gap-2 overflow-hidden rounded-md ring-sidebar-ring outline-hidden transition-[width,height,padding] aria-disabled:pointer-events-none aria-disabled:opacity-50",
       !local.isActive ? "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" : "",
       "focus-visible:ring-2",
       "data-active:bg-sidebar-accent data-active:font-medium data-active:text-sidebar-accent-foreground",
@@ -431,7 +431,7 @@ export function SidebarMenuSubButton(props: SidebarMenuSubButtonProps): JSX.Elem
     <a
       role="menuitem"
       class={cn(
-        "flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden",
+        "group/row flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden",
         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         "focus-visible:ring-2",
         "active:bg-sidebar-accent active:text-sidebar-accent-foreground",
