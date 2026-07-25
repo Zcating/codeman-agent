@@ -34,6 +34,7 @@
 import { type Component, type ComponentProps, Show, splitProps } from "solid-js";
 import { Input } from "../ui/input";
 import { cn } from "../../lib/cn";
+import { useImeSafeValue } from "../../hooks/use-ime-safe-value";
 
 export type CodemanInputProps = Omit<
   ComponentProps<"input">,
@@ -76,9 +77,9 @@ export const CodemanInput: Component<CodemanInputProps> = (props) => {
     "ref",
   ]);
 
-  // IME composition 旗标:composition 期间 onInput 不写 signal,保留浏览器 IME 状态。
-  // compositionend 一次性把 DOM 值写到 value (→ onValueChange)。
-  let composing = false;
+  const ime = useImeSafeValue({
+    onValueChange: local.onValueChange,
+  });
 
   return (
     <div class={cn("space-y-1.5", local.class)} data-codeman-input>
@@ -88,21 +89,14 @@ export const CodemanInput: Component<CodemanInputProps> = (props) => {
       <Input
         type={local.type ?? "text"}
         value={local.value ?? ""}
-        class={local.inputClass}
+        class={cn("h-10", local.inputClass)}
         ref={local.ref}
         aria-invalid={local.error ? true : undefined}
         disabled={local.disabled}
         required={local.required}
-        onCompositionStart={() => {
-          composing = true;
-        }}
-        onCompositionEnd={(e) => {
-          composing = false;
-          local.onValueChange(e.currentTarget.value);
-        }}
-        onInput={(e) => {
-          if (!composing) {local.onValueChange(e.currentTarget.value);}
-        }}
+        onCompositionStart={ime.onCompositionStart}
+        onCompositionEnd={ime.onCompositionEnd}
+        onInput={ime.onInput}
         {...rest}
       />
       <Show

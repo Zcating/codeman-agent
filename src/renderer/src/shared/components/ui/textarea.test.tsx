@@ -7,8 +7,9 @@ describe("Textarea", () => {
     const { container } = render(() => <Textarea />);
     const el = container.querySelector("textarea") as HTMLTextAreaElement;
     expect(el).not.toBeNull();
-    expect(el.className).toContain("min-h-20");
-    expect(el.className).toContain("rounded-md");
+    expect(el.className).toContain("min-h-16");
+    expect(el.className).toContain("rounded-lg");
+    expect(el.className).toContain("field-sizing-content");
   });
 
   it("透传 rows prop", () => {
@@ -21,5 +22,24 @@ describe("Textarea", () => {
     const { container } = render(() => <Textarea class="extra" />);
     const el = container.querySelector("textarea") as HTMLTextAreaElement;
     expect(el.className).toContain("extra");
+  });
+
+  it("has data-slot=textarea", () => {
+    const { container } = render(() => <Textarea />);
+    const el = container.querySelector("textarea") as HTMLTextAreaElement;
+    expect(el.getAttribute("data-slot")).toBe("textarea");
+  });
+
+  it("aria-invalid sets error border class", () => {
+    const { container } = render(() => <Textarea aria-invalid />);
+    const el = container.querySelector("textarea") as HTMLTextAreaElement;
+    expect(el.className).toContain("aria-invalid:border-destructive");
+  });
+
+  it("disabled state applies disabled style", () => {
+    const { container } = render(() => <Textarea disabled />);
+    const el = container.querySelector("textarea") as HTMLTextAreaElement;
+    expect(el.className).toContain("disabled:cursor-not-allowed");
+    expect(el.disabled).toBe(true);
   });
 });

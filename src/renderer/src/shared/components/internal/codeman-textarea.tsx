@@ -6,6 +6,7 @@
 import { type Component, type ComponentProps, Show, splitProps } from "solid-js";
 import { Textarea } from "../ui/textarea";
 import { cn } from "../../lib/cn";
+import { useImeSafeValue } from "../../hooks/use-ime-safe-value";
 
 export type CodemanTextareaProps = Omit<
   ComponentProps<"textarea">,
@@ -38,7 +39,9 @@ export const CodemanTextarea: Component<CodemanTextareaProps> = (props) => {
     "ref",
   ]);
 
-  let composing = false;
+  const ime = useImeSafeValue({
+    onValueChange: local.onValueChange,
+  });
 
   return (
     <div class={cn("space-y-1.5", local.class)} data-codeman-textarea>
@@ -53,16 +56,9 @@ export const CodemanTextarea: Component<CodemanTextareaProps> = (props) => {
         aria-invalid={local.error ? true : undefined}
         disabled={local.disabled}
         required={local.required}
-        onCompositionStart={() => {
-          composing = true;
-        }}
-        onCompositionEnd={(e) => {
-          composing = false;
-          local.onValueChange(e.currentTarget.value);
-        }}
-        onInput={(e) => {
-          if (!composing) {local.onValueChange(e.currentTarget.value);}
-        }}
+        onCompositionStart={ime.onCompositionStart}
+        onCompositionEnd={ime.onCompositionEnd}
+        onInput={ime.onInput}
         {...rest}
       />
       <Show

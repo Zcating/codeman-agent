@@ -10,8 +10,8 @@ describe("CodemanTextarea", () => {
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
     expect(textarea).toBeInTheDocument();
     expect(textarea.rows).toBe(4);
-    expect(textarea.className).toContain("min-h-20");
-    expect(textarea.className).toContain("resize-none");
+    expect(textarea.className).toContain("min-h-16");
+    expect(textarea.className).toContain("field-sizing-content");
   });
 
   it("label 透传,helperText/error 二选一", () => {
@@ -30,6 +30,29 @@ describe("CodemanTextarea", () => {
       <CodemanTextarea value="" onValueChange={() => undefined} error="内容不能为空" />
     ));
     expect(c2.textContent).toContain("内容不能为空");
+  });
+
+  it("透传 data-slot=textarea from underlying Textarea", () => {
+    const { container } = render(() => (
+      <CodemanTextarea value="" onValueChange={() => undefined} />
+    ));
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    expect(textarea?.getAttribute("data-slot")).toBe("textarea");
+  });
+
+  it("aria-invalid=true when error is set", () => {
+    const { container } = render(() => (
+      <CodemanTextarea value="" onValueChange={() => undefined} error="必填" />
+    ));
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
+    expect(textarea?.getAttribute("aria-invalid")).toBe("true");
+  });
+
+  it("error 文本渲染在 codeman-textarea 内", () => {
+    const { container } = render(() => (
+      <CodemanTextarea value="" onValueChange={() => undefined} error="内容不能为空" />
+    ));
+    expect(container.textContent).toContain("内容不能为空");
   });
 
   // ─── IME 安全 (Bug Fix regression:与 codeman-input 同源) ─────────────
