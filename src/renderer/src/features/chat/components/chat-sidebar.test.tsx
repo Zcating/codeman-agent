@@ -186,10 +186,52 @@ describe("ChatSidebar (PR 2)", () => {
     expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/conversation/c-1" });
   });
 
-  it("onItemSelect also navigates (for workspace click, though chat uses onSubItemSelect)", () => {
+  it("onItemSelect is NOT wired (workspace click must NOT navigate — chat AGENTS.md ADR-0023 D7-CS)", () => {
+    // Per chat AGENTS.md + ADR-0023 D7-CS: workspaces are NEVER active, only
+    // convs are. Clicking a workspace label should ONLY toggle its accordion —
+    // it must NOT navigate to /conversation/{wsId} (a non-existent conv route).
+    // Universal CodemanSidebar still calls props.onItemSelect?.() — but chat
+    // intentionally does not pass one (no-op when undefined).
     render(() => <ChatSidebar />);
-    F.capturedProps!.onItemSelect!("c-1");
-    expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/conversation/c-1" });
+    expect(F.capturedProps?.onItemSelect).toBeUndefined();
+  });
+
+  it("clicking workspace label does NOT navigate (regression: avoid /conversation/{wsId} 404)", async () => {
+    // User-reported 2026-07-25: clicking the outer accordion trigger button
+    // (the workspace row containing the label + Rename + Delete buttons) used
+    // to navigate to /conversation/{wsId}. Workspace id ≠ conv id → 404/blank.
+    // After fix: chat passes no onItemSelect → CodemanSidebar's handleSelect
+    // is a no-op → no navigation. Accordion toggle still fires (via
+    // triggerOnClick, separate code path).
+    render(() => <ChatSidebar />);
+    // Sanity: chat-side mockNavigate is fresh.
+    F.mockNavigate.mockClear();
+    // Even if a consumer mistakenly invoked the now-absent onItemSelect,
+    // mockNavigate must remain untouched (proves the absence is wired).
+    expect(F.capturedProps?.onItemSelect).toBeUndefined();
+    expect(F.mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it("clicking inner Delete button in renderItem does NOT navigate (RowActions stopPropagation works through button-in-button)", async () => {
+    // Defensive: even though Chromium allows button-in-button, the inner
+    // Rename/Delete buttons in RowActions call e.stopPropagation() so the
+    // outer CodemanSidebar SidebarMenuButton's onClick should NOT fire.
+    // If stopPropagation failed, handleSelect would fire onItemSelect which
+    // would have triggered navigate (pre-fix). After fix, onItemSelect is
+    // absent — but we still assert no navigate to lock the defensive contract.
+    render(() => <ChatSidebar />);
+    F.mockNavigate.mockClear();
+    const renderItem = F.capturedProps!.renderItem;
+    const { container } = render(() =>
+      renderItem({ label: "WS", value: "ws-navigate" }),
+    );
+    const deleteBtn = container.querySelector('[aria-label="Delete WS"]') as HTMLButtonElement;
+    deleteBtn.click();
+    // No navigation must occur (whether stopPropagation works or not, because
+    // chat no longer wires onItemSelect).
+    expect(F.mockNavigate).not.toHaveBeenCalled();
+    // The inline-confirm overlay should still appear (correct behavior).
+    expect(container.querySelector('[data-state="confirming"]')).toBeTruthy();
   });
 
   it("currentValue comes from URL params (convId)", () => {
