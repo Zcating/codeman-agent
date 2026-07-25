@@ -4,12 +4,12 @@
 //! + chat-domain actions (delete, rename, new conv, settings link). The
 //! universal CodemanSidebar stays generic — chat-specific features
 //! (ConvDeleteAction / hover rename+delete / NewChatButton) are rendered as
-//! `renderItem` / slots.
+//! `renderMenuGroup` / slots.
 //!
 //! Data flow:
 //! - Reads `workspaces$()` + `conversations$()` from chat.store (Solid Accessors)
-//! - Builds `SidebarGroupOption[]` tree (one project group with workspaces as items,
-//!   conversations as subItems)
+//! - Builds `CodemanSidebarGroupOption[]` tree (one project group with workspaces as
+//!   MenuGroups, conversations as Menus inside each MenuGroup's `children`)
 //! - Wires all chat-domain handlers (select / delete / rename / new conv / empty ws)
 //! - Passes URL-derived `selectedConvId` as `currentValue` for active highlight
 //!
@@ -21,9 +21,9 @@ import { Outlet, useLocation, useNavigate, useParams, Link } from "@tanstack/sol
 import { Settings as SettingsIcon } from "lucide-solid";
 import {
   CodemanSidebar,
-  type SidebarGroupOption,
-  type SidebarOption,
-  type SidebarSubOption,
+  type CodemanSidebarGroupOption,
+  type CodemanSidebarMenuGroupOption,
+  type CodemanSidebarMenuOption,
 } from "../../../shared/components/internal/codeman-sidebar";
 import { logger } from "../../../shared/lib/logger";
 import type { Workspace } from "../../../shared/lib/types";
@@ -123,34 +123,34 @@ export function ChatSidebar(): JSX.Element {
 
   // ─── Sidebar tree builders ───────────────────────────────────────────────
 
-  const options = (): SidebarGroupOption[] => {
+  const options = (): CodemanSidebarGroupOption[] => {
     if (wsList().length === 0) {return [];}
 
     return [
       {
         label: "项目",
         value: "workspace",
-        children: wsList().map((ws): SidebarOption => ({
+        children: wsList().map((ws): CodemanSidebarMenuGroupOption => ({
           label: ws.label,
           value: ws.id,
-          // Per-workspace Accordion (sidebar-reshim Q28 reversal): default-expanded
+          // Per-group Accordion (sidebar-reshim Q28 reversal): default-expanded
           // so all workspaces' conv lists are visible at first render (matches
           // the previous per-group expanded-by-default behavior). Users can
           // collapse individual workspaces by clicking them.
           defaultExpanded: true,
-          subItems: conversations$()
+          children: conversations$()
             ?.filter((c) => c.workspaceId === ws.id)
             .sort((a, b) => b.updatedAt - a.updatedAt)
-            .map((c): SidebarSubOption => ({
+            .map((c): CodemanSidebarMenuOption => ({
               label: c.title,
               value: c.id,
-            })),
+            })) ?? [],
         })),
       },
     ];
   };
 
-  const renderItem = (item: SidebarOption): JSX.Element => (
+  const renderMenuGroup = (item: CodemanSidebarMenuGroupOption): JSX.Element => (
     <RowActions
       kind="workspace"
       id={item.value}
@@ -160,12 +160,12 @@ export function ChatSidebar(): JSX.Element {
     />
   );
 
-  const renderSubItem = (sub: SidebarSubOption): JSX.Element => (
+  const renderMenu = (menu: CodemanSidebarMenuOption): JSX.Element => (
     <RowActions
       kind="conv"
-      id={sub.value}
-      label={sub.label}
-      isStreaming={store.byId[sub.value]?.streamingMessageId != null}
+      id={menu.value}
+      label={menu.label}
+      isStreaming={store.byId[menu.value]?.streamingMessageId != null}
       onDelete={(id) => { void handleConvDelete(id); }}
       onRename={(id, newTitle) => { void handleConvRename(id, newTitle); }}
     />
@@ -176,17 +176,17 @@ export function ChatSidebar(): JSX.Element {
   return (
     <CodemanSidebar
       options={options()}
-      renderItem={renderItem}
-      renderSubItem={renderSubItem}
+      renderMenuGroup={renderMenuGroup}
+      renderMenu={renderMenu}
       currentValue={selectedConvId() ?? undefined}
-      // onItemSelect intentionally omitted: per chat AGENTS.md ADR-0023 D7-CS,
+      // onMenuGroupSelect intentionally omitted: per chat AGENTS.md ADR-0023 D7-CS,
       // workspaces are NEVER navigation targets — only convs are. Clicking a
       // workspace label should ONLY toggle its accordion (handled by
       // CodemanSidebar's triggerOnClick), NOT navigate to /conversation/{wsId}
       // (which is a non-existent conv route and was a user-reported page-jump
-      // bug 2026-07-25). CodemanSidebar's `props.onItemSelect?.()` short-circuits
+      // bug 2026-07-25). CodemanSidebar's `props.onMenuGroupSelect?.()` short-circuits
       // to a no-op when undefined, so this is the contract for "pure toggle".
-      onSubItemSelect={handleSelectConv}
+      onMenuSelect={handleSelectConv}
       onEmptyGroupClick={handleEmptyWorkspaceClick}
       header={
         <NewChatButton onClick={handleNewConversation} />
