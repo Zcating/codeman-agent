@@ -1,6 +1,6 @@
 //! SettingsSidebar — settings-domain wrapper for the universal CodemanSidebar.
 //!
-//! 6 flat nav items: LLM / App / Window / Skills / MCP / Advanced. URL is single source of
+//! 4 flat nav items: LLM / App / Window / Advanced. URL is single source of
 //! truth: `currentValue` derived from `/settings/$tab` route param.
 //! `onMenuSelect` navigates to `/settings/{value}`.
 //!
@@ -16,8 +16,6 @@ import {
   SlidersHorizontal,
   AppWindow,
   Terminal,
-  Sparkles,
-  Server,
 } from "lucide-solid";
 import {
   CodemanSidebar,
@@ -27,13 +25,11 @@ import {
 } from "@codeman-frontend/shared/components/internal/codeman-sidebar";
 
 /**
- * Static config for the 6 settings nav items.
+ * Static config for the 4 settings nav items.
  * Tab icons chosen per V2.5 design:
  * - LLM       → Brain       (mental model: AI configuration)
  * - App       → SlidersHorizontal (behavior toggles)
  * - Window    → AppWindow   (window sizing)
- * - Skills    → Sparkles    (V3.1 ADR-0031 Skills plugin)
- * - MCP       → Server      (V3.1 ADR-0032 MCP client)
  * - Advanced  → Terminal    (danger zone, low-level)
  */
 const SETTINGS_NAV: readonly CodemanSidebarMenuOption[] = [
@@ -47,16 +43,6 @@ const SETTINGS_NAV: readonly CodemanSidebarMenuOption[] = [
     label: "Window",
     value: "window",
     icon: <AppWindow class="h-4 w-4" aria-hidden="true" />,
-  },
-  {
-    label: "Skills",
-    value: "skills",
-    icon: <Sparkles class="h-4 w-4" aria-hidden="true" />,
-  },
-  {
-    label: "MCP",
-    value: "mcp",
-    icon: <Server class="h-4 w-4" aria-hidden="true" />,
   },
   {
     label: "Advanced",

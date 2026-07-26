@@ -173,6 +173,8 @@ Chat 输入框 + Home 表单中：
 
 挂到 `src/features/settings/routes/settings-layout.tsx`，新增 SidebarItem `Skills`。
 
+> **迁移注记 (2026-07)**：D9 的 Settings sidebar 入口已被 2026-07 插件迁移 supersede。Skills 现归属 chat-sidebar 的「插件」分组，canonical route 为 `/plugins/skills`；旧 `/settings/skills` 路由保留重定向以兼容。文档不再反映 Settings 入口，仅反映当前实现。
+
 ### D10 — SlashMenu 组件契约
 
 ```tsx

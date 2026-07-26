@@ -18,7 +18,7 @@
 
 import { type JSX } from "solid-js";
 import { Outlet, useLocation, useNavigate, useParams, Link } from "@tanstack/solid-router";
-import { Settings as SettingsIcon } from "lucide-solid";
+import { Settings as SettingsIcon, WandSparkles, Cable } from "lucide-solid";
 import {
   CodemanSidebar,
   type CodemanSidebarGroupOption,
@@ -51,11 +51,24 @@ export function ChatSidebar(): JSX.Element {
   const selectedConvId = (): string | null =>
     (params() as { convId?: string }).convId ?? null;
 
+  // Current pathname for plugin route active detection
+  const currentPathname = (): string => location().pathname;
+
   const wsList = (): Workspace[] => workspaces$() ?? [];
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
   const handleSelectConv = (id: string): void => {
+    // Handle plugin navigation
+    if (id === "skills") {
+      navigate({ to: "/plugins/skills" });
+      return;
+    }
+    if (id === "mcp") {
+      navigate({ to: "/plugins/mcp" });
+      return;
+    }
+    // Handle conversation navigation
     navigate({ to: `/conversation/${id}` });
   };
 
@@ -124,30 +137,53 @@ export function ChatSidebar(): JSX.Element {
   // ─── Sidebar tree builders ───────────────────────────────────────────────
 
   const options = (): CodemanSidebarGroupOption[] => {
-    if (wsList().length === 0) {return [];}
+    // Plugin group is always visible
+    const pluginGroup: CodemanSidebarGroupOption = {
+      label: "插件",
+      value: "plugins",
+      children: [
+        {
+          label: "Skills",
+          value: "skills",
+          icon: <WandSparkles class="h-4 w-4" />,
+          forceSubMenu: true,
+        },
+        {
+          label: "MCP",
+          value: "mcp",
+          icon: <Cable class="h-4 w-4" />,
+          forceSubMenu: true,
+        },
+      ],
+    };
 
-    return [
-      {
-        label: "项目",
-        value: "workspace",
-        children: wsList().map((ws): CodemanSidebarMenuGroupOption => ({
-          label: ws.label,
-          value: ws.id,
-          // Per-group Accordion (sidebar-reshim Q28 reversal): default-expanded
-          // so all workspaces' conv lists are visible at first render (matches
-          // the previous per-group expanded-by-default behavior). Users can
-          // collapse individual workspaces by clicking them.
-          defaultExpanded: true,
-          children: conversations$()
-            ?.filter((c) => c.workspaceId === ws.id)
-            .sort((a, b) => b.updatedAt - a.updatedAt)
-            .map((c): CodemanSidebarMenuOption => ({
-              label: c.title,
-              value: c.id,
-            })) ?? [],
-        })),
-      },
-    ];
+    // Project group only included when there are workspaces
+    if (wsList().length === 0) {
+      return [pluginGroup];
+    }
+
+    const projectGroup: CodemanSidebarGroupOption = {
+      label: "项目",
+      value: "workspace",
+      children: wsList().map((ws): CodemanSidebarMenuGroupOption => ({
+        label: ws.label,
+        value: ws.id,
+        // Per-group Accordion (sidebar-reshim Q28 reversal): default-expanded
+        // so all workspaces' conv lists are visible at first render (matches
+        // the previous per-group expanded-by-default behavior). Users can
+        // collapse individual workspaces by clicking them.
+        defaultExpanded: true,
+        children: conversations$()
+          ?.filter((c) => c.workspaceId === ws.id)
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+          .map((c): CodemanSidebarMenuOption => ({
+            label: c.title,
+            value: c.id,
+          })) ?? [],
+      })),
+    };
+
+    return [pluginGroup, projectGroup];
   };
 
   const renderMenuGroup = (item: CodemanSidebarMenuGroupOption): JSX.Element => (
@@ -173,12 +209,26 @@ export function ChatSidebar(): JSX.Element {
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
+  // Custom active predicate: handles both conversation active state (by convId)
+  // and plugin route active state (by pathname match when on /plugins pages)
+  const isActive = (value: string | undefined): boolean => {
+    if (!value) return false;
+    const pathname = currentPathname();
+    // Plugin routes: match by pathname when on /plugins pages
+    if (pathname.startsWith("/plugins")) {
+      return pathname.includes(value);
+    }
+    // Conversation routes: match by convId
+    return value === selectedConvId();
+  };
+
   return (
     <CodemanSidebar
       options={options()}
       renderMenuGroup={renderMenuGroup}
       renderMenu={renderMenu}
       currentValue={selectedConvId() ?? undefined}
+      isActive={isActive}
       // onMenuGroupSelect intentionally omitted: per chat AGENTS.md ADR-0023 D7-CS,
       // workspaces are NEVER navigation targets — only convs are. Clicking a
       // workspace label should ONLY toggle its accordion (handled by
