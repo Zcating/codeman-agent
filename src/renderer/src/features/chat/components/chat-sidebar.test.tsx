@@ -84,6 +84,16 @@ const F = vi.hoisted(() => {
   };
 });
 
+// ─── Plugin metadata mock (hoisted to top level for vi.mock to work) ────────────
+// Uses an object with a getter so tests can reassign F.getPluginMetadata dynamically.
+const mockPluginMetadata = {
+  get: () => F.getPluginMetadata(),
+};
+
+vi.mock("@codeman-frontend/plugins", () => ({
+  getPluginMetadata: () => mockPluginMetadata.get(),
+}));
+
 // ─── Module mocks ──────────────────────────────────────────────────────────
 
 vi.mock("@tanstack/solid-router", async () => {
@@ -377,11 +387,6 @@ describe("ChatSidebar (PR 2)", () => {
 
   // ─── Seam P1: Plugin group derived from registry metadata ─────────────────────
   describe("Seam P1: Plugin group from registry metadata", () => {
-    // Mock @codeman-frontend/plugins for getPluginMetadata
-    vi.mock("@codeman-frontend/plugins", () => ({
-      getPluginMetadata: () => F.getPluginMetadata(),
-    }));
-
     it("plugin group children are sorted by sidebar.order (not hardcoded order)", () => {
       render(() => <ChatSidebar />);
       const opts = F.capturedProps!.options;
