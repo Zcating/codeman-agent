@@ -37,6 +37,13 @@
 - **File Tool (文件工具)** — pi-agent 工具族，内置 5 个: `read_file` (读全文) / `write_file` (覆盖写) / `edit_file` (替换文本，支持 `replaceAll`) / `search_files` (glob + content 搜索) / `delete_file` (移至回收站)。所有工具通过 IPC 调 Electron Main process 的 `node:fs`，沙箱由 workspace 边界约束。_避免_: fs tool、file operation (过载)。
 - **Sandbox Violation (越界错误)** — Electron Main process 在 `fs.realpath(path)` 后检测到 `path` 不在任何 workspace 目录下时返回的错误。Agent 收到后必须重新规划 (改路径 / 让用户加 workspace) 而非重试原路径。V3 起语义不变；实现从 Rust `std::fs::canonicalize` 改为 Node `fs.realpath.native` (per ADR-0024)。
 
+### Plugins
+
+- **Plugin (插件)** — Agent 的一项可独立启用能力模块。Skills 提供 prompt 知识扩展，MCP 提供外部工具能力；二者是正交能力，不互相替代。
+- **Plugin Registry (插件注册表)** — renderer 中管理内置 Plugin 身份、启动状态和导航信息的统一边界。它协调 Plugin 初始化，但不拥有 Agent runtime 的 tools 或 system prompt 聚合职责。_避免_：动态模块发现、runtime tool registry。
+- **Plugin Initialization (插件初始化)** — Agent 启动阶段为每个已注册 Plugin 建立可用状态的过程。所有 Plugin 完成成功或失败后，Agent 才结束该启动阶段；单个 Plugin 失败不会让其它 Plugin 失去机会。
+- **Plugin Navigation Metadata (插件导航元数据)** — Plugin 对应的 canonical route 与 sidebar 展示信息。它统一 router 与 sidebar 的导航数据，但不意味着运行时动态创建 TanStack Router route。
+
 ### 架构
 
 - **Runtime (运行时)** — 包装 pi-mono agent loop 的**纯工厂函数** `createAgentRuntime()`。无 `Context.Tag` service、无 Layer DI、无内部 Map（V2 起 per ADR-0019 supersede ADR-0014 D1）。每次调用 `createAgentRuntime()` 返回独立的 `AgentRuntime` 实体，存放在 `ConversationState.runtime`（per-conv 实例化）。`AgentRuntime.run({ context, provider })` 内部仍用 Queue-based Mailbox 架构（per ADR-0017）：`Queue.unbounded` 作为 event bus，`Effect.fork` 在子 fiber 里跑 `agent.subscribe + agent.prompt`，事件通过 `Queue.unsafeOffer` 推入；consumer 端 `Stream.fromQueue(queue)` 是 leaf operator。每次 `run()` 调用新建 pi-mono `Agent`，`initialState.messages = context`（store 来的浅拷贝，per ADR-0019 D2 "Agent 是 per-run transient"）；`AbortController` 注入 transport，`cancel()` 通过 `abortController.abort()` 触发 fetch abort。**事件 emit 契约**（per `Bubble Boundary`）：runtime 在每个 `turn_end` 触发 1 个 `done` 事件（emit 该 turn 的 assistant message），**不**在 `agent_end` 聚合跨 turn thinking/tool/text。`_避免_`：agent core、agent loop、AgentRuntime service（旧 Context.Tag + Layer 设计）。
