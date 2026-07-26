@@ -1,24 +1,17 @@
 //! SkillsSection — `/settings/skills` route component.
 //!
 //! Lists all skills (from src/plugins/skills/stores/skills.store) with toggle
-//! controls + Refresh button. Writes to `appStore.settings.enabledSkills` array.
+//! controls. Writes to `appStore.settings.enabledSkills` array.
 //!
 //! V3.1 ADR-0031 Wave A6.
 
-import { Show, For, type JSX, createSignal } from "solid-js";
-import { Effect, Exit } from "effect";
+import { Show, For, type JSX } from "solid-js";
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
 import { settingsSaver } from "@codeman-frontend/features/settings/lib/settings-saver";
-import {
-  refreshManifests,
-  skillsManifests$,
-} from "@codeman-frontend/plugins/skills/stores/skills.store";
-import { codemanToast } from "@codeman-frontend/shared/components/internal/codeman-toast";
-import { CheckCircle2, Package, RefreshCw, XCircle } from "lucide-solid";
+import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
+import { CheckCircle2, Package, XCircle } from "lucide-solid";
 
 export function SkillsSection(): JSX.Element {
-  const [refreshing, setRefreshing] = createSignal(false);
-
   const enabledSet = (): Set<string> =>
     new Set(appStore.state.value.enabledSkills ?? []);
 
@@ -33,24 +26,6 @@ export function SkillsSection(): JSX.Element {
     settingsSaver.scheduleSave();
   };
 
-  const handleRefresh = async (): Promise<void> => {
-    setRefreshing(true);
-    const exit = await Effect.runPromiseExit(refreshManifests());
-    setRefreshing(false);
-    Exit.match(exit, {
-      onSuccess: () => {
-        codemanToast.success(`Refreshed ${skillsManifests$().length} skill(s)`);
-      },
-      onFailure: (cause) => {
-        const errMsg =
-          cause._tag === "Fail"
-            ? String(cause.error)
-            : "(unknown error)";
-        codemanToast.error(`Refresh failed: ${errMsg}`);
-      },
-    });
-  };
-
   const formatSource = (source: "preinstalled" | "user"): string =>
     source === "preinstalled" ? "Pre-installed" : "User";
 
@@ -60,20 +35,6 @@ export function SkillsSection(): JSX.Element {
         <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
           Skills
         </h2>
-        <button
-          type="button"
-          onClick={() => void handleRefresh()}
-          disabled={refreshing()}
-          class="flex items-center gap-1 text-sm text-zinc-600 dark:text-zinc-400 hover:text-foreground disabled:opacity-50 transition-colors"
-          aria-label="Refresh skills list"
-          data-testid="skills-refresh"
-        >
-          <RefreshCw
-            class={`h-4 w-4 ${refreshing() ? "animate-spin" : ""}`}
-            aria-hidden="true"
-          />
-          <span>{refreshing() ? "Refreshing…" : "Refresh"}</span>
-        </button>
       </header>
 
       <p class="text-xs text-zinc-500 dark:text-zinc-400">
@@ -91,8 +52,8 @@ export function SkillsSection(): JSX.Element {
               No skills found.
             </p>
             <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-              Click Refresh to scan <code>~/.agents/skills/</code>, or add a
-              <code>SKILL.md</code> file under a directory there.
+              Skills are scanned during application startup from{' '}
+              <code>~/.agents/skills/</code>.
             </p>
           </div>
         }
