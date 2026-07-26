@@ -58,7 +58,10 @@ vi.mock("@codeman-frontend/plugins/skills/stores/skills.store", () => {
   };
 });
 
-const baseSettings: SettingsV15 = {
+// SettingsV15 extended with enabledSkills (present in real Settings interface)
+type SettingsV15WithSkills = SettingsV15 & { enabledSkills?: string[] };
+
+const baseSettings: SettingsV15WithSkills = {
   providers: [],
   schemaVersion: "1.5",
   defaultLlmProviderId: "minimax",
@@ -90,7 +93,7 @@ describe("SkillsSection — /settings/skills", () => {
     mockState.settings = {
       ...baseSettings,
       enabledSkills: [],
-    };
+    } as SettingsV15;
     mockState.resolved = undefined;
     mockState.v0FixtureActive = false;
     await Effect.runPromise(appStore.refresh());
