@@ -113,7 +113,7 @@ describe("bootstrap sequencing seam", () => {
   describe("render timing relative to plugin initialization", () => {
     it("render is NOT called while plugin initializer is pending", async () => {
       // Arrange: plugin init is deferred so it's still "pending" when we check
-      const { promise: initPromise, resolve } = createDeferred<InitializeAllResult>();
+      const { promise: initPromise } = createDeferred<InitializeAllResult>();
       mockInitializeAll.mockImplementation(() =>
         Effect.promise(() => initPromise),
       );
@@ -181,8 +181,10 @@ describe("bootstrap sequencing seam", () => {
         );
 
         // Verify: initializeAll succeeded (overall result always succeeds per ADR-0035)
-        expect(Exit.isSuccess(initExit)).toBe(true);
-        const result = initExit.value;
+        if (!Exit.isSuccess(initExit)) {
+          throw new Error("Expected initExit to be success");
+        }
+        const result = initExit.value as InitializeAllResult;
         expect(result.ok).toBe(true);
         expect(result.failures.size).toBe(1);
         expect(result.failures.has("failed-plugin")).toBe(true);
@@ -272,8 +274,10 @@ describe("bootstrap sequencing seam", () => {
       const initExit = await Effect.runPromiseExit(mockInitializeAll());
 
       // Assert: overall succeeded despite failures
-      expect(Exit.isSuccess(initExit)).toBe(true);
-      const result = initExit.value;
+      if (!Exit.isSuccess(initExit)) {
+        throw new Error("Expected initExit to be success");
+      }
+      const result = initExit.value as InitializeAllResult;
       expect(result.failures.size).toBe(2);
 
       // In actual bootstrap, failures are logged but do NOT block render

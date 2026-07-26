@@ -4,7 +4,7 @@ import { render } from "solid-js/web";
 import { RouterProvider } from "@tanstack/solid-router";
 import { router } from "@codeman-frontend/router";
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
-import { Effect, Exit } from "effect";
+import { Cause, Effect, Exit } from "effect";
 import { logger } from "@codeman-frontend/shared/lib/logger";
 import * as chatStore from "@codeman-frontend/features/chat/stores/chat.store";
 import { ToasterMount } from "@codeman-frontend/shared/components/internal/codeman-toast";
@@ -103,7 +103,7 @@ function bootstrap(): void {
         for (const [pluginId, error] of result.failures) {
           logger.warn(
             `[index.tsx] plugin "${pluginId}" initialization failed:`,
-            formatAppError(error),
+            formatAppError(Cause.fail(error)),
           );
         }
       }
