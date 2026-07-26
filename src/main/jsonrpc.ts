@@ -57,9 +57,9 @@ export interface JsonRpcOptions {
 }
 
 interface PendingRequest {
-  readonly promise: Promise<never>;
-  readonly resolve: (value: unknown) => void;
-  readonly reject: (reason: unknown) => void;
+  promise: Promise<never>;
+  resolve: (value: unknown) => void;
+  reject: (reason: unknown) => void;
   readonly method: string;
   readonly timeoutHandle: ReturnType<typeof setTimeout>;
 }
@@ -116,10 +116,6 @@ export class JsonRpcConnection {
       const entry = this.#pending.get(id);
       if (entry) {
         this.#pending.delete(id);
-        // NOTE: entry.promise may be null during the TDZ window of the promise
-        // executor; timeout must use entry.resolve/reject directly.
-        entry.resolve = (v: unknown) => {}; // prevent noop if called after timeout but before promise settles
-        void entry.promise.catch(() => {}); // safety net for the never-resolving timeout path
         entry.reject(
           new JsonRpcTimeoutError({
             message: `JSON-RPC request "${method}" (id=${id}) timed out after ${this.#timeoutMs}ms`,
@@ -127,6 +123,7 @@ export class JsonRpcConnection {
             timeoutMs: this.#timeoutMs,
           }),
         );
+        void entry.promise.catch(() => {}); // safety net: prevent unhandled if caller never .catch()es
       }
     }, this.#timeoutMs);
 
