@@ -116,6 +116,8 @@ LLM emit `tool_call` for `mcp_github_create_issue`:
 
 **Edit UX 决定**：V1 不做 in-UI form edit MCP server（form 复杂度高 + JSON 配置更适合手写）。Settings UI 仅 toggle + restart + status。
 
+> **迁移注记 (2026-07)**：D5 的 Settings sidebar 入口已被 2026-07 插件迁移 supersede。MCP Servers 现归属 chat-sidebar 的「插件」分组，canonical route 为 `/plugins/mcp`；旧 `/settings/mcp` 路由保留重定向以兼容。文档不再反映 Settings 入口，仅反映当前实现。
+
 ### D6 — Security：pre-launch authorization（已决议 p1）
 
 仅 enabled flag 控制启停。`~/.agents/mcp_servers.json` 本身需用户手动编辑或 git clone（**用户自己写入 = 隐式授权**）。
