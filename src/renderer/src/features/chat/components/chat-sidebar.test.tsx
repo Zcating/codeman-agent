@@ -61,6 +61,26 @@ const F = vi.hoisted(() => {
       renameWorkspace: vi.fn().mockResolvedValue(true),
       removeWorkspace: vi.fn().mockResolvedValue(true),
     },
+    // Default plugin metadata for tests
+    getPluginMetadata: () =>
+      new Map([
+        [
+          "skills",
+          {
+            id: "skills",
+            route: { path: "/plugins/skills", label: "Skills" },
+            sidebar: { icon: "WandSparkles", order: 3, visible: true },
+          },
+        ],
+        [
+          "mcp",
+          {
+            id: "mcp",
+            route: { path: "/plugins/mcp", label: "MCP" },
+            sidebar: { icon: "Cable", order: 4, visible: true },
+          },
+        ],
+      ]),
   };
 });
 
@@ -355,7 +375,127 @@ describe("ChatSidebar (PR 2)", () => {
     });
   });
 
-  // ─── Seam T8: RowActions integration ───────────────────────────────────────
+  // ─── Seam P1: Plugin group derived from registry metadata ─────────────────────
+  describe("Seam P1: Plugin group from registry metadata", () => {
+    // Mock @codeman-frontend/plugins for getPluginMetadata
+    vi.mock("@codeman-frontend/plugins", () => ({
+      getPluginMetadata: () => F.getPluginMetadata(),
+    }));
+
+    it("plugin group children are sorted by sidebar.order (not hardcoded order)", () => {
+      render(() => <ChatSidebar />);
+      const opts = F.capturedProps!.options;
+      const pluginChildren = opts[0].children;
+      // skills has order=3, mcp has order=4 → skills should come first
+      expect(pluginChildren[0].value).toBe("skills");
+      expect(pluginChildren[1].value).toBe("mcp");
+    });
+
+    it("plugin group children use route.path for navigation (not hardcoded)", () => {
+      render(() => <ChatSidebar />);
+      const opts = F.capturedProps!.options;
+      const pluginChildren = opts[0].children;
+      // Verify the children have the correct values that map to route.path
+      expect(pluginChildren.find((c: any) => c.value === "skills")).toBeTruthy();
+      expect(pluginChildren.find((c: any) => c.value === "mcp")).toBeTruthy();
+    });
+
+    it("navigates using route.path from metadata (not hardcoded /plugins/skills path)", () => {
+      render(() => <ChatSidebar />);
+      // The onMenuSelect handler should navigate using registry metadata
+      // Skills value "skills" should navigate to "/plugins/skills" from metadata
+      F.capturedProps!.onMenuSelect!("skills");
+      expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/plugins/skills" });
+    });
+
+    it("navigates using route.path for mcp (not hardcoded /plugins/mcp path)", () => {
+      render(() => <ChatSidebar />);
+      F.capturedProps!.onMenuSelect!("mcp");
+      expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/plugins/mcp" });
+    });
+
+    it("icons are rendered from sidebar.icon string identifier (WandSparkles/Cable)", () => {
+      render(() => <ChatSidebar />);
+      const opts = F.capturedProps!.options;
+      const pluginChildren = opts[0].children;
+      const skillsChild = pluginChildren.find((c: any) => c.value === "skills");
+      const mcpChild = pluginChildren.find((c: any) => c.value === "mcp");
+      // Icons should be JSX elements (WandSparkles for skills, Cable for mcp)
+      expect(skillsChild?.icon).toBeTruthy();
+      expect(mcpChild?.icon).toBeTruthy();
+    });
+
+    it("FAILS if metadata order is ignored: changing order in registry should reorder sidebar", () => {
+      // Build metadata with REVERSED order to prove sorting is applied
+      const reversedMetadata = new Map([
+        [
+          "mcp",
+          {
+            id: "mcp",
+            route: { path: "/plugins/mcp", label: "MCP" },
+            sidebar: { icon: "Cable", order: 1, visible: true }, // mcp comes first
+          },
+        ],
+        [
+          "skills",
+          {
+            id: "skills",
+            route: { path: "/plugins/skills", label: "Skills" },
+            sidebar: { icon: "WandSparkles", order: 2, visible: true }, // skills comes second
+          },
+        ],
+      ]);
+
+      // This test FAILS with hardcoded implementation because mcp is hardcoded first
+      // With registry-based implementation, mcp should appear first
+      const originalGetPluginMetadata = F.getPluginMetadata;
+      F.getPluginMetadata = () => reversedMetadata;
+
+      render(() => <ChatSidebar />);
+      const opts = F.capturedProps!.options;
+      const pluginChildren = opts[0].children;
+      // With registry-based implementation sorted by order, mcp (order=1) should come first
+      expect(pluginChildren[0].value).toBe("mcp");
+      expect(pluginChildren[1].value).toBe("skills");
+
+      F.getPluginMetadata = originalGetPluginMetadata;
+    });
+
+    it("FAILS if visible=false is ignored: hidden plugin should not appear", () => {
+      const metadataWithHidden = new Map([
+        [
+          "skills",
+          {
+            id: "skills",
+            route: { path: "/plugins/skills", label: "Skills" },
+            sidebar: { icon: "WandSparkles", order: 3, visible: true },
+          },
+        ],
+        [
+          "hidden-plugin",
+          {
+            id: "hidden-plugin",
+            route: { path: "/plugins/hidden", label: "Hidden" },
+            sidebar: { icon: "Star", order: 1, visible: false },
+          },
+        ],
+      ]);
+
+      const originalGetPluginMetadata = F.getPluginMetadata;
+      F.getPluginMetadata = () => metadataWithHidden;
+
+      render(() => <ChatSidebar />);
+      const opts = F.capturedProps!.options;
+      const pluginChildren = opts[0].children;
+      // hidden-plugin should NOT appear
+      expect(pluginChildren.find((c: any) => c.value === "hidden-plugin")).toBeUndefined();
+      expect(pluginChildren.length).toBe(1); // only skills
+
+      F.getPluginMetadata = originalGetPluginMetadata;
+    });
+  });
+
+  // ─── Seam T8: RowActions integration ────────────────────────────────────────
   describe("Seam T8: RowActions integration", () => {
     beforeEach(() => {
       F.capturedRowActionsProps = null;
