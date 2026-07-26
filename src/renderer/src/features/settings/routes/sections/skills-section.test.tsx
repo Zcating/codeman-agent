@@ -11,7 +11,7 @@ import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, cleanup } from "@solidjs/testing-library";
 import { Effect } from "effect";
 import { SkillsSection } from "@codeman-frontend/features/settings/routes/sections/skills-section";
-import { mockState, SettingsV15 } from "@codeman-frontend/__mocks__/ipc-mock";
+import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
 import { appStore, _resetAppStoreForTest } from "@codeman-frontend/shared/stores/app.store";
@@ -31,15 +31,14 @@ vi.mock("solid-js/store", () => {
   const storeProxy = new Proxy(store, {
     get(t, p) {
       if (p === "value") {return store.value;}
-      return (t as any)[p];
+      return Reflect.get(t, p);
     },
     set(t, p, v) {
       if (p === "value") {
         store.value = v;
         return true;
       }
-      (t as any)[p] = v;
-      return true;
+      return Reflect.set(t, p, v);
     },
   });
   return { createStore: () => [storeProxy, setStore] };
@@ -52,32 +51,10 @@ vi.mock("@codeman-frontend/plugins/skills/stores/skills.store", () => {
   return {
     skillsManifests$: () => _manifests,
     setManifests: (next: SkillManifest[]) => { _manifests = next; },
-    refreshManifests: vi.fn(),
     resetManifests: vi.fn(),
     _resetSkillsStoreForTest: () => { _manifests = []; },
   };
 });
-
-// SettingsV15 extended with enabledSkills (present in real Settings interface)
-type SettingsV15WithSkills = SettingsV15 & { enabledSkills?: string[] };
-
-const baseSettings: SettingsV15WithSkills = {
-  providers: [],
-  schemaVersion: "1.5",
-  defaultLlmProviderId: "minimax",
-  userLanguage: "en",
-  theme: "dark",
-  startAtLogin: false,
-  window: {
-    rememberPosition: true,
-    rememberSize: true,
-    defaultSize: { width: 800, height: 600 },
-    minSize: { width: 600, height: 400 },
-  },
-  systemPrompt: { default: "You are a helpful assistant.", userCanEdit: true },
-  conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
-  llmProviders: [],
-};
 
 const mockSkill: SkillManifest = {
   name: "test-skill",
@@ -90,10 +67,25 @@ describe("SkillsSection — /settings/skills", () => {
   beforeEach(async () => {
     _resetAppStoreForTest();
     _manifests = [];
+    // Set up mockState.settings as SettingsV15 (without extra enabledSkills).
+    // The test populates skills via _manifests mock, not appStore settings.
     mockState.settings = {
-      ...baseSettings,
-      enabledSkills: [],
-    } as SettingsV15;
+      providers: [],
+      schemaVersion: "1.5",
+      defaultLlmProviderId: "minimax",
+      userLanguage: "en",
+      theme: "dark",
+      startAtLogin: false,
+      window: {
+        rememberPosition: true,
+        rememberSize: true,
+        defaultSize: { width: 800, height: 600 },
+        minSize: { width: 600, height: 400 },
+      },
+      systemPrompt: { default: "You are a helpful assistant.", userCanEdit: true },
+      conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
+      llmProviders: [],
+    };
     mockState.resolved = undefined;
     mockState.v0FixtureActive = false;
     await Effect.runPromise(appStore.refresh());
