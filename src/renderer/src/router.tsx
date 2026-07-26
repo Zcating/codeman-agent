@@ -84,6 +84,18 @@ const conversationRoute = createRoute({
   component: ConversationRoute,
 });
 
+const pluginsSkillsRoute = createRoute({
+  getParentRoute: () => chatLayoutRoute,
+  path: "/plugins/skills",
+  component: SkillsSection,
+});
+
+const pluginsMcpRoute = createRoute({
+  getParentRoute: () => chatLayoutRoute,
+  path: "/plugins/mcp",
+  component: McpSection,
+});
+
 // ─── Settings nested routes (ADR-0030 D8) ────────────────────────────────
 //
 // Parent route uses `path: "/settings"` + `beforeLoad` redirect — this is
@@ -130,17 +142,21 @@ const settingsAdvancedRoute = createRoute({
 const settingsSkillsRoute = createRoute({
   getParentRoute: () => settingsLayoutRoute,
   path: "skills",
-  component: SkillsSection,
+  beforeLoad: () => {
+    throw redirect({ to: "/plugins/skills", replace: false });
+  },
 });
 
 const settingsMcpRoute = createRoute({
   getParentRoute: () => settingsLayoutRoute,
   path: "mcp",
-  component: McpSection,
+  beforeLoad: () => {
+    throw redirect({ to: "/plugins/mcp", replace: false });
+  },
 });
 
 export const routeTree = rootRoute.addChildren([
-  chatLayoutRoute.addChildren([homeRoute, conversationRoute]),
+  chatLayoutRoute.addChildren([homeRoute, conversationRoute, pluginsSkillsRoute, pluginsMcpRoute]),
   settingsLayoutRoute.addChildren([
     settingsLlmRoute,
     settingsAppRoute,
