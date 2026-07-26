@@ -42,8 +42,8 @@ describe("JsonRpcConnection", () => {
     pair = makePair();
   });
 
-  afterEach(() => {
-    pair.conn.close();
+  afterEach(async () => {
+    await pair.conn.close();
   });
 
   // ─── framing ─────────────────────────────────────
