@@ -44,7 +44,6 @@ function loadSettings(): Settings {
       raw = {};
     }
   }
-  // Load (or initialize) V1.5 camelCase settings from disk.
   // Schema.decodeUnknownEither inside sanitize() validates; malformed JSON → DEFAULT_SETTINGS.
   settingsCache = sanitize(raw as Partial<Settings>);
   saveSettings();
@@ -229,7 +228,6 @@ export function registerIpcHandlers(_deps: {
   dbInit();
   loadSettings();
 
-  // Settings
   ipcMain.handle("getSettings", () => loadSettings());
   ipcMain.handle("updateSettings", (_e, args) => {
     // V2 spec convention: args may be { newSettings } OR just the patch object.

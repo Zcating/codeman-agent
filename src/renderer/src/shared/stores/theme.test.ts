@@ -124,31 +124,26 @@ describe("startThemeSync — .dark 类应用", () => {
 
   // K9: resolveSystemTheme when matchMedia undefined → returns "light"
   it("theme='system' + matchMedia undefined → 回退到 light", async () => {
-    // @ts-ignore — intentionally removing matchMedia to simulate non-browser
     const orig = window.matchMedia;
-    // @ts-ignore
-    delete window.matchMedia;
+    Object.defineProperty(window, "matchMedia", { value: undefined, configurable: true, writable: true });
 
     mockTheme = "system";
     startThemeSync();
     await new Promise((r) => setTimeout(r, 10));
 
-    // @ts-ignore
-    window.matchMedia = orig;
+    Object.defineProperty(window, "matchMedia", { value: orig, configurable: true, writable: true });
   });
 
   // K1: setupMediaQueryListener is no-op when matchMedia is undefined
   it("setupMediaQueryListener no-op when matchMedia undefined → 不抛异常", async () => {
     const orig = window.matchMedia;
-    // @ts-ignore
-    delete window.matchMedia;
+    Object.defineProperty(window, "matchMedia", { value: undefined, configurable: true, writable: true });
 
     mockTheme = "system";
     startThemeSync();
     await new Promise((r) => setTimeout(r, 10));
 
-    // @ts-ignore
-    window.matchMedia = orig;
+    Object.defineProperty(window, "matchMedia", { value: orig, configurable: true, writable: true });
   });
 
   // K2/K3: System theme change event triggers .dark class and theme$ update

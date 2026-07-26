@@ -116,7 +116,6 @@ export class McpManager {
       try { await oldServer.stop(); } catch (e) { logger.warn(`[mcp] ${name} stop failed: ${String(e)}`); }
     }
 
-    // Update in-memory config + create new server instance
     this.#configs.set(name, newCfg);
     const newServer = new McpStdioServer(newCfg);
     this.#servers.set(name, newServer);
@@ -212,7 +211,6 @@ export class McpManager {
       throw new NotFound({ message: `MCP server not found: ${name}` });
     }
 
-    // Update enabled flag
     const updatedServers = config.servers.map((s) =>
       s.name === name ? { ...s, enabled } : s,
     );
@@ -224,7 +222,6 @@ export class McpManager {
       throw new InvalidConfig({ field: "mcp_servers.json", message: String(writeExit.cause) });
     }
 
-    // Update in-memory config
     this.#configs.set(name, { ...config.servers[serverIdx], enabled });
 
     if (enabled) {
