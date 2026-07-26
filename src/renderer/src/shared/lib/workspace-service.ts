@@ -11,7 +11,7 @@ import type { Workspace } from "@codeman-frontend/shared/lib/types";
  * **历史**：本服务最初位于 `src/features/chat/lib/workspace-service.ts`。
  * 因 `src/shared/stores/app.store.ts` 的 `pickWorkspacePath()` 需要 Effect
  * service 注入（ADR-0016 D4），shared/ 不能 import features/，违反单向依赖
- * 规则（src/shared/AGENTS.md line 52）。**V3+ 重构**：本服务提升到 shared/lib/。
+ * 规则（shared/ 不能 import features/）。**V3+ 重构**：本服务提升到 shared/lib/。
  *
  * **chat domain 仍然消费** `WorkspaceService.list()` / `add()` / `rename()` /
  * `remove()` 渲染 sidebar / home workspace picker。chat.store.ts 现在从

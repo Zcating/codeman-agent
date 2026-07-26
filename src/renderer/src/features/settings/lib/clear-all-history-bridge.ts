@@ -1,6 +1,6 @@
 //! clear-all-history-bridge — Settings IPC bridge for "clear all history".
 //!
-//! Per settings/AGENTS.md:38 "`lib/*.ts` 是纯 Effect 函数". Routes consume
+//! Rule: `lib/*.ts` 是纯 Effect 函数. Routes consume
 //! this bridge instead of importing `effect` + `invoke` directly (which
 //! would violate UI layer conventions).
 

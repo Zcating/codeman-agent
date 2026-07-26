@@ -47,7 +47,7 @@ Produce a structured review with these sections (skip empty ones):
    - Null / undefined handling
    - Type errors (especially `as any` / `@ts-ignore` — flag immediately)
 2. **Effect-TS patterns** (this project uses Effect-TS):
-   - Business functions not wrapped in `Effect.fnUntraced` (per AGENTS.md)
+   - Business functions not wrapped in `Effect.fnUntraced`
    - Errors not extending `AppError` via `Schema.TaggedError`
    - Schemas not using `effect/Schema` (`Schema.Struct`, `Schema.brand`, `Schema.filter`)
    - Empty `catch` blocks (`catch(e) {}`)
@@ -71,7 +71,7 @@ Produce a structured review with these sections (skip empty ones):
 1. Read the diff carefully, file by file.
 2. For each potential issue, note `[file_path:line_number]` for the user to jump to.
 3. Be specific — "the `for` loop at line 42 has off-by-one" beats "loops look suspicious".
-4. **Don't** flag style preferences not in AGENTS.md (tabs vs spaces, naming length, etc.).
+4. **Don't** flag style preferences not documented here (tabs vs spaces, naming length, etc.).
 5. If the diff is small (<50 lines), be thorough. If large (>500 lines), focus on Critical + Warnings only.
 6. End with **Strengths** — what the author did well. Always include this section.
 

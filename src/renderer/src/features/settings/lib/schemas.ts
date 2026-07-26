@@ -70,7 +70,7 @@ export const SettingsSchema = Schema.Struct({
 export type Settings = Schema.Schema.Type<typeof SettingsSchema>;
 
 // ─── Per-field validation schemas (for ProviderCard's @tanstack/solid-form) ─────
-// Originally inline in provider-card.tsx:56-66. Moved here per src/AGENTS.md
+// Originally inline in provider-card.tsx:56-66. Moved here so that
 // "domain config (Provider / Settings) 在 features/settings/lib/schemas.ts".
 
 /**

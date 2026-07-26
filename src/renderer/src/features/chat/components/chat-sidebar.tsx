@@ -46,7 +46,7 @@ export function ChatSidebar(): JSX.Element {
   // settings subpage like /settings/llm or /settings/app).
   const location = useLocation();
 
-  // URL-derived active conv id (per chat AGENTS.md: URL is single source of truth)
+  // URL-derived active conv id (URL is single source of truth)
   const params = useParams({ strict: false });
   const selectedConvId = (): string | null =>
     (params() as { convId?: string }).convId ?? null;
@@ -229,7 +229,7 @@ export function ChatSidebar(): JSX.Element {
       renderMenu={renderMenu}
       currentValue={selectedConvId() ?? undefined}
       isActive={isActive}
-      // onMenuGroupSelect intentionally omitted: per chat AGENTS.md ADR-0023 D7-CS,
+      // onMenuGroupSelect intentionally omitted: per ADR-0023 D7-CS,
       // workspaces are NEVER navigation targets — only convs are. Clicking a
       // workspace label should ONLY toggle its accordion (handled by
       // CodemanSidebar's triggerOnClick), NOT navigate to /conversation/{wsId}

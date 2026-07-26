@@ -215,8 +215,8 @@ describe("ChatSidebar (PR 2)", () => {
     expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/plugins/mcp" });
   });
 
-  it("onMenuGroupSelect is NOT wired (MenuGroup click must NOT navigate — chat AGENTS.md ADR-0023 D7-CS)", () => {
-    // Per chat AGENTS.md + ADR-0023 D7-CS: MenuGroups are NEVER active, only
+  it("onMenuGroupSelect is NOT wired (MenuGroup click must NOT navigate — ADR-0023 D7-CS)", () => {
+    // Per ADR-0023 D7-CS: MenuGroups are NEVER active, only
     // menus are. Clicking a MenuGroup label should ONLY toggle its accordion —
     // it must NOT navigate to /conversation/{wsId} (a non-existent conv route).
     // Universal CodemanSidebar still calls props.onMenuGroupSelect?.() — but

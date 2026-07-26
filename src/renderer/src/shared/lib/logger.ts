@@ -24,7 +24,7 @@
 //! - **不**做 sink 抽象：当前唯一 sink 是 `console.*`，未来要加 IPC 写后端
 //!   log 再开接口。
 //!
-//! 反模式（`src/AGENTS.md` 反模式段，ADR-0018 D5）：
+//! 反模式（ADR-0018 D5）：
 //!
 //! - UI 层禁止新增 `console.log` / `console.error` / `console.warn` /
 //!   `console.debug`，全部走 `logger.*`。

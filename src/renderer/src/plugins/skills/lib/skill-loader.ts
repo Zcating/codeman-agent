@@ -6,7 +6,7 @@
 //   - loadSkillContent(skillsDir, skillName): Effect<string, AppError, never>
 //       读 SKILL.md 全文(含 frontmatter), 不存在 → NotFound。
 //
-// 错误复用 AppError union (per AGENTS.md 硬性规则):
+// 错误复用 AppError union:
 //   - NotFound: skill 不存在
 //   - InvalidConfig: 目录不可读 / 文件权限错误 / frontmatter 损坏
 // 解析错误不外抛, 扫描时静默跳过(per ADR-0031 D1: "corrupt 在 list 中省略")。

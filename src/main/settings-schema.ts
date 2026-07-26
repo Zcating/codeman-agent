@@ -10,7 +10,7 @@
 
 import { Schema } from "effect";
 
-// ─── V15 Schema definitions (per src/AGENTS.md:52) ────────────────
+// ─── V15 Schema definitions ────────────────
 
 const ModelMetaStruct = Schema.Struct({
   id: Schema.String,

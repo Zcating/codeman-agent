@@ -13,7 +13,7 @@
 //! 注意:hook 不接管 value getter. value 由调用方直接绑定 (e.g. `value={local.value ?? ""}`),
 //! 这样保留 SolidJS 响应式追踪的直接依赖,避免通过 wrapper getter 的额外开销。
 //!
-//! 跨域 composable (V1 首批 hook, AGENTS.md hooks/ 子目录启用).
+//! 跨域 composable (V1 首批 hook, hooks/ 子目录启用).
 
 import { type JSX } from "solid-js";
 

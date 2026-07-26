@@ -1,6 +1,6 @@
 //! units.ts 单元测试 — 紧凑数字与千分位格式化边界。
 //!
-//! 覆盖矩阵(per `src/shared/AGENTS.md` "测试策略" 段):
+//! 覆盖矩阵:
 //! - compactNumber: NaN / Infinity / 0 / <1k 整数 / 1k-1M / 1M-1B / ≥1B / 负数 / 小数
 //! - formatWithCommas: NaN / Infinity / 0 / 千分位 / 大数
 

@@ -1,7 +1,7 @@
 //! SlashMenu — popup list of skill candidates triggered by `/` in textarea.
 //!
 //! Pure prop component — no internal state beyond UI navigation state.
-//! No `effect` import — UI layer component per plugins/AGENTS.md rule.
+//! No `effect` import — UI layer component (plugins/components rule).
 
 import {
   createSignal,
