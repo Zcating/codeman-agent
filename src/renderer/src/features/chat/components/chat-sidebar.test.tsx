@@ -498,6 +498,28 @@ describe("ChatSidebar (PR 2)", () => {
 
       F.getPluginMetadata = originalGetPluginMetadata;
     });
+
+    it("FAILS if unknown icon identifier: throws with plugin/id context instead of silent WandSparkles fallback", () => {
+      // Registry has exactly two valid icon IDs: WandSparkles and Cable.
+      // Unknown identifiers must fail loudly to catch bad metadata early.
+      const metadataWithUnknownIcon = new Map([
+        [
+          "bad-plugin",
+          {
+            id: "bad-plugin",
+            route: { path: "/plugins/bad", label: "Bad Plugin" },
+            sidebar: { icon: "NonExistentIcon", order: 1, visible: true },
+          },
+        ],
+      ]);
+
+      const originalGetPluginMetadata = F.getPluginMetadata;
+      F.getPluginMetadata = () => metadataWithUnknownIcon;
+
+      expect(() => render(() => <ChatSidebar />)).toThrow(/bad-plugin.*NonExistentIcon|NonExistentIcon.*bad-plugin/);
+
+      F.getPluginMetadata = originalGetPluginMetadata;
+    });
   });
 
   // ─── Seam T8: RowActions integration ────────────────────────────────────────

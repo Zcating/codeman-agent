@@ -41,15 +41,14 @@ import { getPluginMetadata } from "@codeman-frontend/plugins";
 // ─── Icon mapping (UI layer maps registry icon identifiers to JSX) ──────────────
 
 /** Maps registry icon string identifiers to lucide-solid JSX elements. */
-function renderPluginIcon(iconName: string): JSX.Element {
+function renderPluginIcon(pluginId: string, iconName: string): JSX.Element {
   switch (iconName) {
     case "WandSparkles":
       return <WandSparkles class="h-4 w-4" />;
     case "Cable":
       return <Cable class="h-4 w-4" />;
     default:
-      // Fallback to WandSparkles for unknown icons to preserve existing behavior
-      return <WandSparkles class="h-4 w-4" />;
+      throw new Error(`Unknown icon "${iconName}" for plugin "${pluginId}" — expected "WandSparkles" or "Cable"`);
   }
 }
 
@@ -160,7 +159,7 @@ export function ChatSidebar(): JSX.Element {
         (plugin): CodemanSidebarMenuOption => ({
           label: plugin.route.label,
           value: plugin.id,
-          icon: renderPluginIcon(plugin.sidebar.icon),
+          icon: renderPluginIcon(plugin.id, plugin.sidebar.icon),
           forceSubMenu: true,
         }),
       );
