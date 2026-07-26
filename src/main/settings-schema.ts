@@ -29,6 +29,7 @@ const ProviderLlmStruct = Schema.Struct({
   baseUrl: Schema.String,
   /** ADR-0011: V1 only supports anthropic-messages protocol */
   apiType: Schema.Literal("anthropic-messages"),
+  contextWindow: Schema.optional(Schema.Number),
   models: Schema.Array(ModelMetaStruct),
   modelsEndpoint: Schema.String,
 });
@@ -100,6 +101,7 @@ export const DEFAULT_SETTINGS: Settings = {
         defaultModel: MINIMAX_DEFAULT_MODEL,
         baseUrl: MINIMAX_BASE_URL,
         apiType: "anthropic-messages",
+        contextWindow: 200_000,
         // Pre-populate with the default model so the LLM picker has at least
         // one option out of the box (matches app.store.ts default).
         models: [

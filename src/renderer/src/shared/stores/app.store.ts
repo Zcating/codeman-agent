@@ -51,6 +51,7 @@ const DEFAULT_MINIMAX_PROVIDER: Provider = {
     defaultModel: "MiniMax-M2.5-highspeed",
     baseUrl: "https://api.minimaxi.com/anthropic",
     apiType: "anthropic-messages",
+    contextWindow: 200_000,
     models: [
       {
         id: "MiniMax-M2.5-highspeed",

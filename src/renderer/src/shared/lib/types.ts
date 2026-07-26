@@ -20,6 +20,7 @@ export interface ProviderLlm {
   baseUrl: string;
   /** ADR-0011: V1 only supports anthropic-messages protocol */
   apiType: "anthropic-messages";
+  contextWindow?: number;
   models: ModelMeta[];
   modelsEndpoint: string;
 }
