@@ -7,6 +7,11 @@
 //! V2 ADR-0019: 不再 import messages.store / agent.store, 全部走 chat.store。
 //! V2.5 (ADR-0029 D5): 移除 inline `role="alert" data-testid="chat-error-banner"` banner，
 //! runtime 错误改走 `codemanToast.error(formatAppError(...))`。
+//!
+//! V2.6 (2026-07-26, 决议自 `/prototype/context-ring` 路线 C): 发送按钮**左侧**新增
+//! `ContextRing` 圆形上下文进度条 + 双行 label（百分比 + 已用/总额 tokens）。
+//! 实现已拆到 `./context-ring.tsx`;本文件只持有 ringInfo memo(派生 state)
+//! + cluster wrapper。
 
 import { createEffect, createMemo, For, Show, onMount, type JSX } from "solid-js";
 import { Effect, Exit } from "effect";
@@ -14,6 +19,10 @@ import { X, Send } from "lucide-solid";
 import { createForm } from "@tanstack/solid-form";
 import { MessageBubble } from "@codeman-frontend/features/chat/components/message-bubble";
 import { store, sendMessage, cancel } from "@codeman-frontend/features/chat/stores/chat.store";
+import {
+  ContextRing,
+  computeUsedTokensEst,
+} from "@codeman-frontend/features/chat/components/context-ring";
 import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
 import { Button } from "@codeman-frontend/shared/components/ui/button";
 import { CodemanTextarea } from "@codeman-frontend/shared/components/internal/codeman-textarea";
@@ -25,6 +34,7 @@ import { formatAppError } from "@codeman-frontend/shared/lib/format-app-error";
 import { effectSchema, firstErrorMessage } from "@codeman-frontend/shared/lib/effect-schema-adapter";
 import { settingsSaver } from "@codeman-frontend/features/settings/lib/settings-saver";
 import { buildEnabledProviders } from "@codeman-frontend/features/chat/lib/build-enabled-providers";
+import { lookupContextWindow } from "@codeman-frontend/features/chat/lib/context-window-fallback";
 import {
   handleArrowUpField,
   handleArrowDownField,
@@ -59,7 +69,7 @@ function ProviderSelect(props: {
   );
 
   const handleChange = (modelId: string) => {
-    if (!modelId) {return;}
+    if (!modelId) { return; }
     props.onChange(modelId);
   };
 
@@ -105,7 +115,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
   // ─── Derived state ────────────────────────────────────────────────────────
   const isRunning = (): boolean => {
     const id = convId();
-    if (!id) {return false;}
+    if (!id) { return false; }
     return (
       store.byId[id]?.streamingMessageId !== null &&
       store.byId[id]?.streamingMessageId !== undefined
@@ -114,9 +124,42 @@ export function ChatView(props: { convId?: string }): JSX.Element {
 
   const currentMessages = () => {
     const id = convId();
-    if (!id) {return [];}
+    if (!id) { return []; }
     return store.byId[id]?.messages ?? [];
   };
+
+  // ─── ContextRing 派生 state (V2.6) ────────────────────────────────
+  //   读取当前 provider/model + 当前 conv messages 算 context window 使用率。
+  //   `total` 来自 ModelMeta.contextWindow;`used` 优先用最新一条 assistant
+  //   msg 的 `inputTokens` (LLM 真实回报),退路走粗估(字符 /4)。
+  const ringInfo = createMemo(() => {
+    const providers = appStore.state.value.providers ?? [];
+    const pid = appStore.state.value.defaultLlmProviderId;
+    const provider = providers.find((p) => p.id === pid);
+    // 双可选链:settings 数据漂移(老 provider 没 llm / llm 没 models)时不要 throw,
+    // 让 total 走 0 分支,环仍渲染 0% · 0 / 0 tokens 给用户可观察信号。
+    const model = provider?.llm?.models.find(
+      (m) => m.id === provider?.llm?.defaultModel,
+    );
+    const total = (model && provider) ? lookupContextWindow(model, provider) : 0;
+
+    const msgs = currentMessages();
+    let used = 0;
+    if (total > 0 && msgs.length > 0) {
+      // 1. 优先用最新 assistant message 的 inputTokens (API 真实值)
+      const lastAssistant = [...msgs].reverse().find((m) => m.role === "assistant");
+      if (lastAssistant && lastAssistant.inputTokens != null) {
+        used = lastAssistant.inputTokens;
+      } else {
+        // 2. Fallback:用 system prompt + 所有消息内容长度粗估
+        const systemPrompt = appStore.state.value.systemPrompt?.default ?? "";
+        used = computeUsedTokensEst(msgs) + Math.ceil(systemPrompt.length / 4);
+      }
+    }
+
+    const percentage = total > 0 ? Math.min(100, (used / total) * 100) : 0;
+    return { percentage, used, total };
+  });
 
   // Auto-scroll to bottom on messages change.
   // 首次进入对话(mount 后第一次 effect 执行)用 instant 直接定位,后续消息追加
@@ -124,7 +167,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
   let hasScrolledInitially = false;
   createEffect(() => {
     currentMessages();
-    if (!messagesEndRef) {return;}
+    if (!messagesEndRef) { return; }
     const behavior = hasScrolledInitially ? "smooth" : "instant";
     queueMicrotask(() => messagesEndRef.scrollIntoView({ behavior }));
     hasScrolledInitially = true;
@@ -134,12 +177,12 @@ export function ChatView(props: { convId?: string }): JSX.Element {
   // Tracks prev error to avoid duplicate toasts when lastError stays non-null across renders.
   const currentLastError = (): string | null => {
     const id = convId();
-    if (!id) {return null;}
+    if (!id) { return null; }
     return store.byId[id]?.lastError ?? null;
   };
   createEffect(() => {
     const err = currentLastError();
-    if (err) {codemanToast.error(err);}
+    if (err) { codemanToast.error(err); }
   });
 
   // ─── Form ─────────────────────────────────────────────────────────────────
@@ -155,7 +198,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     onSubmit: async ({ value }) => {
       const text = value.draft.trim();
       const id = convId();
-      if (!text || !id || isRunning()) {return;}
+      if (!text || !id || isRunning()) { return; }
 
       // Build ProviderConfig from appStore (read at submit-time, per ADR-0019 D2)
       const providerId = appStore.state.value.defaultLlmProviderId;
@@ -184,7 +227,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
   // ─── Cancel handler (form-external sibling) ───────────────────────────────
   const handleCancel = () => {
     const id = convId();
-    if (!id) {return;}
+    if (!id) { return; }
     cancel(id);
   };
 
@@ -328,28 +371,45 @@ export function ChatView(props: { convId?: string }): JSX.Element {
 
           <div class="flex-1" />
 
-          {/* Submit button — disabled when form not submittable OR running */}
-          <form.Subscribe
-            selector={(state) => ({
-              canSubmit: state.canSubmit,
-              isSubmitting: state.isSubmitting,
-            })}
+          {/* Cluster: [ContextRing] <16px gap> [Send button]
+              — 几何常量和组件本身都在 `./context-ring.tsx`。
+              — ring 数据来自 `ringInfo` memo(下方 ChatView 派生 state)。 */}
+          <div
+            class="flex items-center gap-4"
+            data-testid="ring-send-cluster"
           >
-            {(sub) => (
-              <Button
-                type="submit"
-                disabled={!sub().canSubmit || isRunning()}
-                aria-label="发送消息"
-              >
-                {sub().isSubmitting ? "提交中…" : "发送"}
-                <Send class="h-4 w-4" />
-              </Button>
-            )}
-          </form.Subscribe>
+            {/* 始终渲染 ContextRing — 之前用 <Show when={total > 0}> gate 会让
+                model lookup 失败 / settings 数据漂移时环消失,违背"左侧常驻"的设计。
+                total=0 时环自然显示 "0% · 0 / 0 tokens",作为可观察信号。 */}
+            <ContextRing
+              percentage={ringInfo().percentage}
+              usedTokens={ringInfo().used}
+              totalTokens={ringInfo().total}
+            />
+
+            {/* Submit button — disabled when form not submittable OR running */}
+            <form.Subscribe
+              selector={(state) => ({
+                canSubmit: state.canSubmit,
+                isSubmitting: state.isSubmitting,
+              })}
+            >
+              {(sub) => (
+                <Button
+                  type="submit"
+                  disabled={!sub().canSubmit || isRunning()}
+                  aria-label="发送消息"
+                >
+                  {sub().isSubmitting ? "提交中…" : "发送"}
+                  <Send class="h-4 w-4" />
+                </Button>
+              )}
+            </form.Subscribe>
+          </div>
         </div>
       </form>
 
-        {/* Cancel button — form-external sibling (per ADR-0029 D6) */}
+      {/* Cancel button — form-external sibling (per ADR-0029 D6) */}
       <Show when={isRunning()}>
         <div class="flex justify-end p-2 border-t border-border bg-card">
           <Button
@@ -390,7 +450,7 @@ function initialModelId(): string {
   const enabled = buildEnabledProviders(providers);
   const providerId = appStore.state.value.defaultLlmProviderId;
   const provider = enabled.find((p) => p.id === providerId) ?? enabled[0];
-  if (!provider) {return "";}
+  if (!provider) { return ""; }
   const raw = providers.find((p) => p.id === provider.id);
   const defaultModel = raw?.llm?.defaultModel;
   if (defaultModel && provider.models.some((m) => m.id === defaultModel)) {
