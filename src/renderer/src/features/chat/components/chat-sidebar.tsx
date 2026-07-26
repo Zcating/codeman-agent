@@ -61,11 +61,11 @@ export function ChatSidebar(): JSX.Element {
   const handleSelectConv = (id: string): void => {
     // Handle plugin navigation
     if (id === "skills") {
-      navigate({ to: "/settings/skills" });
+      navigate({ to: "/plugins/skills" });
       return;
     }
     if (id === "mcp") {
-      navigate({ to: "/settings/mcp" });
+      navigate({ to: "/plugins/mcp" });
       return;
     }
     // Handle conversation navigation
@@ -137,46 +137,51 @@ export function ChatSidebar(): JSX.Element {
   // ─── Sidebar tree builders ───────────────────────────────────────────────
 
   const options = (): CodemanSidebarGroupOption[] => {
-    if (wsList().length === 0) {return [];}
+    // Plugin group is always visible
+    const pluginGroup: CodemanSidebarGroupOption = {
+      label: "插件",
+      value: "plugins",
+      children: [
+        {
+          label: "Skills",
+          value: "skills",
+          icon: <WandSparkles class="h-4 w-4" />,
+        },
+        {
+          label: "MCP",
+          value: "mcp",
+          icon: <Cable class="h-4 w-4" />,
+        },
+      ],
+    };
 
-    return [
-      {
-        label: "插件",
-        value: "plugins",
-        children: [
-          {
-            label: "技能",
-            value: "skills",
-            icon: <WandSparkles class="h-4 w-4" />,
-          },
-          {
-            label: "MCP",
-            value: "mcp",
-            icon: <Cable class="h-4 w-4" />,
-          },
-        ],
-      },
-      {
-        label: "项目",
-        value: "workspace",
-        children: wsList().map((ws): CodemanSidebarMenuGroupOption => ({
-          label: ws.label,
-          value: ws.id,
-          // Per-group Accordion (sidebar-reshim Q28 reversal): default-expanded
-          // so all workspaces' conv lists are visible at first render (matches
-          // the previous per-group expanded-by-default behavior). Users can
-          // collapse individual workspaces by clicking them.
-          defaultExpanded: true,
-          children: conversations$()
-            ?.filter((c) => c.workspaceId === ws.id)
-            .sort((a, b) => b.updatedAt - a.updatedAt)
-            .map((c): CodemanSidebarMenuOption => ({
-              label: c.title,
-              value: c.id,
-            })) ?? [],
-        })),
-      },
-    ];
+    // Project group only included when there are workspaces
+    if (wsList().length === 0) {
+      return [pluginGroup];
+    }
+
+    const projectGroup: CodemanSidebarGroupOption = {
+      label: "项目",
+      value: "workspace",
+      children: wsList().map((ws): CodemanSidebarMenuGroupOption => ({
+        label: ws.label,
+        value: ws.id,
+        // Per-group Accordion (sidebar-reshim Q28 reversal): default-expanded
+        // so all workspaces' conv lists are visible at first render (matches
+        // the previous per-group expanded-by-default behavior). Users can
+        // collapse individual workspaces by clicking them.
+        defaultExpanded: true,
+        children: conversations$()
+          ?.filter((c) => c.workspaceId === ws.id)
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+          .map((c): CodemanSidebarMenuOption => ({
+            label: c.title,
+            value: c.id,
+          })) ?? [],
+      })),
+    };
+
+    return [pluginGroup, projectGroup];
   };
 
   const renderMenuGroup = (item: CodemanSidebarMenuGroupOption): JSX.Element => (
@@ -203,12 +208,12 @@ export function ChatSidebar(): JSX.Element {
   // ─── Render ──────────────────────────────────────────────────────────────
 
   // Custom active predicate: handles both conversation active state (by convId)
-  // and plugin route active state (by pathname match when on settings pages)
+  // and plugin route active state (by pathname match when on /plugins pages)
   const isActive = (value: string | undefined): boolean => {
     if (!value) return false;
     const pathname = currentPathname();
-    // Plugin routes: match by pathname when on settings pages
-    if (pathname.startsWith("/settings")) {
+    // Plugin routes: match by pathname when on /plugins pages
+    if (pathname.startsWith("/plugins")) {
       return pathname.includes(value);
     }
     // Conversation routes: match by convId

@@ -157,7 +157,7 @@ describe("ChatSidebar (PR 2)", () => {
     // Plugin children: Skills and MCP
     expect(opts[0].children.length).toBe(2);
     expect(opts[0].children[0]).toMatchObject({
-      label: "技能",
+      label: "Skills",
       value: "skills",
     });
     expect(opts[0].children[1]).toMatchObject({
@@ -203,16 +203,16 @@ describe("ChatSidebar (PR 2)", () => {
     expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/conversation/c-1" });
   });
 
-  it("onMenuSelect navigates to /settings/skills for skills plugin", () => {
+  it("onMenuSelect navigates to /plugins/skills for skills plugin", () => {
     render(() => <ChatSidebar />);
     F.capturedProps!.onMenuSelect!("skills");
-    expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/settings/skills" });
+    expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/plugins/skills" });
   });
 
-  it("onMenuSelect navigates to /settings/mcp for mcp plugin", () => {
+  it("onMenuSelect navigates to /plugins/mcp for mcp plugin", () => {
     render(() => <ChatSidebar />);
     F.capturedProps!.onMenuSelect!("mcp");
-    expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/settings/mcp" });
+    expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/plugins/mcp" });
   });
 
   it("onMenuGroupSelect is NOT wired (MenuGroup click must NOT navigate — chat AGENTS.md ADR-0023 D7-CS)", () => {
