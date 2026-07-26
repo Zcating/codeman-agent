@@ -925,3 +925,84 @@ describe("ChatView nested scroll fix (Bug B)", () => {
     expect(messagesWrapper!.className).toContain("min-h-0");
   });
 });
+
+// ─── ringInfo three-layer lookup (ADR-0036 V2.6) ──────────────────────────────────
+describe("ChatView ringInfo contextWindow three-layer lookup", () => {
+  afterEach(() => cleanup());
+
+  it("ringInfo uses three-layer lookup so MiniMax model without explicit contextWindow still shows 200_000 total", async () => {
+    const appStoreMock = await import("@codeman-frontend/shared/stores/app.store");
+    const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
+
+    // Setup: MiniMax provider with model that has NO contextWindow (simulates API not returning it)
+    // but provider.llm.contextWindow = 200_000 (layer 2 fallback)
+    (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          enabled: true,
+          apiKey: "test-key",
+          llm: {
+            defaultModel: "MiniMax-M2.7-highspeed",
+            baseUrl: "https://api.minimaxi.com/anthropic",
+            apiType: "anthropic-messages",
+            models: [
+              {
+                id: "MiniMax-M2.7-highspeed",
+                label: "MiniMax-M2.7-highspeed",
+                // contextWindow intentionally absent — simulates API not returning it
+                deprecated: false,
+                thinking: false,
+              },
+            ],
+            modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
+            contextWindow: 200_000, // layer 2 fallback
+          },
+        },
+      ],
+      defaultLlmProviderId: "minimax",
+    });
+
+    // Add more message content so used tokens > 0.5% of 200_000 (needed for non-zero pct)
+    // 200_000 * 0.005 = 1000 chars minimum for 1% display
+    const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { messages: Message[] }> } }).store;
+    mockStore.byId["conv-1"].messages = [
+      {
+        id: "msg-1",
+        conversationId: "conv-1",
+        role: "user" as const,
+        content: "A".repeat(2000),
+        thinking: null,
+        toolCalls: null,
+        toolResults: null,
+        model: null,
+        inputTokens: null,
+        outputTokens: null,
+        createdAt: 1710000000,
+      },
+      {
+        id: "msg-2",
+        conversationId: "conv-1",
+        role: "assistant" as const,
+        content: "B".repeat(2000),
+        thinking: null,
+        toolCalls: null,
+        toolResults: null,
+        model: "gpt-4o",
+        inputTokens: null, // null so fallback to estimate is used
+        outputTokens: null,
+        createdAt: 1710000001,
+      },
+    ];
+
+    const { container } = render(() => <ChatView convId="conv-1" />);
+
+    // Ring should be present and show non-zero percentage
+    const ring = container.querySelector('[data-testid="context-ring"]');
+    expect(ring).toBeTruthy();
+    // For pct >= 1: used >= 0.005 * 200_000 = 1000 tokens -> chars >= 4000
+    // With 4000 chars / 4 = 1000 tokens -> 1000/200000*100 = 0.5% -> rounds to 1%
+    expect(ring!.getAttribute("data-context-pct")).not.toBe("0");
+  });
+});

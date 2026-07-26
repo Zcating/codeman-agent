@@ -415,6 +415,7 @@ export async function parseSseStream(
     // Mutable partial state for the assistant message being built.
     const content: Array<TextContent | ThinkingContent | ToolCall> = [];
     let stopReason: StopReason = "stop";
+    let accUsage: Usage = emptyUsage();
 
     let buffer = "";
     let sseDataBuf = "";
@@ -431,7 +432,7 @@ export async function parseSseStream(
             api: model.api,
             provider: model.provider,
             model: model.id,
-            usage: emptyUsage(),
+            usage: { ...accUsage },
             stopReason,
             timestamp: Date.now(),
         };
@@ -624,6 +625,17 @@ export async function parseSseStream(
                         if (delta.stop_reason) {
                             stopReason = mapStopReason(delta.stop_reason);
                         }
+                        const rawUsage = data.usage as { input_tokens?: number; output_tokens?: number } | undefined;
+                        if (rawUsage) {
+                            accUsage = {
+                                input: rawUsage.input_tokens ?? 0,
+                                output: rawUsage.output_tokens ?? 0,
+                                cacheRead: 0,
+                                cacheWrite: 0,
+                                totalTokens: (rawUsage.input_tokens ?? 0) + (rawUsage.output_tokens ?? 0),
+                                cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+                            };
+                        }
                     }
                     // message_start and message_stop 不需要额外处理
                     // (initial partial 已在 start 事件发过,final end 由调用方 push done)
@@ -665,7 +677,7 @@ export async function parseSseStream(
         api: model.api,
         provider: model.provider,
         model: model.id,
-        usage: emptyUsage(),
+        usage: { ...accUsage },
         stopReason,
         timestamp: Date.now(),
     };

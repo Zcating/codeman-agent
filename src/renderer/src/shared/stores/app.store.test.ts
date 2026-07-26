@@ -218,6 +218,47 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     fetchSpy.mockRestore();
   });
 
+  // ─── V2.6.1: contextWindow backfill via three-layer lookup ───
+  it("refreshProviderModels: API 返回无 context_window 的模型时回填 contextWindow", async () => {
+    mockState.settings = {
+      ...mockState.settings,
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          enabled: true,
+          apiKey: "",
+          llm: {
+            defaultModel: "MiniMax-M2.7-highspeed",
+            baseUrl: "https://api.minimaxi.com/anthropic",
+            apiType: "anthropic-messages" as const,
+            contextWindow: 200_000,
+            models: [],
+            modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          },
+        },
+      ],
+    };
+    await Effect.runPromise(appStore.refresh());
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            { id: "MiniMax-M2.7-highspeed", object: "model", created: 123, owned_by: "minimax" },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const exit = await Effect.runPromiseExit(appStore.refreshProviderModels("minimax"));
+    expect(exit._tag).toBe("Success");
+    if (exit._tag === "Success") {
+      // Three-layer lookup should backfill 200_000 from provider.llm.contextWindow
+      expect(exit.value[0].contextWindow).toBe(200_000);
+    }
+    fetchSpy.mockRestore();
+  });
+
   it("refreshProviderModels: 未知 provider 报错 (AppError)", async () => {
     mockState.settings = {
       ...mockState.settings,

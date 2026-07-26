@@ -607,3 +607,48 @@ describe("parseSseStream -- abort during cleanup race", () => {
         expect(result.stopReason).toBe("stop");
     });
 });
+
+// ─── Group I -- parseSseStream usage tracking from message_delta ───────────────
+
+describe("parseSseStream -- usage tracking from message_delta", () => {
+    const testModel: Model<"anthropic-messages"> = {
+        id: "test-model",
+        name: "test-model",
+        api: "anthropic-messages",
+        provider: "anthropic",
+        baseUrl: "https://api.test",
+        reasoning: false,
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 128000,
+        maxTokens: 8192,
+    };
+
+    function makeSseStream(text: string): ReadableStream<Uint8Array> {
+        const encoder = new TextEncoder();
+        return new ReadableStream({
+            start(controller) {
+                controller.enqueue(encoder.encode(text));
+                controller.close();
+            },
+        });
+    }
+
+    it("I1: tracks usage from message_delta SSE event", async () => {
+        const sse =
+            "event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_1\",\"type\":\"message\",\"role\":\"assistant\",\"content\":[],\"model\":\"test\",\"stop_reason\":null,\"stop_sequence\":null,\"usage\":{\"input_tokens\":0,\"output_tokens\":0}}}\n\n" +
+            "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n" +
+            "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello\"}}\n\n" +
+            "event: content_block_stop\ndata: {\"type\":\"content_block_stop\",\"index\":0}\n\n" +
+            "event: message_delta\ndata: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"input_tokens\":100,\"output_tokens\":50}}\n\n" +
+            "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n";
+
+        const stream = makeSseStream(sse);
+        const eventStream = createAssistantMessageEventStream();
+        const result = await parseSseStream(stream, testModel, undefined, eventStream);
+
+        expect(result.usage.input).toBe(100);
+        expect(result.usage.output).toBe(50);
+        expect(result.usage.totalTokens).toBe(150);
+    });
+});

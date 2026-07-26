@@ -39,6 +39,7 @@ import {
   SettingsServiceLive,
 } from "@codeman-frontend/shared/lib/ipc";
 import { WorkspaceService, WorkspaceServiceLive } from "@codeman-frontend/shared/lib/workspace-service";
+import { lookupContextWindow } from "@codeman-frontend/features/chat/lib/context-window-fallback";
 // Note: settingsSaver import removed - was used by deprecated addWorkspace method
 
 // ─── Default Settings (ADR-0015) ──────────────────────────────────────
@@ -51,6 +52,7 @@ const DEFAULT_MINIMAX_PROVIDER: Provider = {
     defaultModel: "MiniMax-M2.5-highspeed",
     baseUrl: "https://api.minimaxi.com/anthropic",
     apiType: "anthropic-messages",
+    contextWindow: 200_000,
     models: [
       {
         id: "MiniMax-M2.5-highspeed",
@@ -139,6 +141,15 @@ const refreshProviderModelsImpl = Effect.fnUntraced(
   function* (id: string) {
     const svc = yield* ProviderService;
     const models = yield* svc.fetchModels(id);
+    // V2.6.1: Backfill contextWindow from three-layer lookup
+    const provider = (settings.value.providers ?? []).find((p) => p.id === id);
+    if (provider) {
+      for (const m of models) {
+        if (m.contextWindow == null) {
+          m.contextWindow = lookupContextWindow(m, provider);
+        }
+      }
+    }
     setSettings("value", (prev) => {
       const providers = (prev.providers ?? []).map((p) => {
         if (p.id !== id) {

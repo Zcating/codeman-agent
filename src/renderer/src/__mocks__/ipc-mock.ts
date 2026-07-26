@@ -21,6 +21,7 @@ export interface ProviderLlm {
   defaultModel: string;
   baseUrl: string;
   apiType: "anthropic-messages";
+  contextWindow?: number;
   models: ModelMeta[];
   modelsEndpoint: string;
 }
@@ -136,6 +137,7 @@ export const mockDeepseekProvider: Provider = mockProvider({
     defaultModel: "deepseek-chat",
     baseUrl: "https://api.deepseek.com/anthropic",
     apiType: "anthropic-messages",
+    contextWindow: 200_000,
     models: [
       {
         id: "deepseek-chat",
@@ -208,6 +210,7 @@ const DEFAULT_MINIMAX_PROVIDER: Provider = {
     defaultModel: "MiniMax-M2.5-highspeed",
     baseUrl: "https://api.minimaxi.com/anthropic",
     apiType: "anthropic-messages",
+    contextWindow: 200_000,
     models: [
       {
         id: "MiniMax-M2.5-highspeed",
