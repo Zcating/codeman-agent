@@ -143,34 +143,51 @@ beforeEach(() => {
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
 describe("ChatSidebar (PR 2)", () => {
-  it("builds CodemanSidebarGroupOption[] with MenuGroup items and conv children", () => {
+  it("builds CodemanSidebarGroupOption[] with plugin group and project group", () => {
     render(() => <ChatSidebar />);
     expect(F.capturedProps).toBeTruthy();
     const opts = F.capturedProps!.options;
-    expect(opts.length).toBe(1);
-    // Top-level group — always visible (no defaultExpanded; sidebar-reshim Q28 reversal)
+    expect(opts.length).toBe(2);
+
+    // Plugin group (top)
     expect(opts[0]).toMatchObject({
+      label: "插件",
+      value: "plugins",
+    });
+    // Plugin children: Skills and MCP
+    expect(opts[0].children.length).toBe(2);
+    expect(opts[0].children[0]).toMatchObject({
+      label: "技能",
+      value: "skills",
+    });
+    expect(opts[0].children[1]).toMatchObject({
+      label: "MCP",
+      value: "mcp",
+    });
+
+    // Project group (second) — always visible (no defaultExpanded; sidebar-reshim Q28 reversal)
+    expect(opts[1]).toMatchObject({
       label: "项目",
       value: "workspace",
     });
     // Two MenuGroups as children, each carrying per-group Accordion defaultExpanded
-    expect(opts[0].children.length).toBe(2);
-    expect(opts[0].children[0]).toMatchObject({
+    expect(opts[1].children.length).toBe(2);
+    expect(opts[1].children[0]).toMatchObject({
       label: "Frontend",
       value: "ws-1",
       defaultExpanded: true,
     });
     // Convs as Menu children of each MenuGroup
-    expect(opts[0].children[0].children).toEqual([
+    expect(opts[1].children[0].children).toEqual([
       { label: "Chat 1", value: "c-1" },
       { label: "Chat 2", value: "c-2" },
     ]);
-    expect(opts[0].children[1]).toMatchObject({
+    expect(opts[1].children[1]).toMatchObject({
       label: "Backend",
       value: "ws-2",
       defaultExpanded: true,
     });
-    expect(opts[0].children[1].children).toEqual([
+    expect(opts[1].children[1].children).toEqual([
       { label: "Chat 3", value: "c-3" },
     ]);
   });
@@ -184,6 +201,18 @@ describe("ChatSidebar (PR 2)", () => {
     render(() => <ChatSidebar />);
     F.capturedProps!.onMenuSelect!("c-1");
     expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/conversation/c-1" });
+  });
+
+  it("onMenuSelect navigates to /settings/skills for skills plugin", () => {
+    render(() => <ChatSidebar />);
+    F.capturedProps!.onMenuSelect!("skills");
+    expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/settings/skills" });
+  });
+
+  it("onMenuSelect navigates to /settings/mcp for mcp plugin", () => {
+    render(() => <ChatSidebar />);
+    F.capturedProps!.onMenuSelect!("mcp");
+    expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/settings/mcp" });
   });
 
   it("onMenuGroupSelect is NOT wired (MenuGroup click must NOT navigate — chat AGENTS.md ADR-0023 D7-CS)", () => {
@@ -263,7 +292,7 @@ describe("ChatSidebar (PR 2)", () => {
 
   it("conversations are sorted by updatedAt descending", () => {
     render(() => <ChatSidebar />);
-    const menus = F.capturedProps!.options[0].children[0].children;
+    const menus = F.capturedProps!.options[1].children[0].children;
     // c-1 has updatedAt=200, c-2 has updatedAt=100
     expect(menus[0].label).toBe("Chat 1");
     expect(menus[1].label).toBe("Chat 2");

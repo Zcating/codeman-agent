@@ -18,7 +18,7 @@
 
 import { type JSX } from "solid-js";
 import { Outlet, useLocation, useNavigate, useParams, Link } from "@tanstack/solid-router";
-import { Settings as SettingsIcon } from "lucide-solid";
+import { Settings as SettingsIcon, WandSparkles, Cable } from "lucide-solid";
 import {
   CodemanSidebar,
   type CodemanSidebarGroupOption,
@@ -51,11 +51,24 @@ export function ChatSidebar(): JSX.Element {
   const selectedConvId = (): string | null =>
     (params() as { convId?: string }).convId ?? null;
 
+  // Current pathname for plugin route active detection
+  const currentPathname = (): string => location().pathname;
+
   const wsList = (): Workspace[] => workspaces$() ?? [];
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
   const handleSelectConv = (id: string): void => {
+    // Handle plugin navigation
+    if (id === "skills") {
+      navigate({ to: "/settings/skills" });
+      return;
+    }
+    if (id === "mcp") {
+      navigate({ to: "/settings/mcp" });
+      return;
+    }
+    // Handle conversation navigation
     navigate({ to: `/conversation/${id}` });
   };
 
@@ -128,6 +141,22 @@ export function ChatSidebar(): JSX.Element {
 
     return [
       {
+        label: "插件",
+        value: "plugins",
+        children: [
+          {
+            label: "技能",
+            value: "skills",
+            icon: <WandSparkles class="h-4 w-4" />,
+          },
+          {
+            label: "MCP",
+            value: "mcp",
+            icon: <Cable class="h-4 w-4" />,
+          },
+        ],
+      },
+      {
         label: "项目",
         value: "workspace",
         children: wsList().map((ws): CodemanSidebarMenuGroupOption => ({
@@ -173,12 +202,26 @@ export function ChatSidebar(): JSX.Element {
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
+  // Custom active predicate: handles both conversation active state (by convId)
+  // and plugin route active state (by pathname match when on settings pages)
+  const isActive = (value: string | undefined): boolean => {
+    if (!value) return false;
+    const pathname = currentPathname();
+    // Plugin routes: match by pathname when on settings pages
+    if (pathname.startsWith("/settings")) {
+      return pathname.includes(value);
+    }
+    // Conversation routes: match by convId
+    return value === selectedConvId();
+  };
+
   return (
     <CodemanSidebar
       options={options()}
       renderMenuGroup={renderMenuGroup}
       renderMenu={renderMenu}
       currentValue={selectedConvId() ?? undefined}
+      isActive={isActive}
       // onMenuGroupSelect intentionally omitted: per chat AGENTS.md ADR-0023 D7-CS,
       // workspaces are NEVER navigation targets — only convs are. Clicking a
       // workspace label should ONLY toggle its accordion (handled by
