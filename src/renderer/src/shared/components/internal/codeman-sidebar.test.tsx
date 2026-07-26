@@ -620,4 +620,25 @@ describe("CodemanSidebar (PR 2)", () => {
       expect(aside?.className).toContain("border-red-500");
     });
   });
+
+  // ─── Bug B fix regression: sidebar inset scroll boundary ──────────────────
+  // Approved fix: add class="min-h-0 overflow-y-auto" at CodemanSidebar -> SidebarInset outlet.
+  // Root cause: nested scroll — ChatView messages wrapper owned overflow-y-auto, and
+  // SidebarInset (the parent scroll container) did not. Fix moves overflow-y-auto to
+  // SidebarInset and removes it from ChatView messages wrapper.
+  describe("SidebarInset scroll boundary (Bug B fix)", () => {
+    it("data-slot=sidebar-inset has min-h-0 (allows flex child to shrink)", () => {
+      const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+      const inset = container.querySelector("[data-slot='sidebar-inset']");
+      expect(inset).toBeTruthy();
+      expect(inset!.className).toContain("min-h-0");
+    });
+
+    it("data-slot=sidebar-inset has overflow-y-auto (enables scrolling)", () => {
+      const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+      const inset = container.querySelector("[data-slot='sidebar-inset']");
+      expect(inset).toBeTruthy();
+      expect(inset!.className).toContain("overflow-y-auto");
+    });
+  });
 });

@@ -410,7 +410,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
         </Sidebar>
 
         <Show when={props.children}>
-          <SidebarInset>{props.children}</SidebarInset>
+          <SidebarInset class="min-h-0 overflow-y-auto">{props.children}</SidebarInset>
         </Show>
       </div>
     </div>

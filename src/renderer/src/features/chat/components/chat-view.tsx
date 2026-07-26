@@ -227,7 +227,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
 
   return (
     <>
-      <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
+      <div class="flex-1 min-h-0 p-4 space-y-3">
         <For each={currentMessages()}>{(m) => <MessageBubble message={m} />}</For>
         <div ref={messagesEndRef} />
       </div>
