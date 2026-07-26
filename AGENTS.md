@@ -78,7 +78,7 @@
 
 ## codeman-agent — 项目知识库
 
-> **AI Agent 协作入口**。读 `CONTEXT.md` 拿词汇表，读 ADR 拿决策，读子目录 `AGENTS.md` 拿硬性规则。
+> **AI Agent 协作入口**。读 `CONTEXT.md` 拿词汇表，读 ADR 拿决策。
 
 **生成时间:** 2026-06-14
 **Commit:** (TBD)
@@ -87,68 +87,41 @@
 
 ### 核心栈
 
-| 层           | 选型                                             | 版本                                           |
-| ------------ | ------------------------------------------------ | ---------------------------------------------- |
-| 桌面壳       | Electron (main + preload)                        | `43.x`                                         |
-| UI           | Solid.js + TypeScript                            | `solid-js ^1.9.3` / `tsc ~5.6.2`               |
-| 构建         | Vite + vite-plugin-solid                         | `^6.0.3`                                       |
-| 样式         | Tailwind v4 + cva + cn (clsx+twMerge)            | `^4.3.0` / `cva 0.7.1` / `lucide-solid 1.18.0` |
-| 逻辑层 (TS)  | **Effect-TS** + `@effect/platform-browser`       | `effect ^3.0.0`                                |
-| Agent 运行时 | **pi-mono** (`@mariozechner/pi-ai` + `pi-agent`) | `latest`                                       |
-| 持久化       | SQLite + sqlx 0.8 + **FTS5** 全文搜索             | `sqlx 0.8`                                     |
-| 密钥         | Windows Credential Manager via `keyring` crate   | `keyring 3`                                    |
-| 路由         | **TanStack Router (code-based)**                 | `^1.170.15`                                    |
-| 包管理       | vite-plus                                        | `0.1.24`                                       |
+> 数据源：`package.json`（同步于 2026-07-26）。完整版本以 `package.json` 为准。
+
+| 层 | 选型 | 版本 |
+| --- | --- | --- |
+| 桌面壳 | Electron (main + preload) | `^39.2.6` |
+| UI | Solid.js + TypeScript | `solid-js ^1.9.3` / `typescript ^7.0.0` |
+| 构建 | electron-vite + Vite + vite-plugin-solid | `6.0.0-beta.1` / `^8.0.16` / `^2.11.12` |
+| 样式 / 图标 | Tailwind v4 + cva + tailwind-merge + clsx + lucide-solid | `^4.3.0` / `^0.7.1` / `^3.6.0` / `^2.1.1` / `^1.18.0` |
+| UI 原语 | @ark-ui/solid | `^5.37.1` |
+| 逻辑层 (TS) | Effect-TS + @effect/platform-browser + ts-pattern | `^3.21.4` / `^0.75.0` / `^5.9.0` |
+| 工具库 | es-toolkit / marked / dotenv | `^1.47.1` / `^15.0.0` / `^17.4.2` |
+| 字体 | @fontsource/inter + @fontsource/noto-sans-sc | `^5.2.8` / `^5.2.9` |
+| Agent 运行时 | @earendil-works/pi-ai + @earendil-works/pi-agent-core | `0.80.3` |
+| 持久化 | SQLite (better-sqlite3) + FTS5 全文搜索 | `^12.11.1` |
+| 配置 / 密钥 | electron-store（明文 JSON；API key 简化决策见 ADR-0015） | `^11.0.2` |
+| Electron 生态 | electron-builder / electron-log / electron-updater / electron-window-state / @electron-toolkit/preload+utils | `^26.15.3` / `^5.4.4` / `^6.8.9` / `^5.0.3` / `^3-4.0` |
+| 路由 | TanStack Router (code-based) | `^1.170.15` |
+| 表单 | @tanstack/solid-form | `^1.33.2` |
+| 测试 | vitest + @effect/vitest + @solidjs/testing-library + @playwright/test + jsdom | `^4.1.9` / `^0.25.0` / `^0.8.10` / `^1.49.0` / `^25.0.0` |
+| Lint / Format | oxlint + oxfmt | `^1.71.0` / `^0.56.0` |
+| 包管理 | pnpm（通过 `vp` / vite-plus CLI 调用脚本） | `pnpm@11.5.3` / `vp 0.1.24` |
 
 ### 目录布局
 
 ```txt
 codeman-agent/
 ├── src/
-│   ├── index.tsx                  # Solid 入口（挂 <RouterProvider>，~6 行）
-│   ├── index.css                  # Tailwind v4 入口（@import + @theme + @layer base）
-│   ├── router.tsx                 # TanStack Router code-based 配置
-│   ├── test-setup.ts              # vitest setup（mockState 唯一源 = __mocks__/）
-│   ├── AGENTS.md                  # src/ 规则
-│   │
-│   ├── shared/                    # 跨 feature 共享（5+1 白名单）
-│   │   ├── AGENTS.md
-│   │   ├── lib/                   # 纯函数 + 跨域类型：cn.ts / ipc.ts / units.ts / types.ts
-│   │   ├── stores/                # 跨域 Solid signal：theme.ts
-│   │   ├── hooks/                 # 跨域 composable（V1 预留位，use- 前缀）
-│   │   ├── components/ui/         # 跨域设计系统原子：Button / Input / Textarea / Checkbox / Card
-│   │   │   └── AGENTS.md
-│   │   └── components/internal/   # 跨域业务组件（V1 预留位：ErrorBoundary / Provider wrappers / Layout atoms）
-│   │
-│   └── features/                  # 5 子目录白名单（按需创建）
-│       ├── chat/                  # 聊天域 — lib + stores + components + routes
-│       │   ├── AGENTS.md
-│       │   ├── index.ts           # public API barrel
-│       │   ├── components/        # chat-view / sidebar / message-bubble / tool-call-card
-│       │   ├── routes/            # / 路由
-│       │   ├── stores/            # conversations + messages（Effect→Solid 桥接层）
-│       │   └── lib/               # runtime.ts（从 chat 根级迁入）
-│       ├── settings/              # 设置域 — lib + components + routes
-│       │   ├── AGENTS.md
-│       │   ├── index.ts
-│       │   ├── components/        # provider-card
-│       │   ├── routes/            # /settings 路由
-│       │   └── lib/               # llm-providers + system-prompt（从 subsystems/ 迁入；snake_case 已修）
-│       └── file-tools/           # 文件工具域 — lib（无 UI，V2 新增）
-│           ├── AGENTS.md
-│           ├── index.ts
-│           └── lib/               # file-tools.ts + file-tools.test.ts
-│
-├── src/
 │   ├── main/                      # Electron 主进程（原 electron/main/）
 │   ├── preload/                   # Electron preload（原 electron/preload/）
 │   ├── renderer/                  # 前端 SPA（原 src/）
 │   ├── resources/                 # Skills 捆绑包（原 electron/resources/）
 │   └── assets/                    # QA 数据等（原 electron/assets/）
-├── docs/adr/                      # 25 个 ADR（0001-0024，见下方索引）
+├── docs/adr/                      # ADR
 ├── (mocks 改在 src/renderer/__mocks__/ — 详见 src/renderer/AGENTS.md)
-├── docs/                          # 治理文档（translation-rules 等）
-└── .agents/                       # 本地 agent skills
+└── docs/                          # 治理文档（translation-rules 等）
 ```
 
 ### 命令
