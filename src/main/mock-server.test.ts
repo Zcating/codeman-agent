@@ -18,7 +18,7 @@ import {
   extractFirstUserText,
   countAssistantMessages,
 } from "./mock-server";
-import { loadQaTable, resetQaLoaderForTest } from "./qa-loader";
+import { loadQaTable, resetQaLoaderForTest, type QaTurn } from "./qa-loader";
 
 // ─── 1. Pure helper tests ───────────────────────────────────────────────────
 
@@ -220,6 +220,29 @@ describe("buildSseTurnEvents — per-character SSE 流构造", () => {
   });
 
   // ─── buildSseEvents wrapper (backward-compat for entry shape) ─────────
+
+  it("T7i: message_delta includes input_tokens in usage (greater than 0)", () => {
+    const turn: QaTurn = { text: "Hello world, this is a test response", thinking: "Let me think about this carefully" };
+    const events = buildSseTurnEvents(turn, 100);
+    // Find the message_delta event
+    const deltaEvent = events.find(e => e.includes('"message_delta"'));
+    expect(deltaEvent).toBeDefined();
+    const dataLine = (deltaEvent!.match(/^data: (.+)$/m) ?? [undefined, ""])[1];
+    const parsed = JSON.parse(dataLine) as { usage: { input_tokens?: number; output_tokens: number } };
+    expect(parsed.usage.input_tokens).toBeDefined();
+    expect(parsed.usage.input_tokens).toBeGreaterThan(0);
+  });
+
+  it("T7j: message_delta usage has both input_tokens and output_tokens", () => {
+    const turn: QaTurn = { text: "Response text" };
+    const events = buildSseTurnEvents(turn, 10);
+    const deltaEvent = events.find(e => e.includes('"message_delta"'));
+    expect(deltaEvent).toBeDefined();
+    const dataLine = (deltaEvent!.match(/^data: (.+)$/m) ?? [undefined, ""])[1];
+    const parsed = JSON.parse(dataLine) as { usage: { input_tokens?: number; output_tokens: number } };
+    expect(parsed.usage.input_tokens).toBeGreaterThan(0);
+    expect(parsed.usage.output_tokens).toBe(turn.text.length);
+  });
 
   it("T7h: buildSseEvents(entry, delta) 等价于 buildSseTurnEvents(entry.turns[0], delta)", () => {
     const entry = {

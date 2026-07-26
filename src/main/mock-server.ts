@@ -189,9 +189,10 @@ function buildSseTurnEvents(turn: QaTurn, deltaSize: number): string[] {
   //    Real Anthropic: "tool_use" if any tool_use was emitted, else "end_turn".
   const stopReason = turn.toolUses && turn.toolUses.length > 0 ? "tool_use" : "end_turn";
   const outputTokens = turn.text.length + (turn.thinking?.length ?? 0);
+  const inputTokens = Math.ceil((turn.text.length + (turn.thinking?.length ?? 0)) / 4);
   events.push(
     `event: message_delta\n` +
-      `data: {"type":"message_delta","delta":{"stop_reason":"${stopReason}"},"usage":{"output_tokens":${outputTokens}}}\n` +
+      `data: {"type":"message_delta","delta":{"stop_reason":"${stopReason}"},"usage":{"input_tokens":${inputTokens},"output_tokens":${outputTokens}}}\n` +
       "\n",
   );
 
