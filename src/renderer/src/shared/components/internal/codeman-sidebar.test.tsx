@@ -224,6 +224,98 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
+  // ─── Slice 14c: forceSubMenu ────────────────────────────────────────────
+  describe("forceSubMenu", () => {
+    it("forceSubMenu item renders inside SidebarMenuSub (data-sidebar=menu-sub-item on parent li)", () => {
+      const opts: CodemanSidebarGroupOption[] = [
+        {
+          label: "Plugins",
+          value: "plugins",
+          children: [
+            { label: "Skills", value: "skills", forceSubMenu: true },
+            { label: "MCP", value: "mcp", forceSubMenu: true },
+          ],
+        },
+      ];
+      const { container } = renderSidebar({ options: opts });
+      // forceSubMenu items should be inside a li with data-sidebar="menu-sub-item"
+      const skillsItem = container.querySelector("[data-value='skills']");
+      expect(skillsItem).toBeTruthy();
+      // Parent should be a SidebarMenuSubItem li
+      const parentLi = skillsItem?.closest("li[data-sidebar='menu-sub-item']");
+      expect(parentLi).toBeTruthy();
+    });
+
+    it("forceSubMenu item does NOT call renderMenu", () => {
+      const renderMenu = vi.fn((menu: CodemanSidebarMenuOption) => (
+        <span data-testid="rendered-via-menu">{menu.label}</span>
+      ));
+      const opts: CodemanSidebarGroupOption[] = [
+        {
+          label: "Plugins",
+          value: "plugins",
+          children: [
+            { label: "Skills", value: "skills", forceSubMenu: true },
+          ],
+        },
+      ];
+      renderSidebar({ options: opts, renderMenu });
+      // renderMenu should NOT be called for forceSubMenu items
+      expect(renderMenu).not.toHaveBeenCalled();
+    });
+
+    it("forceSubMenu item renders with icon and label inside SidebarMenuSub", () => {
+      const opts: CodemanSidebarGroupOption[] = [
+        {
+          label: "Plugins",
+          value: "plugins",
+          children: [
+            { label: "Skills", value: "skills", icon: <span data-testid="skill-icon">✨</span>, forceSubMenu: true },
+          ],
+        },
+      ];
+      const { container } = renderSidebar({ options: opts });
+      const skillsItem = container.querySelector("[data-value='skills']");
+      expect(skillsItem?.textContent).toContain("Skills");
+      expect(container.querySelector("[data-testid='skill-icon']")).toBeTruthy();
+    });
+
+    it("forceSubMenu item click triggers onMenuSelect", () => {
+      const onMenuSelect = vi.fn();
+      const opts: CodemanSidebarGroupOption[] = [
+        {
+          label: "Plugins",
+          value: "plugins",
+          children: [
+            { label: "Skills", value: "skills", forceSubMenu: true },
+          ],
+        },
+      ];
+      const { container } = renderSidebar({ options: opts, onMenuSelect });
+      const skillsBtn = container.querySelector("[data-value='skills']") as HTMLButtonElement;
+      skillsBtn.click();
+      expect(onMenuSelect).toHaveBeenCalledWith("skills");
+    });
+
+    it("non-forceSubMenu item still calls renderMenu and renders via SidebarMenuButton", () => {
+      const renderMenu = vi.fn((menu: CodemanSidebarMenuOption) => (
+        <span data-testid="rendered-via-menu">{menu.label}</span>
+      ));
+      const opts: CodemanSidebarGroupOption[] = [
+        {
+          label: "Plugins",
+          value: "plugins",
+          children: [
+            { label: "Flat", value: "flat" }, // no forceSubMenu
+          ],
+        },
+      ];
+      renderSidebar({ options: opts, renderMenu });
+      expect(renderMenu).toHaveBeenCalledTimes(1);
+      expect(renderMenu).toHaveBeenCalledWith(expect.objectContaining({ label: "Flat", value: "flat" }));
+    });
+  });
+
   // ─── Slice 15: renderGroupHeader ───────────────────────────────────────
   describe("renderGroupHeader", () => {
     it("renderGroupHeader replaces group header label when provided", () => {

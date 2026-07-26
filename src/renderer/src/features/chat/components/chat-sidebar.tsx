@@ -146,11 +146,13 @@ export function ChatSidebar(): JSX.Element {
           label: "Skills",
           value: "skills",
           icon: <WandSparkles class="h-4 w-4" />,
+          forceSubMenu: true,
         },
         {
           label: "MCP",
           value: "mcp",
           icon: <Cable class="h-4 w-4" />,
+          forceSubMenu: true,
         },
       ],
     };

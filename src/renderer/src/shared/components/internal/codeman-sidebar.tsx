@@ -54,6 +54,12 @@ export interface CodemanSidebarMenuOption {
   value: string;
   icon?: JSX.Element;
   disabled?: boolean;
+  /**
+   * When true, forces this item to render inside SidebarMenuSub
+   * (nested submenu path), bypassing the top-level SidebarMenuItem path.
+   * Used for plugin/Skills/MCP children that must align with project children.
+   */
+  forceSubMenu?: boolean;
 }
 
 export interface CodemanSidebarProps {
@@ -291,22 +297,45 @@ function CodemanSidebarGroupView(
                 <Show
                   when={"children" in child && Array.isArray(child.children)}
                   fallback={
-                    <SidebarMenuItem>
-                      <SidebarMenuButton
-                        isActive={props.isMenuActive(child as CodemanSidebarMenuOption)}
-                        onClick={(): void => {
-                          const menu = child as CodemanSidebarMenuOption;
-                          if (!menu.disabled) {
-                            props.onMenuSelect?.(menu.value);
-                          }
-                        }}
-                        data-value={(child as CodemanSidebarMenuOption).value}
-                      >
-                        {props.renderMenu
-                          ? props.renderMenu(child as CodemanSidebarMenuOption)
-                          : (child as CodemanSidebarMenuOption).label}
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
+                    <Show
+                      when={(child as CodemanSidebarMenuOption).forceSubMenu}
+                      fallback={
+                        <SidebarMenuItem>
+                          <SidebarMenuButton
+                            isActive={props.isMenuActive(child as CodemanSidebarMenuOption)}
+                            onClick={(): void => {
+                              const menu = child as CodemanSidebarMenuOption;
+                              if (!menu.disabled) {
+                                props.onMenuSelect?.(menu.value);
+                              }
+                            }}
+                            data-value={(child as CodemanSidebarMenuOption).value}
+                          >
+                            {props.renderMenu
+                              ? props.renderMenu(child as CodemanSidebarMenuOption)
+                              : (child as CodemanSidebarMenuOption).label}
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      }
+                    >
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton
+                          isActive={props.isMenuActive(child as CodemanSidebarMenuOption)}
+                          onClick={(): void => {
+                            const menu = child as CodemanSidebarMenuOption;
+                            if (!menu.disabled) {
+                              props.onMenuSelect?.(menu.value);
+                            }
+                          }}
+                          data-value={(child as CodemanSidebarMenuOption).value}
+                        >
+                          {(child as CodemanSidebarMenuOption).icon}
+                          <span class="truncate flex-1 text-sm">
+                            {(child as CodemanSidebarMenuOption).label}
+                          </span>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    </Show>
                   }
                 >
                   <CodemanSidebarMenuGroup
