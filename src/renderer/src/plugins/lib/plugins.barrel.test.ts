@@ -15,22 +15,7 @@ import {
   getPluginMetadata,
   initializeAll,
   type PluginDescriptor,
-  type PluginMetadata,
-  type RegistryState,
-  type InitializeAllResult,
-} from "@codeman-frontend/plugins/lib/plugin-registry";
-
-// ─── Test subjects ────────────────────────────────────────────────────────────
-
-// Re-exported public APIs from the barrel
-export {
-  getRegistryState,
-  getPluginMetadata,
-  initializeAll,
 } from "@codeman-frontend/plugins";
-
-// Types re-exported through barrel
-export type { PluginDescriptor, PluginMetadata, RegistryState, InitializeAllResult };
 
 // ─── Descriptor metadata (verified by tests) ─────────────────────────────────
 

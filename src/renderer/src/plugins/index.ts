@@ -24,9 +24,8 @@ import type { AppError } from "@codeman-frontend/shared/lib/errors";
 // Skills: initializeSkillsManifests() returns Effect<void, AppError>
 const skillsInitialize: Effect.Effect<void, AppError> = initializeSkillsManifests();
 
-// MCP: initializeMcp() returns Effect<{servers, tools}, AppError>
-// Adapt to void without suppressing types
-const mcpInitialize: Effect.Effect<void, AppError> = Effect.as(initializeMcp(), null);
+// MCP: initializeMcp() returns Effect<void, AppError>
+const mcpInitialize: Effect.Effect<void, AppError> = initializeMcp();
 
 // ─── Descriptor definitions ───────────────────────────────────────────────────
 

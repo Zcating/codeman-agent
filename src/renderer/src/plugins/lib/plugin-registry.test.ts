@@ -5,7 +5,7 @@
 
 import { it, expect } from "@effect/vitest";
 import { describe, beforeEach } from "vitest";
-import { Effect } from "effect";
+import { Effect, Deferred } from "effect";
 import {
   NotFound,
   Unknown,
@@ -281,13 +281,21 @@ describe("plugin registry", () => {
       Effect.gen(function* () {
         pluginRegistry._resetForTest();
 
-        const startTime = Date.now();
-        let order: string[] = [];
+        const order: string[] = [];
+        // Use a Deferred latch so Plugin 1 blocks until Plugin 2 starts.
+        // This creates deterministic coordination without wall-clock thresholds.
+        // - Parallel: Plugin 1 blocks at d2.Await while Plugin 2 runs concurrently,
+        //   so Plugin 2 completes its body (50ms sleep) while Plugin 1 is blocked.
+        // - Sequential: Plugin 1 would deadlock waiting on d2 (Plugin 2 never starts
+        //   because they're not running concurrently), so the test would hang.
+        const d2 = yield* Deferred.make<void>();
 
         pluginRegistry._registerForTest({
           id: "parallel-1",
           initialize: Effect.gen(function* () {
             order.push("parallel-1-start");
+            // Block until Plugin 2 starts — only resolves if parallel execution
+            yield* Deferred.await(d2);
             yield* Effect.sleep(50);
             order.push("parallel-1-end");
           }),
@@ -299,6 +307,8 @@ describe("plugin registry", () => {
           id: "parallel-2",
           initialize: Effect.gen(function* () {
             order.push("parallel-2-start");
+            // Signal that Plugin 2 has started, unblocking Plugin 1
+            yield* Deferred.complete(d2, Effect.void);
             yield* Effect.sleep(50);
             order.push("parallel-2-end");
           }),
@@ -308,19 +318,18 @@ describe("plugin registry", () => {
 
         yield* initializeAll();
 
-        const elapsed = Date.now() - startTime;
-
-        // If sequential, would take ~100ms. If parallel, ~50ms
-        expect(elapsed).toBeLessThan(100);
-
         // Both should have started before either finished (parallel execution)
         const start1 = order.indexOf("parallel-1-start");
         const start2 = order.indexOf("parallel-2-start");
         const end1 = order.indexOf("parallel-1-end");
         const end2 = order.indexOf("parallel-2-end");
 
+        // Both plugins started
         expect(start1).toBeLessThan(end1);
         expect(start2).toBeLessThan(end2);
+        // Key proof of parallel execution: Plugin 2 completes its body (sleep)
+        // while Plugin 1 is blocked waiting on d2. So Plugin 2 ends before Plugin 1.
+        expect(end2).toBeLessThan(end1);
       }),
     );
   });

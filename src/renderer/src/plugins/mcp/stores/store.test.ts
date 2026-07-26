@@ -140,7 +140,7 @@ describe("mcp store", () => {
       }),
     );
 
-    itEffect("initializeMcp 返回的 Effect 兼容 registry descriptor", () =>
+    itEffect("initializeMcp 返回的 Effect<void, AppError> 兼容 registry descriptor", () =>
       Effect.gen(function* () {
         const program = initializeMcp();
         // Effect should be a valid Effect instance
@@ -162,6 +162,10 @@ describe("mcp store", () => {
 
         const result = yield* program.pipe(Effect.provide(mockLayer), Effect.exit);
         expect(result._tag).toBe("Success");
+        // Compile-time proof: success value must be void (undefined)
+        if (result._tag === "Success") {
+          expect(result.value).toBeUndefined();
+        }
       }),
     );
   });
