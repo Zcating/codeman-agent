@@ -36,6 +36,21 @@ import {
 import { chatSidebarActions } from "@codeman-frontend/features/chat/lib/chat-sidebar-actions";
 import { RowActions } from "@codeman-frontend/features/chat/components/row-actions";
 import { NewChatButton } from "@codeman-frontend/features/chat/components/new-chat-button";
+import { getPluginMetadata } from "@codeman-frontend/plugins";
+
+// ─── Icon mapping (UI layer maps registry icon identifiers to JSX) ──────────────
+
+/** Maps registry icon string identifiers to lucide-solid JSX elements. */
+function renderPluginIcon(pluginId: string, iconName: string): JSX.Element {
+  switch (iconName) {
+    case "WandSparkles":
+      return <WandSparkles class="h-4 w-4" />;
+    case "Cable":
+      return <Cable class="h-4 w-4" />;
+    default:
+      throw new Error(`Unknown icon "${iconName}" for plugin "${pluginId}" — expected "WandSparkles" or "Cable"`);
+  }
+}
 
 // ─── ChatSidebar ───────────────────────────────────────────────────────────
 
@@ -59,13 +74,11 @@ export function ChatSidebar(): JSX.Element {
   // ─── Handlers ────────────────────────────────────────────────────────────
 
   const handleSelectConv = (id: string): void => {
-    // Handle plugin navigation
-    if (id === "skills") {
-      navigate({ to: "/plugins/skills" });
-      return;
-    }
-    if (id === "mcp") {
-      navigate({ to: "/plugins/mcp" });
+    // Handle plugin navigation using registry metadata
+    const metadata = getPluginMetadata();
+    const pluginMeta = metadata.get(id);
+    if (pluginMeta) {
+      navigate({ to: pluginMeta.route.path });
       return;
     }
     // Handle conversation navigation
@@ -137,24 +150,24 @@ export function ChatSidebar(): JSX.Element {
   // ─── Sidebar tree builders ───────────────────────────────────────────────
 
   const options = (): CodemanSidebarGroupOption[] => {
-    // Plugin group is always visible
+    // Build plugin group from registry metadata
+    const metadata = getPluginMetadata();
+    const pluginChildren = Array.from(metadata.values())
+      .filter((plugin) => plugin.sidebar.visible)
+      .sort((a, b) => a.sidebar.order - b.sidebar.order)
+      .map(
+        (plugin): CodemanSidebarMenuOption => ({
+          label: plugin.route.label,
+          value: plugin.id,
+          icon: renderPluginIcon(plugin.id, plugin.sidebar.icon),
+          forceSubMenu: true,
+        }),
+      );
+
     const pluginGroup: CodemanSidebarGroupOption = {
       label: "插件",
       value: "plugins",
-      children: [
-        {
-          label: "Skills",
-          value: "skills",
-          icon: <WandSparkles class="h-4 w-4" />,
-          forceSubMenu: true,
-        },
-        {
-          label: "MCP",
-          value: "mcp",
-          icon: <Cable class="h-4 w-4" />,
-          forceSubMenu: true,
-        },
-      ],
+      children: pluginChildren,
     };
 
     // Project group only included when there are workspaces

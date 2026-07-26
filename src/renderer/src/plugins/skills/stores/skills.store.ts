@@ -39,6 +39,17 @@ export const refreshManifests = Effect.fnUntraced(function* () {
   return fresh;
 }, Effect.provide(SkillsServiceLive));
 
+/** Lifecycle initializer seam for plugin registry — scans skills and updates store.
+ *  Returns Effect<void, AppError>; IPC failure leaves state unchanged. */
+export const initializeSkillsManifests = Effect.fnUntraced(
+  function* () {
+    const svc = yield* SkillsService;
+    const fresh = yield* svc.scan();
+    setManifestsInternal(fresh);
+  },
+  Effect.provide(SkillsServiceLive),
+);
+
 /** 测试用 — 重置为初始空状态。 */
 export function _resetSkillsStoreForTest(): void {
   setManifestsInternal([]);

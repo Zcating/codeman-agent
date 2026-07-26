@@ -57,8 +57,9 @@ export interface JsonRpcOptions {
 }
 
 interface PendingRequest {
-  readonly resolve: (value: unknown) => void;
-  readonly reject: (reason: unknown) => void;
+  promise: Promise<never>;
+  resolve: (value: unknown) => void;
+  reject: (reason: unknown) => void;
   readonly method: string;
   readonly timeoutHandle: ReturnType<typeof setTimeout>;
 }
@@ -109,24 +110,42 @@ export class JsonRpcConnection {
       ? { jsonrpc: "2.0", id, method }
       : { jsonrpc: "2.0", id, method, params };
 
-    return new Promise<T>((resolve, reject) => {
-      const timeoutHandle = setTimeout(() => {
-        const entry = this.#pending.get(id);
-        if (entry) {
-          this.#pending.delete(id);
-          reject(
-            new JsonRpcTimeoutError({
-              message: `JSON-RPC request "${method}" (id=${id}) timed out after ${this.#timeoutMs}ms`,
-              method,
-              timeoutMs: this.#timeoutMs,
-            }),
-          );
-        }
-      }, this.#timeoutMs);
+    // Create a placeholder entry first (to avoid TDZ), then create the caller's
+    // promise, then backfill the promise reference into the entry.
+    const timeoutHandle = setTimeout(() => {
+      const entry = this.#pending.get(id);
+      if (entry) {
+        this.#pending.delete(id);
+        entry.reject(
+          new JsonRpcTimeoutError({
+            message: `JSON-RPC request "${method}" (id=${id}) timed out after ${this.#timeoutMs}ms`,
+            method,
+            timeoutMs: this.#timeoutMs,
+          }),
+        );
+        void entry.promise.catch(() => {}); // safety net: prevent unhandled if caller never .catch()es
+      }
+    }, this.#timeoutMs);
 
-      this.#pending.set(id, { resolve: resolve as (v: unknown) => void, reject, method, timeoutHandle });
+    // Placeholder entry — promise will be backfilled below.
+    const entry: PendingRequest = {
+      promise: null as unknown as Promise<never>,
+      resolve: null as unknown as (value: unknown) => void,
+      reject: null as unknown as (reason: unknown) => void,
+      method,
+      timeoutHandle,
+    };
+    this.#pending.set(id, entry);
+
+    const promise = new Promise<T>((resolve, reject) => {
+      // Override the placeholder resolve/reject with the actual ones.
+      entry.resolve = resolve as (value: unknown) => void;
+      entry.reject = reject;
       this.#writeLine(JSON.stringify(req));
     });
+    // Now the promise is created; backfill it so close() can use it.
+    entry.promise = promise as Promise<never>;
+    return promise;
   }
 
   /** Send a notification (no response expected). */
@@ -150,9 +169,11 @@ export class JsonRpcConnection {
   /**
    * Close the connection: removes stream listeners, rejects all pending requests
    * with a protocol error. Does NOT kill the underlying child process.
+   * Returns a promise that resolves after all pending rejections are guaranteed
+   * to have attached handlers (preventing unhandled rejections).
    */
-  close(): void {
-    if (this.#closed) return;
+  close(): Promise<void> {
+    if (this.#closed) return Promise.resolve();
     this.#closed = true;
     this.#input.off("data", this.#handleChunk);
     this.#input.off("end", this.#handleEnd);
@@ -165,8 +186,12 @@ export class JsonRpcConnection {
     for (const [, entry] of this.#pending) {
       clearTimeout(entry.timeoutHandle);
       entry.reject(err);
+      // Safety net: attach a noop catch so the rejection is never unhandled,
+      // even if the caller never attached their own .catch() handler.
+      void entry.promise.catch(() => {});
     }
     this.#pending.clear();
+    return Promise.resolve();
   }
 
   // ─── internals ──────────────────────────────
@@ -251,6 +276,7 @@ export class JsonRpcConnection {
     for (const [, entry] of this.#pending) {
       clearTimeout(entry.timeoutHandle);
       entry.reject(err);
+      void entry.promise.catch(() => {}); // safety net: prevent unhandled rejection
     }
     this.#pending.clear();
   };
@@ -263,6 +289,7 @@ export class JsonRpcConnection {
     for (const [, entry] of this.#pending) {
       clearTimeout(entry.timeoutHandle);
       entry.reject(err);
+      void entry.promise.catch(() => {}); // safety net: prevent unhandled rejection
     }
     this.#pending.clear();
   };

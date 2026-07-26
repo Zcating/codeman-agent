@@ -64,6 +64,27 @@ export function openConfigDir() {
   return program.pipe(Effect.provide(McpServiceLive));
 }
 
+// ─── Lifecycle initializer (registry entry point) ─────────────────
+
+/**
+ * MCP lifecycle initializer — loads servers and tools into store signals.
+ * Called by the plugin registry at startup.
+ *
+ * Unlike `refresh`, this leaves prior signal state unchanged if loading fails,
+ * allowing the registry to handle MCP failures without corrupting existing state.
+ */
+export const initializeMcp = Effect.fnUntraced(
+  function* () {
+    const svc = yield* McpService;
+    const servers = yield* svc.listServers();
+    const tools = yield* svc.getAllTools();
+    // Only update signals on success — leave prior state intact on failure
+    setMcpServersInternal(servers);
+    setMcpAllToolsInternal(tools);
+  },
+  Effect.provide(McpServiceLive),
+);
+
 // ─── Test helpers ───────────────────────────────────────────────
 
 /** Reset signals to initial state (for tests). */

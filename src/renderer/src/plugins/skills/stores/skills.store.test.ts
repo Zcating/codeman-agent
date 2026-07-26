@@ -1,12 +1,17 @@
 // Skills store tests — ADR-0031 Wave A2.
 
 import { describe, it, expect, beforeEach } from "vitest";
+import { Effect, Layer } from "effect";
+import { it as itEffect } from "@effect/vitest";
 import {
 	skillsManifests$,
 	setManifests,
 	resetManifests,
 	_resetSkillsStoreForTest,
+	initializeSkillsManifests,
 } from "@codeman-frontend/plugins/skills/stores/skills.store";
+import { SkillsService } from "@codeman-frontend/shared/lib/ipc";
+import { Unknown } from "@codeman-frontend/shared/lib/errors";
 import type { SkillManifest } from "@codeman-frontend/plugins/skills/lib/skill-loader-schema";
 
 const SAMPLE: SkillManifest[] = [
@@ -57,4 +62,37 @@ describe("skills store", () => {
 		expect(skillsManifests$()).not.toBe(before);
 		expect(skillsManifests$()).toBe(SAMPLE);
 	});
+
+	itEffect("initializeSkillsManifests updates skillsManifests$ on success", () =>
+		Effect.gen(function* () {
+			const fresh: SkillManifest[] = [
+				{ name: "test-skill", description: "Test", source: "user", path: "/fake/test/SKILL.md" },
+			];
+			const mockLayer = Layer.succeed(SkillsService, {
+				scan: () => Effect.succeed(fresh),
+				load: () => Effect.succeed(""),
+			});
+
+			yield* initializeSkillsManifests().pipe(Effect.provide(mockLayer));
+
+			expect(skillsManifests$()).toEqual(fresh);
+		}),
+	);
+
+	itEffect("initializeSkillsManifests leaves state unchanged on IPC failure", () =>
+		Effect.gen(function* () {
+			setManifests(SAMPLE);
+			expect(skillsManifests$()).toHaveLength(2);
+
+			const failingLayer = Layer.succeed(SkillsService, {
+				scan: () => Effect.fail(new Unknown({ message: "IPC failure" })),
+				load: () => Effect.succeed(""),
+			});
+
+			yield* initializeSkillsManifests().pipe(Effect.provide(failingLayer));
+
+			// State should remain unchanged after failure
+			expect(skillsManifests$()).toEqual(SAMPLE);
+		}),
+	);
 });
