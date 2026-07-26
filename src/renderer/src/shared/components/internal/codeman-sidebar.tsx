@@ -9,8 +9,8 @@ import {
   AccordionItem,
   AccordionTrigger,
   AccordionContent,
-} from "../ui/accordion";
-import { cn } from "../../lib/cn";
+} from "@codeman-frontend/shared/components/ui/accordion";
+import { cn } from "@codeman-frontend/shared/lib/cn";
 import {
   Sidebar,
   SidebarHeader,
@@ -26,7 +26,7 @@ import {
   SidebarMenuSubItem,
   SidebarMenuSubButton,
   SidebarInset,
-} from "../ui/sidebar";
+} from "@codeman-frontend/shared/components/ui/sidebar";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 

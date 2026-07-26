@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Schema } from "effect";
-import { ProviderSchema, SettingsSchema } from "./schemas";
+import { ProviderSchema, SettingsSchema } from "@codeman-frontend/features/settings/lib/schemas";
 
 describe("settings schemas (ADR-0025 PR 4)", () => {
   it("ProviderSchema decodes a valid Provider", () => {

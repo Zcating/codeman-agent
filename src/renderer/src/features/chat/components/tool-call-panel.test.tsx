@@ -9,7 +9,7 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
-import type { ToolCall, ToolResult } from "../../../shared/lib/types";
+import type { ToolCall, ToolResult } from "@codeman-frontend/shared/lib/types";
 
 // Mock ToolCallCard — 让 ToolCallPanel 测试聚焦容器契约,无需展开 args/result 子树
 vi.mock("./tool-call-card", () => ({
@@ -25,7 +25,7 @@ vi.mock("./tool-call-card", () => ({
 	),
 }));
 
-import { ToolCallPanel } from "./tool-call-panel";
+import { ToolCallPanel } from "@codeman-frontend/features/chat/components/tool-call-panel";
 
 describe("ToolCallPanel", () => {
 	afterEach(() => cleanup());

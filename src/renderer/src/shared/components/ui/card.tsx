@@ -1,7 +1,7 @@
 //! Card — 7 子件 via cn, 1:1 .repos/shadcn.
 
 import { splitProps } from "solid-js";
-import { cn } from "../../lib/cn";
+import { cn } from "@codeman-frontend/shared/lib/cn";
 
 function Card(props: {
   size?: "default" | "sm";

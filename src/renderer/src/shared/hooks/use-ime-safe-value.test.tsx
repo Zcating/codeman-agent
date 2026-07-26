@@ -1,6 +1,6 @@
 import { fireEvent, render } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
-import { useImeSafeValue } from "./use-ime-safe-value";
+import { useImeSafeValue } from "@codeman-frontend/shared/hooks/use-ime-safe-value";
 
 describe("useImeSafeValue", () => {
   it("普通 keystroke 直接触发 onValueChange", () => {

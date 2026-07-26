@@ -4,13 +4,13 @@
 //! 每个工具调用 FileService 方法，FileService 通过 Effect.provide(Layer) 提供（Effect v3 API）。
 
 import { Schema } from "effect";
-import { toToolParameters } from "../../../shared/lib/tool-schema";
+import { toToolParameters } from "@codeman-frontend/shared/lib/tool-schema";
 import type { Static, TSchema } from "@sinclair/typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Effect, Exit } from "effect";
-import { FileService, FileServiceLive } from "../../../shared/lib/ipc";
-import { InvalidConfig, Unknown, type AppError } from "../../../shared/lib/errors";
-import type { FileMatch } from "../../../shared/lib/types";
+import { FileService, FileServiceLive } from "@codeman-frontend/shared/lib/ipc";
+import { InvalidConfig, Unknown, type AppError } from "@codeman-frontend/shared/lib/errors";
+import type { FileMatch } from "@codeman-frontend/shared/lib/types";
 
 // ============================================================================
 // AgentToolResult type (pi-ai 0.9.4 doesn't export this type)

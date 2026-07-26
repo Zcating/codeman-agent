@@ -15,7 +15,7 @@ import {
   renameConversation,
   renameWorkspace,
   removeWorkspace,
-} from "../stores/chat.store";
+} from "@codeman-frontend/features/chat/stores/chat.store";
 
 async function runEffect<A, E>(
   effect: Effect.Effect<A, E, never>,

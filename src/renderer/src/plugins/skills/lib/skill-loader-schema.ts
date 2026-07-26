@@ -16,7 +16,7 @@ import type {
 	SkillFrontmatter,
 	SkillManifest,
 	SkillSource,
-} from "../../../shared/lib/types";
+} from "@codeman-frontend/shared/lib/types";
 
 export const SkillSourceSchema = Schema.Literal("preinstalled", "user");
 

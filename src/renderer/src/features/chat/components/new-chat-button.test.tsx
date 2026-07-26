@@ -3,7 +3,7 @@
 
 import { render, cleanup, fireEvent } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { NewChatButton } from "./new-chat-button";
+import { NewChatButton } from "@codeman-frontend/features/chat/components/new-chat-button";
 
 afterEach(() => cleanup());
 

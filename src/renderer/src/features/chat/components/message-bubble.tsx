@@ -17,10 +17,10 @@
 import { Show, For, createMemo } from "solid-js";
 import { marked } from "marked";
 import { XCircle, CheckCircle2 } from "lucide-solid";
-import { ToolCallPanel } from "./tool-call-panel";
-import { ThinkingPanel } from "./thinking-panel";
-import type { Message, ToolResult, FileMatch, ToolCall } from "../../../shared/lib/types";
-import { store } from "../stores/chat.store";
+import { ToolCallPanel } from "@codeman-frontend/features/chat/components/tool-call-panel";
+import { ThinkingPanel } from "@codeman-frontend/features/chat/components/thinking-panel";
+import type { Message, ToolResult, FileMatch, ToolCall } from "@codeman-frontend/shared/lib/types";
+import { store } from "@codeman-frontend/features/chat/stores/chat.store";
 
 /** 转义用户提供的文本以防止 XSS。 */
 function escapeHtml(s: string): string {

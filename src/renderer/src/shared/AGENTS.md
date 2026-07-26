@@ -68,7 +68,7 @@ features/file-tools            shared/lib/
 `src/shared/lib/cn.ts` 是 `clsx + tailwind-merge` 的组合工具。
 
 ```typescript
-import { cn } from "@/shared/lib/cn";
+import { cn } from "@codeman-frontend/shared/lib/cn";
 ```
 
 **所有 UI 组件的 className 合并必须用 `cn()`**，不得手动拼接模板字符串或用 `clsx()` 单独使用。

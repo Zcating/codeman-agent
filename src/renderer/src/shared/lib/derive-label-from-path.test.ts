@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { deriveLabelFromPath } from "./derive-label-from-path";
+import { deriveLabelFromPath } from "@codeman-frontend/shared/lib/derive-label-from-path";
 
 describe("deriveLabelFromPath", () => {
   it("取 Windows 路径最后段", () => {

@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, screen, waitFor } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
 import { Effect } from "effect";
-import { mockState } from "../../../__mocks__/ipc-mock";
+import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 
 // 鈹€鈹€鈹€ Mock appStore 鈥?ALL variables inside factory to avoid hoisting issues 鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
@@ -90,11 +90,11 @@ const _mockProviderDisabled = {
 void _mockProviderDisabled;
 
 // 鈹€鈹€鈹€ Import provider-card AFTER mocking 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
-import { ProviderCard } from "./provider-card";
+import { ProviderCard } from "@codeman-frontend/features/settings/components/provider-card";
 
 // We need to access the mock internals - import the module to get the exposed functions
-import * as appStoreMock from "../../../shared/stores/app.store";
-import { _resetSettingsSaverForTest } from "../lib/settings-saver";
+import * as appStoreMock from "@codeman-frontend/shared/stores/app.store";
+import { _resetSettingsSaverForTest } from "@codeman-frontend/features/settings/lib/settings-saver";
 
 // 鈹€鈹€鈹€ Helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 

@@ -18,7 +18,7 @@ import {
   SandboxViolation,
   Unknown,
   type AppError,
-} from "./errors";
+} from "@codeman-frontend/shared/lib/errors";
 import { Schema } from "effect";
 
 const AppErrorUnion = Schema.Union(

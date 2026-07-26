@@ -5,11 +5,11 @@
 //!   - System prompt 函数（ADR-0015）
 //!   - Provider, Settings 类型
 
-export { ProviderCard } from "./components/provider-card";
+export { ProviderCard } from "@codeman-frontend/features/settings/components/provider-card";
 export {
   getDefaultSystemPrompt,
   getUserCanEdit,
   updateDefaultSystemPrompt,
   resolveSystemPromptForConversation,
-} from "./lib/system-prompt";
-export type { Provider, Settings } from "../../shared/lib/types";
+} from "@codeman-frontend/features/settings/lib/system-prompt";
+export type { Provider, Settings } from "@codeman-frontend/shared/lib/types";

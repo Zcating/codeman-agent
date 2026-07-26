@@ -9,7 +9,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Effect } from "effect";
-import { mockState } from "../../__mocks__/ipc-mock";
+import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 
 // Mock solid-js/store（jsdom 没有 Solid reactive context）
 // 不在 vitest.setup.ts 全局注册:见 settings.test.tsx 同位置注释。
@@ -53,7 +53,7 @@ vi.mock("../../features/settings/lib/settings-saver", () => ({
   },
 }));
 
-import { appStore, _resetAppStoreForTest } from "./app.store";
+import { appStore, _resetAppStoreForTest } from "@codeman-frontend/shared/stores/app.store";
 
 describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
   beforeEach(async () => {

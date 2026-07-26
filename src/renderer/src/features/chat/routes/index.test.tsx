@@ -66,9 +66,9 @@ vi.mock("../components/chat-view", () => ({
 
 // ─── Import route components from barrel ────────────────────────────────────
 
-import { HomeRoute } from "./home-route";
-import { ConversationRoute } from "./conversation-route";
-import { ChatLayout } from "./chat-layout";
+import { HomeRoute } from "@codeman-frontend/features/chat/routes/home-route";
+import { ConversationRoute } from "@codeman-frontend/features/chat/routes/conversation-route";
+import { ChatLayout } from "@codeman-frontend/features/chat/routes/chat-layout";
 
 // ─── HomeRoute tests ─────────────────────────────────────────────────────
 

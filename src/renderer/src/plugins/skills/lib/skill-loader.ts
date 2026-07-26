@@ -15,8 +15,8 @@ import { Effect, Schema } from "effect";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { Dirent } from "node:fs";
-import { NotFound, InvalidConfig } from "../../../shared/lib/errors";
-import { SkillFrontmatterSchema, type SkillFrontmatter, type SkillManifest, type SkillSource } from "./skill-loader-schema";
+import { NotFound, InvalidConfig } from "@codeman-frontend/shared/lib/errors";
+import { SkillFrontmatterSchema, type SkillFrontmatter, type SkillManifest, type SkillSource } from "@codeman-frontend/plugins/skills/lib/skill-loader-schema";
 
 /** `---` 块结束位置 (含 trailing newline)。匹配 `---<NL>...<NL>---<NL><body>`。 */
 const FRONT_MATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;

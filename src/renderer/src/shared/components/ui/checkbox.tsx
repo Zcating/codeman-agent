@@ -1,5 +1,5 @@
 import { type Component, type ComponentProps, splitProps } from "solid-js";
-import { cn } from "../../lib/cn";
+import { cn } from "@codeman-frontend/shared/lib/cn";
 
 export type CheckboxProps = ComponentProps<"input"> & { class?: string };
 

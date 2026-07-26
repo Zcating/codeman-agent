@@ -1,8 +1,8 @@
 import { Context, Effect, Layer } from "effect";
-import { invoke as ipcInvoke } from "./ipc";
-import { logger } from "./logger";
-import type { AppError } from "./errors";
-import type { Workspace } from "./types";
+import { invoke as ipcInvoke } from "@codeman-frontend/shared/lib/ipc";
+import { logger } from "@codeman-frontend/shared/lib/logger";
+import type { AppError } from "@codeman-frontend/shared/lib/errors";
+import type { Workspace } from "@codeman-frontend/shared/lib/types";
 
 /**
  * V3 ADR-0023 D8-W: Workspace ownership moved from Settings to chat domain

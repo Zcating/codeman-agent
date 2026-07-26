@@ -6,8 +6,8 @@ import {
 	setManifests,
 	resetManifests,
 	_resetSkillsStoreForTest,
-} from "./skills.store";
-import type { SkillManifest } from "../lib/skill-loader-schema";
+} from "@codeman-frontend/plugins/skills/stores/skills.store";
+import type { SkillManifest } from "@codeman-frontend/plugins/skills/lib/skill-loader-schema";
 
 const SAMPLE: SkillManifest[] = [
 	{ name: "foo", description: "Foo", source: "user", path: "/fake/foo/SKILL.md" },

@@ -4,9 +4,9 @@
 //! 完整设计文档见 codeman-input.tsx 头。
 
 import { type Component, type ComponentProps, Show, splitProps } from "solid-js";
-import { Textarea } from "../ui/textarea";
-import { cn } from "../../lib/cn";
-import { useImeSafeValue } from "../../hooks/use-ime-safe-value";
+import { Textarea } from "@codeman-frontend/shared/components/ui/textarea";
+import { cn } from "@codeman-frontend/shared/lib/cn";
+import { useImeSafeValue } from "@codeman-frontend/shared/hooks/use-ime-safe-value";
 
 export type CodemanTextareaProps = Omit<
   ComponentProps<"textarea">,

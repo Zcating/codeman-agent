@@ -1,7 +1,7 @@
 //! tooltip.test.tsx — Contract tests for Tooltip primitive wrapping @ark-ui/solid.
 import { render, screen, cleanup } from "@solidjs/testing-library";
 import { describe, expect, it, beforeEach } from "vitest";
-import { Tooltip, TooltipTrigger, TooltipContent } from "./tooltip";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@codeman-frontend/shared/components/ui/tooltip";
 
 describe("Tooltip open/close — seam 12", () => {
   beforeEach(() => cleanup());

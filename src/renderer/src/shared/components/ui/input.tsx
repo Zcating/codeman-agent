@@ -1,6 +1,6 @@
 import type { Component, ComponentProps } from "solid-js";
 import { splitProps } from "solid-js";
-import { cn } from "../../lib/cn";
+import { cn } from "@codeman-frontend/shared/lib/cn";
 
 export type InputProps = ComponentProps<"input"> & { class?: string };
 

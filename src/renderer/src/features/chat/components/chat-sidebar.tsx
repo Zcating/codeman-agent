@@ -24,18 +24,18 @@ import {
   type CodemanSidebarGroupOption,
   type CodemanSidebarMenuGroupOption,
   type CodemanSidebarMenuOption,
-} from "../../../shared/components/internal/codeman-sidebar";
-import { logger } from "../../../shared/lib/logger";
-import type { Workspace } from "../../../shared/lib/types";
+} from "@codeman-frontend/shared/components/internal/codeman-sidebar";
+import { logger } from "@codeman-frontend/shared/lib/logger";
+import type { Workspace } from "@codeman-frontend/shared/lib/types";
 import {
   store,
   workspaces$,
   conversations$,
   setSelectedWorkspaceId,
-} from "../stores/chat.store";
-import { chatSidebarActions } from "../lib/chat-sidebar-actions";
-import { RowActions } from "./row-actions";
-import { NewChatButton } from "./new-chat-button";
+} from "@codeman-frontend/features/chat/stores/chat.store";
+import { chatSidebarActions } from "@codeman-frontend/features/chat/lib/chat-sidebar-actions";
+import { RowActions } from "@codeman-frontend/features/chat/components/row-actions";
+import { NewChatButton } from "@codeman-frontend/features/chat/components/new-chat-button";
 
 // ─── ChatSidebar ───────────────────────────────────────────────────────────
 

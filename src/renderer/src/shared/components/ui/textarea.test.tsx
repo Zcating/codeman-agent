@@ -1,6 +1,6 @@
 import { render } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
-import { Textarea } from "./textarea";
+import { Textarea } from "@codeman-frontend/shared/components/ui/textarea";
 
 describe("Textarea", () => {
   it("渲染 textarea tag 且有共享类", () => {

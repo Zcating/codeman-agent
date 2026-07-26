@@ -16,7 +16,7 @@
 //!
 //! Defensive: returns `[]` for any non-object / non-array / item-missing-id.
 
-import type { ModelMeta } from "./types";
+import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 
 interface RawModelItem {
   id?: unknown;

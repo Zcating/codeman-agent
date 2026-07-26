@@ -22,14 +22,14 @@ import {
   Outlet,
   redirect,
 } from "@tanstack/solid-router";
-import { ChatLayout, HomeRoute, ConversationRoute } from "./features/chat/routes/index";
-import { SettingsSidebar } from "./features/settings/components/settings-sidebar";
-import { LlmSection } from "./features/settings/routes/sections/llm-section";
-import { AppSection } from "./features/settings/routes/sections/app-section";
-import { WindowSection } from "./features/settings/routes/sections/window-section";
-import { AdvancedSection } from "./features/settings/routes/sections/advanced-section";
-import { SkillsSection } from "./features/settings/routes/sections/skills-section";
-import { McpSection } from "./features/settings/routes/sections/mcp-section";
+import { ChatLayout, HomeRoute, ConversationRoute } from "@codeman-frontend/features/chat/routes/index";
+import { SettingsSidebar } from "@codeman-frontend/features/settings/components/settings-sidebar";
+import { LlmSection } from "@codeman-frontend/features/settings/routes/sections/llm-section";
+import { AppSection } from "@codeman-frontend/features/settings/routes/sections/app-section";
+import { WindowSection } from "@codeman-frontend/features/settings/routes/sections/window-section";
+import { AdvancedSection } from "@codeman-frontend/features/settings/routes/sections/advanced-section";
+import { SkillsSection } from "@codeman-frontend/features/settings/routes/sections/skills-section";
+import { McpSection } from "@codeman-frontend/features/settings/routes/sections/mcp-section";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,

@@ -124,7 +124,7 @@ vi.mock("../../../shared/components/internal/codeman-sidebar", () => ({
 
 // ─── Imports under test ───────────────────────────────────────────────────
 
-import { ChatSidebar } from "./chat-sidebar";
+import { ChatSidebar } from "@codeman-frontend/features/chat/components/chat-sidebar";
 
 // ─── Setup ─────────────────────────────────────────────────────────────────
 

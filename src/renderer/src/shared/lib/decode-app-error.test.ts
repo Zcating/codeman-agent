@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { NotFound, isAppError } from "./errors";
-import { decodeAppError } from "./decode-app-error";
+import { NotFound, isAppError } from "@codeman-frontend/shared/lib/errors";
+import { decodeAppError } from "@codeman-frontend/shared/lib/decode-app-error";
 
 describe("decodeAppError — bridge from {kind, _tag} payloads to Schema.TaggedError leaf", () => {
   it("returns Schema.TaggedError instances unchanged (identity fast-path)", () => {

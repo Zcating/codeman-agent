@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Cause, Effect } from "effect";
-import { formatAppError } from "./format-app-error";
-import type { AppError } from "./errors";
+import { formatAppError } from "@codeman-frontend/shared/lib/format-app-error";
+import type { AppError } from "@codeman-frontend/shared/lib/errors";
 import {
   NotFound,
   Unauthorized,
@@ -12,8 +12,8 @@ import {
   SandboxViolation,
   Unknown as UnknownErr,
   type AppError as NewAppError,
-} from "./errors";
-import { TauriError } from "./ipc";
+} from "@codeman-frontend/shared/lib/errors";
+import { TauriError } from "@codeman-frontend/shared/lib/ipc";
 
 describe("formatAppError — Schema.TaggedError instances only (ADR-0025 PR 2)", () => {
   const fmt = (e: AppError) => {

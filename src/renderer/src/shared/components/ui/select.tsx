@@ -7,7 +7,7 @@ import {
   useSelectContext,
 } from "@ark-ui/solid";
 import { Check, ChevronDown, ChevronUp } from "lucide-solid";
-import { cn } from "../../lib/cn";
+import { cn } from "@codeman-frontend/shared/lib/cn";
 
 export const SelectRoot = SelectPrimitive.Root;
 

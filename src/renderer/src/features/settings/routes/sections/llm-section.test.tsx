@@ -11,9 +11,9 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, cleanup } from "@solidjs/testing-library";
 import { Effect } from "effect";
-import { LlmSection } from "./llm-section";
-import { mockState, SettingsV15 } from "../../../../__mocks__/ipc-mock";
-import type { Provider } from "../../../../shared/lib/types";
+import { LlmSection } from "@codeman-frontend/features/settings/routes/sections/llm-section";
+import { mockState, SettingsV15 } from "@codeman-frontend/__mocks__/ipc-mock";
+import type { Provider } from "@codeman-frontend/shared/lib/types";
 
 // Mock solid-js/store — LlmSection imports appStore, appStore uses createStore.
 // jsdom lacks Solid reactive context, this mock provides minimal proxy.
@@ -44,7 +44,7 @@ vi.mock("solid-js/store", () => {
   return { createStore: () => [storeProxy, setStore] };
 });
 
-import { appStore, _resetAppStoreForTest } from "../../../../shared/stores/app.store";
+import { appStore, _resetAppStoreForTest } from "@codeman-frontend/shared/stores/app.store";
 
 // V1.5 mock providers
 const mockMiniMaxProvider: Provider = {

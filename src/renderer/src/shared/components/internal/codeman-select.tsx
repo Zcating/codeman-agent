@@ -1,6 +1,6 @@
 import type { Component, JSX } from "solid-js";
 import { For, Show, createMemo } from "solid-js";
-import { SelectRoot, SelectTrigger, SelectContent, SelectItem, SelectValue, SelectAction, createListCollection } from "../ui/select";
+import { SelectRoot, SelectTrigger, SelectContent, SelectItem, SelectValue, SelectAction, createListCollection } from "@codeman-frontend/shared/components/ui/select";
 
 export interface CodemanSelectOption {
   label: string;

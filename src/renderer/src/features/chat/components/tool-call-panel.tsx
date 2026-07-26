@@ -12,8 +12,8 @@
 //! 由 MessageBubble 在 inline-tool-calls 容器内逐条渲染,data-tool-call-id 锚定。
 
 import { Wrench } from "lucide-solid";
-import { ToolCallCard } from "./tool-call-card";
-import type { ToolCall, ToolResult } from "../../../shared/lib/types";
+import { ToolCallCard } from "@codeman-frontend/features/chat/components/tool-call-card";
+import type { ToolCall, ToolResult } from "@codeman-frontend/shared/lib/types";
 
 export interface ToolCallPanelProps {
 	/** tool call 元数据(name / args / id) */

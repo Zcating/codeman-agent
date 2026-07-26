@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { WorkspaceIdSchema, type WorkspaceId } from "./workspace-id";
+import { WorkspaceIdSchema, type WorkspaceId } from "@codeman-frontend/shared/lib/workspace-id";
 
 describe("WorkspaceIdSchema (ADR-0025 PR 4)", () => {
   it("make() returns a branded WorkspaceId string", () => {

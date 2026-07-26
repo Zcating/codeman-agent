@@ -8,8 +8,8 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
-import { MessageBubble } from "./message-bubble";
-import type { Message, ToolCall, ToolResult, FileMatch } from "../../../shared/lib/types";
+import { MessageBubble } from "@codeman-frontend/features/chat/components/message-bubble";
+import type { Message, ToolCall, ToolResult, FileMatch } from "@codeman-frontend/shared/lib/types";
 
 // Mock chat.store (MessageBubble 内部用 isStreaming memo 读 store.byId[…].streamingMessageId)
 vi.mock("../stores/chat.store", () => ({

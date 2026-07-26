@@ -1,7 +1,7 @@
 // Smoke test for effect-schema-adapter
 import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
-import { effectSchema, firstErrorMessage } from "./effect-schema-adapter";
+import { effectSchema, firstErrorMessage } from "@codeman-frontend/shared/lib/effect-schema-adapter";
 
 describe("effectSchema adapter (Standard Schema V1)", () => {
   it("valid value passes", () => {

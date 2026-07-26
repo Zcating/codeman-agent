@@ -8,8 +8,8 @@
 //! 3. buildModel throws on missing api_key (negative)
 
 import { describe, it, expect } from "vitest";
-import { buildModel, BuildModelError } from "./build-model";
-import type { Provider } from "../../../shared/lib/types";
+import { buildModel, BuildModelError } from "@codeman-frontend/features/chat/lib/build-model";
+import type { Provider } from "@codeman-frontend/shared/lib/types";
 
 // ─── Test Fixtures ─────────────────────────────────────────────
 

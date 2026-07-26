@@ -4,7 +4,7 @@ import {
     parseSseLine,
     buildAnthropicRequestBody,
     parseSseStream,
-} from "./anthropic-transport";
+} from "@codeman-frontend/features/chat/lib/anthropic-transport";
 import type {
     AssistantMessageEvent,
     Context,

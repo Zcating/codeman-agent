@@ -11,28 +11,28 @@ import { createSignal, type Accessor } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 
 import { Effect, Stream } from "effect";
-import type { Conversation, Message, SkillManifest, Workspace } from "../../../shared/lib/types";
-import { logger } from "../../../shared/lib/logger";
-import type { AppError } from "../../../shared/lib/errors";
+import type { Conversation, Message, SkillManifest, Workspace } from "@codeman-frontend/shared/lib/types";
+import { logger } from "@codeman-frontend/shared/lib/logger";
+import type { AppError } from "@codeman-frontend/shared/lib/errors";
 import {
   createAgentRuntime,
   type AgentRuntime,
   type RuntimeEvent,
   type ProviderConfig,
-} from "../lib/runtime";
+} from "@codeman-frontend/features/chat/lib/runtime";
 import {
   ConversationService,
   ConversationServiceLive,
   MessageService,
   MessageServiceLive,
-} from "../../../shared/lib/ipc";
+} from "@codeman-frontend/shared/lib/ipc";
 import {
   WorkspaceService,
   WorkspaceServiceLive,
-} from "../../../shared/lib/workspace-service";
-import { deriveLabelFromPath } from "../../../shared/lib/derive-label-from-path";
-import { appStore } from "../../../shared/stores/app.store";
-import { skillsManifests$ } from "../../../plugins/skills/stores/skills.store";
+} from "@codeman-frontend/shared/lib/workspace-service";
+import { deriveLabelFromPath } from "@codeman-frontend/shared/lib/derive-label-from-path";
+import { appStore } from "@codeman-frontend/shared/stores/app.store";
+import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
 
 // ─── ConversationState 类型 (inline 在 chat.store) ──────
 

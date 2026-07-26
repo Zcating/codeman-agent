@@ -29,7 +29,7 @@ import {
   SidebarInput,
   SidebarRail,
   SidebarTrigger,
-} from "./sidebar";
+} from "@codeman-frontend/shared/components/ui/sidebar";
 
 describe("SidebarProvider context — seam 1", () => {
   beforeEach(() => cleanup());

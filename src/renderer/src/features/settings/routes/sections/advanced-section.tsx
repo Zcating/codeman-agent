@@ -5,8 +5,8 @@
 
 import { Show, createSignal, type JSX } from "solid-js";
 import { Trash2 } from "lucide-solid";
-import { clearAllHistoryBridge } from "../../lib/clear-all-history-bridge";
-import { logger } from "../../../../shared/lib/logger";
+import { clearAllHistoryBridge } from "@codeman-frontend/features/settings/lib/clear-all-history-bridge";
+import { logger } from "@codeman-frontend/shared/lib/logger";
 
 export function AdvancedSection(): JSX.Element {
   const [confirmClear, setConfirmClear] = createSignal(false);

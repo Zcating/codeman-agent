@@ -1,6 +1,6 @@
 import { fireEvent, render } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
-import { CodemanInput } from "./codeman-input";
+import { CodemanInput } from "@codeman-frontend/shared/components/internal/codeman-input";
 
 describe("CodemanInput", () => {
   it("必传 props:渲染 input 元素 + 默认 type=text", () => {

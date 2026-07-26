@@ -24,21 +24,21 @@
 
 import { createStore } from "solid-js/store";
 import { Effect } from "effect";
-import type { Settings, Provider, ModelMeta, Workspace } from "../lib/types";
-import { logger } from "../lib/logger";
-import { Unknown, type AppError } from "../lib/errors";
-import { decodeAppError } from "../lib/decode-app-error";
+import type { Settings, Provider, ModelMeta, Workspace } from "@codeman-frontend/shared/lib/types";
+import { logger } from "@codeman-frontend/shared/lib/logger";
+import { Unknown, type AppError } from "@codeman-frontend/shared/lib/errors";
+import { decodeAppError } from "@codeman-frontend/shared/lib/decode-app-error";
 // V3: route IPC through the V3 canonical (window.codeman dispatch) instead of
 // the V2 @tauri-apps/api/core which reads window.__TAURI_INTERNALS__ (missing
 // in V3 Electron).
-import { invoke as ipcInvoke } from "../lib/ipc";
+import { invoke as ipcInvoke } from "@codeman-frontend/shared/lib/ipc";
 import {
   ProviderService,
   ProviderServiceLive,
   SettingsService,
   SettingsServiceLive,
-} from "../lib/ipc";
-import { WorkspaceService, WorkspaceServiceLive } from "../lib/workspace-service";
+} from "@codeman-frontend/shared/lib/ipc";
+import { WorkspaceService, WorkspaceServiceLive } from "@codeman-frontend/shared/lib/workspace-service";
 // Note: settingsSaver import removed - was used by deprecated addWorkspace method
 
 // ─── Default Settings (ADR-0015) ──────────────────────────────────────

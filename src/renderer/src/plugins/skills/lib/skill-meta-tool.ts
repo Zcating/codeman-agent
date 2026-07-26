@@ -7,11 +7,11 @@
 // 永久拼), 避免永久累积撑爆 context window。
 
 import { Effect, Exit, Schema } from "effect";
-import { toToolParameters } from "../../../shared/lib/tool-schema";
+import { toToolParameters } from "@codeman-frontend/shared/lib/tool-schema";
 import type { Static } from "@sinclair/typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { SkillsService, SkillsServiceLive } from "../../../shared/lib/ipc";
-import { AppError } from "../../../shared/lib/errors";
+import { SkillsService, SkillsServiceLive } from "@codeman-frontend/shared/lib/ipc";
+import { AppError } from "@codeman-frontend/shared/lib/errors";
 
 const LoadSkillParamsSchema = Schema.Struct({
   skillName: Schema.String,

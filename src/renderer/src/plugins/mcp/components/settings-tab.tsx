@@ -10,7 +10,7 @@ import {
   RefreshCw,
   Server,
 } from "lucide-solid";
-import { cn } from "../../../shared/lib/cn";
+import { cn } from "@codeman-frontend/shared/lib/cn";
 import {
   mcpServers$,
   mcpAllTools$,
@@ -18,8 +18,8 @@ import {
   enable,
   restart,
   openConfigDir,
-} from "../stores/store";
-import type { McpServerStatus, McpServerInfo } from "../../../shared/lib/types";
+} from "@codeman-frontend/plugins/mcp/stores/store";
+import type { McpServerStatus, McpServerInfo } from "@codeman-frontend/shared/lib/types";
 
 // ─── Status pill ────────────────────────────────────────────────
 

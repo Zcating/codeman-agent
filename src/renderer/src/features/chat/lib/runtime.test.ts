@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { createAgentRuntime, type ProviderConfig, type RuntimeEvent } from "./runtime";
+import { createAgentRuntime, type ProviderConfig, type RuntimeEvent } from "@codeman-frontend/features/chat/lib/runtime";
 import { Stream, Effect } from "effect";
-import type { Message } from "../../../shared/lib/types";
+import type { Message } from "@codeman-frontend/shared/lib/types";
 import { vi } from "vitest";
 
 // Mock pi-agent-core Agent

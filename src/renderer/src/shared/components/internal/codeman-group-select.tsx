@@ -12,7 +12,7 @@ import {
   SelectItem,
   SelectValue,
   createListCollection,
-} from "../ui/select";
+} from "@codeman-frontend/shared/components/ui/select";
 
 export interface CodemanGroupSelectOption {
   label: string;

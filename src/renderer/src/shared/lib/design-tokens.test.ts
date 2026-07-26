@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SIDEBAR_TRANSITION_MS,
   SIDEBAR_KEYBOARD_SHORTCUT,
-} from "./design-tokens";
+} from "@codeman-frontend/shared/lib/design-tokens";
 
 describe("design-tokens", () => {
   it("SIDEBAR_TRANSITION_MS is 200 (milliseconds, snappy)", () => {

@@ -1,8 +1,8 @@
 // Skill injector tests — ADR-0031 Wave A2.
 
 import { describe, it, expect } from "vitest";
-import { formatSkillsManifestSection } from "./skill-injector";
-import type { SkillManifest } from "./skill-loader-schema";
+import { formatSkillsManifestSection } from "@codeman-frontend/plugins/skills/lib/skill-injector";
+import type { SkillManifest } from "@codeman-frontend/plugins/skills/lib/skill-loader-schema";
 
 const SKILL = (
 	name: string,

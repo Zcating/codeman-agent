@@ -1,7 +1,7 @@
 //! parseModelsApiResponse — pure parser unit tests.
 
 import { describe, it, expect } from "vitest";
-import { parseModelsApiResponse } from "./parse-models-api-response";
+import { parseModelsApiResponse } from "@codeman-frontend/shared/lib/parse-models-api-response";
 
 describe("parseModelsApiResponse", () => {
   // Real MiniMax /v1/models response shape (verified 2026-07-15):

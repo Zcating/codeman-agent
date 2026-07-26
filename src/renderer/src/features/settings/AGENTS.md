@@ -50,7 +50,7 @@ ProviderCard 用 [`@tanstack/solid-form`](https://tanstack.com/form/latest) 替�
 ```tsx
 import { createForm } from "@tanstack/solid-form";
 import { Schema } from "effect";
-import { effectSchema } from "@/shared/lib/effect-schema-adapter";
+import { effectSchema } from "@codeman-frontend/shared/lib/effect-schema-adapter";
 import { BaseUrlSchema } from "../lib/schemas";
 
 const form = createForm(() => ({
@@ -152,7 +152,7 @@ it.effect("description", () =>
 
 `MockSettingsServiceLive = Layer.succeed(SettingsService, { getSettings, updateSettings, ... })`
 
-**注意**（T5 迁移）：`lib/*.test.ts` 中 `import { mockState } from "src/__mocks__/ipc-mock"`——`mockState` 唯一源在 `src/__mocks__/ipc-mock.ts`，**不是** `@/shared/shared-mock-state`。
+**注意**（T5 迁移）：`lib/*.test.ts` 中 `import { mockState } from "src/__mocks__/ipc-mock"`——`mockState` 唯一源在 `src/__mocks__/ipc-mock.ts`，**不是** `@codeman-frontend/shared/shared-mock-state`。
 
 ### 测试：UI 组件
 

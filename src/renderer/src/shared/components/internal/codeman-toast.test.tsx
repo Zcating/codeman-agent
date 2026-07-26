@@ -3,7 +3,7 @@
 
 import { describe, expect, it, afterEach } from "vitest";
 import { cleanup, render, waitFor } from "@solidjs/testing-library";
-import { codemanToast, ToasterMount } from "./codeman-toast";
+import { codemanToast, ToasterMount } from "@codeman-frontend/shared/components/internal/codeman-toast";
 
 describe("codemanToast", () => {
   afterEach(() => {

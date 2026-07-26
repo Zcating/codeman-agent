@@ -1,8 +1,8 @@
 //! Pure-function spec for the Mock (dev) template used by createProviderFormDialog().
 
 import { describe, it, expect } from "vitest";
-import type { Provider } from "../../../shared/lib/types";
-import { buildMockDevTemplate } from "./mock-provider-template";
+import type { Provider } from "@codeman-frontend/shared/lib/types";
+import { buildMockDevTemplate } from "@codeman-frontend/features/settings/lib/mock-provider-template";
 
 describe("buildMockDevTemplate", () => {
   it("返回 prefill shape with given id (baseUrl 指向本地 mock server)", () => {

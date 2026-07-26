@@ -11,8 +11,8 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "../ui/dialog";
-import { Button } from "../ui/button";
+} from "@codeman-frontend/shared/components/ui/dialog";
+import { Button } from "@codeman-frontend/shared/components/ui/button";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

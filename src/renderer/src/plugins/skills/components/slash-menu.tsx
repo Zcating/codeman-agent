@@ -15,7 +15,7 @@ import {
   type JSX,
 } from "solid-js";
 import { X, Terminal, User } from "lucide-solid";
-import type { SkillManifest } from "../../../shared/lib/types";
+import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 

@@ -7,8 +7,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Effect } from "effect";
-import { mockState } from "../../../__mocks__/ipc-mock";
-import { logger } from "../../../shared/lib/logger";
+import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
+import { logger } from "@codeman-frontend/shared/lib/logger";
 
 // Mock solid-js/store（jsdom 没有 Solid reactive context）
 // 不在 vitest.setup.ts 全局注册:见 settings.test.tsx 同位置注释。
@@ -41,8 +41,8 @@ vi.mock("solid-js/store", () => {
   return { createStore: () => [storeProxy, setStore] };
 });
 
-import { appStore, _resetAppStoreForTest } from "../../../shared/stores/app.store";
-import { settingsSaver, _resetSettingsSaverForTest } from "./settings-saver";
+import { appStore, _resetAppStoreForTest } from "@codeman-frontend/shared/stores/app.store";
+import { settingsSaver, _resetSettingsSaverForTest } from "@codeman-frontend/features/settings/lib/settings-saver";
 
 describe("settingsSaver (ADR-0015 V1.7+)", () => {
   beforeEach(async () => {

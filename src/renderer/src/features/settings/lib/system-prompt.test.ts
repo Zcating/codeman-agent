@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Effect } from "effect";
-import { mockState } from "../../../__mocks__/ipc-mock";
+import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 
 // Mock solid-js/store before importing app.store (same as app.store.test.ts)
 // 必须支持 Solid setStore 的两种签名：
@@ -37,13 +37,13 @@ vi.mock("solid-js/store", () => {
   return { createStore: () => [storeProxy, setStore] };
 });
 
-import { appStore, _resetAppStoreForTest } from "../../../shared/stores/app.store";
+import { appStore, _resetAppStoreForTest } from "@codeman-frontend/shared/stores/app.store";
 import {
   getDefaultSystemPrompt,
   getUserCanEdit,
   updateDefaultSystemPrompt,
   resolveSystemPromptForConversation,
-} from "./system-prompt";
+} from "@codeman-frontend/features/settings/lib/system-prompt";
 
 describe("system-prompt (ADR-0015)", () => {
   beforeEach(async () => {

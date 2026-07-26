@@ -3,7 +3,7 @@
 //! API 形状与 `console.*` 1:1，迁移成本最低：
 //!
 //! ```ts
-//! import { logger } from "@/shared/lib/logger";
+//! import { logger } from "@codeman-frontend/shared/lib/logger";
 //!
 //! logger.debug("调试信息", { foo: 1 });
 //! logger.info("刷新 settings 成功", { providers: 2 });

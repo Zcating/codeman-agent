@@ -8,8 +8,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, fireEvent } from "@solidjs/testing-library";
 import { createSignal, type JSX } from "solid-js";
-import { SlashMenu } from "./slash-menu";
-import type { SkillManifest } from "../../../shared/lib/types";
+import { SlashMenu } from "@codeman-frontend/plugins/skills/components/slash-menu";
+import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 

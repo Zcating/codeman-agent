@@ -2,9 +2,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, fireEvent, waitFor } from "@solidjs/testing-library";
 import { Effect } from "effect";
-import { HomeAgentForm } from "./home";
-import type { ProviderConfig } from "../lib/runtime";
-import { createConversation, sendMessage, addWorkspace as addWorkspaceFromStore } from "../stores/chat.store";
+import { HomeAgentForm } from "@codeman-frontend/features/chat/components/home";
+import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
+import { createConversation, sendMessage, addWorkspace as addWorkspaceFromStore } from "@codeman-frontend/features/chat/stores/chat.store";
 
 // ─── Mock codeman-toast (ADR-0029 D5 silent-drop fix verification) ────────────
 
@@ -355,7 +355,7 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
   });
 
   it("T4.1.6: send button click triggers createConversation then sendMessage", async () => {
-    const { appStore } = await import("../../../shared/stores/app.store");
+    const { appStore } = await import("@codeman-frontend/shared/stores/app.store");
     mockWorkspaces.current.push({ id: "ws-1", label: "Frontend", rootPath: "/p" });
     mockSelectedWsId.current = "ws-1";
     mockDefaultLlmProvider.id = "minimax";
@@ -495,7 +495,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
     mockWorkspaces.current.length = 0;
     mockSelectedWsId.current = "ws-1"; // default: 1 pre-selected workspace
     // Reset providers to default mock state to avoid test isolation issues
-    const { appStore } = await import("../../../shared/stores/app.store");
+    const { appStore } = await import("@codeman-frontend/shared/stores/app.store");
     appStore.state.value.providers = [
       {
         id: "minimax",
@@ -651,7 +651,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
 
   // T4.2.7
   it("T4.2.7: LLM picker 显示 enabled providers 的所有 models", async () => {
-    const { appStore } = await import("../../../shared/stores/app.store");
+    const { appStore } = await import("@codeman-frontend/shared/stores/app.store");
     // Workspace data comes from chat.store mock (already set by T4.2 beforeEach)
     // Setup 2 providers with 1 model each
     appStore.state.value.providers = [
@@ -703,8 +703,8 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
 
   // T4.2.8
   it("T4.2.8: LLM picker 选中 → 写 defaultLlmProviderId + scheduleSave", async () => {
-    const { appStore } = await import("../../../shared/stores/app.store");
-    const { settingsSaver } = await import("../../settings/lib/settings-saver");
+    const { appStore } = await import("@codeman-frontend/shared/stores/app.store");
+    const { settingsSaver } = await import("@codeman-frontend/features/settings/lib/settings-saver");
     // Workspace data comes from chat.store mock (already set by T4.2 beforeEach)
     appStore.state.value.providers = [
       {
@@ -785,8 +785,8 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
 
   // ─── Regression: 同 provider 非首项模型回写 ─────────────────────────────
   it("T4.2.9: LLM picker 点击同 provider 非首项模型 → 写 provider.llm.defaultModel + defaultLlmProviderId", async () => {
-    const { appStore } = await import("../../../shared/stores/app.store");
-    const { settingsSaver } = await import("../../settings/lib/settings-saver");
+    const { appStore } = await import("@codeman-frontend/shared/stores/app.store");
+    const { settingsSaver } = await import("@codeman-frontend/features/settings/lib/settings-saver");
     // 单个 provider，2 个模型，默认选第一个
     appStore.state.value.providers = [
       {
@@ -846,7 +846,7 @@ describe("HomeAgentForm — Ctrl+Enter / Cmd+Enter send shortcut (T4.3)", () => 
     sharedOnValueChanges = [];
     mockWorkspaces.current.length = 0;
     mockSelectedWsId.current = "ws-1";
-    const { appStore } = await import("../../../shared/stores/app.store");
+    const { appStore } = await import("@codeman-frontend/shared/stores/app.store");
     appStore.state.value.providers = [
       {
         id: "minimax",

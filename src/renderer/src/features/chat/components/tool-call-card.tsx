@@ -16,7 +16,7 @@ import {
   CheckCircle2,
   XCircle,
 } from "lucide-solid";
-import type { ToolCall, ToolResult } from "../../../shared/lib/types";
+import type { ToolCall, ToolResult } from "@codeman-frontend/shared/lib/types";
 
 type Status = "running" | "success" | "error";
 

@@ -5,8 +5,8 @@
 
 import type { JSX } from "solid-js";
 import { createSignal, createContext, useContext, mergeProps, splitProps, Show } from "solid-js";
-import { cn } from "../../lib/cn";
-import { Tooltip as TooltipRoot, TooltipTrigger, TooltipContent } from "./tooltip";
+import { cn } from "@codeman-frontend/shared/lib/cn";
+import { Tooltip as TooltipRoot, TooltipTrigger, TooltipContent } from "@codeman-frontend/shared/components/ui/tooltip";
 
 // ─── SidebarContext & SidebarProvider ─────────────────────────────────────────
 

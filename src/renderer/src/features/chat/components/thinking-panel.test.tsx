@@ -10,7 +10,7 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
-import { ThinkingPanel } from "./thinking-panel";
+import { ThinkingPanel } from "@codeman-frontend/features/chat/components/thinking-panel";
 
 describe("ThinkingPanel", () => {
 	afterEach(() => cleanup());

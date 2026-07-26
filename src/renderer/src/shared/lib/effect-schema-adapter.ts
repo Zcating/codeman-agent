@@ -13,7 +13,7 @@
 //! ## 用法
 //!
 //! ```tsx
-//! import { effectSchema } from "@/shared/lib/effect-schema-adapter";
+//! import { effectSchema } from "@codeman-frontend/shared/lib/effect-schema-adapter";
 //! import { Schema } from "effect";
 //!
 //! const BaseUrlSchema = Schema.String.pipe(

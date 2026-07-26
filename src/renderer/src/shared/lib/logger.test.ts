@@ -3,7 +3,7 @@
 //! 验证 4 个 level 方法都打到对应 `console.*` 且 prefix 正确。
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { logger, type LogLevel } from "./logger";
+import { logger, type LogLevel } from "@codeman-frontend/shared/lib/logger";
 
 describe("logger", () => {
   let debugSpy: ReturnType<typeof vi.spyOn>;

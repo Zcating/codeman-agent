@@ -24,13 +24,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createRoot } from "solid-js";
 import { Effect, Layer } from "effect";
-import type { Workspace } from "../../../shared/lib/types";
+import type { Workspace } from "@codeman-frontend/shared/lib/types";
 import {
   workspaces$,
   selectedWorkspaceId$,
   setSelectedWorkspaceId,
   loadWorkspaces,
-} from "./chat.store";
+} from "@codeman-frontend/features/chat/stores/chat.store";
 
 // ─── vi.hoisted mutable mock state(供 vi.mock factory closure 用) ───
 

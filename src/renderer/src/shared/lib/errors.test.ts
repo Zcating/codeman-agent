@@ -11,7 +11,7 @@ import {
   Unknown,
   isAppError,
   type AppError,
-} from "./errors";
+} from "@codeman-frontend/shared/lib/errors";
 
 describe("errors — Schema.TaggedError variants (ADR-0025 PR1)", () => {
   it("each variant carries its OWN instance _tag (not a shared base)", () => {

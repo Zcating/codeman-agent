@@ -28,17 +28,17 @@ import { createSignal, Show, For } from "solid-js";
 import { Schema } from "effect";
 import { Effect, Exit } from "effect";
 import { createForm } from "@tanstack/solid-form";
-import { appStore } from "../../../shared/stores/app.store";
-import { settingsSaver } from "../lib/settings-saver";
+import { appStore } from "@codeman-frontend/shared/stores/app.store";
+import { settingsSaver } from "@codeman-frontend/features/settings/lib/settings-saver";
 import {
   effectSchema,
   firstErrorMessage,
-} from "../../../shared/lib/effect-schema-adapter";
-import { formatAppError } from "../../../shared/lib/format-app-error";
-import type { Provider } from "../../../shared/lib/types";
-import { Button } from "../../../shared/components/ui/button";
-import { CodemanInput } from "../../../shared/components/internal/codeman-input";
-import { Checkbox } from "../../../shared/components/ui/checkbox";
+} from "@codeman-frontend/shared/lib/effect-schema-adapter";
+import { formatAppError } from "@codeman-frontend/shared/lib/format-app-error";
+import type { Provider } from "@codeman-frontend/shared/lib/types";
+import { Button } from "@codeman-frontend/shared/components/ui/button";
+import { CodemanInput } from "@codeman-frontend/shared/components/internal/codeman-input";
+import { Checkbox } from "@codeman-frontend/shared/components/ui/checkbox";
 import {
   Card,
   CardHeader,
@@ -46,12 +46,12 @@ import {
   CardDescription,
   CardContent,
   CardFooter,
-} from "../../../shared/components/ui/card";
+} from "@codeman-frontend/shared/components/ui/card";
 import {
   BaseUrlSchema,
   ModelSchema,
   ApiKeySchema,
-} from "../lib/schemas";
+} from "@codeman-frontend/features/settings/lib/schemas";
 
 export interface ProviderCardProps {
   provider: Provider;

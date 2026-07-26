@@ -7,7 +7,7 @@ import userEvent from "@testing-library/user-event";
 
 // ─── Import the imperative API under test (will fail until function exists) ─────
 
-import { createProviderFormDialog } from "./add-provider-dialog";
+import { createProviderFormDialog } from "@codeman-frontend/features/settings/components/add-provider-dialog";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

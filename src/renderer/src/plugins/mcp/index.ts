@@ -3,7 +3,7 @@
 // V3.1 MCP Client plugin — stdio-based tool augmentation (per ADR-0032).
 // Responsibility: exposes MCP servers as agent tools via pi-agent tool interface.
 
-export { McpSettingsTab } from "./components/settings-tab";
+export { McpSettingsTab } from "@codeman-frontend/plugins/mcp/components/settings-tab";
 export {
   mcpServers$,
   mcpAllTools$,
@@ -12,7 +12,7 @@ export {
   restart,
   openConfigDir,
   _resetMcpStoreForTest,
-} from "./stores/store";
+} from "@codeman-frontend/plugins/mcp/stores/store";
 export type {
   McpServerStatus,
   McpServerConfig,
@@ -20,4 +20,4 @@ export type {
   McpCallResult,
   McpServerInfo,
   McpToolEntry,
-} from "../../shared/lib/types";
+} from "@codeman-frontend/shared/lib/types";

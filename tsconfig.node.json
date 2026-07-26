@@ -6,6 +6,12 @@
     "src/preload/**/*.ts"
   ],
   "compilerOptions": {
-    "composite": true
+    "composite": true,
+    "types": ["electron-vite/node"],
+    "paths": {
+      "@codeman-frontend/*": [
+        "./src/renderer/src/*"
+      ]
+    }
   }
 }

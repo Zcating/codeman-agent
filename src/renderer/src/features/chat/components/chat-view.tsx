@@ -12,34 +12,34 @@ import { createEffect, createMemo, For, Show, onMount, type JSX } from "solid-js
 import { Effect, Exit } from "effect";
 import { X, Send } from "lucide-solid";
 import { createForm } from "@tanstack/solid-form";
-import { MessageBubble } from "./message-bubble";
-import { store, sendMessage, cancel } from "../stores/chat.store";
-import type { ProviderConfig } from "../lib/runtime";
-import { Button } from "../../../shared/components/ui/button";
-import { CodemanTextarea } from "../../../shared/components/internal/codeman-textarea";
-import { CodemanGroupSelect } from "../../../shared/components/internal/codeman-group-select";
-import { codemanToast } from "../../../shared/components/internal/codeman-toast";
-import { startThemeSync } from "../../../shared/stores/theme";
-import { appStore } from "../../../shared/stores/app.store";
-import { formatAppError } from "../../../shared/lib/format-app-error";
-import { effectSchema, firstErrorMessage } from "../../../shared/lib/effect-schema-adapter";
-import { settingsSaver } from "../../settings/lib/settings-saver";
-import { buildEnabledProviders } from "../lib/build-enabled-providers";
+import { MessageBubble } from "@codeman-frontend/features/chat/components/message-bubble";
+import { store, sendMessage, cancel } from "@codeman-frontend/features/chat/stores/chat.store";
+import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
+import { Button } from "@codeman-frontend/shared/components/ui/button";
+import { CodemanTextarea } from "@codeman-frontend/shared/components/internal/codeman-textarea";
+import { CodemanGroupSelect } from "@codeman-frontend/shared/components/internal/codeman-group-select";
+import { codemanToast } from "@codeman-frontend/shared/components/internal/codeman-toast";
+import { startThemeSync } from "@codeman-frontend/shared/stores/theme";
+import { appStore } from "@codeman-frontend/shared/stores/app.store";
+import { formatAppError } from "@codeman-frontend/shared/lib/format-app-error";
+import { effectSchema, firstErrorMessage } from "@codeman-frontend/shared/lib/effect-schema-adapter";
+import { settingsSaver } from "@codeman-frontend/features/settings/lib/settings-saver";
+import { buildEnabledProviders } from "@codeman-frontend/features/chat/lib/build-enabled-providers";
 import {
   handleArrowUpField,
   handleArrowDownField,
   recordInputEntry,
-} from "../stores/input-history.store";
+} from "@codeman-frontend/features/chat/stores/input-history.store";
 import {
   ModelIdFieldSchema,
   ChatViewFormSchema,
   type ChatViewFormValue,
-} from "../lib/schemas";
+} from "@codeman-frontend/features/chat/lib/schemas";
 // Wave A7: Slash menu integration
-import { useSlashTrigger } from "../../../plugins/skills/lib/use-slash-trigger";
-import { SlashMenu } from "../../../plugins/skills/components/slash-menu";
-import { skillsManifests$ } from "../../../plugins/skills/stores/skills.store";
-import type { SkillManifest } from "../../../shared/lib/types";
+import { useSlashTrigger } from "@codeman-frontend/plugins/skills/lib/use-slash-trigger";
+import { SlashMenu } from "@codeman-frontend/plugins/skills/components/slash-menu";
+import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
+import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
 // ─── ProviderSelect (model picker bound to form.Field "modelId") ─────────────
 

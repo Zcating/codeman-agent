@@ -5,7 +5,7 @@
 //! - formatWithCommas: NaN / Infinity / 0 / 千分位 / 大数
 
 import { describe, it, expect } from "vitest";
-import { compactNumber, formatWithCommas } from "./units";
+import { compactNumber, formatWithCommas } from "@codeman-frontend/shared/lib/units";
 
 describe("compactNumber — 紧凑显示", () => {
     describe("D1: 非有限数", () => {

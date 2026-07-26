@@ -7,13 +7,13 @@
 
 import { Show, For, type JSX, createSignal } from "solid-js";
 import { Effect, Exit } from "effect";
-import { appStore } from "../../../../shared/stores/app.store";
-import { settingsSaver } from "../../lib/settings-saver";
+import { appStore } from "@codeman-frontend/shared/stores/app.store";
+import { settingsSaver } from "@codeman-frontend/features/settings/lib/settings-saver";
 import {
   refreshManifests,
   skillsManifests$,
-} from "../../../../plugins/skills/stores/skills.store";
-import { codemanToast } from "../../../../shared/components/internal/codeman-toast";
+} from "@codeman-frontend/plugins/skills/stores/skills.store";
+import { codemanToast } from "@codeman-frontend/shared/components/internal/codeman-toast";
 import { CheckCircle2, Package, RefreshCw, XCircle } from "lucide-solid";
 
 export function SkillsSection(): JSX.Element {

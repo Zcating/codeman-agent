@@ -4,7 +4,7 @@
 import type { Component, JSX } from "solid-js";
 import { splitProps } from "solid-js";
 import { DialogBackdrop as ArkBackdrop, DialogCloseTrigger as ArkCloseTrigger, DialogContent as ArkContent, DialogDescription as ArkDescription, DialogPositioner as ArkPositioner, DialogRoot as ArkRoot, DialogTitle as ArkTitle, DialogTrigger as ArkTrigger } from "@ark-ui/solid/dialog";
-import { cn } from "../../lib/cn";
+import { cn } from "@codeman-frontend/shared/lib/cn";
 
 interface DialogOpenChangeDetails {
   open: boolean;

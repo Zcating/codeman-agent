@@ -5,8 +5,8 @@
 
 import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
-import { ToolCallCard } from "./tool-call-card";
-import type { ToolCall, ToolResult } from "../../../shared/lib/types";
+import { ToolCallCard } from "@codeman-frontend/features/chat/components/tool-call-card";
+import type { ToolCall, ToolResult } from "@codeman-frontend/shared/lib/types";
 
 describe("ToolCallCard", () => {
   afterEach(() => cleanup());

@@ -1,6 +1,6 @@
 import { render } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
-import { Button } from "./button";
+import { Button } from "@codeman-frontend/shared/components/ui/button";
 
 describe("Button", () => {
   it("默认：渲染 base 和 default variant 类", () => {

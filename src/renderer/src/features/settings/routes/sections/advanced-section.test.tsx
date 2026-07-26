@@ -2,8 +2,8 @@
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
-import { AdvancedSection } from "./advanced-section";
-import { mockState } from "../../../../__mocks__/ipc-mock";
+import { AdvancedSection } from "@codeman-frontend/features/settings/routes/sections/advanced-section";
+import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 
 vi.mock("@tanstack/solid-router", () => ({
   // No router usage in this section, but include minimal stub for safety

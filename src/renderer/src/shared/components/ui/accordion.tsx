@@ -9,7 +9,7 @@ import {
 import { ChevronRightIcon } from "lucide-solid";
 import type { Component, ComponentProps } from "solid-js";
 import { splitProps } from "solid-js";
-import { cn } from "../../lib/cn";
+import { cn } from "@codeman-frontend/shared/lib/cn";
 
 export const Accordion: Component<ComponentProps<typeof AccordionRoot>> = (props) => {
   const [local, rest] = splitProps(props, ["class"]);

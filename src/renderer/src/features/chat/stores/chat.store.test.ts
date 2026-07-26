@@ -24,9 +24,9 @@ import {
   pickWorkspacePath,
   loadWorkspaces,
   type ConversationState,
-} from "./chat.store";
-import type { Conversation, Message, Workspace } from "../../../shared/lib/types";
-import type { RuntimeEvent, ProviderConfig } from "../lib/runtime";
+} from "@codeman-frontend/features/chat/stores/chat.store";
+import type { Conversation, Message, Workspace } from "@codeman-frontend/shared/lib/types";
+import type { RuntimeEvent, ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
 
 // ─── Mock tauri services ─────────────────────────────────────────────
 

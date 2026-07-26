@@ -3,8 +3,8 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
 import { Effect } from "effect";
-import { AppSection } from "./app-section";
-import { mockState, SettingsV15 } from "../../../../__mocks__/ipc-mock";
+import { AppSection } from "@codeman-frontend/features/settings/routes/sections/app-section";
+import { mockState, SettingsV15 } from "@codeman-frontend/__mocks__/ipc-mock";
 
 // Mock solid-js/store (jsdom lacks Solid reactive context)
 vi.mock("solid-js/store", () => {
@@ -34,7 +34,7 @@ vi.mock("solid-js/store", () => {
   return { createStore: () => [storeProxy, setStore] };
 });
 
-import { appStore, _resetAppStoreForTest } from "../../../../shared/stores/app.store";
+import { appStore, _resetAppStoreForTest } from "@codeman-frontend/shared/stores/app.store";
 
 const baseSettings: SettingsV15 = {
   providers: [],

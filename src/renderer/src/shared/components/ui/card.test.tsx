@@ -8,7 +8,7 @@ import {
   CardContent,
   CardFooter,
   CardAction,
-} from "./card";
+} from "@codeman-frontend/shared/components/ui/card";
 
 describe("Card", () => {
   it("renders with shadcn-style classes", () => {

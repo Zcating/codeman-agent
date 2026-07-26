@@ -7,8 +7,8 @@ import { Effect, Exit } from "effect";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadSkillContent, parseFrontmatter, scanSkillsDir } from "./skill-loader";
-import { NotFound } from "../../../shared/lib/errors";
+import { loadSkillContent, parseFrontmatter, scanSkillsDir } from "@codeman-frontend/plugins/skills/lib/skill-loader";
+import { NotFound } from "@codeman-frontend/shared/lib/errors";
 
 let tempDir: string;
 

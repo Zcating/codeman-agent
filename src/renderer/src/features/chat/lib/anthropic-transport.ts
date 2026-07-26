@@ -32,7 +32,7 @@ import {
     type Usage,
 } from "@earendil-works/pi-ai";
 import type { StreamFn } from "@earendil-works/pi-agent-core";
-import { logger } from "../../../shared/lib/logger";
+import { logger } from "@codeman-frontend/shared/lib/logger";
 
 // ─── SSE 行解析 ─────────────────────────────────────────────────────
 

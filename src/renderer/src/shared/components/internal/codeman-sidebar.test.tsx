@@ -23,7 +23,7 @@ import {
   type CodemanSidebarGroupOption,
   type CodemanSidebarMenuGroupOption,
   type CodemanSidebarMenuOption,
-} from "./codeman-sidebar";
+} from "@codeman-frontend/shared/components/internal/codeman-sidebar";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Schema } from "effect";
 import type { Static } from "@sinclair/typebox";
-import { toToolParameters } from "./tool-schema";
+import { toToolParameters } from "@codeman-frontend/shared/lib/tool-schema";
 
 // Mirrors pi-mono's TYPEBOX_KIND constant in
 // @earendil-works/pi-ai/dist/utils/validation.js (line 13).

@@ -4,7 +4,7 @@
 //! appStore.set() triggers debounced auto-save (settingsSaver.scheduleSave).
 
 import type { JSX } from "solid-js";
-import { appStore } from "../../../../shared/stores/app.store";
+import { appStore } from "@codeman-frontend/shared/stores/app.store";
 
 export function AppSection(): JSX.Element {
   return (

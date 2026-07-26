@@ -16,7 +16,7 @@
 //   ...
 //   </available_skills>
 
-import type { SkillManifest } from "./skill-loader-schema";
+import type { SkillManifest } from "@codeman-frontend/plugins/skills/lib/skill-loader-schema";
 
 /**
  * 格式化 enabled skills 为 system prompt 注入段。

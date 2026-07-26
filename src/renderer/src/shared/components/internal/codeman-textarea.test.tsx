@@ -1,6 +1,6 @@
 import { fireEvent, render } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
-import { CodemanTextarea } from "./codeman-textarea";
+import { CodemanTextarea } from "@codeman-frontend/shared/components/internal/codeman-textarea";
 
 describe("CodemanTextarea", () => {
   it("渲染 textarea 元素 + rows 透传", () => {

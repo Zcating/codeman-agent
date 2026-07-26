@@ -2,7 +2,7 @@
 
 import { render, screen, fireEvent } from "@solidjs/testing-library";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { CodemanSelect, CodemanSelectOption } from "./codeman-select";
+import { CodemanSelect, CodemanSelectOption } from "@codeman-frontend/shared/components/internal/codeman-select";
 
 // Mock state - plain values, not reactive
 let mockIsOpen = false;

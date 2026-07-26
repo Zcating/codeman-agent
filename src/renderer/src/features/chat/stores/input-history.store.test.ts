@@ -5,7 +5,7 @@ import { createRoot } from "solid-js";
 import {
   INPUT_HISTORY_STORAGE_KEY,
   INPUT_HISTORY_MAX_ENTRIES,
-} from "../lib/input-history";
+} from "@codeman-frontend/features/chat/lib/input-history";
 import {
   inputHistory$,
   inputHistoryCursor$,
@@ -17,7 +17,7 @@ import {
   handleArrowUpField,
   handleArrowDownField,
   _resetInputHistoryForTest,
-} from "./input-history.store";
+} from "@codeman-frontend/features/chat/stores/input-history.store";
 
 beforeEach(() => {
   window.localStorage.clear();

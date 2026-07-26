@@ -6,7 +6,7 @@ import {
   SelectAction, SelectContent, SelectGroup, SelectItem, SelectLabel,
   SelectRoot, SelectSeparator, SelectScrollDownButton,
   SelectScrollUpButton, SelectTrigger, SelectValue,
-} from "./select";
+} from "@codeman-frontend/shared/components/ui/select";
 
 const emptyCollection = createListCollection({ items: [] });
 const sampleCollection = createListCollection({

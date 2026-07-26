@@ -6,12 +6,12 @@
 
 import { For, Show, type JSX } from "solid-js";
 import { Plus } from "lucide-solid";
-import { ProviderCard } from "../../components/provider-card";
-import { createProviderFormDialog } from "../../components/add-provider-dialog";
-import { appStore } from "../../../../shared/stores/app.store";
-import { settingsSaver } from "../../lib/settings-saver";
-import { logger } from "../../../../shared/lib/logger";
-import type { Provider } from "../../../../shared/lib/types";
+import { ProviderCard } from "@codeman-frontend/features/settings/components/provider-card";
+import { createProviderFormDialog } from "@codeman-frontend/features/settings/components/add-provider-dialog";
+import { appStore } from "@codeman-frontend/shared/stores/app.store";
+import { settingsSaver } from "@codeman-frontend/features/settings/lib/settings-saver";
+import { logger } from "@codeman-frontend/shared/lib/logger";
+import type { Provider } from "@codeman-frontend/shared/lib/types";
 
 export function LlmSection(): JSX.Element {
   const onProviderDelete = (id: string): void => {

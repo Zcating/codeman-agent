@@ -17,9 +17,9 @@
 //! 失败时用 Cause 详细 log, 不再丢 AppError 类型信息。
 import { debounce } from "es-toolkit";
 import { Effect, Exit } from "effect";
-import { appStore } from "../../../shared/stores/app.store";
-import { formatAppError } from "../../../shared/lib/format-app-error";
-import { logger } from "../../../shared/lib/logger";
+import { appStore } from "@codeman-frontend/shared/stores/app.store";
+import { formatAppError } from "@codeman-frontend/shared/lib/format-app-error";
+import { logger } from "@codeman-frontend/shared/lib/logger";
 
 const DEBOUNCE_MS = 500;
 

@@ -6,9 +6,9 @@ import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, cleanup, fireEvent, waitFor } from "@solidjs/testing-library";
 import { For } from "solid-js";
 import { Effect } from "effect";
-import { ChatView } from "./chat-view";
-import type { Message } from "../../../shared/lib/types";
-import type { CodemanGroupSelectProps } from "../../../shared/components/internal/codeman-group-select";
+import { ChatView } from "@codeman-frontend/features/chat/components/chat-view";
+import type { Message } from "@codeman-frontend/shared/lib/types";
+import type { CodemanGroupSelectProps } from "@codeman-frontend/shared/components/internal/codeman-group-select";
 
 // ─── Mock codeman-group-select: 轻量测试替身，渲染 trigger + role=option ──────
 vi.mock("../../../shared/components/internal/codeman-group-select", () => ({
@@ -221,7 +221,7 @@ vi.mock("../../../shared/components/internal/codeman-toast", () => ({
   ToasterMount: () => null,
 }));
 
-vi.mock(import("../lib/runtime"), async (importOriginal) => {
+vi.mock(import("@codeman-frontend/features/chat/lib/runtime"), async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/runtime")>();
   return {
     ...actual,
@@ -310,7 +310,7 @@ describe("ChatView", () => {
   // handleChange() 只写 defaultLlmProviderId，不写 provider.llm.defaultModel。
   // 结果：同 provider 下点击非首项模型，受控值立即弹回首项。
   it("Bug: 选择非首项模型 MiniMax-M2.7 后，llm.defaultModel 应为 MiniMax-M2.7（不弹回首项）", async () => {
-    const { appStore } = await import("../../../shared/stores/app.store");
+    const { appStore } = await import("@codeman-frontend/shared/stores/app.store");
     // 通过 appStore.set 设置多模型 fixture（shallow merge，替换整个 providers 数组）
     appStore.set({
       providers: [
@@ -353,7 +353,7 @@ describe("ChatView", () => {
   });
 
   it("无 enabled provider 时显示空状态链接到 /settings", async () => {
-    const appStoreMock = await import("../../../shared/stores/app.store");
+    const appStoreMock = await import("@codeman-frontend/shared/stores/app.store");
     (appStoreMock as any).__setAppStoreState({
       providers: [
         {
@@ -385,8 +385,8 @@ describe("ChatView", () => {
   // ─── handleSend 测试 ─────────────────────────────────────────────────
   it("handleSend with valid input 调 sendMessage", async () => {
     const user = (await import("@testing-library/user-event")).default;
-    const conversationsStoreMock = await import("../stores/chat.store");
-    const appStoreMock = await import("../../../shared/stores/app.store");
+    const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
+    const appStoreMock = await import("@codeman-frontend/shared/stores/app.store");
     // Reset sendMessage mock and appStore state
     (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
     (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
@@ -436,7 +436,7 @@ describe("ChatView", () => {
 
   it("handleSend empty input 不调 sendMessage", async () => {
     const user = (await import("@testing-library/user-event")).default;
-    const conversationsStoreMock = await import("../stores/chat.store");
+    const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
     // Reset sendMessage mock before test
     (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
     const { container } = render(() => <ChatView convId="conv-1" />);
@@ -447,8 +447,8 @@ describe("ChatView", () => {
 
   it("handleSend 输入后清空 input", async () => {
     const user = (await import("@testing-library/user-event")).default;
-    const appStoreMock = await import("../../../shared/stores/app.store");
-    const conversationsStoreMock = await import("../stores/chat.store");
+    const appStoreMock = await import("@codeman-frontend/shared/stores/app.store");
+    const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
     // Reset sendMessage mock and appStore state
     (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
     (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
@@ -491,7 +491,7 @@ describe("ChatView", () => {
   // ─── handleCancel 测试 ───────────────────────────────────────────────
   it("handleCancel 调 cancel(convId)", async () => {
     const user = (await import("@testing-library/user-event")).default;
-    const conversationsStoreMock = await import("../stores/chat.store");
+    const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
     // Reset cancel mock and set streaming state
     (conversationsStoreMock as unknown as { cancel: ReturnType<typeof vi.fn> }).cancel.mockClear();
     const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null }> } }).store;
@@ -506,7 +506,7 @@ describe("ChatView", () => {
 
   // ─── thinking indicator 测试 (W3.x 已移除 — WX-OPT-2026-07-16 页面优化) ──────
   it("thinking indicator 已移除 — streaming + 空内容场景不再渲染", async () => {
-    const conversationsStoreMock = await import("../stores/chat.store");
+    const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
     const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null; messages: Message[] }> } }).store;
     // Reset streaming state first, then set fresh
     mockStore.byId["conv-1"].streamingMessageId = null;
@@ -519,7 +519,7 @@ describe("ChatView", () => {
   });
 
   it("thinking indicator 已移除 — non-streaming 也不渲染", async () => {
-    const conversationsStoreMock = await import("../stores/chat.store");
+    const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
     // Ensure store state is clean
     const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null }> } }).store;
     mockStore.byId["conv-1"].streamingMessageId = null;
@@ -531,8 +531,8 @@ describe("ChatView", () => {
   // ─── form submit 测试 ────────────────────────────────────────────────
   it("form submit preventDefault + handleSend", async () => {
     const user = (await import("@testing-library/user-event")).default;
-    const conversationsStoreMock = await import("../stores/chat.store");
-    const appStoreMock = await import("../../../shared/stores/app.store");
+    const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
+    const appStoreMock = await import("@codeman-frontend/shared/stores/app.store");
     // Reset sendMessage mock and appStore state
     (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
     (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
@@ -606,8 +606,8 @@ describe("ChatView", () => {
   // ─── Ctrl+Enter send shortcut ─────────────────────────────────────────────
   it("Ctrl+Enter on textarea triggers sendMessage", async () => {
     const user = (await import("@testing-library/user-event")).default;
-    const conversationsStoreMock = await import("../stores/chat.store");
-    const appStoreMock = await import("../../../shared/stores/app.store");
+    const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
+    const appStoreMock = await import("@codeman-frontend/shared/stores/app.store");
     (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
     (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
       providers: [
@@ -646,8 +646,8 @@ describe("ChatView", () => {
 
   it("Cmd+Enter on textarea (Mac) triggers sendMessage", async () => {
     const user = (await import("@testing-library/user-event")).default;
-    const conversationsStoreMock = await import("../stores/chat.store");
-    const appStoreMock = await import("../../../shared/stores/app.store");
+    const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
+    const appStoreMock = await import("@codeman-frontend/shared/stores/app.store");
     (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
     (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
       providers: [
@@ -684,8 +684,8 @@ describe("ChatView", () => {
 
   it("Plain Enter does NOT trigger sendMessage", async () => {
     const user = (await import("@testing-library/user-event")).default;
-    const conversationsStoreMock = await import("../stores/chat.store");
-    const appStoreMock = await import("../../../shared/stores/app.store");
+    const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
+    const appStoreMock = await import("@codeman-frontend/shared/stores/app.store");
     (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
     (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
       providers: [

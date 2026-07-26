@@ -5,7 +5,7 @@
 //! would violate UI layer conventions).
 
 import { Effect } from "effect";
-import { invoke } from "../../../shared/lib/ipc";
+import { invoke } from "@codeman-frontend/shared/lib/ipc";
 
 export const clearAllHistoryBridge = async (): Promise<boolean> => {
   const exit = await Effect.runPromiseExit(

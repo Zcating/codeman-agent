@@ -60,7 +60,7 @@ vi.mock("../../../shared/components/internal/codeman-sidebar", () => ({
 
 // ─── Imports under test ───────────────────────────────────────────────────
 
-import { SettingsSidebar } from "./settings-sidebar";
+import { SettingsSidebar } from "@codeman-frontend/features/settings/components/settings-sidebar";
 
 // ─── Setup ─────────────────────────────────────────────────────────────────
 

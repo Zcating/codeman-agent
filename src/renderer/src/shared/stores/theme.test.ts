@@ -4,7 +4,7 @@
 //! Mock matchMedia 用于 system-theme 解析。
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import type { Settings } from "../lib/types";
+import type { Settings } from "@codeman-frontend/shared/lib/types";
 
 // Mutable mock settings — 在每个测试导入前设置
 let mockTheme: Settings["theme"] = "dark";
@@ -27,7 +27,7 @@ vi.mock("../lib/ipc", () => ({
 }));
 
 // 在 vi.mock 之后导入，使 mock 生效
-import { startThemeSync, _resetThemeSync } from "./theme";
+import { startThemeSync, _resetThemeSync } from "@codeman-frontend/shared/stores/theme";
 
 describe("startThemeSync — .dark 类应用", () => {
   // 每个测试前重置 document 状态和模块级 started 标志

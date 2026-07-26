@@ -1,6 +1,6 @@
 import { render } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
-import { Checkbox } from "./checkbox";
+import { Checkbox } from "@codeman-frontend/shared/components/ui/checkbox";
 
 describe("Checkbox", () => {
   it("渲染 input checkbox", () => {

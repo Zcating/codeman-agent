@@ -32,9 +32,9 @@
 //! ```
 
 import { type Component, type ComponentProps, Show, splitProps } from "solid-js";
-import { Input } from "../ui/input";
-import { cn } from "../../lib/cn";
-import { useImeSafeValue } from "../../hooks/use-ime-safe-value";
+import { Input } from "@codeman-frontend/shared/components/ui/input";
+import { cn } from "@codeman-frontend/shared/lib/cn";
+import { useImeSafeValue } from "@codeman-frontend/shared/hooks/use-ime-safe-value";
 
 export type CodemanInputProps = Omit<
   ComponentProps<"input">,

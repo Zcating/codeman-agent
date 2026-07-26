@@ -10,7 +10,7 @@
 //!   - Otherwise falls back to String(result)
 
 import type { AgentToolResult } from "@earendil-works/pi-agent-core";
-import { isTextBlock } from "./runtime-type-guards";
+import { isTextBlock } from "@codeman-frontend/features/chat/lib/runtime-type-guards";
 
 /**
  * Extract human-readable error text from a tool result.

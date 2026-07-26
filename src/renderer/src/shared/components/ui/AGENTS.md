@@ -81,7 +81,7 @@ import { cn } from "../../lib/cn";
 // 实际路径：从 components/ui/select.tsx 到 lib/cn.ts 是 ../../lib/cn
 
 // 项目配置的 @/ path alias（如有）优先使用，例如：
-// import { cn } from "@/shared/lib/cn";
+// import { cn } from "@codeman-frontend/shared/lib/cn";
 ```
 
 ## 轻量契约测试约定
@@ -144,4 +144,4 @@ V1 明确排除 Radix UI 和 Kobalte 依赖，理由：
 
 ## 变更维护者
 
-`src/shared/components/ui/` 下的组件由 `@/shared/components/ui` 维护者统一负责，任何 feature 开发者均可提 PR，review 时重点检查 cva 用法正确性和测试覆盖率。
+`src/shared/components/ui/` 下的组件由 `@codeman-frontend/shared/components/ui` 维护者统一负责，任何 feature 开发者均可提 PR，review 时重点检查 cva 用法正确性和测试覆盖率。

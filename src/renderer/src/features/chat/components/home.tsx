@@ -20,14 +20,14 @@ import { Send } from "lucide-solid";
 import { Effect, Exit } from "effect";
 import { useNavigate } from "@tanstack/solid-router";
 import { createForm } from "@tanstack/solid-form";
-import { appStore } from "../../../shared/stores/app.store";
-import { formatAppError } from "../../../shared/lib/format-app-error";
-import { effectSchema, firstErrorMessage } from "../../../shared/lib/effect-schema-adapter";
-import { Button } from "../../../shared/components/ui/button";
-import { CodemanSelect } from "../../../shared/components/internal/codeman-select";
-import { CodemanGroupSelect } from "../../../shared/components/internal/codeman-group-select";
-import { CodemanTextarea } from "../../../shared/components/internal/codeman-textarea";
-import { codemanToast } from "../../../shared/components/internal/codeman-toast";
+import { appStore } from "@codeman-frontend/shared/stores/app.store";
+import { formatAppError } from "@codeman-frontend/shared/lib/format-app-error";
+import { effectSchema, firstErrorMessage } from "@codeman-frontend/shared/lib/effect-schema-adapter";
+import { Button } from "@codeman-frontend/shared/components/ui/button";
+import { CodemanSelect } from "@codeman-frontend/shared/components/internal/codeman-select";
+import { CodemanGroupSelect } from "@codeman-frontend/shared/components/internal/codeman-group-select";
+import { CodemanTextarea } from "@codeman-frontend/shared/components/internal/codeman-textarea";
+import { codemanToast } from "@codeman-frontend/shared/components/internal/codeman-toast";
 import {
   workspaces$,
   selectedWorkspaceId$,
@@ -35,26 +35,26 @@ import {
   addWorkspace,
   createConversation,
   sendMessage,
-} from "../stores/chat.store";
-import type { ProviderConfig } from "../lib/runtime";
-import { buildEnabledProviders } from "../lib/build-enabled-providers";
-import { settingsSaver } from "../../settings/lib/settings-saver";
+} from "@codeman-frontend/features/chat/stores/chat.store";
+import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
+import { buildEnabledProviders } from "@codeman-frontend/features/chat/lib/build-enabled-providers";
+import { settingsSaver } from "@codeman-frontend/features/settings/lib/settings-saver";
 import {
   handleArrowUpField,
   handleArrowDownField,
   recordInputEntry,
-} from "../stores/input-history.store";
+} from "@codeman-frontend/features/chat/stores/input-history.store";
 import {
   ModelIdFieldSchema,
   WorkspaceIdFieldSchema,
   HomeFormSchema,
   type HomeFormValue,
-} from "../lib/schemas";
+} from "@codeman-frontend/features/chat/lib/schemas";
 // Wave A7: Slash menu integration
-import { useSlashTrigger } from "../../../plugins/skills/lib/use-slash-trigger";
-import { SlashMenu } from "../../../plugins/skills/components/slash-menu";
-import { skillsManifests$ } from "../../../plugins/skills/stores/skills.store";
-import type { SkillManifest } from "../../../shared/lib/types";
+import { useSlashTrigger } from "@codeman-frontend/plugins/skills/lib/use-slash-trigger";
+import { SlashMenu } from "@codeman-frontend/plugins/skills/components/slash-menu";
+import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
+import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
 // ─── LlmPicker (D6-H5) ─────────────────────────────────────────────────────────
 

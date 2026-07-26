@@ -1,7 +1,7 @@
 //! buildEnabledProviders unit tests.
 
 import { describe, it, expect } from "vitest";
-import { buildEnabledProviders } from "./build-enabled-providers";
+import { buildEnabledProviders } from "@codeman-frontend/features/chat/lib/build-enabled-providers";
 
 describe("buildEnabledProviders", () => {
   it("returns array of providers where enabled && llm is true", () => {

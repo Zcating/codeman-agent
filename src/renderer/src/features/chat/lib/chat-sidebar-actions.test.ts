@@ -1,7 +1,7 @@
 //! chat-sidebar-actions.test.ts
 import { describe, it, expect, vi } from "vitest";
 import { Effect } from "effect";
-import { chatSidebarActions } from "./chat-sidebar-actions";
+import { chatSidebarActions } from "@codeman-frontend/features/chat/lib/chat-sidebar-actions";
 
 // Mock the chat.store module
 vi.mock("../stores/chat.store", () => ({
@@ -12,7 +12,7 @@ vi.mock("../stores/chat.store", () => ({
 
 describe("chatSidebarActions", () => {
   it("renameConversation calls underlying Effect with correct args", async () => {
-    const { renameConversation } = await import("../stores/chat.store");
+    const { renameConversation } = await import("@codeman-frontend/features/chat/stores/chat.store");
 
     await chatSidebarActions.renameConversation("c-1", "new title");
 

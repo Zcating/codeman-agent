@@ -6,7 +6,7 @@ import {
   AccordionItem,
   AccordionTrigger,
   AccordionContent,
-} from "./accordion";
+} from "@codeman-frontend/shared/components/ui/accordion";
 
 describe("Accordion — seam 10 (AccordionProvider)", () => {
   beforeEach(() => cleanup());

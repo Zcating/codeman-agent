@@ -1,13 +1,13 @@
 /* @refresh reload */
-import "./index.css";
+import "@codeman-frontend/index.css";
 import { render } from "solid-js/web";
 import { RouterProvider } from "@tanstack/solid-router";
-import { router } from "./router";
-import { appStore } from "./shared/stores/app.store";
+import { router } from "@codeman-frontend/router";
+import { appStore } from "@codeman-frontend/shared/stores/app.store";
 import { Effect, Exit } from "effect";
-import { logger } from "./shared/lib/logger";
-import * as chatStore from "./features/chat/stores/chat.store";
-import { ToasterMount } from "./shared/components/internal/codeman-toast";
+import { logger } from "@codeman-frontend/shared/lib/logger";
+import * as chatStore from "@codeman-frontend/features/chat/stores/chat.store";
+import { ToasterMount } from "@codeman-frontend/shared/components/internal/codeman-toast";
 
 // Render the RouterProvider FIRST with the in-memory defaultSettings, so the SPA
 // is visible immediately even if the Rust backend is slow or `get_settings` IPC
@@ -21,7 +21,7 @@ import { ToasterMount } from "./shared/components/internal/codeman-toast";
 //
 // V1.8+ ADR-0016 D3: 启动 refresh 改用 Effect.runPromiseExit 替换 .catch, 失败时
 // 用 formatAppError 输出 (保留 AppError 类型信息), 不用 String(e) 拍平。
-import { formatAppError } from "./shared/lib/format-app-error";
+import { formatAppError } from "@codeman-frontend/shared/lib/format-app-error";
 
 function bootstrap() {
   const root = document.getElementById("root");

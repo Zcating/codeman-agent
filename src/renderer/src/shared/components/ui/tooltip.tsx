@@ -6,7 +6,7 @@
 import type { JSX } from "solid-js";
 import { splitProps } from "solid-js";
 import { TooltipRoot as ArkTooltipRoot, TooltipTrigger as ArkTooltipTrigger, TooltipContent as ArkTooltipContent, TooltipPositioner, TooltipArrow } from "@ark-ui/solid/tooltip";
-import { cn } from "../../lib/cn";
+import { cn } from "@codeman-frontend/shared/lib/cn";
 
 export interface TooltipProps {
   open?: boolean;

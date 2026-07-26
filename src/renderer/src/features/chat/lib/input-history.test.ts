@@ -7,7 +7,7 @@ import {
   loadHistory,
   saveHistory,
   recordEntry,
-} from "./input-history";
+} from "@codeman-frontend/features/chat/lib/input-history";
 
 beforeEach(() => {
   window.localStorage.clear();

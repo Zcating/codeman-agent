@@ -72,13 +72,13 @@ vp run test src/features/file-tools
 
 ```ts
 // 仅导入工具数组
-import { fileTools } from "@/features/file-tools/lib/file-tools";
+import { fileTools } from "@codeman-frontend/features/file-tools/lib/file-tools";
 
 // 通过 barrel 导入单个工具
-import { readFileTool, writeFileTool } from "@/features/file-tools";
+import { readFileTool, writeFileTool } from "@codeman-frontend/features/file-tools";
 
 // 导入类型
-import type { FileMatch } from "@/features/file-tools";
+import type { FileMatch } from "@codeman-frontend/features/file-tools";
 ```
 
 ## 关键约束

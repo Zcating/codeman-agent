@@ -2,7 +2,7 @@
 //! These tests verify the V1.5+ mock implementation.
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { invoke, mockState, mockMinimaxProvider, mockDeepseekProvider, mockProvider } from "./ipc-mock";
+import { invoke, mockState, mockMinimaxProvider, mockDeepseekProvider, mockProvider } from "@codeman-frontend/__mocks__/ipc-mock";
 
 describe("IPC Mock - V1.5+ Schema", () => {
   beforeEach(() => {

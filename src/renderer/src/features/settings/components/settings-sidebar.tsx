@@ -24,7 +24,7 @@ import {
   type CodemanSidebarGroupOption,
   type CodemanSidebarMenuGroupOption,
   type CodemanSidebarMenuOption,
-} from "../../../shared/components/internal/codeman-sidebar";
+} from "@codeman-frontend/shared/components/internal/codeman-sidebar";
 
 /**
  * Static config for the 6 settings nav items.

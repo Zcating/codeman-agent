@@ -1,4 +1,4 @@
-import type { ProviderConfig } from "./runtime";
+import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
 
 export type ValidationResult = { ok: true } | { ok: false; reason: string };
 

@@ -14,13 +14,13 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "../../../shared/components/ui/dialog";
-import { Button } from "../../../shared/components/ui/button";
-import { CodemanInput } from "../../../shared/components/internal/codeman-input";
-import { Checkbox } from "../../../shared/components/ui/checkbox";
-import { Dialog } from "../../../shared/components/internal/codeman-dialog";
-import type { Provider } from "../../../shared/lib/types";
-import { buildMockDevTemplate } from "../lib/mock-provider-template";
+} from "@codeman-frontend/shared/components/ui/dialog";
+import { Button } from "@codeman-frontend/shared/components/ui/button";
+import { CodemanInput } from "@codeman-frontend/shared/components/internal/codeman-input";
+import { Checkbox } from "@codeman-frontend/shared/components/ui/checkbox";
+import { Dialog } from "@codeman-frontend/shared/components/internal/codeman-dialog";
+import type { Provider } from "@codeman-frontend/shared/lib/types";
+import { buildMockDevTemplate } from "@codeman-frontend/features/settings/lib/mock-provider-template";
 
 type ProviderType = "real" | "mock";
 

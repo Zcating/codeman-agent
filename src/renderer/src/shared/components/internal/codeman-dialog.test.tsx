@@ -5,7 +5,7 @@
 
 import { describe, expect, it, afterEach, beforeEach } from "vitest";
 import { cleanup } from "@solidjs/testing-library";
-import { Dialog } from "./codeman-dialog";
+import { Dialog } from "@codeman-frontend/shared/components/internal/codeman-dialog";
 
 describe("Dialog", () => {
   beforeEach(() => {

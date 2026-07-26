@@ -4,9 +4,9 @@
 
 import { type JSX, onMount } from "solid-js";
 import { Effect, Exit } from "effect";
-import { McpSettingsTab } from "../../../../plugins/mcp/components/settings-tab";
-import { refresh } from "../../../../plugins/mcp/stores/store";
-import { codemanToast } from "../../../../shared/components/internal/codeman-toast";
+import { McpSettingsTab } from "@codeman-frontend/plugins/mcp/components/settings-tab";
+import { refresh } from "@codeman-frontend/plugins/mcp/stores/store";
+import { codemanToast } from "@codeman-frontend/shared/components/internal/codeman-toast";
 
 export function McpSection(): JSX.Element {
   onMount(async () => {

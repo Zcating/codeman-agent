@@ -2,7 +2,7 @@
 //!
 //! Per V3 consensus 1.3 (shim approach): this file is the canonical IPC.
 //! `tauri.ts` is a 3-line re-export shim so existing 50+ imports of
-//! `@/shared/lib/tauri` keep working without churn.
+//! `@codeman-frontend/shared/lib/tauri` keep working without churn.
 //!
 //! T5 changes from tauri.ts:
 //! - `invoke<T>()` no longer calls `@tauri-apps/api/core` `invoke`
@@ -11,9 +11,9 @@
 //!   populates `window.codeman` with vi.fn()s; the dispatch routes to those.
 
 import { Effect, Stream, Context, Layer } from "effect";
-import { logger } from "./logger";
-import { Unknown, type AppError } from "./errors";
-import { decodeAppError } from "./decode-app-error";
+import { logger } from "@codeman-frontend/shared/lib/logger";
+import { Unknown, type AppError } from "@codeman-frontend/shared/lib/errors";
+import { decodeAppError } from "@codeman-frontend/shared/lib/decode-app-error";
 import type {
   Conversation,
   Message,
@@ -26,8 +26,8 @@ import type {
   McpServerInfo,
   McpTool,
   McpToolEntry,
-} from "./types";
-import { parseModelsApiResponse } from "./parse-models-api-response";
+} from "@codeman-frontend/shared/lib/types";
+import { parseModelsApiResponse } from "@codeman-frontend/shared/lib/parse-models-api-response";
 
 /** Tauri-Electron IPC error - distinct from AppError for service-specific error handling */
 export interface TauriError {

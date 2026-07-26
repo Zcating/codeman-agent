@@ -5,7 +5,7 @@ import {
   mcpServers$,
   mcpAllTools$,
   _resetMcpStoreForTest,
-} from "./store";
+} from "@codeman-frontend/plugins/mcp/stores/store";
 
 describe("mcp store", () => {
   beforeEach(() => {

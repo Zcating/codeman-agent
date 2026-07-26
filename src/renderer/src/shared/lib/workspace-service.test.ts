@@ -1,7 +1,7 @@
 import { it, expect } from "@effect/vitest";
 import { describe } from "vitest";
 import { Effect, Layer } from "effect";
-import { WorkspaceService } from "./workspace-service";
+import { WorkspaceService } from "@codeman-frontend/shared/lib/workspace-service";
 
 const TestLayer = Layer.succeed(WorkspaceService, {
   list: () => Effect.succeed([]),

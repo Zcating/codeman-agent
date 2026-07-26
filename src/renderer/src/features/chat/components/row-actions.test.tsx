@@ -25,7 +25,7 @@
 
 import { cleanup, fireEvent, render, waitFor } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RowActions, RowActionsProps } from "./row-actions";
+import { RowActions, RowActionsProps } from "@codeman-frontend/features/chat/components/row-actions";
 
 // ─── Shared render helper ───────────────────────────────────────────────────
 

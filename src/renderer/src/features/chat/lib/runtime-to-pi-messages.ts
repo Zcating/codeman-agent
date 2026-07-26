@@ -2,7 +2,7 @@ import type {
   Message as DbMessage,
   ToolCall as DbToolCall,
   ToolResult,
-} from "../../../shared/lib/types";
+} from "@codeman-frontend/shared/lib/types";
 import type {
   AssistantMessage,
   Message as PiMessage,

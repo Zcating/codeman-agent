@@ -5,5 +5,5 @@ export {
   searchFilesTool,
   deleteFileTool,
   fileTools,
-} from "./lib/file-tools";
-export type { FileMatch } from "../../shared/lib/types";
+} from "@codeman-frontend/features/file-tools/lib/file-tools";
+export type { FileMatch } from "@codeman-frontend/shared/lib/types";

@@ -10,7 +10,7 @@ import {
   Toast as ArkToast,
 } from "@ark-ui/solid";
 import { AlertCircle, CheckCircle2 } from "lucide-solid";
-import { cn } from "../../lib/cn";
+import { cn } from "@codeman-frontend/shared/lib/cn";
 
 // ─── Singleton toaster ───────────────────────────────────────────────────────
 //

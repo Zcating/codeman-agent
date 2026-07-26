@@ -28,8 +28,8 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, waitFor } from "@solidjs/testing-library";
-import { HomeAgentForm } from "./home";
-import type { ProviderConfig } from "../lib/runtime";
+import { HomeAgentForm } from "@codeman-frontend/features/chat/components/home";
+import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
 
 // ─── Shared signal handle (hoisted to be visible inside vi.mock factory) ────
 

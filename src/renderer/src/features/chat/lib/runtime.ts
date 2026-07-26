@@ -22,28 +22,28 @@
 
 import { Effect, Exit, Stream } from "effect";
 import { match } from "ts-pattern";
-import type { Message } from "../../../shared/lib/types";
-import type { SkillManifest } from "../../../shared/lib/types";
-import { logger } from "../../../shared/lib/logger";
-import { anthropicStream } from "./anthropic-transport";
+import type { Message } from "@codeman-frontend/shared/lib/types";
+import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
+import { logger } from "@codeman-frontend/shared/lib/logger";
+import { anthropicStream } from "@codeman-frontend/features/chat/lib/anthropic-transport";
 import { Agent, type AgentEvent, type AgentTool } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai";
-import { createFileTools } from "../../file-tools/lib/file-tools";
-import { formatSkillsManifestSection } from "../../../plugins/skills/lib/skill-injector";
-import { loadSkillTool } from "../../../plugins/skills/lib/skill-meta-tool";
-import { mcpAllTools$ } from "../../../plugins/mcp/stores/store";
-import type { McpToolEntry } from "../../../shared/lib/types";
-import { McpService, McpServiceLive } from "../../../shared/lib/ipc";
+import { createFileTools } from "@codeman-frontend/features/file-tools/lib/file-tools";
+import { formatSkillsManifestSection } from "@codeman-frontend/plugins/skills/lib/skill-injector";
+import { loadSkillTool } from "@codeman-frontend/plugins/skills/lib/skill-meta-tool";
+import { mcpAllTools$ } from "@codeman-frontend/plugins/mcp/stores/store";
+import type { McpToolEntry } from "@codeman-frontend/shared/lib/types";
+import { McpService, McpServiceLive } from "@codeman-frontend/shared/lib/ipc";
 import {
   isTextBlock,
   isThinkingBlock,
   isToolCallBlock,
   contentOf,
-} from "./runtime-type-guards";
-import { validateProvider } from "./runtime-validate-provider";
-import { extractToolErrorText } from "./runtime-tool-error";
-import { toPiMessages } from "./runtime-to-pi-messages";
-import { AppError } from "../../../shared/lib/errors";
+} from "@codeman-frontend/features/chat/lib/runtime-type-guards";
+import { validateProvider } from "@codeman-frontend/features/chat/lib/runtime-validate-provider";
+import { extractToolErrorText } from "@codeman-frontend/features/chat/lib/runtime-tool-error";
+import { toPiMessages } from "@codeman-frontend/features/chat/lib/runtime-to-pi-messages";
+import { AppError } from "@codeman-frontend/shared/lib/errors";
 import type { TSchema } from "@sinclair/typebox";
 
 // ─── MCP tools builder (ADR-0032 D4) ────────────────────────────────────────

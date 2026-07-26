@@ -1,6 +1,6 @@
 import { render } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
-import { Input } from "./input";
+import { Input } from "@codeman-frontend/shared/components/ui/input";
 
 describe("Input", () => {
   it("默认 type text：tag 是 input 且 type 是 text 且 className 包含 h-8 和 rounded-lg", () => {

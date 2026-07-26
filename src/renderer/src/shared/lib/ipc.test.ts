@@ -6,7 +6,7 @@
 import { it, expect, beforeEach } from "@effect/vitest";
 import { describe } from "vitest";
 import { Effect, Layer, Exit } from "effect";
-import { mockState } from "../../__mocks__/ipc-mock";
+import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 import {
   invoke,
   ConversationService,
@@ -23,8 +23,8 @@ import {
   getSettingsBridge,
   updateSettingsBridge,
   clearAllHistoryBridge,
-} from "./ipc";
-import type { Provider } from "./types";
+} from "@codeman-frontend/shared/lib/ipc";
+import type { Provider } from "@codeman-frontend/shared/lib/types";
 
 // ─── Mock Data ────────────────────────────────────────────────
 
@@ -111,7 +111,7 @@ const _MockSettingsServiceLive = Layer.succeed(SettingsService, {
 });
 void _MockSettingsServiceLive;
 
-import type { AppError } from "./errors";
+import type { AppError } from "@codeman-frontend/shared/lib/errors";
 
 beforeEach(() => {
   mockState.calls = [];

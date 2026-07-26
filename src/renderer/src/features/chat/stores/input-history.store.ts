@@ -16,7 +16,7 @@ import {
   INPUT_HISTORY_MAX_ENTRIES,
   loadHistory,
   saveHistory,
-} from "../lib/input-history";
+} from "@codeman-frontend/features/chat/lib/input-history";
 
 // ─── 反应式状态 ───────────────────────────────
 
