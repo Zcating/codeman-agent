@@ -7,6 +7,7 @@ import { CodemanSelect, CodemanSelectOption } from "@codeman-frontend/shared/com
 // Mock state - plain values, not reactive
 let mockIsOpen = false;
 let sharedOnValueChange: ((details: { value: string[] }) => void) | null = null;
+let sharedPositioning: Record<string, unknown> | undefined;
 
 vi.mock("@ark-ui/solid", async () => {
   const actual = await vi.importActual("@ark-ui/solid");
@@ -16,6 +17,7 @@ vi.mock("@ark-ui/solid", async () => {
     Select: {
       Root: (props: any) => {
         sharedOnValueChange = props.onValueChange ?? null;
+        sharedPositioning = props.positioning;
         return <>{props.children}</>;
       },
       Control: (props: any) => <>{props.children}</>,
@@ -98,6 +100,7 @@ vi.mock("@ark-ui/solid", async () => {
 beforeEach(() => {
   mockIsOpen = false;
   sharedOnValueChange = null;
+  sharedPositioning = undefined;
 });
 
 const defaultOptions: CodemanSelectOption[] = [
@@ -343,5 +346,26 @@ describe("CodemanSelect", () => {
     // Content owns the codeman-explicit visible chrome (bg-background).
     // border/shadow live in ui/select default styles (bypassed by mock).
     expect(content.className).toMatch(/bg-background\b/);
+  });
+
+  // 15. regression: dropdown must NOT use sameWidth positioning.
+  //     Root cause (2026-07-26): `positioning={{ sameWidth: true }}` locked
+  //     dropdown width to trigger width. Combined with `w-(--anchor-width)
+  //     min-w-36 overflow-x-hidden` on SelectContent, long option labels were
+  //     clipped to ~144px and hidden on the right edge — WorkspacePicker in
+  //     home.tsx rendered broken text. Fix: pass `sameWidth: false` so the
+  //     dropdown auto-sizes to its content.
+  it("passes sameWidth: false to SelectRoot so long option labels are not clipped", () => {
+    render(() => (
+      <CodemanSelect
+        options={defaultOptions}
+        value={null}
+        onChange={vi.fn()}
+        placeholder="Select"
+        data-testid="test-select"
+      />
+    ));
+    expect(sharedPositioning).toBeDefined();
+    expect(sharedPositioning?.sameWidth).toBe(false);
   });
 });

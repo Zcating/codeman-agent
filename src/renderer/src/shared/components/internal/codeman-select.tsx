@@ -44,7 +44,11 @@ export const CodemanSelect: Component<CodemanSelectProps> = (props) => {
       value={props.value ? [props.value] : []}
       onValueChange={handleValueChange}
       disabled={props.disabled}
-      positioning={{ sameWidth: true }}
+      // sameWidth:false lets the dropdown size to its longest option, so long
+      // labels are not clipped against a narrow trigger.
+      // SelectContent uses w-max min-w-(--anchor-width) min-w-36 (in ui/select.tsx)
+      // to auto-expand the dropdown while keeping a sensible minimum width.
+      positioning={{ sameWidth: false }}
     >
       <SelectTrigger
         data-testid={triggerTestId}

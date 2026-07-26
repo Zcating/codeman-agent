@@ -7,6 +7,7 @@ import { CodemanGroupSelect, CodemanGroupSelectGroup } from "@codeman-frontend/s
 // Mock state - plain values, not reactive
 let mockIsOpen = false;
 let sharedOnValueChange: ((details: { value: string[] }) => void) | null = null;
+let sharedPositioning: Record<string, unknown> | undefined;
 
 vi.mock("@ark-ui/solid", async () => {
   const actual = await vi.importActual("@ark-ui/solid");
@@ -16,6 +17,7 @@ vi.mock("@ark-ui/solid", async () => {
     Select: {
       Root: (props: any) => {
         sharedOnValueChange = props.onValueChange ?? null;
+        sharedPositioning = props.positioning;
         return <>{props.children}</>;
       },
       Control: (props: any) => <>{props.children}</>,
@@ -104,6 +106,7 @@ vi.mock("@ark-ui/solid", async () => {
 beforeEach(() => {
   mockIsOpen = false;
   sharedOnValueChange = null;
+  sharedPositioning = undefined;
 });
 
 const defaultGroups: CodemanGroupSelectGroup[] = [
@@ -266,5 +269,28 @@ describe("CodemanGroupSelect", () => {
 
     // Content (the part that toggles data-state + hidden) owns the visible chrome.
     expect(content.className).toMatch(chrome);
+  });
+
+  // 8. regression: dropdown must NOT use sameWidth positioning.
+  //    Root cause (2026-07-26): `positioning={{ sameWidth: true }}` locked dropdown
+  //    width to trigger width. Combined with `w-(--anchor-width) min-w-36
+  //    overflow-x-hidden` on SelectContent, long option labels (e.g.
+  //    "MiniMax-M2.7-highspeed") were clipped to ~144px and hidden on the
+  //    right edge — provider picker rendered broken text in chat-view.tsx.
+  //    Fix: pass `sameWidth: false` so @ark-ui positions the dropdown sized
+  //    to its content; SelectContent then uses `w-max min-w-(--anchor-width)`
+  //    so the dropdown auto-expands to fit the widest option.
+  it("passes sameWidth: false to SelectRoot so long option labels are not clipped", () => {
+    render(() => (
+      <CodemanGroupSelect
+        groups={defaultGroups}
+        value={null}
+        onChange={vi.fn()}
+        placeholder="Select"
+        data-testid="test-select"
+      />
+    ));
+    expect(sharedPositioning).toBeDefined();
+    expect(sharedPositioning?.sameWidth).toBe(false);
   });
 });
