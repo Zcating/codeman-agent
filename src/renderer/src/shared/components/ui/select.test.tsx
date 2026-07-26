@@ -63,6 +63,27 @@ describe("SelectItem", () => {
     ));
     expect(screen.getByTestId("item")).toHaveAttribute("data-slot", "select-item");
   });
+
+  // Regression (2026-07-26): SelectItem had focus:bg-accent but no hover:bg-accent,
+  // so mouse hover over an option was visually inert — no background change to
+  // signal which option would be picked. Focus style (keyboard nav) worked fine,
+  // mouse users got nothing. Fix: add hover:bg-accent hover:text-accent-foreground
+  // to match the focus state, so both keyboard and mouse users see the same
+  // visual feedback on the active option.
+  it("applies hover:bg-accent so mouse hover on an option shows visual feedback", () => {
+    render(() => (
+      <SelectRoot collection={sampleCollection} open>
+        <SelectTrigger>Open</SelectTrigger>
+        <SelectContent>
+          <SelectItem item={{ label: "Apple", value: "apple" }} data-testid="item">Apple</SelectItem>
+        </SelectContent>
+      </SelectRoot>
+    ));
+    const item = screen.getByTestId("item");
+    // The fix adds hover:bg-accent + hover:text-accent-foreground to mirror focus.
+    expect(item.className).toContain("hover:bg-accent");
+    expect(item.className).toContain("hover:text-accent-foreground");
+  });
 });
 
 describe("SelectSeparator", () => {
