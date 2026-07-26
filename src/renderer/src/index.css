@@ -112,6 +112,13 @@
   #root {
     height: 100%;
   }
+  /* Per user 2026-07-26: SidebarMenu inner <span> labels were observed with
+     text cursor. Lock global default so any <span> in the app renders with
+     cursor: default regardless of ancestor inheritance, focus state, or
+     accidental overrides. */
+  span {
+    cursor: default;
+  }
   :root {
     color-scheme: light dark;
   }
