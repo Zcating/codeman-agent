@@ -145,7 +145,7 @@ const refreshProviderModelsImpl = Effect.fnUntraced(
     const provider = (settings.value.providers ?? []).find((p) => p.id === id);
     if (provider) {
       for (const m of models) {
-        if (m.contextWindow == null || m.contextWindow === 0) {
+        if (m.contextWindow == null) {
           m.contextWindow = lookupContextWindow(m, provider);
         }
       }

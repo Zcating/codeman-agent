@@ -69,3 +69,12 @@ ChatView 的发送按钮**左侧**新增圆形上下文进度条 + 双行 label�
 **影响文件**:
 - `lib/anthropic-transport.ts`
 - `src/main/mock-server.ts`
+
+### UI 行为变更: 环始终渲染
+
+原 V2.6 设计: `chat-view.tsx` 用 `<Show when={total > 0}>` gate,当 provider/model
+数据不完整时隐藏环。实测发现该 gate 违背"环在发送按钮左侧常驻"的设计意图,
+且在 settings 数据漂移时给用户零信号。
+
+**修正**: 移除 `<Show>` gate,`<ContextRing>` 始终渲染。`total=0` / provider 未配置
+时环显示 "0% · 0 / 0 tokens" 作为可观察的诊断信号。

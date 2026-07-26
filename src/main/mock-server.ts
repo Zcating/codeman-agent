@@ -189,6 +189,8 @@ function buildSseTurnEvents(turn: QaTurn, deltaSize: number): string[] {
   //    Real Anthropic: "tool_use" if any tool_use was emitted, else "end_turn".
   const stopReason = turn.toolUses && turn.toolUses.length > 0 ? "tool_use" : "end_turn";
   const outputTokens = turn.text.length + (turn.thinking?.length ?? 0);
+  // V2.6.1: 粗略估算 input_tokens (chars/4)。mock 无真实 tokenizer,
+  //        仅用于验证 inputTokens 主路径在 mock 环境可走通。
   const inputTokens = Math.ceil((turn.text.length + (turn.thinking?.length ?? 0)) / 4);
   events.push(
     `event: message_delta\n` +
