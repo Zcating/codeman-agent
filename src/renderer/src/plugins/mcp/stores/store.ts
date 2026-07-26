@@ -10,7 +10,6 @@ import type {
   McpServerInfo,
   McpToolEntry,
 } from "@codeman-frontend/shared/lib/types";
-import type { AppError } from "@codeman-frontend/shared/lib/errors";
 
 // ─── Signals ────────────────────────────────────────────────────
 
@@ -74,17 +73,17 @@ export function openConfigDir() {
  * Unlike `refresh`, this leaves prior signal state unchanged if loading fails,
  * allowing the registry to handle MCP failures without corrupting existing state.
  */
-export function initializeMcp(): Effect.Effect<void, AppError> {
-  const program = Effect.gen(function* () {
+export const initializeMcp = Effect.fnUntraced(
+  function* () {
     const svc = yield* McpService;
     const servers = yield* svc.listServers();
     const tools = yield* svc.getAllTools();
     // Only update signals on success — leave prior state intact on failure
     setMcpServersInternal(servers);
     setMcpAllToolsInternal(tools);
-  });
-  return program.pipe(Effect.provide(McpServiceLive));
-}
+  },
+  Effect.provide(McpServiceLive),
+);
 
 // ─── Test helpers ───────────────────────────────────────────────
 
