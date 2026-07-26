@@ -79,7 +79,7 @@ beforeEach(() => {
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
 describe("SettingsSidebar (PR 2)", () => {
-  it("builds options as CodemanSidebarGroupOption[] with 6 nav items in children", () => {
+  it("builds options as CodemanSidebarGroupOption[] with 4 nav items in children", () => {
       render(() => <SettingsSidebar />);
       const opts = F.capturedProps.options;
       // options is CodemanSidebarGroupOption[] — one group (always visible per Q28 reversal)
@@ -88,22 +88,18 @@ describe("SettingsSidebar (PR 2)", () => {
         label: "Settings",
         value: "settings",
       });
-      // 6 nav items as children
-      expect(opts[0].children.length).toBe(6);
+      // 4 nav items as children
+      expect(opts[0].children.length).toBe(4);
     expect(opts[0].children.map((c: any) => c.label)).toEqual([
       "LLM",
       "App",
       "Window",
-      "Skills",
-      "MCP",
       "Advanced",
     ]);
     expect(opts[0].children.map((c: any) => c.value)).toEqual([
       "llm",
       "app",
       "window",
-      "skills",
-      "mcp",
       "advanced",
     ]);
   });
