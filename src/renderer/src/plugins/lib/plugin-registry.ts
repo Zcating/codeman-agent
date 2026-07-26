@@ -10,7 +10,7 @@
 //! - Aggregate tools or prompts
 //! - Depend on concrete skills/MCP stores (avoids circular imports)
 
-import { type Accessor } from "solid-js";
+import { createSignal, type Accessor } from "solid-js";
 import { Effect } from "effect";
 import { Unknown, type AppError } from "@codeman-frontend/shared/lib/errors";
 
@@ -106,22 +106,24 @@ interface InternalPlugin {
 class PluginRegistryImpl {
   private plugins = new Map<PluginId, InternalPlugin>();
 
+  // Module-owned Solid signal for reactive state updates
+  private _stateSignal = createSignal<RegistryState>({ plugins: new Map() });
+
   constructor() {
-    // Register built-in plugins with their metadata.
+    // Register built-in plugins with their metadata and proper icons.
     // The actual initialize effects are provided by the stores (skills/mcp)
-    // to avoid circular imports. These are placeholders - real effects injected
-    // by the stores when they call _updateInitializeEffect.
+    // to avoid circular imports. Callers use registerPlugin to inject real effects.
     this.registerBuiltin({
       id: "skills",
       initialize: Effect.void,
       route: { path: "/plugins/skills", label: "Skills" },
-      sidebar: { icon: "book", order: 3, visible: true },
+      sidebar: { icon: "WandSparkles", order: 3, visible: true },
     });
     this.registerBuiltin({
       id: "mcp",
       initialize: Effect.void,
       route: { path: "/plugins/mcp", label: "MCP" },
-      sidebar: { icon: "plug", order: 4, visible: true },
+      sidebar: { icon: "Cable", order: 4, visible: true },
     });
   }
 
@@ -131,22 +133,26 @@ class PluginRegistryImpl {
       descriptor,
       state: pendingState,
     });
+    this.notifyStateChange();
   }
 
-  register(descriptor: PluginDescriptor): void {
-    if (this.plugins.has(descriptor.id)) {
-      // Idempotent: already registered, do not overwrite
-      return;
-    }
-    const pendingState: PluginState = Object.freeze({ status: "pending" });
+  /**
+   * Public registration API — allows replacing a plugin's descriptor/initialize effect.
+   * Use this to inject the actual initialize effect from plugin stores.
+   */
+  registerPlugin(descriptor: PluginDescriptor): void {
+    // Always reset to pending when explicitly replacing via public API
+    const newState: PluginState = Object.freeze({ status: "pending" });
+
     this.plugins.set(descriptor.id, {
       descriptor,
-      state: pendingState,
+      state: newState,
     });
+    this.notifyStateChange();
   }
 
   getState(): Accessor<RegistryState> {
-    return () => ({ plugins: this.buildPluginStates() });
+    return this._stateSignal[0];
   }
 
   getMetadata(): ReadonlyMap<PluginId, PluginMetadata> {
@@ -159,20 +165,6 @@ class PluginRegistryImpl {
       });
     }
     return result;
-  }
-
-  /**
-   * Updates the initialize effect for a registered plugin.
-   * Used by plugin stores to inject their actual initialization logic.
-   */
-  _updateInitializeEffect(id: PluginId, initialize: Effect.Effect<void, AppError>): void {
-    const plugin = this.plugins.get(id);
-    if (plugin) {
-      this.plugins.set(id, {
-        descriptor: { ...plugin.descriptor, initialize },
-        state: plugin.state,
-      });
-    }
   }
 
   /**
@@ -196,7 +188,15 @@ class PluginRegistryImpl {
         return { ok: true as const, failures: new Map() };
       }
 
-      // Transition pending plugins to initializing and collect effects
+      // FIX 1: Set ALL pending plugins to frozen "initializing" state BEFORE Promise.all
+      for (const { id, descriptor } of pendingPlugins) {
+        const initializingState: PluginState = Object.freeze({ status: "initializing" });
+        registry.plugins.set(id, { descriptor, state: initializingState });
+      }
+      // Notify state change after transitioning to initializing
+      registry.notifyStateChange();
+
+      // Collect initialize effects for all pending plugins
       const initEffects = pendingPlugins.map(({ descriptor }) => descriptor.initialize);
 
       // Run all in parallel using Promise.all and collect exit results
@@ -225,16 +225,20 @@ class PluginRegistryImpl {
         }
       }
 
+      // Notify final state change
+      registry.notifyStateChange();
+
       return { ok: true as const, failures };
     });
   }
 
-  private buildPluginStates(): PluginStates {
-    const result = new Map<PluginId, PluginState>();
+  private notifyStateChange(): void {
+    // Build fresh state and update the signal
+    const pluginStates = new Map<PluginId, PluginState>();
     for (const [id, plugin] of this.plugins) {
-      result.set(id, plugin.state);
+      pluginStates.set(id, plugin.state);
     }
-    return result;
+    this._stateSignal[1]({ plugins: pluginStates });
   }
 
   _resetForTest(): void {
@@ -242,16 +246,18 @@ class PluginRegistryImpl {
     for (const [id, plugin] of this.plugins) {
       this.plugins.set(id, { descriptor: plugin.descriptor, state: pendingState });
     }
+    this.notifyStateChange();
   }
 
+  // For test use only - allows replacing a plugin for testing
   _registerForTest(descriptor: PluginDescriptor): void {
-    // For tests: remove existing and re-register with new descriptor
     const pendingState: PluginState = Object.freeze({ status: "pending" });
     this.plugins.delete(descriptor.id);
     this.plugins.set(descriptor.id, {
       descriptor,
       state: pendingState,
     });
+    this.notifyStateChange();
   }
 }
 
@@ -263,7 +269,7 @@ export const pluginRegistry = new PluginRegistryImpl();
 
 /**
  * Returns a Solid accessor for the current registry state.
- * The accessor returns a frozen snapshot; individual plugin states are also frozen.
+ * Returns the same accessor instance — subscribers observe transitions.
  */
 export const getRegistryState = (): Accessor<RegistryState> => pluginRegistry.getState();
 

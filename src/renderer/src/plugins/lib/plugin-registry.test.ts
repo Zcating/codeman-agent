@@ -369,4 +369,143 @@ describe("plugin registry", () => {
       }
     });
   });
+
+  // ─── Issue Fix 1: initializing state is set before parallel init ─────────────
+
+  describe("initializing state before parallel init", () => {
+    it.effect("sets all pending plugins to initializing BEFORE Promise.all starts", () =>
+      Effect.gen(function* () {
+        pluginRegistry._resetForTest();
+        let initializingObserved = false;
+
+        pluginRegistry._registerForTest({
+          id: "blocking-plugin",
+          initialize: Effect.gen(function* () {
+            // Observe state DURING initialization
+            const midState = pluginRegistry.getState()();
+            const plugin = midState.plugins.get("blocking-plugin");
+            if (plugin?.status === "initializing") {
+              initializingObserved = true;
+            }
+            // Block briefly so we can observe
+            yield* Effect.sleep(10);
+          }),
+          route: { path: "/blocking", label: "Blocking" },
+          sidebar: { icon: "block", order: 0, visible: true },
+        });
+
+        yield* initializeAll();
+        expect(initializingObserved).toBe(true);
+      }),
+    );
+
+    it.effect("initializing state is frozen when set before Promise.all", () =>
+      Effect.gen(function* () {
+        pluginRegistry._resetForTest();
+        let observedInitializing = false;
+
+        pluginRegistry._registerForTest({
+          id: "freeze-test",
+          initialize: Effect.gen(function* () {
+            // Inside the effect, check what state was set BEFORE this ran
+            const s = pluginRegistry.getState()();
+            const p = s.plugins.get("freeze-test");
+            if (p?.status === "initializing") {
+              observedInitializing = true;
+            }
+          }),
+          route: { path: "/freeze", label: "Freeze" },
+          sidebar: { icon: "f", order: 0, visible: true },
+        });
+
+        yield* initializeAll();
+        // If we observed "initializing" inside the effect, the state was set before Promise.all
+        expect(observedInitializing).toBe(true);
+      }),
+    );
+  });
+
+  // ─── Issue Fix 2: getRegistryState() is reactive (Solid signal), not snapshot ─
+
+  describe("reactive state accessor", () => {
+    it.effect("state changes are observable via accessor after init", () =>
+      Effect.gen(function* () {
+        pluginRegistry._resetForTest();
+        pluginRegistry._registerForTest(makeSuccessDescriptor());
+
+        // Get accessor via method call
+        const accessor = pluginRegistry.getState();
+
+        // First call - should be pending
+        let state1 = accessor();
+        expect(state1.plugins.get(SuccessPluginId)?.status).toBe("pending");
+
+        yield* initializeAll();
+
+        // Second call with SAME accessor - should be ready (reactive signal)
+        let state2 = accessor();
+        expect(state2.plugins.get(SuccessPluginId)?.status).toBe("ready");
+      }),
+    );
+  });
+
+  // ─── Issue Fix 3: Public registration API ────────────────────────────────────
+
+  describe("public registration API", () => {
+    it.effect("registerPlugin allows replacing a plugin's initialize effect", () =>
+      Effect.gen(function* () {
+        pluginRegistry._resetForTest();
+
+        // Initially with void effect
+        let callCount = 0;
+        const countingInitialize = Effect.gen(function* () {
+          callCount++;
+        });
+
+        // Use public API to register/replace
+        pluginRegistry.registerPlugin({
+          id: "replaceable-plugin",
+          initialize: countingInitialize,
+          route: { path: "/replace", label: "Replace" },
+          sidebar: { icon: "r", order: 0, visible: true },
+        });
+
+        yield* initializeAll();
+        expect(callCount).toBe(1);
+
+        // Replace with new initialize
+        let secondCallCount = 0;
+        const newInitialize = Effect.gen(function* () {
+          secondCallCount++;
+        });
+
+        pluginRegistry.registerPlugin({
+          id: "replaceable-plugin",
+          initialize: newInitialize,
+          route: { path: "/replace", label: "Replace" },
+          sidebar: { icon: "r", order: 0, visible: true },
+        });
+
+        // Re-initialize should use new effect
+        yield* initializeAll();
+        expect(secondCallCount).toBe(1);
+      }),
+    );
+  });
+
+  // ─── Issue Fix 4: Icon metadata uses proper identifiers ─────────────────────
+
+  describe("built-in plugin icon metadata", () => {
+    it("skills plugin uses WandSparkles icon identifier", () => {
+      const metadata = pluginRegistry.getMetadata();
+      const skillsMeta = metadata.get("skills");
+      expect(skillsMeta?.sidebar.icon).toBe("WandSparkles");
+    });
+
+    it("mcp plugin uses Cable icon identifier", () => {
+      const metadata = pluginRegistry.getMetadata();
+      const mcpMeta = metadata.get("mcp");
+      expect(mcpMeta?.sidebar.icon).toBe("Cable");
+    });
+  });
 });
