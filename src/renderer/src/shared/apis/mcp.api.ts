@@ -31,13 +31,13 @@ export class McpApi extends Context.Tag("McpApi")<
 // ─── McpApi live layer ──────────────────────────────────
 
 export const McpApiLive = Layer.succeed(McpApi, {
-  listServers: () => invoke<McpServerInfo[]>("mcp:list-servers"),
-  getTools: (serverName: string) => invoke<McpTool[]>("mcp:get-tools", { serverName }),
-  getAllTools: () => invoke<McpToolEntry[]>("mcp:get-all-tools"),
+  listServers: () => invoke<McpServerInfo[]>("mcpListServers"),
+  getTools: (serverName: string) => invoke<McpTool[]>("mcpGetTools", { serverName }),
+  getAllTools: () => invoke<McpToolEntry[]>("mcpGetAllTools"),
   enable: (serverName: string, enabled: boolean) =>
-    invoke<void>("mcp:enable", { serverName, enabled }),
-  restart: (serverName: string) => invoke<void>("mcp:restart", { serverName }),
+    invoke<void>("mcpEnable", { serverName, enabled }),
+  restart: (serverName: string) => invoke<void>("mcpRestart", { serverName }),
   callTool: (serverName: string, toolName: string, args: unknown) =>
-    invoke<unknown>("mcp:call-tool", { serverName, toolName, args }),
-  openConfigDir: () => invoke<void>("mcp:open-config-dir"),
+    invoke<unknown>("mcpCallTool", { serverName, toolName, args }),
+  openConfigDir: () => invoke<void>("mcpOpenConfigDir"),
 });

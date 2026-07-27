@@ -1,10 +1,14 @@
-//! Tests for invoke.api.ts �?dispatchInvoke error mapping + success path.
+//! Tests for invoke.api.ts — invoke<T> error mapping + success path.
 //!
-//! Minimal 4-case coverage:
-//! Case 1: JSON error message -> falls back to Unknown (decodeAppError only handles {_tag} not {kind})
-//! Case 2: IPC error message is plain Error -> Unknown wrapper
-//! Case 3: unknown command -> Unknown error
-//! Case 4: success path -> returns resolved value
+//! 3-case coverage (V3.2 typed invoke):
+//! Case 1: JSON error message → decodeAppError还原 (handles {kind} or {_tag})
+//! Case 2: plain Error message → Unknown wrapper fallback
+//! Case 3: success path → returns resolved value
+//!
+//! Removed (V3.2): "unknown IPC command" case — `T extends keyof CodemanApi`
+//! makes that compile-time impossible; the runtime `getApi()[channel]` path
+//! can still hit an undefined method (which produces a TypeError → Unknown),
+//! but that scenario is now covered by Case 2's plain-error path.
 
 import { it, expect, beforeEach } from "@effect/vitest";
 import { describe } from "vitest";
@@ -19,7 +23,7 @@ beforeEach(() => {
 });
 
 describe("invoke dispatch error mapping", () => {
-  // Case 1: IPC error message with JSON -> decodeAppError还原
+  // Case 1: IPC error message with JSON → decodeAppError还原
   it.effect("JSON error payload falls back to Unknown AppError", () =>
     Effect.gen(function* () {
       // Simulate Electron's doubly-wrapped error:
@@ -39,7 +43,7 @@ describe("invoke dispatch error mapping", () => {
     }),
   );
 
-  // Case 2: Plain error message (no JSON) -> Unknown wrapper
+  // Case 2: Plain error message (no JSON) → Unknown wrapper
   it.effect("plain error message is wrapped as Unknown AppError", () =>
     Effect.gen(function* () {
       // Plain error without JSON payload
@@ -57,22 +61,7 @@ describe("invoke dispatch error mapping", () => {
     }),
   );
 
-  // Case 3: unknown command -> throws Unknown from dispatchInvoke
-  it.effect("unknown IPC command throws Unknown error", () =>
-    Effect.gen(function* () {
-      // No mockState.rejected needed �?dispatchInvoke throws Unknown directly for unknown commands
-      const exit = yield* Effect.exit(invoke("nonexistent_command", {}));
-
-      expect(Exit.isFailure(exit)).toBe(true);
-      if (Exit.isFailure(exit)) {
-        const err = (exit.cause as any).error as any;
-        expect(err._tag).toBe("Unknown");
-        expect(err.message).toContain("nonexistent_command");
-      }
-    }),
-  );
-
-  // Case 4: success path -> returns resolved value
+  // Case 3: success path → returns resolved value
   it.effect("successful invoke returns resolved value", () =>
     Effect.gen(function* () {
       mockState.resolved = "file content here";
