@@ -10,7 +10,7 @@ import {
 	_resetSkillsStoreForTest,
 	initializeSkillsManifests,
 } from "@codeman-frontend/plugins/skills/stores/skills.store";
-import { SkillsService } from "@codeman-frontend/shared/lib/ipc";
+import { SkillsService } from "@shared/apis";
 import { Unknown } from "@codeman-frontend/shared/lib/errors";
 import type { SkillManifest } from "@codeman-frontend/plugins/skills/lib/skill-loader-schema";
 

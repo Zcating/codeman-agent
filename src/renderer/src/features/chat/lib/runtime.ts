@@ -33,7 +33,7 @@ import { formatSkillsManifestSection } from "@codeman-frontend/plugins/skills/li
 import { loadSkillTool } from "@codeman-frontend/plugins/skills/lib/skill-meta-tool";
 import { mcpAllTools$ } from "@codeman-frontend/plugins/mcp/stores/store";
 import type { McpToolEntry } from "@codeman-frontend/shared/lib/types";
-import { McpService, McpServiceLive } from "@codeman-frontend/shared/lib/ipc";
+import { McpService, McpServiceLive } from "@shared/apis";
 import {
   isTextBlock,
   isThinkingBlock,

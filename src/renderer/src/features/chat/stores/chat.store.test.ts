@@ -30,7 +30,7 @@ import type { RuntimeEvent, ProviderConfig } from "@codeman-frontend/features/ch
 
 // ─── Mock tauri services ─────────────────────────────────────────────
 
-vi.mock("../../../shared/lib/ipc", async () => {
+vi.mock("@shared/apis", async () => {
   const { Layer, Effect: E } = await import("effect");
   const {
     MessageService,
@@ -38,8 +38,8 @@ vi.mock("../../../shared/lib/ipc", async () => {
     ProviderService,
     SettingsService,
     SkillsService,
-  } = await vi.importActual<typeof import("../../../shared/lib/ipc")>(
-    "../../../shared/lib/ipc",
+  } = await vi.importActual<typeof import("@shared/apis")>(
+    "@shared/apis",
   );
   return {
     MessageService,

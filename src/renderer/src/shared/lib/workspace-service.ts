@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from "effect";
-import { invoke as ipcInvoke } from "@codeman-frontend/shared/lib/ipc";
+import { invoke as ipcInvoke } from "@shared/apis";
 import { logger } from "@codeman-frontend/shared/lib/logger";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
 import type { Workspace } from "@codeman-frontend/shared/lib/types";

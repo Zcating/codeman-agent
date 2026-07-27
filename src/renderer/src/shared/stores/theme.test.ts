@@ -9,7 +9,7 @@ import type { Settings } from "@codeman-frontend/shared/lib/types";
 // Mutable mock settings — 在每个测试导入前设置
 let mockTheme: Settings["theme"] = "dark";
 
-vi.mock("../lib/ipc", () => ({
+vi.mock("@shared/apis", () => ({
   getSettingsBridge: async (): Promise<Settings> => ({
     llmProviders: [],
     userLanguage: "en",

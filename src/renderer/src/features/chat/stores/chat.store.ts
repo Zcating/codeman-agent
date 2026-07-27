@@ -25,7 +25,7 @@ import {
   ConversationServiceLive,
   MessageService,
   MessageServiceLive,
-} from "@codeman-frontend/shared/lib/ipc";
+} from "@shared/apis";
 import {
   WorkspaceService,
   WorkspaceServiceLive,

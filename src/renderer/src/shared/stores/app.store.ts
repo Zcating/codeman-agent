@@ -31,13 +31,13 @@ import { decodeAppError } from "@codeman-frontend/shared/lib/decode-app-error";
 // V3: route IPC through the V3 canonical (window.codeman dispatch) instead of
 // the V2 @tauri-apps/api/core which reads window.__TAURI_INTERNALS__ (missing
 // in V3 Electron).
-import { invoke as ipcInvoke } from "@codeman-frontend/shared/lib/ipc";
 import {
+  invoke as ipcInvoke,
   ProviderService,
   ProviderServiceLive,
   SettingsService,
   SettingsServiceLive,
-} from "@codeman-frontend/shared/lib/ipc";
+} from "@shared/apis";
 import { WorkspaceService, WorkspaceServiceLive } from "@codeman-frontend/shared/lib/workspace-service";
 import { lookupContextWindow } from "@codeman-frontend/features/chat/lib/context-window-fallback";
 // Note: settingsSaver import removed - was used by deprecated addWorkspace method

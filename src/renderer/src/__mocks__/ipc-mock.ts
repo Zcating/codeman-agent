@@ -310,6 +310,11 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
     // No-op in mock
   },
 
+  deleteProvider(): unknown {
+    // No-op in mock (backend may not implement this yet)
+    return undefined;
+  },
+
   fetchModels(args?: IPCArgs): unknown {
     // Returns current models from settings for the given provider
     const providerId = args?.providerId as string;
@@ -438,7 +443,7 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
 
 // ─── Invoke Mock ────────────────────────────────────────────────
 
-export const invoke = vi.fn().mockImplementation((name: string, args?: IPCArgs) => {
+export const invoke: (name: string, args?: IPCArgs) => Promise<unknown> = vi.fn().mockImplementation((name: string, args?: IPCArgs) => {
   mockState.calls.push(name);
   mockState.callArgs.push({ name, args: args as Record<string, unknown> | undefined });
   mockState.invokeCalls.push({ name, args: args as Record<string, unknown> | undefined });
@@ -478,7 +483,7 @@ export const invoke = vi.fn().mockImplementation((name: string, args?: IPCArgs) 
 });
 
 export { invoke as TauriInvoke };
-export default { invoke };
+export default { invoke } as { invoke: (name: string, args?: IPCArgs) => Promise<unknown> };
 
 // ─── V3: window.codeman Mock ───────────────────────────────────
 //
@@ -512,6 +517,7 @@ function buildCodemanMock(): Record<string, unknown> {
     renameWorkspace: { cmd: "renameWorkspace", build: (id, l) => ({ id, label: l }) },
     deleteWorkspace: { cmd: "deleteWorkspace", build: (id) => ({ id }) },
     pickWorkspacePath: { cmd: "pickWorkspacePath", build: () => ({}) },
+    deleteProvider: { cmd: "deleteProvider", build: (id) => ({ id }) },
     readFile: { cmd: "readFile", build: (wid, p) => ({ workspaceId: wid, path: p }) },
     writeFile: { cmd: "writeFile", build: (wid, p, c) => ({ workspaceId: wid, path: p, content: c }) },
     editFile: { cmd: "editFile", build: (wid, p, ot, nt, ra) => ({ workspaceId: wid, path: p, oldText: ot, newText: nt, replaceAll: ra }) },

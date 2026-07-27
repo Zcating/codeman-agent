@@ -5,7 +5,7 @@
 
 import { createSignal, type Accessor } from "solid-js";
 import { Effect } from "effect";
-import { McpService, McpServiceLive } from "@codeman-frontend/shared/lib/ipc";
+import { McpService, McpServiceLive } from "@shared/apis";
 import type {
   McpServerInfo,
   McpToolEntry,

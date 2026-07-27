@@ -8,7 +8,7 @@
 
 import { createSignal, type Accessor } from "solid-js";
 import { Effect } from "effect";
-import { SkillsService, SkillsServiceLive } from "@codeman-frontend/shared/lib/ipc";
+import { SkillsService, SkillsServiceLive } from "@shared/apis";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
 // ─── Signal ─────────────────────────────────────────────
