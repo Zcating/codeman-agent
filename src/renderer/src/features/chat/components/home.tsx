@@ -14,6 +14,9 @@
 //! - 0 workspaces → input disabled + "Add workspace" CTA
 //! - 1 workspace  → auto-select, input enabled
 //! - 2+ workspaces → 无预选, input disabled until user picks
+//!
+//! V2.6 (ADR-0037): textarea + slash menu 合并为 `<ComboTextarea>`。移除
+//! `useSlashTrigger` + `<SlashMenu>` + `handleSkillSelect`。
 
 import { createMemo, createEffect, Show, type JSX } from "solid-js";
 import { Send } from "lucide-solid";
@@ -26,7 +29,7 @@ import { effectSchema, firstErrorMessage } from "@codeman-frontend/shared/lib/ef
 import { Button } from "@codeman-frontend/shared/components/ui/button";
 import { CodemanSelect } from "@codeman-frontend/shared/components/internal/codeman-select";
 import { CodemanGroupSelect } from "@codeman-frontend/shared/components/internal/codeman-group-select";
-import { CodemanTextarea } from "@codeman-frontend/shared/components/internal/codeman-textarea";
+import { ComboTextarea } from "@codeman-frontend/features/chat/components/combo-textarea";
 import { codemanToast } from "@codeman-frontend/shared/components/internal/codeman-toast";
 import {
   workspaces$,
@@ -50,9 +53,7 @@ import {
   HomeFormSchema,
   type HomeFormValue,
 } from "@codeman-frontend/features/chat/lib/schemas";
-// Wave A7: Slash menu integration
-import { useSlashTrigger } from "@codeman-frontend/plugins/skills/lib/use-slash-trigger";
-import { SlashMenu } from "@codeman-frontend/plugins/skills/components/slash-menu";
+// ADR-0037: ComboTextarea 替代 useSlashTrigger + SlashMenu
 import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
@@ -112,9 +113,8 @@ export function HomeAgentForm(): JSX.Element {
 
   const navigate = useNavigate();
 
-  // Wave A7: textarea ref for slash trigger
-  let textareaEl: HTMLTextAreaElement | null = null;
-  const textareaRef = () => textareaEl;
+  // ADR-0037: textarea ref + cursor management now owned by ComboTextarea.
+  // No local `textareaEl` needed; ComboTextarea forwards focus internally.
 
   // ─── Form ──────────────────────────────────────────────────────────────────
   const form = createForm(() => ({
@@ -168,40 +168,14 @@ export function HomeAgentForm(): JSX.Element {
     },
   }));
 
-  // Wave A7: Slash trigger + skills
-  const slashTrigger = useSlashTrigger({
-    textareaRef,
-    getValue: () => form.getFieldValue("draft") ?? "",
-  });
-
+  // Wave A7 (legacy): Slash trigger + skills. ADR-0037 — ComboTextarea owns
+  // the trigger; we only compute enabledSkills for the `skills` prop.
   /** Enabled skills = manifests ∩ appStore.enabledSkills */
   const enabledSkills = createMemo((): readonly SkillManifest[] => {
     const all = skillsManifests$();
     const enabledNames = new Set(appStore.state.value.enabledSkills ?? []);
     return all.filter((s) => enabledNames.has(s.name));
   });
-
-  /** Handle skill selection: replace /<query> with /<skill-name> + space */
-  const handleSkillSelect = (skill: SkillManifest) => {
-    const trigger = slashTrigger();
-    if (!trigger) return;
-
-    const currentValue = form.getFieldValue("draft") ?? "";
-    const triggerPos = trigger.cursorPosition;
-
-    // Replace everything from triggerPos to end with /<skill-name>
-    const newValue =
-      currentValue.slice(0, triggerPos) + `/${skill.name} ` + currentValue.slice(triggerPos);
-
-    form.setFieldValue("draft", newValue);
-    // Blur the textarea so the cursor moves to the end of the inserted text
-    textareaEl?.focus();
-    // Move cursor to after the inserted skill name
-    const newCursorPos = triggerPos + skill.name.length + 2; // "/" + name + " "
-    queueMicrotask(() => {
-      textareaEl?.setSelectionRange(newCursorPos, newCursorPos);
-    });
-  };
 
   // Sync workspace ID from store signal to form field when async load resolves.
   // Without this, the form field stays "" (captured at createForm time before
@@ -258,30 +232,32 @@ export function HomeAgentForm(): JSX.Element {
                 <label for="codex-input" class="sr-only">
                   发条消息
                 </label>
-                <CodemanTextarea
+                <ComboTextarea
                   id="codex-input"
                   data-testid="codex-input"
                   class="w-full"
                   rows={3}
                   value={field().state.value}
-                  onValueChange={(v) => field().handleChange(v)}
-                  onBlur={() => field().handleBlur()}
-                  ref={(el) => {
-                    textareaEl = el;
-                  }}
+                  onChange={(v) => field().handleChange(v)}
                   onKeyDown={(e) => {
+                    // ComboTextarea handles `/`, Ctrl+/, ArrowUp/Down/Enter/Esc
+                    // when menu is open. This handler runs unconditionally for
+                    // keys that don't go through the menu:
+                    // - Ctrl/Cmd+Enter: submit form
+                    // - ArrowUp/Down when menu closed: input history
                     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                      if (e.defaultPrevented) {return;}
                       e.preventDefault();
                       e.currentTarget.form?.requestSubmit();
                       return;
                     }
-                    if (e.key === "ArrowUp") {
+                    if (e.key === "ArrowUp" && !e.defaultPrevented) {
                       if (handleArrowUpField(field)) {
                         e.preventDefault();
                       }
                       return;
                     }
-                    if (e.key === "ArrowDown") {
+                    if (e.key === "ArrowDown" && !e.defaultPrevented) {
                       if (handleArrowDownField(field)) {
                         e.preventDefault();
                       }
@@ -290,6 +266,7 @@ export function HomeAgentForm(): JSX.Element {
                   }}
                   disabled={isInputDisabled() || form.state.isSubmitting}
                   placeholder={placeholder()}
+                  skills={enabledSkills()}
                   error={
                     // submit-only: 错误只在用户提交后才显示。isTouched 在 blur 后变 true,
                     // 不再用作显示门控(避免 blur 触发校验后立即渲染错误)。
@@ -403,22 +380,6 @@ export function HomeAgentForm(): JSX.Element {
             </form.Subscribe>
           </div>
         </form>
-
-        {/* Wave A7: SlashMenu popup */}
-        <SlashMenu
-          trigger={slashTrigger()}
-          candidates={enabledSkills()}
-          query={slashTrigger()?.query ?? ""}
-          onSelect={handleSkillSelect}
-          onClose={() => {
-            const trigger = slashTrigger();
-            if (trigger?.rect) {
-              // Focus back to textarea and reset selection
-              textareaEl?.focus();
-            }
-          }}
-          anchorRect={slashTrigger()?.rect ?? null}
-        />
       </div>
     </div>
   );
