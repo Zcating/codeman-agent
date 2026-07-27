@@ -1,11 +1,11 @@
-// MessageService - rendered MessageService Tag + Live Layer for message domain IPC.
+// MessageApi - rendered MessageApi Tag + Live Layer for message domain IPC.
 import { Effect, Context, Layer } from "effect";
 import type { Message } from "../lib/types";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
 import { invoke } from "./invoke.api";
 
-export class MessageService extends Context.Tag("MessageService")<
-  MessageService,
+export class MessageApi extends Context.Tag("MessageApi")<
+  MessageApi,
   {
     readonly list: (conversationId: string) => Effect.Effect<Message[], AppError>;
     readonly append: (args: {
@@ -23,7 +23,7 @@ export class MessageService extends Context.Tag("MessageService")<
   }
 >() {}
 
-export const MessageServiceLive = Layer.succeed(MessageService, {
+export const MessageApiLive = Layer.succeed(MessageApi, {
   list: (conversationId) => invoke<Message[]>("listMessages", { conversationId }),
   append: (args) => invoke<Message>("appendMessage", args),
   search: (query, limit) => invoke<Message[]>("searchMessages", { query, limit }),

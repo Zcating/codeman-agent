@@ -1,30 +1,30 @@
-// conversation Service IPC 测试，搬迁自 shared/lib/ipc.test.ts
+// conversation Api IPC 测试，搬迁自 shared/lib/ipc.test.ts
 import { it, expect } from "@effect/vitest";
 import { describe } from "vitest";
 import { Effect } from "effect";
 import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 import {
-  ConversationService,
-  ConversationServiceLive,
+  ConversationApi,
+  ConversationApiLive,
 } from "./conversation.api";
 
-describe("ConversationService", () => {
+describe("ConversationApi", () => {
   it.effect("list returns array from IPC", () =>
     Effect.gen(function* () {
-      const svc = yield* ConversationService;
+      const svc = yield* ConversationApi;
       const convos = yield* svc.list(false);
       expect(Array.isArray(convos)).toBe(true);
-    }).pipe(Effect.provide(ConversationServiceLive)),
+    }).pipe(Effect.provide(ConversationApiLive)),
   );
 
   it.effect("rename forwards to window.codeman.renameConversation with correct args", () =>
     Effect.gen(function* () {
-      const svc = yield* ConversationService;
+      const svc = yield* ConversationApi;
       mockState.invokeCalls = [];
       yield* svc.rename("conv-123", "New Title");
       const renameCall = mockState.invokeCalls.find((c) => c.name === "renameConversation");
       expect(renameCall).toBeDefined();
       expect(renameCall?.args).toEqual({ id: "conv-123", title: "New Title" });
-    }).pipe(Effect.provide(ConversationServiceLive)),
+    }).pipe(Effect.provide(ConversationApiLive)),
   );
 });

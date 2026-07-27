@@ -9,7 +9,7 @@
 //!
 //! 用法:
 //!   const wsId = WorkspaceIdSchema.make(row.id);  // 入口（DB → 运行时）
-//!   await FileService.readFile(wsId, path);       // 出口（已 branded，安全）
+//!   await FileApi.readFile(wsId, path);       // 出口（已 branded，安全）
 import { Schema } from "effect";
 
 /** Effect Schema: branded string. */

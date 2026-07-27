@@ -1,12 +1,12 @@
-// ProviderService - rendered ProviderService Tag + Live Layer for provider domain IPC.
+// ProviderApi - rendered ProviderApi Tag + Live Layer for provider domain IPC.
 import { Effect, Context, Layer } from "effect";
 import type { Provider, ModelMeta } from "../lib/types";
 import { invoke } from "./invoke.api";
 import { TauriError } from "./invoke.api";
 import { parseModelsApiResponse } from "@codeman-frontend/shared/lib/parse-models-api-response";
 
-export class ProviderService extends Context.Tag("ProviderService")<
-  ProviderService,
+export class ProviderApi extends Context.Tag("ProviderApi")<
+  ProviderApi,
   {
     readonly list: () => Effect.Effect<Provider[], TauriError>;
     readonly get: (id: string) => Effect.Effect<Provider, TauriError>;
@@ -16,10 +16,10 @@ export class ProviderService extends Context.Tag("ProviderService")<
   }
 >() {}
 
-// ProviderService uses settings.providers (V1.5 unified schema) — calls
+// ProviderApi uses settings.providers (V1.5 unified schema) — calls
 // getSettings via the codeman dispatch.
-export const ProviderServiceLive = Layer.effect(
-  ProviderService,
+export const ProviderApiLive = Layer.effect(
+  ProviderApi,
   Effect.gen(function* () {
     const getProviders = invoke<{ providers: Provider[] }>("getSettings").pipe(
       Effect.map((s) => s.providers ?? []),

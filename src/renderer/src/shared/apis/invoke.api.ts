@@ -41,7 +41,7 @@ export interface CodemanApi {
   deleteWorkspace: (id: string) => Promise<unknown>;
   pickWorkspacePath: () => Promise<unknown>;
   /** V3+ ADR-0023 D8-W: 删除 provider（注意：当前 Electron 后端未实现，
-   * ProviderService.delete 仍会触发 IPC 失败 — 由 mapError 转 AppError）。
+   * ProviderApi.delete 仍会触发 IPC 失败 — 由 mapError 转 AppError）。
    * 留此声明是为 renderer/preload 类型一致，避免 dispatchInvoke 命中 default 抛 Unknown。
    */
   deleteProvider: (id: string) => Promise<unknown>;

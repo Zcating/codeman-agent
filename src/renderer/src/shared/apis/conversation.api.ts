@@ -1,11 +1,11 @@
-// ConversationService - rendered ConversationService Tag + Live Layer for conversation domain IPC.
+// ConversationApi - rendered ConversationApi Tag + Live Layer for conversation domain IPC.
 import { Effect, Context, Layer } from "effect";
 import type { Conversation } from "../lib/types";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
 import { invoke } from "./invoke.api";
 
-export class ConversationService extends Context.Tag("ConversationService")<
-  ConversationService,
+export class ConversationApi extends Context.Tag("ConversationApi")<
+  ConversationApi,
   {
     readonly list: (includeArchived: boolean) => Effect.Effect<Conversation[], AppError>;
     readonly get: (id: string) => Effect.Effect<Conversation, AppError>;
@@ -20,7 +20,7 @@ export class ConversationService extends Context.Tag("ConversationService")<
   }
 >() {}
 
-export const ConversationServiceLive = Layer.succeed(ConversationService, {
+export const ConversationApiLive = Layer.succeed(ConversationApi, {
   list: (includeArchived) => invoke<Conversation[]>("listConversations", { includeArchived }),
   get: (id) => invoke<Conversation>("getConversation", { id }),
   create: (title, systemPrompt, workspaceId) =>

@@ -1,10 +1,10 @@
-// provider Service IPC 测试，搬迁自 shared/lib/ipc.test.ts
+// provider Api IPC 测试，搬迁自 shared/lib/ipc.test.ts
 import { it, expect, beforeEach } from "@effect/vitest";
 import { describe } from "vitest";
 import { Effect, Layer, Exit } from "effect";
 import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 import {
-  ProviderService,
+  ProviderApi,
 } from "./provider.api";
 import type { Provider } from "../lib/types";
 import { TauriError } from "./invoke.api";
@@ -37,7 +37,7 @@ const mockProviderList: Provider[] = [mockProvider];
 
 // ─── Mock Layers ──────────────────────────────────────────────
 
-const MockProviderServiceLive = Layer.succeed(ProviderService, {
+const MockProviderApiLive = Layer.succeed(ProviderApi, {
   list: () => Effect.succeed(mockProviderList.filter((p) => p.enabled)),
   get: (id) => {
     const provider = mockProviderList.find((p) => p.id === id);
@@ -109,38 +109,38 @@ beforeEach(() => {
   mockState.v0FixtureActive = false;
 });
 
-describe("ProviderService", () => {
+describe("ProviderApi", () => {
   it.effect("list returns enabled providers", () =>
     Effect.gen(function* () {
-      const svc = yield* ProviderService;
+      const svc = yield* ProviderApi;
       const providers = yield* svc.list();
       expect(providers).toHaveLength(1);
       expect(providers[0].id).toBe("minimax");
-    }).pipe(Effect.provide(MockProviderServiceLive)),
+    }).pipe(Effect.provide(MockProviderApiLive)),
   );
 
   it.effect("get returns provider by id", () =>
     Effect.gen(function* () {
-      const svc = yield* ProviderService;
+      const svc = yield* ProviderApi;
       const provider = yield* svc.get("minimax");
       expect(provider.id).toBe("minimax");
-    }).pipe(Effect.provide(MockProviderServiceLive)),
+    }).pipe(Effect.provide(MockProviderApiLive)),
   );
 
   it.effect("get fails for unknown provider", () =>
     Effect.gen(function* () {
-      const svc = yield* ProviderService;
+      const svc = yield* ProviderApi;
       const exit = yield* Effect.exit(svc.get("nonexistent"));
       expect(Exit.isFailure(exit)).toBe(true);
-    }).pipe(Effect.provide(MockProviderServiceLive)),
+    }).pipe(Effect.provide(MockProviderApiLive)),
   );
 
   it.effect("getModels returns provider models", () =>
     Effect.gen(function* () {
-      const svc = yield* ProviderService;
+      const svc = yield* ProviderApi;
       const models = yield* svc.getModels("minimax");
       expect(models).toHaveLength(1);
       expect(models[0].id).toBe("MiniMax-M2.5-highspeed");
-    }).pipe(Effect.provide(MockProviderServiceLive)),
+    }).pipe(Effect.provide(MockProviderApiLive)),
   );
 });

@@ -1,11 +1,11 @@
-// SettingsService - rendered SettingsService Tag + Live Layer + Bridge Functions for settings domain IPC.
+// SettingsApi - rendered SettingsApi Tag + Live Layer + Bridge Functions for settings domain IPC.
 import { Effect, Context, Layer } from "effect";
 import type { Settings, LLMProvider } from "../lib/types";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
 import { invoke } from "./invoke.api";
 
-export class SettingsService extends Context.Tag("SettingsService")<
-  SettingsService,
+export class SettingsApi extends Context.Tag("SettingsApi")<
+  SettingsApi,
   {
     readonly getSettings: () => Effect.Effect<Settings, AppError>;
     readonly updateSettings: (patch: unknown) => Effect.Effect<Settings, AppError>;
@@ -14,7 +14,7 @@ export class SettingsService extends Context.Tag("SettingsService")<
   }
 >() {}
 
-export const SettingsServiceLive = Layer.succeed(SettingsService, {
+export const SettingsApiLive = Layer.succeed(SettingsApi, {
   getSettings: () => invoke<Settings>("getSettings"),
   updateSettings: (patch) => invoke<Settings>("updateSettings", { newSettings: patch }),
   clearAllHistory: () => invoke<void>("clearAllHistory"),
@@ -50,24 +50,24 @@ export const SettingsServiceLive = Layer.succeed(SettingsService, {
 
 export async function getSettingsBridge(): Promise<Settings> {
   const program = Effect.gen(function* () {
-    const svc = yield* SettingsService;
+    const svc = yield* SettingsApi;
     return yield* svc.getSettings();
-  }).pipe(Effect.provide(SettingsServiceLive));
+  }).pipe(Effect.provide(SettingsApiLive));
   return Effect.runPromise(program);
 }
 
 export async function updateSettingsBridge(patch: Partial<Settings>): Promise<Settings> {
   const program = Effect.gen(function* () {
-    const svc = yield* SettingsService;
+    const svc = yield* SettingsApi;
     return yield* svc.updateSettings(patch);
-  }).pipe(Effect.provide(SettingsServiceLive));
+  }).pipe(Effect.provide(SettingsApiLive));
   return Effect.runPromise(program);
 }
 
 export async function clearAllHistoryBridge(): Promise<void> {
   const program = Effect.gen(function* () {
-    const svc = yield* SettingsService;
+    const svc = yield* SettingsApi;
     yield* svc.clearAllHistory();
-  }).pipe(Effect.provide(SettingsServiceLive));
+  }).pipe(Effect.provide(SettingsApiLive));
   await Effect.runPromise(program);
 }

@@ -1,22 +1,22 @@
-// settings Service IPC 测试，搬迁自 shared/lib/ipc.test.ts
+// settings Api IPC 测试，搬迁自 shared/lib/ipc.test.ts
 import { it, expect } from "@effect/vitest";
 import { describe } from "vitest";
 import { Effect } from "effect";
 import {
-  SettingsService,
-  SettingsServiceLive,
+  SettingsApi,
+  SettingsApiLive,
   getSettingsBridge,
   updateSettingsBridge,
   clearAllHistoryBridge,
 } from "./settings.api";
 
-describe("SettingsService", () => {
+describe("SettingsApi", () => {
   it.effect("getSettings reads from IPC", () =>
     Effect.gen(function* () {
-      const svc = yield* SettingsService;
+      const svc = yield* SettingsApi;
       const settings = yield* svc.getSettings();
       expect(settings.schemaVersion).toBe("1.5");
-    }).pipe(Effect.provide(SettingsServiceLive)),
+    }).pipe(Effect.provide(SettingsApiLive)),
   );
 });
 

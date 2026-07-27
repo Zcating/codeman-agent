@@ -33,21 +33,21 @@ import type { RuntimeEvent, ProviderConfig } from "@codeman-frontend/features/ch
 vi.mock("@shared/apis", async () => {
   const { Layer, Effect: E } = await import("effect");
   const {
-    MessageService,
-    ConversationService,
-    ProviderService,
-    SettingsService,
-    SkillsService,
+    MessageApi,
+    ConversationApi,
+    ProviderApi,
+    SettingsApi,
+    SkillsApi,
   } = await vi.importActual<typeof import("@shared/apis")>(
     "@shared/apis",
   );
   return {
-    MessageService,
-    ConversationService,
-    ProviderService,
-    SettingsService,
-    SkillsService,
-    MessageServiceLive: Layer.succeed(MessageService, {
+    MessageApi,
+    ConversationApi,
+    ProviderApi,
+    SettingsApi,
+    SkillsApi,
+    MessageApiLive: Layer.succeed(MessageApi, {
       list: () => E.succeed([] as Message[]),
       append: (args: {
         conversationId: string;
@@ -73,7 +73,7 @@ vi.mock("@shared/apis", async () => {
         } as Message),
       search: () => E.succeed([] as Message[]),
     }),
-    ConversationServiceLive: Layer.succeed(ConversationService, {
+    ConversationApiLive: Layer.succeed(ConversationApi, {
       list: () => E.succeed([] as Conversation[]),
       get: (id: string) =>
         E.succeed({
@@ -100,14 +100,14 @@ vi.mock("@shared/apis", async () => {
       rename: () => E.void,
     }),
     // V3.1 ADR-0031 + ADR-0016: appStore reads these — provide minimal stubs
-    ProviderServiceLive: Layer.succeed(ProviderService, {
+    ProviderApiLive: Layer.succeed(ProviderApi, {
       list: () => E.succeed([]),
       get: () => E.fail({ kind: "IPC", message: "not used" } as never),
       getModels: () => E.succeed([]),
       fetchModels: () => E.succeed([]),
       delete: () => E.void,
     }),
-    SettingsServiceLive: Layer.succeed(SettingsService, {
+    SettingsApiLive: Layer.succeed(SettingsApi, {
       getSettings: () =>
         E.succeed({
           providers: [],
@@ -149,7 +149,7 @@ vi.mock("@shared/apis", async () => {
       clearAllHistory: () => E.void,
       getActiveLlmProvider: () => E.succeed(null),
     }),
-    SkillsServiceLive: Layer.succeed(SkillsService, {
+    SkillsApiLive: Layer.succeed(SkillsApi, {
       scan: () => E.succeed([]),
       load: () => E.succeed(""),
     }),
@@ -1185,8 +1185,8 @@ describe("loadConversations — G16: 遍历 convs + 填充 byId", () => {
   });
 });
 
-describe("loadConversations — G17: 当 MessageService.list 失败时跳过 per-conv", () => {
-  it("loadConversations() 当 conv 的 MessageService.list 失败时继续执行", async () => {
+describe("loadConversations — G17: 当 MessageApi.list 失败时跳过 per-conv", () => {
+  it("loadConversations() 当 conv 的 MessageApi.list 失败时继续执行", async () => {
     await createRoot(async (dispose) => {
       // With the mock returning empty list, loadConversations should not throw
       await expect(Effect.runPromise(loadConversations(false))).resolves.toBeUndefined();
@@ -1197,7 +1197,7 @@ describe("loadConversations — G17: 当 MessageService.list 失败时跳过 per
 
 // ─── New tests: createConversation ────────────────────────────────
 
-describe("createConversation — G18: 调用 ConversationService.create + setupConvState + 返回 convId", () => {
+describe("createConversation — G18: 调用 ConversationApi.create + setupConvState + 返回 convId", () => {
   it("createConversation() 创建 conv + 设置 state + 返回 convId", async () => {
     await createRoot(async (dispose) => {
       const convId = await Effect.runPromise(createConversation("ws-1", "New Chat"));
@@ -1223,7 +1223,7 @@ describe("createConversation — G22: workspaceId 作为第一参数传入 IPC",
 
 // ─── New tests: persistUserMessage / persistAssistantMessage ─────
 
-describe("persistUserMessage — G20: 调用 MessageService.append 并传入正确参数 (snake→camel 桥接)", () => {
+describe("persistUserMessage — G20: 调用 MessageApi.append 并传入正确参数 (snake→camel 桥接)", () => {
   it("persistUserMessage() 通过 sendMessage 工作 - 验证 snake→camel 桥接", async () => {
     await createRoot(async (dispose) => {
       setupConvState(mockConv, []);
@@ -1316,8 +1316,8 @@ describe("createAndSendConversation — T4.2: create + sendMessage chained", () 
 describe("loadConversations — G23: setupConvState called with conversation + history", () => {
   it("loadConversations: calls setupConvState for each conversation returned by list", async () => {
     await createRoot(async (dispose) => {
-      // The mock's ConversationService.list returns 1 conv (c1).
-      // The mock's MessageService.list returns [] (empty history).
+      // The mock's ConversationApi.list returns 1 conv (c1).
+      // The mock's MessageApi.list returns [] (empty history).
       // This exercises the success path of the for-loop in loadConversations.
       await Effect.runPromise(loadConversations(false));
       // Verify setupConvState was called (by the real implementation)

@@ -1,4 +1,4 @@
-//! McpService domain (ADR-0032) — extracted from ipc.ts for domain split.
+//! McpApi domain (ADR-0032) — extracted from ipc.ts for domain split.
 //!
 //! Wraps the 6 MCP IPC channels: mcpListServers, mcpGetTools, mcpGetAllTools,
 //! mcpEnable, mcpRestart, mcpCallTool, mcpOpenConfigDir.
@@ -12,11 +12,11 @@ import type {
 } from "@codeman-frontend/shared/lib/types";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
 
-// ─── McpService tag ─────────────────────────────────────────
+// ─── McpApi tag ─────────────────────────────────────────
 
 // MCP client service (ADR-0032) — wraps the 6 MCP IPC channels.
-export class McpService extends Context.Tag("McpService")<
-  McpService,
+export class McpApi extends Context.Tag("McpApi")<
+  McpApi,
   {
     readonly listServers: () => Effect.Effect<McpServerInfo[], AppError>;
     readonly getTools: (serverName: string) => Effect.Effect<McpTool[], AppError>;
@@ -28,9 +28,9 @@ export class McpService extends Context.Tag("McpService")<
   }
 >() {}
 
-// ─── McpService live layer ──────────────────────────────────
+// ─── McpApi live layer ──────────────────────────────────
 
-export const McpServiceLive = Layer.succeed(McpService, {
+export const McpApiLive = Layer.succeed(McpApi, {
   listServers: () => invoke<McpServerInfo[]>("mcp:list-servers"),
   getTools: (serverName: string) => invoke<McpTool[]>("mcp:get-tools", { serverName }),
   getAllTools: () => invoke<McpToolEntry[]>("mcp:get-all-tools"),

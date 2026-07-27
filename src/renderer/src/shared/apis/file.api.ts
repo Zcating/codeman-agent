@@ -1,14 +1,14 @@
-//! FileService domain — extracted from ipc.ts for domain split.
+//! FileApi domain — extracted from ipc.ts for domain split.
 
 import { Effect, Layer, Context } from "effect";
 import { invoke } from "./invoke.api";
 import type { FileMatch } from "@codeman-frontend/shared/lib/types";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
 
-// ─── FileService tag ─────────────────────────────────────────
+// ─── FileApi tag ─────────────────────────────────────────
 
-export class FileService extends Context.Tag("FileService")<
-  FileService,
+export class FileApi extends Context.Tag("FileApi")<
+  FileApi,
   {
     readonly readFile: (workspaceId: string, path: string) => Effect.Effect<string, AppError>;
     readonly writeFile: (
@@ -32,9 +32,9 @@ export class FileService extends Context.Tag("FileService")<
   }
 >() {}
 
-// ─── FileService live layer ──────────────────────────────────
+// ─── FileApi live layer ──────────────────────────────────
 
-export const FileServiceLive = Layer.succeed(FileService, {
+export const FileApiLive = Layer.succeed(FileApi, {
   readFile: (workspaceId: string, path: string) =>
     invoke<string>("readFile", { workspaceId, path }),
 

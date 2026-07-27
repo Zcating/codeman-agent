@@ -6,7 +6,7 @@
 //!
 //! 用法:
 //!   const fp = FilePathSchema.make(args.path);  // LLM args → branded
-//!   await FileService.readFile(workspaceId, fp); // 进入 IPC
+//!   await FileApi.readFile(workspaceId, fp); // 进入 IPC
 import { Schema } from "effect";
 
 /**

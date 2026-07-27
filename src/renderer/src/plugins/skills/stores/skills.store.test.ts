@@ -10,7 +10,7 @@ import {
 	_resetSkillsStoreForTest,
 	initializeSkillsManifests,
 } from "@codeman-frontend/plugins/skills/stores/skills.store";
-import { SkillsService } from "@shared/apis";
+import { SkillsApi } from "@shared/apis";
 import { Unknown } from "@codeman-frontend/shared/lib/errors";
 import type { SkillManifest } from "@codeman-frontend/plugins/skills/lib/skill-loader-schema";
 
@@ -68,7 +68,7 @@ describe("skills store", () => {
 			const fresh: SkillManifest[] = [
 				{ name: "test-skill", description: "Test", source: "user", path: "/fake/test/SKILL.md" },
 			];
-			const mockLayer = Layer.succeed(SkillsService, {
+			const mockLayer = Layer.succeed(SkillsApi, {
 				scan: () => Effect.succeed(fresh),
 				load: () => Effect.succeed(""),
 			});
@@ -84,7 +84,7 @@ describe("skills store", () => {
 			setManifests(SAMPLE);
 			expect(skillsManifests$()).toHaveLength(2);
 
-			const failingLayer = Layer.succeed(SkillsService, {
+			const failingLayer = Layer.succeed(SkillsApi, {
 				scan: () => Effect.fail(new Unknown({ message: "IPC failure" })),
 				load: () => Effect.succeed(""),
 			});
