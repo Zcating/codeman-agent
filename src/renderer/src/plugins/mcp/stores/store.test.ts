@@ -9,7 +9,7 @@ import {
   _resetMcpStoreForTest,
   initializeMcp,
 } from "@codeman-frontend/plugins/mcp/stores/store";
-import { McpService } from "@codeman-frontend/shared/lib/ipc";
+import { McpApi } from "@shared/apis";
 import { Unknown } from "@codeman-frontend/shared/lib/errors";
 import type { McpServerInfo, McpToolEntry } from "@codeman-frontend/shared/lib/types";
 
@@ -65,7 +65,7 @@ describe("mcp store", () => {
           },
         ];
 
-        const mockLayer = Layer.succeed(McpService, {
+        const mockLayer = Layer.succeed(McpApi, {
           listServers: () => Effect.succeed(mockServers),
           getTools: () => Effect.succeed([]),
           getAllTools: () => Effect.succeed(mockTools),
@@ -103,7 +103,7 @@ describe("mcp store", () => {
         ];
 
         // First, set up initial state with a success layer
-        const initialLayer = Layer.succeed(McpService, {
+        const initialLayer = Layer.succeed(McpApi, {
           listServers: () => Effect.succeed(existingServers),
           getTools: () => Effect.succeed([]),
           getAllTools: () => Effect.succeed(existingTools),
@@ -119,7 +119,7 @@ describe("mcp store", () => {
         expect(mcpAllTools$()).toEqual(existingTools);
 
         // Now simulate failure
-        const failingLayer = Layer.succeed(McpService, {
+        const failingLayer = Layer.succeed(McpApi, {
           listServers: () => Effect.fail(new Unknown({ message: "MCP service unavailable" })),
           getTools: () => Effect.succeed([]),
           getAllTools: () => Effect.succeed([]),
@@ -150,7 +150,7 @@ describe("mcp store", () => {
         expect(program).toHaveProperty("pipe");
 
         // Verify it can be provided with a layer and runs
-        const mockLayer = Layer.succeed(McpService, {
+        const mockLayer = Layer.succeed(McpApi, {
           listServers: () => Effect.succeed([]),
           getTools: () => Effect.succeed([]),
           getAllTools: () => Effect.succeed([]),

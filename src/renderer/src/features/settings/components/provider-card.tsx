@@ -2,7 +2,7 @@
 //! 1 card per provider with LLM subform (always).
 //! V1.8+ ADR-0016: all writes go through appStore (debounced 500ms auto-flush);
 //! handleRefreshModels + handleDelete 走 appStore.refreshProviderModels / appStore.deleteProvider,
-//! 不用 Effect.gen + ProviderService 也不再裸 invoke "delete_provider"。
+//! 不用 Effect.gen + ProviderApi 也不再裸 invoke "delete_provider"。
 //! Uses Tailwind v4 utility classes only (ADR-0006). No BEM, no <style> blocks.
 //!
 //! ## Form 模式 (2026-07, Plan C: @tanstack/solid-form)

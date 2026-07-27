@@ -33,7 +33,7 @@ import { formatSkillsManifestSection } from "@codeman-frontend/plugins/skills/li
 import { loadSkillTool } from "@codeman-frontend/plugins/skills/lib/skill-meta-tool";
 import { mcpAllTools$ } from "@codeman-frontend/plugins/mcp/stores/store";
 import type { McpToolEntry } from "@codeman-frontend/shared/lib/types";
-import { McpService, McpServiceLive } from "@codeman-frontend/shared/lib/ipc";
+import { McpApi, McpApiLive } from "@shared/apis";
 import {
   isTextBlock,
   isThinkingBlock,
@@ -57,9 +57,9 @@ function buildMcpTools(entries: readonly McpToolEntry[]): AgentTool<TSchema, unk
     parameters: entry.inputSchema as TSchema,
     execute: async (_toolCallId: string, args: unknown): Promise<{ content: Array<{ type: "text"; text: string }>; details: unknown }> => {
       const callToolEffect = Effect.gen(function* () {
-        const svc = yield* McpService;
+        const svc = yield* McpApi;
         return yield* svc.callTool(entry.serverName, entry.toolName, args as Record<string, unknown>);
-      }).pipe(Effect.provide(McpServiceLive));
+      }).pipe(Effect.provide(McpApiLive));
 
       const exit = await Effect.runPromiseExit(callToolEffect);
       if (Exit.isFailure(exit)) {

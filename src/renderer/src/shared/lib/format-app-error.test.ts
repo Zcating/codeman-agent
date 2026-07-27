@@ -13,7 +13,7 @@ import {
   Unknown as UnknownErr,
   type AppError as NewAppError,
 } from "@codeman-frontend/shared/lib/errors";
-import { TauriError } from "@codeman-frontend/shared/lib/ipc";
+import { TauriError } from "@shared/apis";
 
 describe("formatAppError — Schema.TaggedError instances only (ADR-0025 PR 2)", () => {
   const fmt = (e: AppError) => {

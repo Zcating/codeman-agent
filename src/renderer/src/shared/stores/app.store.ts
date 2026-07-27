@@ -8,7 +8,7 @@
 //! - **store 函数返回类型二选一**：`void` 或 `Effect<A, E, never>`。绝不返回 Promise。
 //! - **本模块不接 debounce 逻辑**。`set()` 是同步 state mutation；debounce 由 Settings
 //!   feature 层（`src/features/settings/lib/settings-saver.ts`）用 es-toolkit 实现。
-//! - **D4 硬规则**（ADR-0016）：所有 service 操作（IPC / ProviderService / SettingsService /
+//! - **D4 硬规则**（ADR-0016）：所有 service 操作（IPC / ProviderApi / SettingsApi /
 //!   WorkspaceService）必须包成 store method，组件层只调 `Effect.runPromiseExit(store.method())`。
 //!
 //! 设计要点：
@@ -31,13 +31,13 @@ import { decodeAppError } from "@codeman-frontend/shared/lib/decode-app-error";
 // V3: route IPC through the V3 canonical (window.codeman dispatch) instead of
 // the V2 @tauri-apps/api/core which reads window.__TAURI_INTERNALS__ (missing
 // in V3 Electron).
-import { invoke as ipcInvoke } from "@codeman-frontend/shared/lib/ipc";
 import {
-  ProviderService,
-  ProviderServiceLive,
-  SettingsService,
-  SettingsServiceLive,
-} from "@codeman-frontend/shared/lib/ipc";
+  invoke as ipcInvoke,
+  ProviderApi,
+  ProviderApiLive,
+  SettingsApi,
+  SettingsApiLive,
+} from "@shared/apis";
 import { WorkspaceService, WorkspaceServiceLive } from "@codeman-frontend/shared/lib/workspace-service";
 import { lookupContextWindow } from "@codeman-frontend/features/chat/lib/context-window-fallback";
 // Note: settingsSaver import removed - was used by deprecated addWorkspace method
@@ -139,7 +139,7 @@ const refreshImpl = Effect.fnUntraced(function* () {
  */
 const refreshProviderModelsImpl = Effect.fnUntraced(
   function* (id: string) {
-    const svc = yield* ProviderService;
+    const svc = yield* ProviderApi;
     const models = yield* svc.fetchModels(id);
     // V2.6.1: Backfill contextWindow from three-layer lookup
     const provider = (settings.value.providers ?? []).find((p) => p.id === id);
@@ -167,7 +167,7 @@ const refreshProviderModelsImpl = Effect.fnUntraced(
     });
     return models;
   },
-  Effect.provide(ProviderServiceLive),
+  Effect.provide(ProviderApiLive),
   Effect.mapError((e: unknown) => toAppError(e)),
 );
 
@@ -188,20 +188,20 @@ const deleteProviderImpl = Effect.fnUntraced(
     const providers = (settings.value.providers ?? []).filter((p) => p.id !== id);
     setSettings("value", (prev) => ({ ...prev, providers }));
     // 2. 后端 IPC (V0 占位, 失败不阻塞 — Rust 端无此命令但前端调用不 throw)
-    const svc = yield* ProviderService;
+    const svc = yield* ProviderApi;
     yield* svc.delete(id);
   },
-  Effect.provide(ProviderServiceLive),
+  Effect.provide(ProviderApiLive),
   Effect.mapError((e: unknown) => toAppError(e)),
 );
 
 /** V1.8+ ADR-0016 D4 + D5: 清 SQLite conversation 表。 */
 const clearAllHistoryImpl = Effect.fnUntraced(
   function* () {
-    const svc = yield* SettingsService;
+    const svc = yield* SettingsApi;
     yield* svc.clearAllHistory();
   },
-  Effect.provide(SettingsServiceLive),
+  Effect.provide(SettingsApiLive),
   Effect.mapError((e: unknown) => toAppError(e)),
 );
 

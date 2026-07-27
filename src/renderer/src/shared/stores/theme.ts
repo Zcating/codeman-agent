@@ -8,7 +8,7 @@
 //! - startThemeSync(): void — 幂等；启动轮询 + media listener
 
 import { createSignal, type Accessor } from "solid-js";
-import { getSettingsBridge } from "@codeman-frontend/shared/lib/ipc";
+import { getSettingsBridge } from "@shared/apis";
 
 // 模块级状态 — 在同一 session 内多次调用 startThemeSync() 时保持。
 // 注意：开发环境下从不清理（store 模式中无 onCleanup）。

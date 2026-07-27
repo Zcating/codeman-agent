@@ -478,7 +478,7 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
   });
 
   // ─── J11: deleteProvider() client mutation happens BEFORE IPC call ───
-  // Note: ProviderService.delete() catches errors and returns void on failure,
+  // Note: ProviderApi.delete() catches errors and returns void on failure,
   // so deleteProvider effect always succeeds (Failure is swallowed in provider service layer).
   // J11 verifies client mutation happens before the IPC attempt regardless of outcome.
   it("deleteProvider(id) 客户端变更先于 IPC 调用 — 即使 IPC 报错 provider 也被移除", async () => {
@@ -506,7 +506,7 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     // Even if IPC throws, the client-side state mutation has already happened synchronously
     mockState.rejected = new Error("delete IPC failed");
     const exit = await Effect.runPromiseExit(appStore.deleteProvider("minimax"));
-    // ProviderService.delete catches its own errors → effect still succeeds
+    // ProviderApi.delete catches its own errors → effect still succeeds
     expect(exit._tag).toBe("Success");
     const providers = (appStore.state.value as any).providers;
     expect(providers.length).toBe(0); // client-side deletion already happened before IPC

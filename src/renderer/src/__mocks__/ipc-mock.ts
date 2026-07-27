@@ -310,6 +310,11 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
     // No-op in mock
   },
 
+  deleteProvider(): unknown {
+    // No-op in mock (backend may not implement this yet)
+    return undefined;
+  },
+
   fetchModels(args?: IPCArgs): unknown {
     // Returns current models from settings for the given provider
     const providerId = args?.providerId as string;
@@ -438,7 +443,7 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
 
 // ─── Invoke Mock ────────────────────────────────────────────────
 
-export const invoke = vi.fn().mockImplementation((name: string, args?: IPCArgs) => {
+export const invoke: (name: string, args?: IPCArgs) => Promise<unknown> = vi.fn().mockImplementation((name: string, args?: IPCArgs) => {
   mockState.calls.push(name);
   mockState.callArgs.push({ name, args: args as Record<string, unknown> | undefined });
   mockState.invokeCalls.push({ name, args: args as Record<string, unknown> | undefined });
@@ -478,7 +483,7 @@ export const invoke = vi.fn().mockImplementation((name: string, args?: IPCArgs) 
 });
 
 export { invoke as TauriInvoke };
-export default { invoke };
+export default { invoke } as { invoke: (name: string, args?: IPCArgs) => Promise<unknown> };
 
 // ─── V3: window.codeman Mock ───────────────────────────────────
 //
@@ -487,53 +492,50 @@ export default { invoke };
 // `window.codeman`, so V3 ipc.ts finds the mock at runtime in jsdom tests.
 
 function buildCodemanMock(): Record<string, unknown> {
-  // The renderer (ipc.ts) dispatches each IPC command via a different
-  // window.codeman method (NOT a generic invoke). Each method has a
-  // specific positional signature. The mock reconstructs an args object
-  // matching the V2 invoke(cmd, args) shape so that mockState.callArgs /
-  // invokeCalls / commandHandlers continue to work unchanged.
-  //
-  // Method → (cmd, arg-builder from positional args):
-  const methodToCmd: Record<string, { cmd: string; build: (...a: unknown[]) => Record<string, unknown> }> = {
-    getSettings: { cmd: "getSettings", build: () => ({}) },
-    updateSettings: { cmd: "updateSettings", build: (ns) => ({ newSettings: ns }) },
-    clearAllHistory: { cmd: "clearAllHistory", build: () => ({}) },
-    listConversations: { cmd: "listConversations", build: (ia) => ({ includeArchived: ia }) },
-    getConversation: { cmd: "getConversation", build: (id) => ({ id }) },
-    createConversation: { cmd: "createConversation", build: (a) => a as Record<string, unknown> },
-  archiveConversation: { cmd: "archiveConversation", build: (id) => ({ id }) },
-  deleteConversation: { cmd: "deleteConversation", build: (id) => ({ id }) },
-  renameConversation: { cmd: "renameConversation", build: (id, title) => ({ id, title }) },
-    listMessages: { cmd: "listMessages", build: (cid) => ({ conversationId: cid }) },
-    appendMessage: { cmd: "appendMessage", build: (a) => a as Record<string, unknown> },
-    searchMessages: { cmd: "searchMessages", build: (q, l) => ({ query: q, limit: l }) },
-    listWorkspaces: { cmd: "listWorkspaces", build: () => ({}) },
-    addWorkspace: { cmd: "addWorkspace", build: (l, rp) => ({ label: l, rootPath: rp }) },
-    renameWorkspace: { cmd: "renameWorkspace", build: (id, l) => ({ id, label: l }) },
-    deleteWorkspace: { cmd: "deleteWorkspace", build: (id) => ({ id }) },
-    pickWorkspacePath: { cmd: "pickWorkspacePath", build: () => ({}) },
-    readFile: { cmd: "readFile", build: (wid, p) => ({ workspaceId: wid, path: p }) },
-    writeFile: { cmd: "writeFile", build: (wid, p, c) => ({ workspaceId: wid, path: p, content: c }) },
-    editFile: { cmd: "editFile", build: (wid, p, ot, nt, ra) => ({ workspaceId: wid, path: p, oldText: ot, newText: nt, replaceAll: ra }) },
-    searchFiles: { cmd: "searchFiles", build: (wid, g, cp) => ({ workspaceId: wid, glob: g, contentPattern: cp }) },
-    deleteFile: { cmd: "deleteFile", build: (wid, p) => ({ workspaceId: wid, path: p }) },
-    skillsScan: { cmd: "skillsScan", build: () => ({}) },
-    skillsLoad: { cmd: "skillsLoad", build: (n) => ({ name: n }) },
-    mcpListServers: { cmd: "mcp:list-servers", build: () => ({}) },
-    mcpGetTools: { cmd: "mcp:get-tools", build: (a) => a as Record<string, unknown> },
-    mcpGetAllTools: { cmd: "mcp:get-all-tools", build: () => ({}) },
-    mcpEnable: { cmd: "mcp:enable", build: (a) => a as Record<string, unknown> },
-    mcpRestart: { cmd: "mcp:restart", build: (sn) => ({ serverName: sn }) },
-    mcpCallTool: { cmd: "mcp:call-tool", build: (sn, tn, a) => ({ serverName: sn, toolName: tn, args: a }) },
-    mcpOpenConfigDir: { cmd: "mcp:open-config-dir", build: () => ({}) },
+  // V3.2 IPC contract: every method on window.codeman takes a single
+  // args object (or no args). The mock just passes that object through
+  // to the V2 `invoke` recorder, so `mockState.callArgs` /
+  // `mockState.invokeCalls` / `commandHandlers` continue to work
+  // unchanged. No positional-args reconstruction needed.
+  const methodToCmd: Record<string, { cmd: string }> = {
+    getSettings: { cmd: "getSettings" },
+    updateSettings: { cmd: "updateSettings" },
+    clearAllHistory: { cmd: "clearAllHistory" },
+    listConversations: { cmd: "listConversations" },
+    getConversation: { cmd: "getConversation" },
+    createConversation: { cmd: "createConversation" },
+    archiveConversation: { cmd: "archiveConversation" },
+    deleteConversation: { cmd: "deleteConversation" },
+    renameConversation: { cmd: "renameConversation" },
+    listMessages: { cmd: "listMessages" },
+    appendMessage: { cmd: "appendMessage" },
+    searchMessages: { cmd: "searchMessages" },
+    listWorkspaces: { cmd: "listWorkspaces" },
+    addWorkspace: { cmd: "addWorkspace" },
+    renameWorkspace: { cmd: "renameWorkspace" },
+    deleteWorkspace: { cmd: "deleteWorkspace" },
+    pickWorkspacePath: { cmd: "pickWorkspacePath" },
+    deleteProvider: { cmd: "deleteProvider" },
+    abortRequest: { cmd: "abortRequest" },
+    readFile: { cmd: "readFile" },
+    writeFile: { cmd: "writeFile" },
+    editFile: { cmd: "editFile" },
+    searchFiles: { cmd: "searchFiles" },
+    deleteFile: { cmd: "deleteFile" },
+    skillsScan: { cmd: "skillsScan" },
+    skillsLoad: { cmd: "skillsLoad" },
+    mcpListServers: { cmd: "mcp:list-servers" },
+    mcpGetTools: { cmd: "mcp:get-tools" },
+    mcpGetAllTools: { cmd: "mcp:get-all-tools" },
+    mcpEnable: { cmd: "mcp:enable" },
+    mcpRestart: { cmd: "mcp:restart" },
+    mcpCallTool: { cmd: "mcp:call-tool" },
+    mcpOpenConfigDir: { cmd: "mcp:open-config-dir" },
   };
 
   const codeman: Record<string, unknown> = {};
   for (const [method, mapping] of Object.entries(methodToCmd)) {
-    codeman[method] = (...args: unknown[]) => {
-      const builtArgs = mapping.build(...args);
-      return invoke(mapping.cmd, builtArgs);
-    };
+    codeman[method] = (args?: unknown) => invoke(mapping.cmd, args as Record<string, unknown> | undefined);
   }
   // Native shims (no IPC handler — return resolved Promise for tests).
   codeman.notify = () => Promise.resolve();

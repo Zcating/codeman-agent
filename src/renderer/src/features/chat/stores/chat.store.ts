@@ -21,11 +21,11 @@ import {
   type ProviderConfig,
 } from "@codeman-frontend/features/chat/lib/runtime";
 import {
-  ConversationService,
-  ConversationServiceLive,
-  MessageService,
-  MessageServiceLive,
-} from "@codeman-frontend/shared/lib/ipc";
+  ConversationApi,
+  ConversationApiLive,
+  MessageApi,
+  MessageApiLive,
+} from "@shared/apis";
 import {
   WorkspaceService,
   WorkspaceServiceLive,
@@ -115,26 +115,26 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
 // functions that only return Effect.gen" 改写:
 //  - 复用 generator body(避免每次 sendMessage 重新分配 closure)
 //  - 跳过 trace span(嵌套 span 价值低,加 span 是 noise)
-//  - 提供 MessageServiceLive 通过 fnUntraced 第二参数 transform,与 Effect.provide 同效
+//  - 提供 MessageApiLive 通过 fnUntraced 第二参数 transform,与 Effect.provide 同效
 //
 // 注意:必须 const + module-top,不能 function 声明 — sendMessage 在 line 110
 // 引用这俩,const 没有 hoisting,TDZ 会炸。
 
 const persistUserMessage = Effect.fnUntraced(
   function* (msg: Message) {
-    const svc = yield* MessageService;
+    const svc = yield* MessageApi;
     yield* svc.append({
       conversationId: msg.conversationId,
       role: msg.role,
       content: msg.content,
     });
   },
-  Effect.provide(MessageServiceLive),
+  Effect.provide(MessageApiLive),
 );
 
 const persistAssistantMessage = Effect.fnUntraced(
   function* (msg: Message) {
-    const svc = yield* MessageService;
+    const svc = yield* MessageApi;
     yield* svc.append({
       conversationId: msg.conversationId,
       role: msg.role,
@@ -145,7 +145,7 @@ const persistAssistantMessage = Effect.fnUntraced(
       model: msg.model ?? undefined,
     });
   },
-  Effect.provide(MessageServiceLive),
+  Effect.provide(MessageApiLive),
 );
 
 // ─── sendMessage: append user msg + run + subscribe ───────────
@@ -427,12 +427,12 @@ export function cancel(convId: string): void {
 export const archiveConversation = Effect.fnUntraced(
   function* (convId: string) {
     cancel(convId);
-    const svc = yield* ConversationService;
+    const svc = yield* ConversationApi;
     yield* svc.archive(convId);
     setStore("byId", produce(prev => { delete prev[convId]; }));
     setConversationsSignal(Object.values(store.byId));
   },
-  Effect.provide(ConversationServiceLive),
+  Effect.provide(ConversationApiLive),
 );
 
 // ─── deleteConversation: cancel + 从 store 移除 + DB delete ───
@@ -440,40 +440,40 @@ export const archiveConversation = Effect.fnUntraced(
 export const deleteConversation = Effect.fnUntraced(
   function* (convId: string) {
     cancel(convId);
-    const svc = yield* ConversationService;
+    const svc = yield* ConversationApi;
     yield* svc.delete(convId);
     setStore("byId", produce(prev => { delete prev[convId]; }));
     setConversationsSignal(Object.values(store.byId));
   },
-  Effect.provide(ConversationServiceLive),
+  Effect.provide(ConversationApiLive),
 );
 
 // ─── renameConversation: 更新 title + 刷新 conversations$ ───────
 
 export const renameConversation = Effect.fnUntraced(
   function* (convId: string, newTitle: string) {
-    const svc = yield* ConversationService;
+    const svc = yield* ConversationApi;
     yield* svc.rename(convId, newTitle);
     setStore("byId", produce(prev => { prev[convId].title = newTitle; }));
     setConversationsSignal(Object.values(store.byId));
   },
-  Effect.provide(ConversationServiceLive),
+  Effect.provide(ConversationApiLive),
 );
 
 // ─── loadConversations: DB → byId ─────────────────────────────
 
 export const loadConversations = Effect.fnUntraced(
   function* (includeArchived: boolean = false) {
-    const svc = yield* ConversationService;
+    const svc = yield* ConversationApi;
     const convs = yield* svc.list(includeArchived);
     for (const conv of convs) {
-      const msgSvc = yield* MessageService;
+      const msgSvc = yield* MessageApi;
       const history = yield* msgSvc.list(conv.id);
       setupConvState(conv, history);
     }
   },
-  Effect.provide(ConversationServiceLive),
-  Effect.provide(MessageServiceLive),
+  Effect.provide(ConversationApiLive),
+  Effect.provide(MessageApiLive),
 );
 
 // ─── createConversation: DB 新建 + setupConvState ─────────────
@@ -488,12 +488,12 @@ export const loadConversations = Effect.fnUntraced(
  */
 export const createConversation = Effect.fnUntraced(
   function* (workspaceId: string, title: string, systemPrompt?: string) {
-    const svc = yield* ConversationService;
+    const svc = yield* ConversationApi;
     const conv = yield* svc.create(title, systemPrompt ?? null, workspaceId);
     setupConvState(conv, []);
     return conv.id;
   },
-  Effect.provide(ConversationServiceLive),
+  Effect.provide(ConversationApiLive),
 );
 
 // ─── createAndSendConversation: Home send flow ─────────────────

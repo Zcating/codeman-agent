@@ -8,7 +8,7 @@
 
 import { createSignal, type Accessor } from "solid-js";
 import { Effect } from "effect";
-import { SkillsService, SkillsServiceLive } from "@codeman-frontend/shared/lib/ipc";
+import { SkillsApi, SkillsApiLive } from "@shared/apis";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
 // ─── Signal ─────────────────────────────────────────────
@@ -33,21 +33,21 @@ export function resetManifests(): void {
 /** Wave A5: 从 main process 拉最新 manifest 列表 + 写 store。
  *  IPC 失败时 store 不变 (load 不阻塞), 错误抛回 caller。 */
 export const refreshManifests = Effect.fnUntraced(function* () {
-  const svc = yield* SkillsService;
+  const svc = yield* SkillsApi;
   const fresh = yield* svc.scan();
   setManifestsInternal(fresh);
   return fresh;
-}, Effect.provide(SkillsServiceLive));
+}, Effect.provide(SkillsApiLive));
 
 /** Lifecycle initializer seam for plugin registry — scans skills and updates store.
  *  Returns Effect<void, AppError>; IPC failure leaves state unchanged. */
 export const initializeSkillsManifests = Effect.fnUntraced(
   function* () {
-    const svc = yield* SkillsService;
+    const svc = yield* SkillsApi;
     const fresh = yield* svc.scan();
     setManifestsInternal(fresh);
   },
-  Effect.provide(SkillsServiceLive),
+  Effect.provide(SkillsApiLive),
 );
 
 /** 测试用 — 重置为初始空状态。 */

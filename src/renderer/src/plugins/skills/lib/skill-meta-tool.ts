@@ -10,7 +10,7 @@ import { Effect, Exit, Schema } from "effect";
 import { toToolParameters } from "@codeman-frontend/shared/lib/tool-schema";
 import type { Static } from "@sinclair/typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { SkillsService, SkillsServiceLive } from "@codeman-frontend/shared/lib/ipc";
+import { SkillsApi, SkillsApiLive } from "@shared/apis";
 import { AppError } from "@codeman-frontend/shared/lib/errors";
 
 const LoadSkillParamsSchema = Schema.Struct({
@@ -21,10 +21,10 @@ const loadSkillParams = toToolParameters(LoadSkillParamsSchema);
 
 const loadSkill = Effect.fnUntraced(
   function* (typedArgs: Static<typeof loadSkillParams>) {
-    const svc = yield* SkillsService;
+    const svc = yield* SkillsApi;
     return yield* svc.load(typedArgs.skillName);
   },
-  Effect.provide(SkillsServiceLive),
+  Effect.provide(SkillsApiLive),
 );
 
 export const loadSkillTool: AgentTool<typeof loadSkillParams, string | AppError> = {

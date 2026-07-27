@@ -1,30 +1,13 @@
-//! Tests for V1.5+ ProviderService + V2 WorkspaceService + FileService + SettingsService.
-//! Uses Layer.succeed for mock implementations with it.effect pattern.
-//!
-//! V2: BillingService removed (ADR-0012 reversed) — no billing tests here.
-
+// provider Api IPC 测试，搬迁自 shared/lib/ipc.test.ts
 import { it, expect, beforeEach } from "@effect/vitest";
 import { describe } from "vitest";
 import { Effect, Layer, Exit } from "effect";
 import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 import {
-  invoke,
-  ConversationService,
-  MessageService,
-  ConversationServiceLive,
-  MessageServiceLive,
-  SettingsService,
-  SettingsServiceImpl,
-  ProviderService,
-  FileService,
-  SettingsServiceLive,
-  FileServiceLive,
-  TauriError,
-  getSettingsBridge,
-  updateSettingsBridge,
-  clearAllHistoryBridge,
-} from "@codeman-frontend/shared/lib/ipc";
-import type { Provider } from "@codeman-frontend/shared/lib/types";
+  ProviderApi,
+} from "./provider.api";
+import type { Provider } from "../lib/types";
+import { TauriError } from "./invoke.api";
 
 // ─── Mock Data ────────────────────────────────────────────────
 
@@ -54,7 +37,7 @@ const mockProviderList: Provider[] = [mockProvider];
 
 // ─── Mock Layers ──────────────────────────────────────────────
 
-const MockProviderServiceLive = Layer.succeed(ProviderService, {
+const MockProviderApiLive = Layer.succeed(ProviderApi, {
   list: () => Effect.succeed(mockProviderList.filter((p) => p.enabled)),
   get: (id) => {
     const provider = mockProviderList.find((p) => p.id === id);
@@ -103,16 +86,6 @@ const MockProviderServiceLive = Layer.succeed(ProviderService, {
   delete: () => Effect.succeed(undefined),
 });
 
-const _MockSettingsServiceLive = Layer.succeed(SettingsService, {
-  getSettings: () => invoke("getSettings") as Effect.Effect<any, AppError>,
-  updateSettings: (patch) => invoke("updateSettings", { newSettings: patch }) as Effect.Effect<any, AppError>,
-  clearAllHistory: () => Effect.succeed(undefined),
-  getActiveLlmProvider: () => Effect.succeed(null),
-});
-void _MockSettingsServiceLive;
-
-import type { AppError } from "@codeman-frontend/shared/lib/errors";
-
 beforeEach(() => {
   mockState.calls = [];
   mockState.rejected = undefined;
@@ -136,112 +109,38 @@ beforeEach(() => {
   mockState.v0FixtureActive = false;
 });
 
-describe("ProviderService", () => {
+describe("ProviderApi", () => {
   it.effect("list returns enabled providers", () =>
     Effect.gen(function* () {
-      const svc = yield* ProviderService;
+      const svc = yield* ProviderApi;
       const providers = yield* svc.list();
       expect(providers).toHaveLength(1);
       expect(providers[0].id).toBe("minimax");
-    }).pipe(Effect.provide(MockProviderServiceLive)),
+    }).pipe(Effect.provide(MockProviderApiLive)),
   );
 
   it.effect("get returns provider by id", () =>
     Effect.gen(function* () {
-      const svc = yield* ProviderService;
+      const svc = yield* ProviderApi;
       const provider = yield* svc.get("minimax");
       expect(provider.id).toBe("minimax");
-    }).pipe(Effect.provide(MockProviderServiceLive)),
+    }).pipe(Effect.provide(MockProviderApiLive)),
   );
 
   it.effect("get fails for unknown provider", () =>
     Effect.gen(function* () {
-      const svc = yield* ProviderService;
+      const svc = yield* ProviderApi;
       const exit = yield* Effect.exit(svc.get("nonexistent"));
       expect(Exit.isFailure(exit)).toBe(true);
-    }).pipe(Effect.provide(MockProviderServiceLive)),
+    }).pipe(Effect.provide(MockProviderApiLive)),
   );
 
   it.effect("getModels returns provider models", () =>
     Effect.gen(function* () {
-      const svc = yield* ProviderService;
+      const svc = yield* ProviderApi;
       const models = yield* svc.getModels("minimax");
       expect(models).toHaveLength(1);
       expect(models[0].id).toBe("MiniMax-M2.5-highspeed");
-    }).pipe(Effect.provide(MockProviderServiceLive)),
+    }).pipe(Effect.provide(MockProviderApiLive)),
   );
-});
-
-describe("ConversationService", () => {
-  it.effect("list returns array from IPC", () =>
-    Effect.gen(function* () {
-      const svc = yield* ConversationService;
-      const convos = yield* svc.list(false);
-      expect(Array.isArray(convos)).toBe(true);
-    }).pipe(Effect.provide(ConversationServiceLive)),
-  );
-
-  it.effect("rename forwards to window.codeman.renameConversation with correct args", () =>
-    Effect.gen(function* () {
-      const svc = yield* ConversationService;
-      mockState.invokeCalls = [];
-      yield* svc.rename("conv-123", "New Title");
-      const renameCall = mockState.invokeCalls.find((c) => c.name === "renameConversation");
-      expect(renameCall).toBeDefined();
-      expect(renameCall?.args).toEqual({ id: "conv-123", title: "New Title" });
-    }).pipe(Effect.provide(ConversationServiceLive)),
-  );
-});
-
-describe("MessageService", () => {
-  it.effect("list returns array from IPC", () =>
-    Effect.gen(function* () {
-      const svc = yield* MessageService;
-      const msgs = yield* svc.list("test-conv");
-      expect(Array.isArray(msgs)).toBe(true);
-    }).pipe(Effect.provide(MessageServiceLive)),
-  );
-});
-
-describe("FileService", () => {
-  it.effect("readFile is wired to read_file IPC", () =>
-    Effect.gen(function* () {
-      const svc = yield* FileService;
-      const result = yield* svc.readFile("main", "/tmp/x.txt");
-      // mockState.resolved is undefined by default, so result is undefined
-      expect(result).toBeUndefined();
-    }).pipe(Effect.provide(FileServiceLive)),
-  );
-});
-
-describe("SettingsService", () => {
-  it.effect("getSettings reads from IPC", () =>
-    Effect.gen(function* () {
-      const svc = yield* SettingsService;
-      const settings = yield* svc.getSettings();
-      expect(settings.schemaVersion).toBe("1.5");
-    }).pipe(Effect.provide(SettingsServiceLive)),
-  );
-});
-
-describe("Bridge Functions", () => {
-  it("getSettingsBridge returns current settings", async () => {
-    const settings = await getSettingsBridge();
-    expect(settings.schemaVersion).toBe("1.5");
-  });
-
-  it("updateSettingsBridge patches settings", async () => {
-    const updated = await updateSettingsBridge({ theme: "dark" });
-    expect(updated.theme).toBe("dark");
-  });
-
-  it("clearAllHistoryBridge completes", async () => {
-    await expect(clearAllHistoryBridge()).resolves.toBeUndefined();
-  });
-});
-
-describe("SettingsServiceImpl (compat object)", () => {
-  it("exposes getSettings", () => {
-    expect(typeof SettingsServiceImpl.getSettings).toBe("function");
-  });
 });

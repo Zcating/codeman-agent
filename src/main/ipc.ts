@@ -229,7 +229,7 @@ export function registerIpcHandlers(_deps: {
   loadSettings();
 
   ipcMain.handle("getSettings", () => loadSettings());
-  ipcMain.handle("updateSettings", (_e, args) => {
+  ipcMain.handle("updateSettings", (_e, args: unknown) => {
     // V2 spec convention: args may be { newSettings } OR just the patch object.
     const rawPatch =
       (args && typeof args === "object" && ("newSettings" in args ? (args as { newSettings: unknown }).newSettings : args)) ?? {};
@@ -242,8 +242,8 @@ export function registerIpcHandlers(_deps: {
   });
 
   // Conversations
-  ipcMain.handle("listConversations", (_e, args) => {
-    const include = !!(args && typeof args === "object" && (args as { includeArchived?: boolean }).includeArchived);
+  ipcMain.handle("listConversations", (_e, args: { includeArchived?: boolean } | null | undefined) => {
+    const include = !!(args && typeof args === "object" && args.includeArchived);
     return getConv(include);
   });
   ipcMain.handle("getConversation", (_e, args: { id: string }) => {
@@ -471,16 +471,16 @@ export function registerIpcHandlers(_deps: {
   // 经 qa-loader.ts 读 Q→A 文件);不再走 IPC。
 
   // Native shims
-  ipcMain.handle("setLoginItem", (_e, args) => {
-    app.setLoginItemSettings({ openAtLogin: !!(args && (args as { enabled?: boolean }).enabled) });
+  ipcMain.handle("setLoginItem", (_e, args: { enabled?: boolean } | null | undefined) => {
+    app.setLoginItemSettings({ openAtLogin: !!(args && args.enabled) });
   });
-  ipcMain.handle("notify", (_e, args) => {
-    const title = (args && (args as { title?: string }).title) ?? "";
-    const body = (args && (args as { body?: string }).body) ?? "";
+  ipcMain.handle("notify", (_e, args: { title?: string; body?: string } | null | undefined) => {
+    const title = args?.title ?? "";
+    const body = args?.body ?? "";
     new Notification({ title, body }).show();
   });
-  ipcMain.handle("openExternal", (_e, args) => {
-    const url = (args && (args as { url?: string }).url) ?? "";
+  ipcMain.handle("openExternal", (_e, args: { url?: string } | null | undefined) => {
+    const url = args?.url ?? "";
     return shell.openExternal(url);
   });
   ipcMain.handle("getLogPath", async () => {

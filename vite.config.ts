@@ -29,6 +29,10 @@ export default defineConfig(async () => ({
         find: "@codeman-frontend",
         replacement: resolve(__dirname, "src/renderer/src"),
       },
+      {
+        find: "@shared",
+        replacement: resolve(__dirname, "src/renderer/src/shared"),
+      },
     ],
   },
   test: {
@@ -70,7 +74,7 @@ export default defineConfig(async () => ({
         "src/renderer/src/main.tsx",
         "src/renderer/src/router.tsx",
         "src/renderer/src/features/**/routes/index.tsx",
-        "src/renderer/src/shared/lib/ipc.ts",
+        "src/renderer/src/shared/apis/invoke.api.ts",
         "e2e/**",
         "*.config.ts",
         "src/main/index.ts",

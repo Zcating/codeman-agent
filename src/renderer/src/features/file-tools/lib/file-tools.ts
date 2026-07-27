@@ -1,14 +1,14 @@
 //! File Tools — 5 个 AgentTool 定义（V2 文件 IO，ADR-0013）。
 //!
 //! T11-T15：read_file / write_file / edit_file / search_files / delete_file。
-//! 每个工具调用 FileService 方法，FileService 通过 Effect.provide(Layer) 提供（Effect v3 API）。
+//! 每个工具调用 FileApi 方法，FileApi 通过 Effect.provide(Layer) 提供（Effect v3 API）。
 
 import { Schema } from "effect";
 import { toToolParameters } from "@codeman-frontend/shared/lib/tool-schema";
 import type { Static, TSchema } from "@sinclair/typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Effect, Exit } from "effect";
-import { FileService, FileServiceLive } from "@codeman-frontend/shared/lib/ipc";
+import { FileApi, FileApiLive } from "@shared/apis";
 import { InvalidConfig, Unknown, type AppError } from "@codeman-frontend/shared/lib/errors";
 import type { FileMatch } from "@codeman-frontend/shared/lib/types";
 
@@ -157,10 +157,10 @@ async function runFileEffect<T>(
 const readFile = Effect.fnUntraced(
   function* (typedArgs: Static<typeof readParams>) {
     const workspaceId = yield* requireWorkspaceId(typedArgs);
-    const svc = yield* FileService;
+    const svc = yield* FileApi;
     return yield* svc.readFile(workspaceId, pickArgs(typedArgs, "path"));
   },
-  Effect.provide(FileServiceLive),
+  Effect.provide(FileApiLive),
 );
 
 const readParams = toToolParameters(ReadFileSchema);
@@ -181,14 +181,14 @@ export const readFileTool: AgentTool<typeof readParams, string | AppError> = {
 const writeFile = Effect.fnUntraced(
   function* (typedArgs: Static<typeof writeParams>) {
     const workspaceId = yield* requireWorkspaceId(typedArgs);
-    const svc = yield* FileService;
+    const svc = yield* FileApi;
     return yield* svc.writeFile(
       workspaceId,
       pickArgs(typedArgs, "path"),
       pickArgs(typedArgs, "content"),
     );
   },
-  Effect.provide(FileServiceLive),
+  Effect.provide(FileApiLive),
 );
 
 const writeParams = toToolParameters(WriteFileSchema);
@@ -209,7 +209,7 @@ export const writeFileTool: AgentTool<typeof writeParams, void | AppError> = {
 const editFile = Effect.fnUntraced(
   function* (typedArgs: Static<typeof editParams>) {
     const workspaceId = yield* requireWorkspaceId(typedArgs);
-    const svc = yield* FileService;
+    const svc = yield* FileApi;
     return yield* svc.editFile(
       workspaceId,
       pickArgs(typedArgs, "path"),
@@ -218,7 +218,7 @@ const editFile = Effect.fnUntraced(
       pickArgs(typedArgs, "replaceAll"),
     );
   },
-  Effect.provide(FileServiceLive),
+  Effect.provide(FileApiLive),
 );
 
 const editParams = toToolParameters(EditFileSchema);
@@ -243,14 +243,14 @@ export const editFileTool: AgentTool<typeof editParams, void | AppError> = {
 const searchFiles = Effect.fnUntraced(
   function* (typedArgs: Static<typeof searchParams>) {
     const workspaceId = yield* requireWorkspaceId(typedArgs);
-    const svc = yield* FileService;
+    const svc = yield* FileApi;
     return yield* svc.searchFiles(
       workspaceId,
       pickArgs(typedArgs, "glob"),
       pickArgs(typedArgs, "contentPattern") ?? null,
     );
   },
-  Effect.provide(FileServiceLive),
+  Effect.provide(FileApiLive),
 );
 
 const searchParams = toToolParameters(SearchFilesSchema);
@@ -277,10 +277,10 @@ export const searchFilesTool: AgentTool<typeof searchParams, FileMatch[] | AppEr
 const deleteFile = Effect.fnUntraced(
   function* (typedArgs: Static<typeof deleteParams>) {
     const workspaceId = yield* requireWorkspaceId(typedArgs);
-    const svc = yield* FileService;
+    const svc = yield* FileApi;
     return yield* svc.deleteFile(workspaceId, pickArgs(typedArgs, "path"));
   },
-  Effect.provide(FileServiceLive),
+  Effect.provide(FileApiLive),
 );
 
 const deleteParams = toToolParameters(DeleteFileSchema);
