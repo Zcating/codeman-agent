@@ -21,15 +21,14 @@ export class ProviderService extends Context.Tag("ProviderService")<
 export const ProviderServiceLive = Layer.effect(
   ProviderService,
   Effect.gen(function* () {
-    const getProviders = Effect.tryPromise({
-      try: () => Effect.runPromise(invoke<{ providers: Provider[] }>("getSettings")),
-      catch: (e) => TauriError.IPC(String(e)),
-    });
+    const getProviders = invoke<{ providers: Provider[] }>("getSettings").pipe(
+      Effect.map((s) => s.providers ?? []),
+      Effect.mapError((e) => TauriError.IPC(String(e))),
+    );
 
     const getProvider = (id: string) =>
       Effect.gen(function* () {
-        const result = yield* getProviders;
-        const providers = (result as { providers?: Provider[] }).providers ?? [];
+        const providers = yield* getProviders;
         const provider = providers.find((p) => p.id === id);
         if (!provider) {
           return yield* Effect.fail(TauriError.IPC(`Provider not found: ${id}`));
@@ -40,8 +39,7 @@ export const ProviderServiceLive = Layer.effect(
     return {
       list: () =>
         Effect.gen(function* () {
-          const result = yield* getProviders;
-          const providers = (result as { providers?: Provider[] }).providers ?? [];
+          const providers = yield* getProviders;
           return providers.filter((p) => p.enabled);
         }),
 
@@ -88,13 +86,9 @@ export const ProviderServiceLive = Layer.effect(
         }),
 
       delete: (id) =>
-        Effect.tryPromise({
-          try: () =>
-            Effect.runPromise(invoke<void>("deleteProvider", { id })).catch(
-              () => undefined,
-            ),
-          catch: (e) => TauriError.IPC(`deleteProvider failed: ${String(e)}`),
-        }),
+        invoke<void>("deleteProvider", { id }).pipe(
+          Effect.catchAll(() => Effect.void),
+        ),
     };
   }),
 );

@@ -1,7 +1,7 @@
 //! FileService domain — extracted from ipc.ts for domain split.
 
 import { Effect, Layer, Context } from "effect";
-import { invoke } from "@codeman-frontend/shared/apis/invoke.api";
+import { invoke } from "./invoke.api";
 import type { FileMatch } from "@codeman-frontend/shared/lib/types";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
 

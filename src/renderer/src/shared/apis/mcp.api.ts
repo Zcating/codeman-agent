@@ -4,7 +4,7 @@
 //! mcpEnable, mcpRestart, mcpCallTool, mcpOpenConfigDir.
 
 import { Effect, Layer, Context } from "effect";
-import { invoke } from "@codeman-frontend/shared/apis/invoke.api";
+import { invoke } from "./invoke.api";
 import type {
   McpServerInfo,
   McpTool,

@@ -3,7 +3,7 @@
 //! Wraps the 2 skills IPC channels: skillsScan, skillsLoad.
 
 import { Effect, Layer, Context } from "effect";
-import { invoke } from "@codeman-frontend/shared/apis/invoke.api";
+import { invoke } from "./invoke.api";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
 
