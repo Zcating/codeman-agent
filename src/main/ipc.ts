@@ -220,6 +220,21 @@ function matchGlob(relPath: string, glob: string): boolean {
   return new RegExp(`^${escaped}$`).test(relPath);
 }
 
+// ─── editFile pattern validation ────────────────────────────────────
+
+export function checkPatternMatch(oldText: string, replaceAll: boolean, path: string, content: string): { kind: "ok" | "notFound" | "ambiguous"; message?: string } {
+  const occurrences = content.split(oldText).length - 1;
+  const snippet = oldText.length > 200 ? oldText.slice(0, 200) + "..." : oldText;
+  const quoted = JSON.stringify(snippet);
+  if (occurrences === 0) {
+    return { kind: "notFound", message: `Pattern not found in ${path}. Searched for: ${quoted}` };
+  }
+  if (occurrences > 1 && !replaceAll) {
+    return { kind: "ambiguous", message: `Pattern matches ${occurrences} times in ${path}. Searched for: ${quoted}. Use replaceAll=true or make the pattern more specific.` };
+  }
+  return { kind: "ok" };
+}
+
 // ─── Handler registration ──────────────────────────────────────────
 
 export function registerIpcHandlers(_deps: {
@@ -433,20 +448,16 @@ export function registerIpcHandlers(_deps: {
     const ws = await getWorkspaceById(wsId);
     await writeFileInWorkspace(ws.root_path, args.path, args.content);
   }));
+
   ipcMain.handle("editFile", sandboxHandler(async (_e, args: { workspaceId?: string; path: string; oldText: string; newText: string; replaceAll?: boolean }) => {
     dbInit();
     const wsId = args.workspaceId ?? "";
     const ws = await getWorkspaceById(wsId);
     const abs = await validatePathInWorkspace(args.path, ws.root_path);
     const content = await readFile(abs, "utf-8");
-    const occurrences = content.split(args.oldText).length - 1;
-    if (occurrences === 0) {
-      throw new Error(`Pattern not found in ${args.path}`);
-    }
-    if (occurrences > 1 && !args.replaceAll) {
-      throw new Error(
-        `Pattern matches ${occurrences} times — use replaceAll or be more specific (must match exactly once)`,
-      );
+    const match = checkPatternMatch(args.oldText, args.replaceAll ?? false, args.path, content);
+    if (match.message) {
+      throw new Error(match.message);
     }
     const newContent = args.replaceAll
       ? content.split(args.oldText).join(args.newText)
