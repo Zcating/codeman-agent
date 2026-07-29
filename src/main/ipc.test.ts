@@ -162,3 +162,49 @@ describe("T3 — src/main/ipc.ts", () => {
     expect(typeof handler).toBe("function");
   });
 });
+
+describe("checkPatternMatch helper", () => {
+  it("returns notFound when content has no occurrences", async () => {
+    const { checkPatternMatch } = await import("./ipc");
+    const result = checkPatternMatch("needle", false, "/fake/path.txt", "no match here");
+    expect(result.kind).toBe("notFound");
+    expect(result.message).toBeDefined();
+    expect(result.message).toContain("/fake/path.txt");
+    expect(result.message).toContain("needle");
+  });
+
+  it("returns ambiguous when content has 2+ occurrences and replaceAll=false", async () => {
+    const { checkPatternMatch } = await import("./ipc");
+    const result = checkPatternMatch("needle", false, "/fake/path.txt", "needle and needle again");
+    expect(result.kind).toBe("ambiguous");
+    expect(result.message).toBeDefined();
+    expect(result.message).toContain("/fake/path.txt");
+    expect(result.message).toContain("needle");
+    expect(result.message).toContain("2");
+  });
+
+  it("returns ok when content has exactly 1 occurrence", async () => {
+    const { checkPatternMatch } = await import("./ipc");
+    const result = checkPatternMatch("needle", false, "/fake/path.txt", "found my needle here");
+    expect(result.kind).toBe("ok");
+    expect(result.message).toBeUndefined();
+  });
+
+  it("returns ok when content has 2+ occurrences and replaceAll=true", async () => {
+    const { checkPatternMatch } = await import("./ipc");
+    const result = checkPatternMatch("needle", true, "/fake/path.txt", "needle and needle again");
+    expect(result.kind).toBe("ok");
+    expect(result.message).toBeUndefined();
+  });
+
+  it("truncates oldText longer than 200 chars and includes ... in message", async () => {
+    const { checkPatternMatch } = await import("./ipc");
+    const longPattern = "a".repeat(250);
+    const result = checkPatternMatch(longPattern, false, "/fake/path.txt", "no match");
+    expect(result.kind).toBe("notFound");
+    expect(result.message).toContain("...");
+    // The snippet should be 200 chars + "..."
+    expect(result.message).toContain("a".repeat(200));
+    expect(result.message).not.toContain("a".repeat(201));
+  });
+});
