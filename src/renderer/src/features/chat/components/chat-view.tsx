@@ -16,6 +16,13 @@
 //! V2.7 (ADR-0037): textarea + slash menu 合并为 `<ComboTextarea>`。移除
 //! `useSlashTrigger` + `<SlashMenu>` + `handleSkillSelect` + `enabledSkills`
 //! memo(部分保留用于传入 ComboTextarea 的 skills prop)。
+//!
+//! V2.8 (2026-07-29, 决议自 `/prototype/chat-textarea-fixed` route A): messages wrapper
+//! 重新拥有 `overflow-y-auto`(撤销 V2.7.1 "Bug B" 把滚动移到 SidebarInset 的修复)。
+//! 用户反馈"下方 textarea 不要连带滚动",需要 form 与 messages 在不同滚动上下文;
+//! Variant A(内嵌滚动)以"messages 自己滚,form sibling 占底部"实现,改动最小。
+//! 副作用:SidebarInset 仍带 `overflow-y-auto`,但因 ConversationRoute 的内容恰好占满
+//! 视口高度,outer 滚动不再触发 — 嵌套滚动仅在 messages 自身高度溢出时激活。
 
 import { createEffect, createMemo, For, Show, onMount, type JSX } from "solid-js";
 import { Effect, Exit } from "effect";
@@ -240,7 +247,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
 
   return (
     <>
-      <div class="flex-1 min-h-0 p-4 space-y-3">
+      <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
         <For each={currentMessages()}>{(m) => <MessageBubble message={m} />}</For>
         <div ref={messagesEndRef} />
       </div>

@@ -899,30 +899,35 @@ describe("ChatView Scroll: 首次进入对话不应动画滚动", () => {
   });
 });
 
-// ─── Bug B fix regression: ChatView nested scroll removal ───────────────────
-// Approved fix: remove overflow-y-auto from ChatView messages wrapper.
-// Root cause: nested scroll — ChatView messages wrapper owned overflow-y-auto, and
-// SidebarInset (the parent scroll container) did not. Fix moves overflow-y-auto to
-// SidebarInset and removes it from ChatView messages wrapper so a single scroll
-// context is owned by the parent (SidebarInset).
-describe("ChatView nested scroll fix (Bug B)", () => {
+// ─── V2.8 (revert Bug B): ChatView messages wrapper owns its scroll ──────────
+// 2026-07-29: User feedback "下方 textarea 固定,不连带滚动" — re-adopted Variant A
+// from /prototype/chat-textarea-fixed (inner scroll). Messages wrapper owns
+// overflow-y-auto so it scrolls independently of the form (form is a sibling,
+// fixed at bottom by flex layout). The earlier "Bug B" removal of inner scroll
+// is reversed by deliberate design decision, not regression.
+describe("ChatView inner scroll (V2.8, Variant A from /prototype/chat-textarea-fixed)", () => {
   afterEach(() => cleanup());
 
-  it("Bug: messages wrapper should NOT own overflow-y-auto (scroll handled by parent SidebarInset)", () => {
+  it("V2.8: messages wrapper owns overflow-y-auto so it scrolls independently of the form", () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
-    // The messages wrapper is the div containing MessageBubble components.
-    // It has class "flex-1 min-h-0 overflow-y-auto p-4 space-y-3" — after fix,
-    // it must NOT have overflow-y-auto (the scroll context moves to SidebarInset).
     const messagesWrapper = container.querySelector("div.flex-1.min-h-0");
     expect(messagesWrapper).toBeTruthy();
-    expect(messagesWrapper!.className).not.toContain("overflow-y-auto");
+    expect(messagesWrapper!.className).toContain("overflow-y-auto");
   });
 
-  it("Bug: messages wrapper still has min-h-0 (allows it to shrink within flex parent)", () => {
+  it("V2.8: messages wrapper still has min-h-0 (allows it to shrink within flex parent)", () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
     const messagesWrapper = container.querySelector("div.flex-1.min-h-0");
     expect(messagesWrapper).toBeTruthy();
     expect(messagesWrapper!.className).toContain("min-h-0");
+  });
+
+  it("V2.8: textarea is a SIBLING of messages wrapper (not nested inside scrollable area)", () => {
+    const { container } = render(() => <ChatView convId="conv-1" />);
+    const messagesWrapper = container.querySelector("div.flex-1.min-h-0");
+    expect(messagesWrapper).toBeTruthy();
+    const textareaInsideScroll = messagesWrapper!.querySelector("textarea");
+    expect(textareaInsideScroll).toBeNull();
   });
 });
 
