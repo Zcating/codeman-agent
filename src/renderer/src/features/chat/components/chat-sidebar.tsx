@@ -242,13 +242,6 @@ export function ChatSidebar(): JSX.Element {
       renderMenu={renderMenu}
       currentValue={selectedConvId() ?? undefined}
       isActive={isActive}
-      // onMenuGroupSelect intentionally omitted: per ADR-0023 D7-CS,
-      // workspaces are NEVER navigation targets — only convs are. Clicking a
-      // workspace label should ONLY toggle its accordion (handled by
-      // CodemanSidebar's triggerOnClick), NOT navigate to /conversation/{wsId}
-      // (which is a non-existent conv route and was a user-reported page-jump
-      // bug 2026-07-25). CodemanSidebar's `props.onMenuGroupSelect?.()` short-circuits
-      // to a no-op when undefined, so this is the contract for "pure toggle".
       onMenuSelect={handleSelectConv}
       onEmptyGroupClick={handleEmptyWorkspaceClick}
       header={
