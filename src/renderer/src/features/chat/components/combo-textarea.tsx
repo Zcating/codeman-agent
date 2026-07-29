@@ -78,7 +78,6 @@ interface TriggerState {
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-const POPOVER_WIDTH = 320;
 const POPOVER_HEIGHT = 320;
 
 // ─── SlashMenuItem (private) ───────────────────────────────────────────────────
@@ -351,7 +350,7 @@ export function ComboTextarea(props: ComboTextareaProps): JSX.Element {
           <PopoverContent
             class="p-0 overflow-hidden"
             style={{
-              width: `${POPOVER_WIDTH}px`,
+              width: `${wrapperEl?.getBoundingClientRect().width ?? 0}px`,
               height: `${POPOVER_HEIGHT}px`,
             }}
           >

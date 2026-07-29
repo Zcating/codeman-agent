@@ -288,4 +288,22 @@ describe("ComboTextarea — selection", () => {
     );
     expect(queryByTestId("slash-menu")).toBeNull();
   });
+
+  it("popover width tracks the textarea wrapper width (not hardcoded 320px)", () => {
+    // Override the global mock from beforeEach so every element — including
+    // the textarea wrapper that ComboTextarea reads width from — reports
+    // 640px instead of 320px.
+    vi.mocked(Element.prototype.getBoundingClientRect).mockReturnValue(
+      new DOMRect(50, 100, 640, 50),
+    );
+
+    const { queryByTestId } = render(() => <TestWrapper initialValue="/" />);
+    expect(queryByTestId("slash-menu")).toBeInTheDocument();
+
+    const popoverContent = document.querySelector(
+      '[data-slot="popover-content"]',
+    ) as HTMLElement | null;
+    expect(popoverContent).not.toBeNull();
+    expect(popoverContent!.style.width).toBe("640px");
+  });
 });
