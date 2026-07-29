@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from "effect";
-import { invoke as ipcInvoke, type CodemanApi } from "@shared/apis";
+import { invoke as ipcInvoke, type CodemanApi } from "@codeman-frontend/shared/apis";
 import { logger } from "@codeman-frontend/shared/lib/logger";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
 import type { Workspace } from "@codeman-frontend/shared/lib/types";
@@ -23,7 +23,7 @@ export class WorkspaceService extends Context.Tag("WorkspaceService")<WorkspaceS
   readonly rename: (id: string, label: string) => Effect.Effect<void, AppError>;
   readonly remove: (id: string) => Effect.Effect<void, AppError>;
   readonly pickPath: () => Effect.Effect<string | null, AppError>;
-}>() {}
+}>() { }
 
 // V3 IPC: dispatch through shared/apis/invoke.api.ts (window.codeman) instead
 // of V2 @tauri-apps/api/core (which reads window.__TAURI_INTERNALS__.invoke,

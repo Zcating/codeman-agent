@@ -12,7 +12,7 @@
 //!   }
 import { Cause } from "effect";
 import { isAppError, type AppError } from "@codeman-frontend/shared/lib/errors";
-import type { TauriError } from "@shared/apis";
+import type { TauriError } from "@codeman-frontend/shared/apis";
 
 /** 把 Effect Cause 拍平成人类可读字符串，保留错误判别信息（_tag 或 kind）。 */
 export function formatAppError(cause: Cause.Cause<AppError | TauriError>): string {

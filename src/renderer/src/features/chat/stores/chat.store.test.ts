@@ -30,7 +30,7 @@ import type { RuntimeEvent, ProviderConfig } from "@codeman-frontend/features/ch
 
 // ─── Mock tauri services ─────────────────────────────────────────────
 
-vi.mock("@shared/apis", async () => {
+vi.mock("@codeman-frontend/shared/apis", async () => {
   const { Layer, Effect: E } = await import("effect");
   const {
     MessageApi,
@@ -38,8 +38,8 @@ vi.mock("@shared/apis", async () => {
     ProviderApi,
     SettingsApi,
     SkillsApi,
-  } = await vi.importActual<typeof import("@shared/apis")>(
-    "@shared/apis",
+  } = await vi.importActual<typeof import("@codeman-frontend/shared/apis")>(
+    "@codeman-frontend/shared/apis",
   );
   return {
     MessageApi,
@@ -186,7 +186,7 @@ vi.mock("../../../shared/lib/workspace-service", async () => {
 vi.mock("../lib/runtime", () => ({
   createAgentRuntime: () => ({
     run: () => Stream.fromIterable([]),
-    cancel: () => {},
+    cancel: () => { },
   }),
 }));
 
@@ -1046,7 +1046,7 @@ describe("sendMessage — G10: 处理 error event → console.error", () => {
   it("sendMessage() 在 error event 时调用 console.error", async () => {
     await createRoot(async (dispose) => {
       setupConvState(mockConv, []);
-      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => { });
       const events: RuntimeEvent[] = [{ type: "error", error: { message: "Something went wrong" } }];
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
       await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
@@ -1071,7 +1071,7 @@ describe("sendMessage — G12: 当 runtime stream 失败时 → console.error", 
   it("sendMessage() 当 runtime stream 失败时调用 console.error", async () => {
     await createRoot(async (dispose) => {
       setupConvState(mockConv, []);
-      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => { });
       // Create a stream that fails - use 'any' cast since run is mocked anyway
       const failStream = Stream.fail(new Error("Stream failed")) as any;
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(failStream);
@@ -1089,7 +1089,7 @@ describe("sendMessage — Bug B: RuntimeEvent 'error' sets store.byId[convId].la
   it("G25: 收到 {type:'error', error:{message:'X'}} 时 lastError = 'X'，且 streamingMessageId 清空", async () => {
     await createRoot(async (dispose) => {
       setupConvState(mockConv, []);
-      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => { });
 
       // Runtime emits a single error event then ends — via Stream.make
       const errorStream = Stream.make({

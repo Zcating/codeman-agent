@@ -37,7 +37,7 @@ import {
   ProviderApiLive,
   SettingsApi,
   SettingsApiLive,
-} from "@shared/apis";
+} from "@codeman-frontend/shared/apis";
 import { WorkspaceService, WorkspaceServiceLive } from "@codeman-frontend/shared/lib/workspace-service";
 import { lookupContextWindow } from "@codeman-frontend/features/chat/lib/context-window-fallback";
 // Note: settingsSaver import removed - was used by deprecated addWorkspace method

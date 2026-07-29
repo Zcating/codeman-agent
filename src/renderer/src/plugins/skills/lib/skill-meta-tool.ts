@@ -10,7 +10,7 @@ import { Effect, Exit, Schema } from "effect";
 import { toToolParameters } from "@codeman-frontend/shared/lib/tool-schema";
 import type { Static } from "@sinclair/typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
-import { SkillsApi, SkillsApiLive } from "@shared/apis";
+import { SkillsApi, SkillsApiLive } from "@codeman-frontend/shared/apis";
 import { AppError } from "@codeman-frontend/shared/lib/errors";
 
 const LoadSkillParamsSchema = Schema.Struct({

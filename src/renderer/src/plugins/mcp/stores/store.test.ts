@@ -9,7 +9,7 @@ import {
   _resetMcpStoreForTest,
   initializeMcp,
 } from "@codeman-frontend/plugins/mcp/stores/store";
-import { McpApi } from "@shared/apis";
+import { McpApi } from "@codeman-frontend/shared/apis";
 import { Unknown } from "@codeman-frontend/shared/lib/errors";
 import type { McpServerInfo, McpToolEntry } from "@codeman-frontend/shared/lib/types";
 

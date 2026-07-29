@@ -29,10 +29,6 @@ export default defineConfig(async () => ({
         find: "@codeman-frontend",
         replacement: resolve(__dirname, "src/renderer/src"),
       },
-      {
-        find: "@shared",
-        replacement: resolve(__dirname, "src/renderer/src/shared"),
-      },
     ],
   },
   test: {

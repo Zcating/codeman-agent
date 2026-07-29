@@ -25,7 +25,7 @@ import {
   ConversationApiLive,
   MessageApi,
   MessageApiLive,
-} from "@shared/apis";
+} from "@codeman-frontend/shared/apis";
 import {
   WorkspaceService,
   WorkspaceServiceLive,
@@ -203,7 +203,7 @@ export const sendMessage = Effect.fnUntraced(
           `${provider.systemPrompt}\n\n` +
           `[Workspace context]\n` +
           `You are operating inside workspaceId="${cs.workspaceId}".\n` +
-           `You MUST pass this exact id as the workspaceId parameter for ALL file tools ` +
+          `You MUST pass this exact id as the workspaceId parameter for ALL file tools ` +
           `(read_file, write_file, edit_file, search_files, delete_file).\n` +
           `Do NOT infer the id from user messages, folder names, or any other context — ` +
           `use ONLY the id given above.`,
@@ -416,7 +416,7 @@ export function cancel(convId: string): void {
   // between cancel() and the error event handler, causing D2 ("Cancel → Send 按钮恢复")
   // to flake in CI environments with slower Effect fiber scheduling.
   const cs = store.byId[convId];
-  if (!cs) {return;}
+  if (!cs) { return; }
   cs.runtime.cancel();
   setStore("byId", convId, "streamingMessageId", null);
   setConversationsSignal(Object.values(store.byId));
@@ -553,7 +553,7 @@ export const loadWorkspaces = Effect.fnUntraced(
 export const addWorkspace = Effect.fnUntraced(
   function* () {
     const rootPath = yield* pickWorkspacePath();
-    if (rootPath === null) {return null;}
+    if (rootPath === null) { return null; }
     const label = deriveLabelFromPath(rootPath);
     const svc = yield* WorkspaceService;
     const result = yield* svc.add(label, rootPath);
@@ -572,7 +572,7 @@ export const removeWorkspace = Effect.fnUntraced(
     // CASCADE deletes conversations with this workspaceId in SQLite
     setStore("workspaces", (ws) => ws.filter((w) => w.id !== id));
     setWorkspacesSignal(Object.values(store.workspaces));
-    if (selectedWorkspaceId() === id) {setSelectedWorkspaceIdSignal(null);}
+    if (selectedWorkspaceId() === id) { setSelectedWorkspaceIdSignal(null); }
   },
   Effect.provide(WorkspaceServiceLive),
 );

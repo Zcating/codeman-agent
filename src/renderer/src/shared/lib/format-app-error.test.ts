@@ -13,12 +13,12 @@ import {
   Unknown as UnknownErr,
   type AppError as NewAppError,
 } from "@codeman-frontend/shared/lib/errors";
-import { TauriError } from "@shared/apis";
+import { TauriError } from "@codeman-frontend/shared/apis";
 
 describe("formatAppError — Schema.TaggedError instances only (ADR-0025 PR 2)", () => {
   const fmt = (e: AppError) => {
     const exit = Effect.runSyncExit(Effect.fail(e));
-    if (exit._tag !== "Failure") {throw new Error("expected failure");}
+    if (exit._tag !== "Failure") { throw new Error("expected failure"); }
     return formatAppError(exit.cause);
   };
 
@@ -62,7 +62,7 @@ describe("formatAppError — Schema.TaggedError instances only (ADR-0025 PR 2)",
 describe("formatAppError — new Schema.TaggedError instances (ADR-0025 PR1)", () => {
   const fmt = (e: NewAppError) => {
     const exit = Effect.runSyncExit(Effect.fail(e));
-    if (exit._tag !== "Failure") {throw new Error("expected failure");}
+    if (exit._tag !== "Failure") { throw new Error("expected failure"); }
     return formatAppError(exit.cause);
   };
 
@@ -103,7 +103,7 @@ describe("formatAppError — new Schema.TaggedError instances (ADR-0025 PR1)", (
 describe("formatAppError — TauriError fallback (ADR-0025 review Hard #3)", () => {
   it("TauriError falls back to 'IPC: <message>' format", () => {
     const exit = Effect.runSyncExit(Effect.fail(TauriError.IPC("connection refused")));
-    if (exit._tag !== "Failure") {throw new Error("expected failure");}
+    if (exit._tag !== "Failure") { throw new Error("expected failure"); }
     expect(formatAppError(exit.cause)).toBe("IPC: connection refused");
   });
 });

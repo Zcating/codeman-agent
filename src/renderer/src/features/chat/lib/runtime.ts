@@ -33,7 +33,7 @@ import { formatSkillsManifestSection } from "@codeman-frontend/plugins/skills/li
 import { loadSkillTool } from "@codeman-frontend/plugins/skills/lib/skill-meta-tool";
 import { mcpAllTools$ } from "@codeman-frontend/plugins/mcp/stores/store";
 import type { McpToolEntry } from "@codeman-frontend/shared/lib/types";
-import { McpApi, McpApiLive } from "@shared/apis";
+import { McpApi, McpApiLive } from "@codeman-frontend/shared/apis";
 import {
   isTextBlock,
   isThinkingBlock,
@@ -78,7 +78,7 @@ function buildMcpTools(entries: readonly McpToolEntry[]): AgentTool<TSchema, unk
           details: err,
         };
       }
-      const result = exit.value as { content: Array<{ type: string; text?: string; [k: string]: unknown }> };
+      const result = exit.value as { content: Array<{ type: string; text?: string;[k: string]: unknown }> };
       return {
         content: result.content.map((block) => {
           if (block.type === "text" && block.text !== undefined) {
@@ -325,7 +325,7 @@ function handleTurnEnd(
 /** Flatten pi-ai ToolResultMessage.content (Content[]) to chat.store ToolResult.result.
  *  Text-only results stay as string; mixed results JSON-stringify. */
 function extractResultContent(content: unknown): unknown {
-  if (!Array.isArray(content)) {return content;}
+  if (!Array.isArray(content)) { return content; }
   const textBlocks = content.filter(
     (b): b is { type: "text"; text: string } =>
       !!b && typeof b === "object" && (b as { type?: unknown }).type === "text",

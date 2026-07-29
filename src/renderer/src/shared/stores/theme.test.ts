@@ -9,7 +9,7 @@ import type { Settings } from "@codeman-frontend/shared/lib/types";
 // Mutable mock settings — 在每个测试导入前设置
 let mockTheme: Settings["theme"] = "dark";
 
-vi.mock("@shared/apis", () => ({
+vi.mock("@codeman-frontend/shared/apis", () => ({
   getSettingsBridge: async (): Promise<Settings> => ({
     llmProviders: [],
     userLanguage: "en",
@@ -83,8 +83,8 @@ describe("startThemeSync — .dark 类应用", () => {
       value: vi.fn().mockReturnValue({
         matches: false,
         media: "(prefers-color-scheme: dark)",
-        addEventListener: () => {},
-        removeEventListener: () => {},
+        addEventListener: () => { },
+        removeEventListener: () => { },
       }),
     });
   });
@@ -97,8 +97,8 @@ describe("startThemeSync — .dark 类应用", () => {
       value: vi.fn().mockReturnValue({
         matches: false,
         media: "(prefers-color-scheme: dark)",
-        addEventListener: () => {},
-        removeEventListener: () => {},
+        addEventListener: () => { },
+        removeEventListener: () => { },
       }),
     });
 
@@ -158,7 +158,7 @@ describe("startThemeSync — .dark 类应用", () => {
         addEventListener: (_: string, listener: (e: MediaQueryListEvent) => void) => {
           listenerRegistry.push(listener);
         },
-        removeEventListener: (_: string) => {},
+        removeEventListener: (_: string) => { },
       }),
     });
 
@@ -187,7 +187,7 @@ describe("startThemeSync — .dark 类应用", () => {
         addEventListener: (_: string, listener: (e: MediaQueryListEvent) => void) => {
           listenerRegistry.push(listener);
         },
-        removeEventListener: () => {},
+        removeEventListener: () => { },
       }),
     });
 
@@ -218,7 +218,7 @@ describe("startThemeSync — .dark 类应用", () => {
         },
         removeEventListener: (_: string, listener: (e: MediaQueryListEvent) => void) => {
           const idx = listenerRegistry.indexOf(listener);
-          if (idx !== -1) {listenerRegistry.splice(idx, 1);}
+          if (idx !== -1) { listenerRegistry.splice(idx, 1); }
         },
       }),
     });

@@ -8,7 +8,7 @@ import { toToolParameters } from "@codeman-frontend/shared/lib/tool-schema";
 import type { Static, TSchema } from "@sinclair/typebox";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { Effect, Exit } from "effect";
-import { FileApi, FileApiLive } from "@shared/apis";
+import { FileApi, FileApiLive } from "@codeman-frontend/shared/apis";
 import { InvalidConfig, Unknown, type AppError } from "@codeman-frontend/shared/lib/errors";
 import type { FileMatch } from "@codeman-frontend/shared/lib/types";
 
