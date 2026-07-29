@@ -36,3 +36,17 @@ proposed
 - DB schema 变化（`messages` 表字段不动）。
 - 旧 session history 迁移（DB 里现存的跨轮聚合 message 保留原状不动）。
 - runtime events 协议升级到 ts-pattern / 6 变体类型签名（那是 V3.1 已落地的，跟本次 boundary 决策正交）。
+
+## 后续：V2.8 拆分 per-turn stub 与 per-message running 状态
+
+ADR-0028 让 `streamingMessageId`「1 turn 1 stub」（`done` 时清 → 下一 turn 创建新 stub），正确实现了多 turn 任务独立 stub。但 `done` 同时清 `streamingMessageId` 也成了 chat-view `isRunning()` 唯一的真值信号，导致多 turn 场景下中间 `done` 触发会让 UI isRunning 在 turn 间抖动（Stop → Send → Stop → Send）。
+
+**V2.8（chat-view V2.8，2026-07-29）**：拆出 `isAgentActive: boolean` 作为 per-message running 信号。`done` 仍清 `streamingMessageId`（per-turn 行为不变，符合 ADR-0028 决策），但**不**碰 `isAgentActive`。`isAgentActive` 由 sendMessage 起始置 true，由新增的 `message_stop` RuntimeEvent 变体（runtime 在 `agent_end` 时 emit）置 false。chat-view 的 `isRunning()` 改读 `isAgentActive`，Send/Stop 按钮只在 message 真正结束时切一次，不在中间 turn 间抖动。
+
+新增变体：
+
+```ts
+| { type: "message_stop" }  // V2.8: agent_end 时 emit; chat.store 清 isAgentActive
+```
+
+详见 `src/renderer/src/features/chat/lib/runtime.ts` 的 `handleAgentEnd` 注释与 `chat.store.ts` 的 `ConversationState.isAgentActive` 字段。

@@ -1,8 +1,8 @@
-//! ChatView — 消息列表 + 输入框 + store 订阅 (V2.5, ADR-0029)。
+//! ChatView — 消息列表 + 输入框 + store 订阅 (V2.5+, ADR-0029; V2.8 见末尾)。
 //!
 //! V2.5 (ADR-0029): 从 `createSignal` + 原生 `<form onSubmit>` 切换到 `@tanstack/solid-form`
 //! 的 `createForm` + 2 个 `form.Field`（`draft` / `modelId`）。running 状态由 `isRunning()`
-//! 派生；form-level `disabled` 在 streaming 时切，Cancel 按钮渲染为 form 外部 sibling。
+//! 派生；form-level `disabled` 在 streaming 时切。
 //!
 //! V2 ADR-0019: 不再 import messages.store / agent.store, 全部走 chat.store。
 //! V2.5 (ADR-0029 D5): 移除 inline `role="alert" data-testid="chat-error-banner"` banner，
@@ -23,10 +23,20 @@
 //! Variant A(内嵌滚动)以"messages 自己滚,form sibling 占底部"实现,改动最小。
 //! 副作用:SidebarInset 仍带 `overflow-y-auto`,但因 ConversationRoute 的内容恰好占满
 //! 视口高度,outer 滚动不再触发 — 嵌套滚动仅在 messages 自身高度溢出时激活。
+//!
+//! V2.8 (2026-07-29, 来自 `fix/chat-view-merge-send-cancel`): Send/Cancel 按钮
+//! 合并到同一位置 — running 时 Send 切 Stop (`type=button`, `variant=destructive`,
+//! `<Square>` 图标, "停止"),通过 `<Show when={isRunning()} fallback={Send}>` 切换。
+//! 覆盖 ADR-0029 D3/D6 "Cancel 必须为 form 外部 sibling" 的旧约束。
+//!
+//! V2.8 同步: `isRunning()` 改读 `ConversationState.isAgentActive` (per-message)
+//! 而非 `streamingMessageId` (per-turn)。多 turn 场景下 turn 间不再抖动,
+//! Send/Stop 按钮只在 `message_stop` (对应 agent_end) 切回 Send。详见
+//! ADR-0028 末尾 V2.8 关联说明。
 
 import { createEffect, createMemo, For, Show, onMount, type JSX } from "solid-js";
 import { Effect, Exit } from "effect";
-import { X, Send } from "lucide-solid";
+import { Square, Send } from "lucide-solid";
 import { createForm } from "@tanstack/solid-form";
 import { MessageBubble } from "@codeman-frontend/features/chat/components/message-bubble";
 import { store, sendMessage, cancel } from "@codeman-frontend/features/chat/stores/chat.store";
@@ -122,10 +132,13 @@ export function ChatView(props: { convId?: string }): JSX.Element {
   const isRunning = (): boolean => {
     const id = convId();
     if (!id) { return false; }
-    return (
-      store.byId[id]?.streamingMessageId !== null &&
-      store.byId[id]?.streamingMessageId !== undefined
-    );
+    // V2.8: 读 isAgentActive 而非 streamingMessageId。streamingMessageId 是
+    // per-turn stub id(`done` 时清,turn 切换时让下一个 token 创建新 stub),
+    // 多 turn 场景下中间 done 会让 streamingMessageId 在 turn 间反复 null 切换
+    // → isRunning 抖动 → Send/Stop 按钮闪。isAgentActive 是 per-message 信号
+    // (sendMessage 起始 = true,message_stop/error/cancel = false),只在真正
+    // 整条 message 结束时才转 false,Send/Stop 切换只在边界发生一次。
+    return store.byId[id]?.isAgentActive === true;
   };
 
   const currentMessages = () => {
@@ -367,7 +380,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
               totalTokens={ringInfo().total}
             />
 
-            {/* Submit button — disabled when form not submittable OR running */}
+            {/* V2.8: Send/Stop 同位置切换 — running 时变 Stop(type=button, destructive) */}
             <form.Subscribe
               selector={(state) => ({
                 canSubmit: state.canSubmit,
@@ -375,34 +388,34 @@ export function ChatView(props: { convId?: string }): JSX.Element {
               })}
             >
               {(sub) => (
-                <Button
-                  type="submit"
-                  disabled={!sub().canSubmit || isRunning()}
-                  aria-label="发送消息"
+                <Show
+                  when={isRunning()}
+                  fallback={
+                    <Button
+                      type="submit"
+                      disabled={!sub().canSubmit || isRunning()}
+                      aria-label="发送消息"
+                    >
+                      {sub().isSubmitting ? "提交中…" : "发送"}
+                      <Send class="h-4 w-4" />
+                    </Button>
+                  }
                 >
-                  {sub().isSubmitting ? "提交中…" : "发送"}
-                  <Send class="h-4 w-4" />
-                </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleCancel}
+                    aria-label="停止运行"
+                  >
+                    停止
+                    <Square class="h-4 w-4" />
+                  </Button>
+                </Show>
               )}
             </form.Subscribe>
           </div>
         </div>
       </form>
-
-      {/* Cancel button — form-external sibling (per ADR-0029 D6) */}
-      <Show when={isRunning()}>
-        <div class="flex justify-end p-2 border-t border-border bg-card">
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={handleCancel}
-            aria-label="取消运行"
-          >
-            取消
-            <X class="h-4 w-4" />
-          </Button>
-        </div>
-      </Show>
     </>
   );
 }

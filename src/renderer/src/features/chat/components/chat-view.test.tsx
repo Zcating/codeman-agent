@@ -2,7 +2,7 @@
 //!
 //! Mocked: conversations store (V2 ADR-0019，不再 mock messages.store / agent.store）。
 
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach, beforeAll } from "vitest";
 import { render, cleanup, fireEvent, waitFor } from "@solidjs/testing-library";
 import { For } from "solid-js";
 import { Effect } from "effect";
@@ -114,6 +114,7 @@ vi.mock("../stores/chat.store", () => ({
           },
         ] as Message[],
         streamingMessageId: null,
+        isAgentActive: false,
         runtime: { run: vi.fn(), cancel: vi.fn() },
       },
       "conv-err": {
@@ -125,6 +126,7 @@ vi.mock("../stores/chat.store", () => ({
         archivedAt: null,
         messages: [],
         streamingMessageId: null,
+        isAgentActive: false,
         lastError: "AnthropicTransport: 缺 apiKey",
         runtime: { run: vi.fn(), cancel: vi.fn() },
       },
@@ -229,8 +231,32 @@ vi.mock(import("@codeman-frontend/features/chat/lib/runtime"), async (importOrig
   };
 });
 
+// Module-level reference to the mock store so afterEach can reset shared state.
+// vi.mock hoists, so we can resolve the mock via dynamic import in beforeAll,
+// then use the cached reference across afterEach calls.
+let mockConversationsStore: { store: { byId: Record<string, { streamingMessageId: string | null; isAgentActive: boolean }> } } | undefined;
+
 describe("ChatView", () => {
-  afterEach(() => cleanup());
+  beforeAll(async () => {
+    mockConversationsStore = (await import("@codeman-frontend/features/chat/stores/chat.store")) as unknown as typeof mockConversationsStore;
+  });
+
+  afterEach(() => {
+    cleanup();
+    // Reset module-scoped mock store state to prevent pollution between tests.
+    // streamingMessageId + isAgentActive both control chat-view rendering and
+    // the form submit handler's early-return, so any leaked true state breaks
+    // unrelated tests.
+    if (mockConversationsStore) {
+      for (const convId of ["conv-1", "conv-err"]) {
+        const cs = mockConversationsStore.store.byId[convId];
+        if (cs) {
+          cs.streamingMessageId = null;
+          cs.isAgentActive = false;
+        }
+      }
+    }
+  });
 
   it("从 store.byId[convId].messages 渲染消息列表", () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
@@ -249,15 +275,13 @@ describe("ChatView", () => {
     expect(submitBtn).toBeDisabled();
   });
 
-  it("运行中状态显示 Cancel 按钮", async () => {
+  it("V2.8:idle 时渲染 Send 按钮(running 形态测试见下方)", () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
-    // 运行状态在组件内部 - 我们测试当 isRunning() 为 true 时，
-    // Cancel 按钮替代 Send 按钮出现。我们可以验证初始状态显示 "发送"。
     const submitBtn = container.querySelector('button[type="submit"]');
-    expect(submitBtn?.textContent).toBe("发送");
-    // 当运行时，按钮会通过 <Show> fallback 变为 "取消"。Cancel 按钮有 aria-label="取消运行"。
-    const cancelBtn = container.querySelector('button[aria-label="取消运行"]');
-    expect(cancelBtn).toBeNull(); // 初始时无 cancel 按钮
+    expect(submitBtn?.textContent).toContain("发送");
+    // V2.8:合并后,idle 时不存在任何 Stop/Cancel 形态按钮
+    expect(container.querySelector('button[aria-label="停止运行"]')).toBeNull();
+    expect(container.querySelector('button[aria-label="取消运行"]')).toBeNull();
   });
 
   it("tool 角色的消息渲染工具结果", () => {
@@ -488,29 +512,58 @@ describe("ChatView", () => {
     });
   });
 
-  // ─── handleCancel 测试 ───────────────────────────────────────────────
-  it("handleCancel 调 cancel(convId)", async () => {
+  // ─── V2.8 Send/Stop 合并按钮测试 (覆盖 ADR-0029 D3/D6) ───────────────
+  it("idle 状态:Send 位置渲染 type=submit 的发送按钮", () => {
+    const { container } = render(() => <ChatView convId="conv-1" />);
+    const sendBtn = container.querySelector('button[aria-label="发送消息"]') as HTMLButtonElement;
+    expect(sendBtn).toBeTruthy();
+    expect(sendBtn.getAttribute("type")).toBe("submit");
+    // idle 时不存在运行中的 Stop 按钮
+    expect(container.querySelector('button[aria-label="停止运行"]')).toBeNull();
+  });
+
+  it("running 状态:Send 位置切换为 type=button 的 Stop 按钮,无独立取消按钮", async () => {
+    const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
+    const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null; isAgentActive: boolean }> } }).store;
+    mockStore.byId["conv-1"].streamingMessageId = "msg-streaming";
+    mockStore.byId["conv-1"].isAgentActive = true;
+    const { container } = render(() => <ChatView convId="conv-1" />);
+    // 同位置只有 Stop 按钮(不再有独立 Cancel sibling,不再有 submit 按钮)
+    const stopBtn = container.querySelector('button[aria-label="停止运行"]') as HTMLButtonElement;
+    expect(stopBtn).toBeTruthy();
+    expect(stopBtn.getAttribute("type")).toBe("button");
+    expect(stopBtn.textContent).toContain("停止");
+    // running 时不再渲染 idle 的 Send 按钮
+    expect(container.querySelector('button[aria-label="发送消息"]')).toBeNull();
+    // 旧的独立 Cancel sibling 已移除
+    expect(container.querySelector('button[aria-label="取消运行"]')).toBeNull();
+  });
+
+  it("handleCancel 调 cancel(convId) — 点击 Stop 按钮触发取消", async () => {
     const user = (await import("@testing-library/user-event")).default;
     const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
     // Reset cancel mock and set streaming state
     (conversationsStoreMock as unknown as { cancel: ReturnType<typeof vi.fn> }).cancel.mockClear();
-    const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null }> } }).store;
+    const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null; isAgentActive: boolean }> } }).store;
     mockStore.byId["conv-1"].streamingMessageId = "msg-streaming";
+    mockStore.byId["conv-1"].isAgentActive = true;
     const { container } = render(() => <ChatView convId="conv-1" />);
-    // Cancel button appears when streaming; use aria-label selector to avoid provider-select-trigger
-    const cancelBtn = container.querySelector('button[aria-label="取消运行"]') as HTMLButtonElement;
-    expect(cancelBtn).toBeTruthy();
-    await user.click(cancelBtn);
+    // 合并后,取消按钮 = Stop 按钮(同位置)
+    const stopBtn = container.querySelector('button[aria-label="停止运行"]') as HTMLButtonElement;
+    expect(stopBtn).toBeTruthy();
+    await user.click(stopBtn);
     expect((conversationsStoreMock as unknown as { cancel: ReturnType<typeof vi.fn> }).cancel).toHaveBeenCalledWith("conv-1");
   });
 
   // ─── thinking indicator 测试 (W3.x 已移除 — WX-OPT-2026-07-16 页面优化) ──────
   it("thinking indicator 已移除 — streaming + 空内容场景不再渲染", async () => {
     const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
-    const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null; messages: Message[] }> } }).store;
+    const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null; isAgentActive: boolean; messages: Message[] }> } }).store;
     // Reset streaming state first, then set fresh
     mockStore.byId["conv-1"].streamingMessageId = null;
+    mockStore.byId["conv-1"].isAgentActive = false;
     mockStore.byId["conv-1"].streamingMessageId = "msg-streaming";
+    mockStore.byId["conv-1"].isAgentActive = true;
     // Set last message content to empty string (原 thinking indicator 触发条件)
     mockStore.byId["conv-1"].messages[mockStore.byId["conv-1"].messages.length - 1].content = "";
     const { container } = render(() => <ChatView convId="conv-1" />);

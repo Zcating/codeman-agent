@@ -47,7 +47,15 @@ export interface ConversationState {
   archivedAt: number | null;
   // Per-conv reactive state
   messages: Message[];
+  // 当前 turn 的 streaming stub id。`done`(per-turn)时清;`token`/`thinking`
+  // 首个 event 时 lazy-init。**不**是 UI running 状态的唯一信号 — 见 isAgentActive。
   streamingMessageId: string | null;
+  // V2.8: agent 整体是否仍在工作 (per-message 状态)。
+  // 与 streamingMessageId 拆开:多 turn 场景下 turn-1 done 后 stub 已被替换
+  // (streamingMessageId 须清,否则 turn-2 token 会 append 到 turn-1 消息),
+  // 但 agent 还在工作 (isAgentActive=true) → UI isRunning() 仍为 true,
+  // Send/Stop 按钮不抖动。仅 message_stop / error / cancel 清。
+  isAgentActive: boolean;
   // Bug B: 上次 runtime error 的人读消息，null 表示无错误。
   // 任何 send 成功（type:'done'）后清空。
   lastError: string | null;
@@ -98,6 +106,7 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
     archivedAt: conv.archivedAt,
     messages: history,
     streamingMessageId: null,
+    isAgentActive: false,
     lastError: null,
     runtime,
   };
@@ -173,6 +182,11 @@ export const sendMessage = Effect.fnUntraced(
     };
     setStore("byId", convId, "messages", (msgs) => [...msgs, userMsg]);
     yield* persistUserMessage(userMsg);
+
+    // V2.8: mark agent as active BEFORE first event arrives. isAgentActive is
+    // the per-message running signal (cleared by message_stop / error / cancel).
+    // streamingMessageId is the per-turn stub id (cleared by done / cancel).
+    setStore("byId", convId, "isAgentActive", true);
 
     // 2. Build context (浅拷贝,含最新 user msg)
     const context = [...store.byId[convId]!.messages];
@@ -385,21 +399,37 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
           );
         }
       }
+      // V2.8: `done` (per-turn, ADR-0028) 保留 stub 替换 + 内容累积 + 持久化。
+      // **清** streamingMessageId(否则 turn-2 的 token 会 append 到 turn-1 的
+      // finalized 消息 — stubId 仍指向 turn-1,`msgs.map(m => m.id === stubId ...)`
+      // 会命中 turn-1)。
+      // **不**碰 isAgentActive — agent 整体还在工作(可能还有 turn-2、turn-3)。
+      // 真正的 per-message 终止由 `message_stop` (在 `agent_end` 时 emit) 接管,
+      // 它会清 isAgentActive → isRunning() → Send/Stop 按钮恢复 Send。
       setStore("byId", convId, "streamingMessageId", null);
-      // Notify sidebar re: streaming ended (triggers conversations$ update → badge removal)
       setConversationsSignal(Object.values(store.byId));
       Effect.runPromise(persistAssistantMessage({ ...evt.message, conversationId: convId })).catch((err) =>
         logger.error("[chat.store] persistAssistantMessage failed:", err),
       );
       break;
     }
+    case "message_stop": {
+      // V2.8: per-message 终止信号(对应 agent_end)。清 isAgentActive +
+      // streamingMessageId → isRunning() → Send/Stop 按钮恢复 Send。
+      // 同步清,UI 立即看到 non-running 状态(参考 e2e spec 09 D2 经验)。
+      setStore("byId", convId, "streamingMessageId", null);
+      setStore("byId", convId, "isAgentActive", false);
+      setConversationsSignal(Object.values(store.byId));
+      break;
+    }
     case "error":
       // 不论 cancel 还是真实 LLM 错误,都从 error path 进来。
-      // 这里必须清 streamingMessageId,否则 UI 永远 stuck in "running" 状态
+      // 必须清 streamingMessageId + isAgentActive,否则 UI 永远 stuck in "running" 状态
       // (Cancel 按钮不消失,Send 按钮不恢复 — e2e spec 09 D2 失败的原因)。
       // Bug B: 同步写 lastError，UI 渲染红色 banner 提示用户 (而非静默)。
       logger.error("[chat.store] runtime error:", evt.error);
       setStore("byId", convId, "streamingMessageId", null);
+      setStore("byId", convId, "isAgentActive", false);
       setStore("byId", convId, "lastError", evt.error.message);
       setConversationsSignal(Object.values(store.byId));
       break;
@@ -409,16 +439,18 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
 // ─── cancel: 调 runtime.cancel() 中断 in-flight stream ───────
 
 export function cancel(convId: string): void {
-  // Bug B fix (e2e spec 09 D2): synchronously clear streamingMessageId so the UI
-  // (chat-view's isRunning() + sidebar's isStreaming badge) sees the conv as non-streaming
-  // IMMEDIATELY after cancel(), without waiting for the error event to propagate through
-  // the Effect fiber. Without this, the textarea stays disabled for ~1 render frame
-  // between cancel() and the error event handler, causing D2 ("Cancel → Send 按钮恢复")
-  // to flake in CI environments with slower Effect fiber scheduling.
+  // Bug B fix (e2e spec 09 D2): synchronously clear streamingMessageId + isAgentActive
+  // so the UI (chat-view's isRunning() + sidebar's isStreaming badge) sees the conv as
+  // non-streaming IMMEDIATELY after cancel(), without waiting for the error event to
+  // propagate through the Effect fiber. Without this, the textarea stays disabled for
+  // ~1 render frame between cancel() and the error event handler, causing D2
+  // ("Cancel → Send 按钮恢复") to flake in CI environments with slower Effect fiber
+  // scheduling. V2.8: also clear isAgentActive (the per-message running signal).
   const cs = store.byId[convId];
   if (!cs) { return; }
   cs.runtime.cancel();
   setStore("byId", convId, "streamingMessageId", null);
+  setStore("byId", convId, "isAgentActive", false);
   setConversationsSignal(Object.values(store.byId));
 }
 
