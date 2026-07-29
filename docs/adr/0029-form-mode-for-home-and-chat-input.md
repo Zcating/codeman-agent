@@ -56,6 +56,8 @@ ChatView 当 `isRunning()` 时：
 
 "form = 提交候选态" 与 "Cancel = 取消候选态" 显式分属不同 element，避免 `<Show fallback={Cancel}>` 在两种 button type 间隐式翻转。
 
+> **2026-07-29 V2.8 覆盖**：Send/Cancel 合并为同一位置的 `<Show when={isRunning()} fallback={Send}>` 切换 — running 时 Send 变 Stop（`type=button`, `variant=destructive`, `<Square>` 图标, "停止"）。原 D3/D6 的"Cancel 必须为 form 外部 sibling"约束已**不适用**。决策见 `src/renderer/src/features/chat/components/chat-view.tsx` 头部 V2.8 注释与 `chat-view.test.tsx` 三个 Send/Stop 形态测试。
+
 ### D4 — onSubmit 内联（不抽 submitDraft helper），覆盖到 step 3 dispatch
 
 两个 form 的 `onSubmit = async ({ value }) => { ... }` 各自内联全部 3 步（provider card 模板的 onSubmit 也是内联），不抽 helper 函数：
@@ -97,6 +99,8 @@ ChatView 既有 inline `<div role="alert" data-testid="chat-error-banner">` 删�
 - handleCancel 调用 `cancel(convId)` (`chat.store`)，不动 form 状态
 
 Cancel button 的存在条件：`Show when={isRunning()}`（不是 fallback）— 因为 "running 时才出现 cancel" 而不是 "非 running 时才出现 send"，语义更清晰。
+
+> **2026-07-29 V2.8 覆盖**：合并后不存在独立的 Cancel sibling。Send/Stop 在原 Send 位置用 `<Show when={isRunning()} fallback={Send}>` 切换，running 时按钮 `aria-label="停止运行"`、`<Square>` 图标、"停止" 文案、`onClick={handleCancel}`。原 D6 完整语义由 chat-view.tsx V2.8 实现接管。
 
 ### D7 — 输入历史 + IME 安全保留
 
