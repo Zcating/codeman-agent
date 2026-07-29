@@ -116,11 +116,11 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
   return cs;
 }
 
-// ─── DB 持久化辅助 (Effect.fnUntraced) ───────────────────────────────
+// ─── DB 持久化辅助 (Effect.fn) ───────────────────────────────
 //
 // 与公共 store API (sendMessage / archiveConversation / ...) 不同,这两个是
 // sendMessage 的紧耦合内部分支,嵌套在已 traced 的 sendMessage span 内。
-// 按上游 .repos/effect/.patterns/effect.md "Prefer Effect.fnUntraced over
+// 按上游 .repos/effect/.patterns/effect.md "Prefer Effect.fn over
 // functions that only return Effect.gen" 改写:
 //  - 复用 generator body(避免每次 sendMessage 重新分配 closure)
 //  - 跳过 trace span(嵌套 span 价值低,加 span 是 noise)
@@ -129,7 +129,7 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
 // 注意:必须 const + module-top,不能 function 声明 — sendMessage 在 line 110
 // 引用这俩,const 没有 hoisting,TDZ 会炸。
 
-const persistUserMessage = Effect.fnUntraced(
+const persistUserMessage = Effect.fn(
   function* (msg: Message) {
     const svc = yield* MessageApi;
     yield* svc.append({
@@ -141,7 +141,7 @@ const persistUserMessage = Effect.fnUntraced(
   Effect.provide(MessageApiLive),
 );
 
-const persistAssistantMessage = Effect.fnUntraced(
+const persistAssistantMessage = Effect.fn(
   function* (msg: Message) {
     const svc = yield* MessageApi;
     yield* svc.append({
@@ -159,7 +159,7 @@ const persistAssistantMessage = Effect.fnUntraced(
 
 // ─── sendMessage: append user msg + run + subscribe ───────────
 
-export const sendMessage = Effect.fnUntraced(
+export const sendMessage = Effect.fn(
   function* (convId: string, content: string, provider: ProviderConfig) {
     const cs = store.byId[convId];
     if (!cs) {
@@ -456,7 +456,7 @@ export function cancel(convId: string): void {
 
 // ─── archiveConversation: cancel + 从 store 移除 + DB archive ──
 
-export const archiveConversation = Effect.fnUntraced(
+export const archiveConversation = Effect.fn(
   function* (convId: string) {
     cancel(convId);
     const svc = yield* ConversationApi;
@@ -469,7 +469,7 @@ export const archiveConversation = Effect.fnUntraced(
 
 // ─── deleteConversation: cancel + 从 store 移除 + DB delete ───
 
-export const deleteConversation = Effect.fnUntraced(
+export const deleteConversation = Effect.fn(
   function* (convId: string) {
     cancel(convId);
     const svc = yield* ConversationApi;
@@ -482,7 +482,7 @@ export const deleteConversation = Effect.fnUntraced(
 
 // ─── renameConversation: 更新 title + 刷新 conversations$ ───────
 
-export const renameConversation = Effect.fnUntraced(
+export const renameConversation = Effect.fn(
   function* (convId: string, newTitle: string) {
     const svc = yield* ConversationApi;
     yield* svc.rename(convId, newTitle);
@@ -494,7 +494,7 @@ export const renameConversation = Effect.fnUntraced(
 
 // ─── loadConversations: DB → byId ─────────────────────────────
 
-export const loadConversations = Effect.fnUntraced(
+export const loadConversations = Effect.fn(
   function* (includeArchived: boolean = false) {
     const svc = yield* ConversationApi;
     const convs = yield* svc.list(includeArchived);
@@ -518,7 +518,7 @@ export const loadConversations = Effect.fnUntraced(
  * @param title - 会话标题
  * @param systemPrompt - 可选，覆盖 settings.system_prompt.default
  */
-export const createConversation = Effect.fnUntraced(
+export const createConversation = Effect.fn(
   function* (workspaceId: string, title: string, systemPrompt?: string) {
     const svc = yield* ConversationApi;
     const conv = yield* svc.create(title, systemPrompt ?? null, workspaceId);
@@ -554,7 +554,7 @@ export function createAndSendConversation(
 
 // ─── Workspace CRUD (D8-W) ──────────────────────────────────────────
 
-export const pickWorkspacePath = Effect.fnUntraced(
+export const pickWorkspacePath = Effect.fn(
   function* () {
     const svc = yield* WorkspaceService;
     return yield* svc.pickPath();
@@ -562,7 +562,7 @@ export const pickWorkspacePath = Effect.fnUntraced(
   Effect.provide(WorkspaceServiceLive),
 );
 
-export const loadWorkspaces = Effect.fnUntraced(
+export const loadWorkspaces = Effect.fn(
   function* () {
     const svc = yield* WorkspaceService;
     const result = yield* svc.list();
@@ -582,7 +582,7 @@ export const loadWorkspaces = Effect.fnUntraced(
   Effect.provide(WorkspaceServiceLive),
 );
 
-export const addWorkspace = Effect.fnUntraced(
+export const addWorkspace = Effect.fn(
   function* () {
     const rootPath = yield* pickWorkspacePath();
     if (rootPath === null) { return null; }
@@ -597,7 +597,7 @@ export const addWorkspace = Effect.fnUntraced(
   Effect.provide(WorkspaceServiceLive),
 );
 
-export const removeWorkspace = Effect.fnUntraced(
+export const removeWorkspace = Effect.fn(
   function* (id: string) {
     const svc = yield* WorkspaceService;
     yield* svc.remove(id);
@@ -609,7 +609,7 @@ export const removeWorkspace = Effect.fnUntraced(
   Effect.provide(WorkspaceServiceLive),
 );
 
-export const renameWorkspace = Effect.fnUntraced(
+export const renameWorkspace = Effect.fn(
   function* (id: string, label: string) {
     const svc = yield* WorkspaceService;
     yield* svc.rename(id, label);

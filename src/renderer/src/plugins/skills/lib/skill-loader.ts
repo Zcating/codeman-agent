@@ -64,7 +64,7 @@ function detectSource(skillDir: string): SkillSource {
  * - corrupt frontmatter / 缺字段 / 读失败 → 静默跳过
  * - 非目录条目(散文件)→ 跳过
  */
-export const scanSkillsDir = Effect.fnUntraced(function* (skillsDir: string) {
+export const scanSkillsDir = Effect.fn(function* (skillsDir: string) {
 	// ENOENT → succeed([]), 其它 IO 错误 → fail(InvalidConfig)。
 	// catchAll 在 tryPromise 失败时调用, 转换失败为成功或另一个失败。
 	const entries: Dirent[] = yield* Effect.tryPromise({
@@ -115,7 +115,7 @@ export const scanSkillsDir = Effect.fnUntraced(function* (skillsDir: string) {
  * 读取 skill 完整 SKILL.md 内容(含 frontmatter) — 供 `_load_skill` meta-tool 使用。
  * skill 不存在 → NotFound; 读错误 → InvalidConfig。
  */
-export const loadSkillContent = Effect.fnUntraced(function* (
+export const loadSkillContent = Effect.fn(function* (
 	skillsDir: string,
 	skillName: string,
 ) {

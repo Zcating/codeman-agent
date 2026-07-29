@@ -154,7 +154,7 @@ async function runFileEffect<T>(
 // Tool Definitions
 // ============================================================================
 
-const readFile = Effect.fnUntraced(
+const readFile = Effect.fn(
   function* (typedArgs: Static<typeof readParams>) {
     const workspaceId = yield* requireWorkspaceId(typedArgs);
     const svc = yield* FileApi;
@@ -178,7 +178,7 @@ export const readFileTool: AgentTool<typeof readParams, string | AppError> = {
   },
 };
 
-const writeFile = Effect.fnUntraced(
+const writeFile = Effect.fn(
   function* (typedArgs: Static<typeof writeParams>) {
     const workspaceId = yield* requireWorkspaceId(typedArgs);
     const svc = yield* FileApi;
@@ -206,7 +206,7 @@ export const writeFileTool: AgentTool<typeof writeParams, void | AppError> = {
   },
 };
 
-const editFile = Effect.fnUntraced(
+const editFile = Effect.fn(
   function* (typedArgs: Static<typeof editParams>) {
     const workspaceId = yield* requireWorkspaceId(typedArgs);
     const svc = yield* FileApi;
@@ -240,7 +240,7 @@ export const editFileTool: AgentTool<typeof editParams, void | AppError> = {
   },
 };
 
-const searchFiles = Effect.fnUntraced(
+const searchFiles = Effect.fn(
   function* (typedArgs: Static<typeof searchParams>) {
     const workspaceId = yield* requireWorkspaceId(typedArgs);
     const svc = yield* FileApi;
@@ -274,7 +274,7 @@ export const searchFilesTool: AgentTool<typeof searchParams, FileMatch[] | AppEr
   },
 };
 
-const deleteFile = Effect.fnUntraced(
+const deleteFile = Effect.fn(
   function* (typedArgs: Static<typeof deleteParams>) {
     const workspaceId = yield* requireWorkspaceId(typedArgs);
     const svc = yield* FileApi;

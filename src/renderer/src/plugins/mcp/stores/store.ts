@@ -73,7 +73,7 @@ export function openConfigDir() {
  * Unlike `refresh`, this leaves prior signal state unchanged if loading fails,
  * allowing the registry to handle MCP failures without corrupting existing state.
  */
-export const initializeMcp = Effect.fnUntraced(
+export const initializeMcp = Effect.fn(
   function* () {
     const svc = yield* McpApi;
     const servers = yield* svc.listServers();

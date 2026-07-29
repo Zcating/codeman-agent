@@ -23,7 +23,7 @@ Choose the structure that best fits the content. Common patterns:
 ## <file path>
 **Purpose**: <one line>
 **Key exports**: <list>
-**Notable patterns**: <list, e.g. "uses Effect.fnUntraced", "subscribes to stream">
+**Notable patterns**: <list, e.g. "uses Effect.fn", "subscribes to stream">
 **Caveats**: <list, if any>
 ```
 

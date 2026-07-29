@@ -19,7 +19,7 @@ const LoadSkillParamsSchema = Schema.Struct({
 
 const loadSkillParams = toToolParameters(LoadSkillParamsSchema);
 
-const loadSkill = Effect.fnUntraced(
+const loadSkill = Effect.fn(
   function* (typedArgs: Static<typeof loadSkillParams>) {
     const svc = yield* SkillsApi;
     return yield* svc.load(typedArgs.skillName);

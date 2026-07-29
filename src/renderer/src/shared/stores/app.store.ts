@@ -117,13 +117,13 @@ function toAppError(e: unknown): AppError {
 // ("An object could not be cloned"). Shallow spread `{ ...settings.value }`
 // is NOT enough because nested arrays/objects remain Proxies. JSON
 // round-trip produces a fully plain object tree that structured-clones.
-const flushImpl = Effect.fnUntraced(function* () {
+const flushImpl = Effect.fn(function* () {
   yield* ipcInvoke("updateSettings", {
     newSettings: JSON.parse(JSON.stringify(settings.value)),
   });
 });
 
-const refreshImpl = Effect.fnUntraced(function* () {
+const refreshImpl = Effect.fn(function* () {
   const fresh = yield* ipcInvoke<Settings>("getSettings");
   setSettings("value", fresh);
   return fresh;
@@ -137,7 +137,7 @@ const refreshImpl = Effect.fnUntraced(function* () {
  *  若数组为空 → 改 `""`
  *  已经在数组里 → 不动
  */
-const refreshProviderModelsImpl = Effect.fnUntraced(
+const refreshProviderModelsImpl = Effect.fn(
   function* (id: string) {
     const svc = yield* ProviderApi;
     const models = yield* svc.fetchModels(id);
@@ -172,7 +172,7 @@ const refreshProviderModelsImpl = Effect.fnUntraced(
 );
 
 /** V1.8+ ADR-0016 D4: 弹 OS folder picker，返回选中路径或 null。 */
-const pickWorkspacePathImpl = Effect.fnUntraced(
+const pickWorkspacePathImpl = Effect.fn(
   function* () {
     const svc = yield* WorkspaceService;
     return yield* svc.pickPath();
@@ -182,7 +182,7 @@ const pickWorkspacePathImpl = Effect.fnUntraced(
 );
 
 /** V1.8+ ADR-0016 D4: 从 providers[] 移除指定记录 + 触发后端 delete IPC (V0 占位)。 */
-const deleteProviderImpl = Effect.fnUntraced(
+const deleteProviderImpl = Effect.fn(
   function* (id: string) {
     // 1. client-side state mutation (实际删除)
     const providers = (settings.value.providers ?? []).filter((p) => p.id !== id);
@@ -196,7 +196,7 @@ const deleteProviderImpl = Effect.fnUntraced(
 );
 
 /** V1.8+ ADR-0016 D4 + D5: 清 SQLite conversation 表。 */
-const clearAllHistoryImpl = Effect.fnUntraced(
+const clearAllHistoryImpl = Effect.fn(
   function* () {
     const svc = yield* SettingsApi;
     yield* svc.clearAllHistory();

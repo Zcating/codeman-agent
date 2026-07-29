@@ -32,7 +32,7 @@ export function resetManifests(): void {
 
 /** Wave A5: 从 main process 拉最新 manifest 列表 + 写 store。
  *  IPC 失败时 store 不变 (load 不阻塞), 错误抛回 caller。 */
-export const refreshManifests = Effect.fnUntraced(function* () {
+export const refreshManifests = Effect.fn(function* () {
   const svc = yield* SkillsApi;
   const fresh = yield* svc.scan();
   setManifestsInternal(fresh);
@@ -41,7 +41,7 @@ export const refreshManifests = Effect.fnUntraced(function* () {
 
 /** Lifecycle initializer seam for plugin registry — scans skills and updates store.
  *  Returns Effect<void, AppError>; IPC failure leaves state unchanged. */
-export const initializeSkillsManifests = Effect.fnUntraced(
+export const initializeSkillsManifests = Effect.fn(
   function* () {
     const svc = yield* SkillsApi;
     const fresh = yield* svc.scan();

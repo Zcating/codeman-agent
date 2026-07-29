@@ -47,7 +47,7 @@ Produce a structured review with these sections (skip empty ones):
    - Null / undefined handling
    - Type errors (especially `as any` / `@ts-ignore` — flag immediately)
 2. **Effect-TS patterns** (this project uses Effect-TS):
-   - Business functions not wrapped in `Effect.fnUntraced`
+   - Business functions not wrapped in `Effect.fn`
    - Errors not extending `AppError` via `Schema.TaggedError`
    - Schemas not using `effect/Schema` (`Schema.Struct`, `Schema.brand`, `Schema.filter`)
    - Empty `catch` blocks (`catch(e) {}`)
