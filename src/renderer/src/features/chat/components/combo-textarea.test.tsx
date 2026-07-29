@@ -306,4 +306,33 @@ describe("ComboTextarea — selection", () => {
     expect(popoverContent).not.toBeNull();
     expect(popoverContent!.style.width).toBe("640px");
   });
+
+  it("popover width is not stolen by an empty PopoverAnchor (0px wide)", () => {
+    // Production scenario: <PopoverAnchor> is an empty inline-block div with
+    // 0 width. ComboTextarea used to share wrapperEl between the textarea
+    // wrapper div and the PopoverAnchor (see <div ref={wrapperEl}> +
+    // <PopoverAnchor ref={wrapperEl} />). When PopoverAnchor mounted it
+    // reassigned wrapperEl to the empty anchor div, so the popover width
+    // ended up at 0px instead of matching its textarea. The fix gives
+    // PopoverAnchor its own ref so the wrapperEl ref keeps pointing at the
+    // textarea wrapper div.
+    vi.mocked(Element.prototype.getBoundingClientRect).mockImplementation(
+      function (this: Element): DOMRect {
+        const el = this as HTMLElement;
+        if (el.matches('[data-slot="popover-anchor"]')) {
+          return new DOMRect(50, 100, 0, 50);
+        }
+        return new DOMRect(50, 100, 640, 50);
+      },
+    );
+
+    const { queryByTestId } = render(() => <TestWrapper initialValue="/" />);
+    expect(queryByTestId("slash-menu")).toBeInTheDocument();
+
+    const popoverContent = document.querySelector(
+      '[data-slot="popover-content"]',
+    ) as HTMLElement | null;
+    expect(popoverContent).not.toBeNull();
+    expect(popoverContent!.style.width).toBe("640px");
+  });
 });

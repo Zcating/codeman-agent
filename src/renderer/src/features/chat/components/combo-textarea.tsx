@@ -173,6 +173,7 @@ export function ComboTextarea(props: ComboTextareaProps): JSX.Element {
   // Refs
   let textareaEl: HTMLTextAreaElement | null = null;
   let wrapperEl: HTMLDivElement | undefined;
+  let anchorEl: HTMLDivElement | undefined;
 
   // Auto-reset userDismissed when the user backspaces the `/` out of the input
   // — they have to type `/` again to reopen the menu.
@@ -346,7 +347,7 @@ export function ComboTextarea(props: ComboTextareaProps): JSX.Element {
           restoreFocus={false}
           closeOnInteractOutside={false}
         >
-          <PopoverAnchor ref={wrapperEl} />
+          <PopoverAnchor ref={anchorEl} />
           <PopoverContent
             class="p-0 overflow-hidden"
             style={{
