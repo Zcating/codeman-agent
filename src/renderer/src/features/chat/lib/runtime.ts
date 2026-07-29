@@ -95,12 +95,19 @@ function buildMcpTools(entries: readonly McpToolEntry[]): AgentTool<TSchema, unk
 // ─── Runtime event types (6 variants,ADR-0017 + thinking) ──────────────────
 
 export type RuntimeEvent =
-  | { type: "token"; content: string }
-  | { type: "thinking"; content: string }
-  | { type: "tool_call"; toolCall: { id: string; name: string; args: Record<string, unknown> } }
-  | { type: "tool_result"; toolCallId: string; result: unknown; error?: string }
-  | { type: "done"; message: Message }
-  | { type: "error"; error: { message: string } };
+| { type: "token"; content: string }
+| { type: "thinking"; content: string }
+| { type: "tool_call"; toolCall: { id: string; name: string; args: Record<string, unknown> } }
+| { type: "tool_result"; toolCallId: string; result: unknown; error?: string }
+| { type: "done"; message: Message }
+/**
+ * V2.8: per-message 终止信号(对应 agent_end)。与 `done`(per-turn)区分:
+ * - `done`: 每个 turn 触发一次,ADR-0028 Bubble Boundary。chat.store 替换 stub 累积内容,**不**清 streamingMessageId。
+ * - `message_stop`: 整个 message 真正结束时触发一次(agent_end)。chat.store 清 streamingMessageId → isRunning → Send 按钮恢复。
+ * 多 turn 场景(turn-1 tool + turn-2 text)下,`done` 在中间 turn 触发不会让 UI 抖动(Stop→Send→Stop),只有 `message_stop` 才终止 running 状态。
+ */
+| { type: "message_stop" }
+| { type: "error"; error: { message: string } };
 
 /** Structural subset of Effect's `Emit` we use (`single` + `end`). */
 interface RuntimeEmitter {
@@ -343,19 +350,24 @@ function extractResultText(content: unknown): string {
 }
 
 /**
- * agent_end handler (ADR-0028): CLEANUP-ONLY. Per-turn `done` events already
- * fired via handleTurnEnd. agent_end only:
- *   1. emit.end() the runtime EventStream
- *   2. call finalize() (unsubscribe + clear currentAgent)
+ * agent_end handler (ADR-0028 + V2.8): per-turn `done` events already fired
+ * via handleTurnEnd. V2.8: emit `message_stop` BEFORE emit.end() so chat.store
+ * can clear streamingMessageId (isRunning → Send 按钮恢复) only at the true
+ * per-message boundary, not at every turn_end. This prevents the Send/Stop
+ * button from flapping between turns in multi-turn agent runs (e.g. tool_use
+ * → tool_result → final answer).
  *
- * Does NOT emit `done` (per ADR-0028: bubble boundary is per turn).
+ *   1. emit.single({ type: "message_stop" }) — terminate per-message running state
+ *   2. emit.end() the runtime EventStream
+ *   3. call finalize() (unsubscribe + clear currentAgent)
  */
 function handleAgentEnd(
   _evt: Extract<AgentEvent, { type: "agent_end" }>,
   emit: RuntimeEmitter,
   finalize: () => void,
 ): void {
-  logger.info("[runtime/diag] agent_end cleanup (per-turn done events already emitted)");
+  logger.info("[runtime/diag] agent_end → message_stop + cleanup");
+  emit.single({ type: "message_stop" });
   emit.end();
   finalize();
 }

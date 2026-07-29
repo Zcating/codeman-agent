@@ -1042,6 +1042,127 @@ describe("sendMessage — G29: Bubble Boundary — 1 user input → N assistant 
   });
 });
 
+// ─── V2.8: message_stop 终止信号 — isRunning 只在 message_stop 清除 ───────
+//
+// Bug: runtime 在每个 turn_end emit `done`(per-turn, ADR-0028),done 当前清
+// streamingMessageId。多 turn 场景(turn-1 = 工具调用,turn-2 = 文本)中间
+// done 触发会让 UI isRunning 在 turn 间抖动(Stop → Send → Stop → Send)。
+//
+// Fix: 新增 `message_stop` RuntimeEvent 变体,在 `agent_end` 时 emit。
+// - `done`(per-turn): 保留替换 stub + 累积内容,但不清 streamingMessageId
+// - `message_stop`(per-message): 清 streamingMessageId → isRunning → Send 按钮恢复
+// - `error`: 仍立即清(用户/网络错误,不能再 keep Stop)
+// - `cancel()`: 仍同步清(用户主动取消)
+describe("sendMessage — V2.8: isRunning 只在 message_stop 时停止,中间 done 不抖动", () => {
+  it("V2.8-A: 多 turn 场景 (turn-1 done → turn-2 token → turn-2 done) 中,中间 done 不清 streamingMessageId", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, []);
+      const readFileToolCall = {
+        id: "tc-read-1",
+        name: "read_file",
+        args: { path: "README.md" },
+      };
+      const events: RuntimeEvent[] = [
+        // Turn 1: thinking + text + tool_use + done(per-turn)
+        { type: "thinking", content: "Let me read the file." },
+        { type: "token", content: "Reading file." },
+        { type: "tool_call", toolCall: readFileToolCall },
+        {
+          type: "tool_result",
+          toolCallId: "tc-read-1",
+          result: "file content",
+        },
+        {
+          type: "done",
+          message: {
+            id: "turn-1-msg",
+            conversationId: "c1",
+            role: "assistant",
+            content: "Reading file.",
+            thinking: "Let me read the file.",
+            toolCalls: [readFileToolCall],
+            toolResults: [{ toolCallId: "tc-read-1", result: "file content", error: null }],
+            model: "mock-default",
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
+          },
+        },
+        // ── 关键断言点:turn-1 done 后,UI 仍应是 running 状态
+        // (后续 turn-2 token 还没来,但用户视角是"agent 还在工作")
+        // 此前实现会在此处清掉 streamingMessageId → UI 闪 Send。
+        // ── Turn 2: token + done(per-turn)
+        { type: "token", content: "Final answer after tool." },
+        {
+          type: "done",
+          message: {
+            id: "turn-2-msg",
+            conversationId: "c1",
+            role: "assistant",
+            content: "Final answer after tool.",
+            thinking: null,
+            toolCalls: null,
+            toolResults: null,
+            model: "mock-default",
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
+          },
+        },
+      ];
+      vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
+      await Effect.runPromise(sendMessage("c1", "read me", defaultProvider));
+
+      // V2.8 关键断言:多 turn 跑完后(中间 done 已 emit,无 message_stop 注入)
+      // 由于本次测试序列未包含 message_stop,isAgentActive(per-message running
+      // 信号)仍为 true — UI isRunning() 仍 true,Send/Stop 按钮不抖动。
+      // 旧实现:此处 streamingMessageId 已被 turn-1 done 清,turn-2 token 会
+      // append 到 turn-1 消息,V2.8 拆分 isAgentActive 后每个 turn 各自有 stub。
+      expect(store.byId["c1"]?.isAgentActive).toBe(true);
+      // 消息内容应正确累积:1 user + 2 assistant(每 turn 独立 stub)
+      const msgs = store.byId["c1"]?.messages ?? [];
+      expect(msgs.length).toBe(3);
+      expect(msgs[1]?.content).toBe("Reading file.");
+      expect(msgs[2]?.content).toBe("Final answer after tool.");
+      // turn-1 与 turn-2 消息 id 不同(各自独立 stub)
+      expect(msgs[1]?.id).not.toBe(msgs[2]?.id);
+      dispose();
+    });
+  });
+
+  it("V2.8-B: message_stop event 清 streamingMessageId (per-message 终止)", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, []);
+      const events: RuntimeEvent[] = [
+        { type: "token", content: "Hello" },
+        {
+          type: "done",
+          message: {
+            id: "final",
+            conversationId: "c1",
+            role: "assistant",
+            content: "Hello",
+            thinking: null,
+            toolCalls: null,
+            toolResults: null,
+            model: "test-model",
+            inputTokens: null,
+            outputTokens: null,
+            createdAt: Date.now(),
+          },
+        },
+        // V2.8 新增:message_stop = per-message 终止信号(对应 agent_end)
+        { type: "message_stop" },
+      ];
+      vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
+      await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
+      // message_stop 应清 streamingMessageId
+      expect(store.byId["c1"]?.streamingMessageId).toBeNull();
+      dispose();
+    });
+  });
+});
+
 describe("sendMessage — G10: 处理 error event → console.error", () => {
   it("sendMessage() 在 error event 时调用 console.error", async () => {
     await createRoot(async (dispose) => {
