@@ -110,7 +110,7 @@ export function PopoverAnchor(props: PopoverAnchorProps): JSX.Element {
   return (
     <ArkPopover.Anchor
       data-slot="popover-anchor"
-      class={cn("inline-block", local.class)}
+      class={local.class}
       {...rest}
     />
   );
