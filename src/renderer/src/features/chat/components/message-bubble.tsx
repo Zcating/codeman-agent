@@ -106,12 +106,10 @@ export function MessageBubble(props: { message: Message }) {
             </div>
           </Show>
 
-          {/* 3. 正文 Markdown */}
-          {/* FIXME: prose* 类依赖未装的 @tailwindcss/typography 插件,目前无样式生效。
-              见 .omo/plans/chatbubble-markdown-it.md "已知未修问题"。 */}
+          {/* 3. 正文 Markdown — typeset 样式系统,见 src/renderer/src/typeset.css */}
           <Show when={hasContent()}>
             <div
-              class="prose prose-sm dark:prose-invert max-w-none"
+              class="typeset typeset-chat"
               data-testid="agent-text-content"
               innerHTML={renderMarkdown(props.message.content)}
             />
