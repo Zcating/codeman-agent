@@ -1,5 +1,3 @@
-// 状态：running（尚无结果）、success（有结果无错误）、error（有错误的结果）。
-// 纯 UI。不导入 effect。
 
 import { Show, type Component } from "solid-js";
 import {
@@ -17,7 +15,6 @@ import type { ToolCall, ToolResult } from "@codeman-frontend/shared/lib/types";
 
 type Status = "running" | "success" | "error";
 
-// File tool icon mapping
 const TOOL_ICONS: Record<string, Component<{ class?: string }>> = {
   read_file: FileText,
   write_file: FilePlus,
@@ -36,7 +33,6 @@ export function ToolCallCard(props: { toolCall: ToolCall; result?: ToolResult })
 
   const outerClass = () => {
     const s = status();
-    // Polish: 严格遵守 "border + shadow 不同现",只 border 不用 shadow。
     const base = "p-3 border rounded-lg space-y-2 mb-2";
     if (s === "running") {
       return `${base} border-border bg-card`;
@@ -87,7 +83,7 @@ export function ToolCallCard(props: { toolCall: ToolCall; result?: ToolResult })
         </Show>
         <code class="text-xs text-muted-foreground font-mono ml-auto">{props.toolCall.id}</code>
       </div>
-      {/* V3.1: 参数 / 结果 section 去掉折叠,常驻显示 — 用户反馈"找不到展开入口" */}
+      {}
       <div class="text-sm border-t border-border pt-2 mt-2">
         <div class="font-medium text-muted-foreground py-1">参数</div>
         <pre

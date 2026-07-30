@@ -1,12 +1,3 @@
-//! Phase 3 PR 4 — settings domain schemas.
-//!
-//! Mirror of `Provider` / `Settings` interfaces in `src/shared/lib/types.ts` (TS 镜像）。
-//! 校验逻辑：src/main/settings-schema.ts 在 Rust-IPC 边界把关；本文件提供
-//! TS 层入口（外部 JSON 反序列化、runtime validation）的 Schema。
-//!
-//! 拒绝理由（"electron-side Zod 镜像对齐" 的 误解修正）：
-//! electron 侧只有 `src/main/settings-schema.ts`（普通 JSON schema），
-//! 无 Zod。本文件与该 JSON schema 字段一一对齐即可，不假设存在跨进程 Zod bridge。
 import { Schema } from "effect";
 
 const ProviderLlmSchema = Schema.Struct({
@@ -53,26 +44,11 @@ export const SettingsSchema = Schema.Struct({
     auto_archive_after_days: Schema.Number,
     max_history: Schema.Number,
   }),
-  llm_providers: Schema.Array(Schema.Unknown), // deprecated, kept for back-compat
+  llm_providers: Schema.Array(Schema.Unknown), 
 });
 
 export type Settings = Schema.Schema.Type<typeof SettingsSchema>;
 
-// ─── Per-field validation schemas (for ProviderCard's @tanstack/solid-form) ─────
-// Originally inline in provider-card.tsx:56-66. Moved here so that
-// "domain config (Provider / Settings) 在 features/settings/lib/schemas.ts".
-
-/**
- * Attach a custom error message to any Schema via the standard message annotation.
- *
- * Uses the canonical `.annotations({ message: () => "..." })` method form — this is
- * the typed-clean way to attach a custom error message to a refinement. Effect's
- * TS signature requires a function `() => string`, which is also the runtime shape
- * `SchemaAST.getMessageAnnotation(ast)` expects (per our adapter's `resolveMessage`
- * which already handles both string and function forms at runtime).
- *
- * Replaces the prior `{ message: "..." } as never` cast that hid the type gap.
- */
 export const withMessage = <A, I, R>(
   schema: Schema.Schema<A, I, R>,
   message: string,
@@ -89,4 +65,4 @@ export const ModelSchema = withMessage(
   "Model is required",
 );
 
-export const ApiKeySchema = Schema.String; // 不强校验 (mock provider 可空)
+export const ApiKeySchema = Schema.String; 

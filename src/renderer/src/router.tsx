@@ -1,19 +1,3 @@
-//! Router — TanStack Router configuration (V2.2).
-//!
-//! Code-based routing (no Vite plugin). Route structure:
-//! - /              → ChatLayout → HomeRoute (HomeAgentForm)
-//! - /conversation/$convId → ChatLayout → ConversationRoute (ChatView + back)
-//! - /settings      → SettingsSidebar (layout) → 4 child sections
-//!   - /settings/llm       → LlmSection
-//!   - /settings/app       → AppSection
-//!   - /settings/window    → WindowSection
-//!   - /settings/advanced  → AdvancedSection
-//!
-//! `/settings` (no tab) → redirect to `/settings/llm` via `beforeLoad`.
-//!
-//! V3 e2e patch: exposes `window.__router` so cdp-driver.ts::goto can call
-//! `router.navigate({ to: path })` directly (bypasses `history.pushState`
-//! which on file:// URLs can't update the absolute Windows path).
 
 import {
   createRouter,
@@ -34,8 +18,6 @@ import { McpSection } from "@codeman-frontend/features/settings/routes/sections/
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
   errorComponent: (err) => {
-    // Debug-friendly error UI. Production should be replaced with a proper
-    // error page; this surfaces stacktraces for e2e diagnostics.
     const e = (err as { error?: unknown })?.error;
     const msg =
       e instanceof Error
@@ -96,13 +78,6 @@ const pluginsMcpRoute = createRoute({
   component: McpSection,
 });
 
-// ─── Settings nested routes (ADR-0030 D8) ────────────────────────────────
-//
-// Parent route uses `path: "/settings"` + `beforeLoad` redirect — this is
-// the canonical TanStack Router pattern that lights up SettingsSidebar on
-// every `/settings/*` URL. (Plan-agent Q1: confirmed ADR-0030 wins over
-// the `id: "settings"` alternative — that variant doesn't auto-mount
-// the layout on /settings/* paths.)
 
 const settingsLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,

@@ -1,13 +1,7 @@
-//! SettingsSidebar — settings-domain wrapper tests (PR 2).
-//!
-//! Strategy: mock CodemanSidebar to capture the props SettingsSidebar passes.
-//! Verify SettingsSidebar's CONTRACT (what it passes to CodemanSidebar) +
-//! the 6 nav items + URL-driven currentValue + click → navigate behavior.
 
 import { render } from "@solidjs/testing-library";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-// ─── Mock state in vi.hoisted ───────────────────────────────────────────
 
 const F = vi.hoisted(() => {
   return {
@@ -21,7 +15,6 @@ const F = vi.hoisted(() => {
   };
 });
 
-// ─── Module mocks (factories reference F.* via closure) ─────────────────
 
 vi.mock("@tanstack/solid-router", async () => {
   const actual = await vi.importActual<typeof import("@tanstack/solid-router")>(
@@ -58,11 +51,9 @@ vi.mock("../../../shared/components/internal/codeman-sidebar", () => ({
   },
 }));
 
-// ─── Imports under test ───────────────────────────────────────────────────
 
 import { SettingsSidebar } from "@codeman-frontend/features/settings/components/settings-sidebar";
 
-// ─── Setup ─────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
   F.capturedProps = null;
@@ -76,19 +67,16 @@ beforeEach(() => {
   }));
 });
 
-// ─── Tests ─────────────────────────────────────────────────────────────────
 
 describe("SettingsSidebar (PR 2)", () => {
   it("builds options as CodemanSidebarGroupOption[] with 4 nav items in children", () => {
       render(() => <SettingsSidebar />);
       const opts = F.capturedProps.options;
-      // options is CodemanSidebarGroupOption[] — one group (always visible per Q28 reversal)
       expect(opts.length).toBe(1);
       expect(opts[0]).toMatchObject({
         label: "Settings",
         value: "settings",
       });
-      // 4 nav items as children
       expect(opts[0].children.length).toBe(4);
     expect(opts[0].children.map((c: any) => c.label)).toEqual([
       "LLM",

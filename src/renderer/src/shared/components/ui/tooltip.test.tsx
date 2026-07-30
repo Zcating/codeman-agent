@@ -1,4 +1,3 @@
-//! tooltip.test.tsx — Contract tests for Tooltip primitive wrapping @ark-ui/solid.
 import { render, screen, cleanup } from "@solidjs/testing-library";
 import { describe, expect, it, beforeEach } from "vitest";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@codeman-frontend/shared/components/ui/tooltip";
@@ -14,7 +13,6 @@ describe("Tooltip open/close — seam 12", () => {
       </Tooltip>
     ));
 
-    // Content should be visible when open=true
     expect(screen.getByTestId("trigger")).toBeInTheDocument();
     expect(screen.getByTestId("content")).toBeInTheDocument();
   });
@@ -27,12 +25,9 @@ describe("Tooltip open/close — seam 12", () => {
       </Tooltip>
     ));
 
-    // Trigger should still be there
     expect(screen.getByTestId("trigger")).toBeInTheDocument();
-    // Content should either not be in DOM or be hidden
     const content = document.querySelector("[data-testid='content']");
     if (content) {
-      // If it exists, it should have hidden attribute or similar
       expect(content.hasAttribute("hidden") || content.getAttribute("aria-hidden") === "true" || !content.textContent?.trim()).toBeTruthy();
     }
   });
@@ -58,7 +53,6 @@ describe("Tooltip structural", () => {
         <TooltipContent>tip content</TooltipContent>
       </Tooltip>
     ));
-    // Content should be in the DOM
     expect(screen.getByText("tip content")).toBeInTheDocument();
   });
 

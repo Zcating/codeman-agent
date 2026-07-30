@@ -1,5 +1,3 @@
-// ! shared/apis barrel — single import entry for all IPC API surface.
-// Re-exports all <domain>.api.ts modules.
 
 export * from "./invoke.api";
 export * from "./conversation.api";

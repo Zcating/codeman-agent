@@ -1,4 +1,3 @@
-//! input-history 纯函数单测 — load / save / recordEntry
 
 import { describe, it, expect, beforeEach } from "vitest";
 import {
@@ -13,7 +12,6 @@ beforeEach(() => {
   window.localStorage.clear();
 });
 
-// ─── loadHistory ─────────────────────────────────────
 
 describe("loadHistory", () => {
   it("localStorage 为空时返回空数组", () => {
@@ -51,7 +49,6 @@ describe("loadHistory", () => {
     );
     const loaded = loadHistory();
     expect(loaded.length).toBe(INPUT_HISTORY_MAX_ENTRIES);
-    // newest-first 保留前 N 个
     expect(loaded[0]).toBe("e0");
     expect(loaded[99]).toBe("e99");
   });
@@ -61,7 +58,6 @@ describe("loadHistory", () => {
   });
 });
 
-// ─── saveHistory ─────────────────────────────────────
 
 describe("saveHistory", () => {
   it("写入 localStorage 的 JSON 字符串", () => {
@@ -89,7 +85,6 @@ describe("saveHistory", () => {
   });
 });
 
-// ─── recordEntry ─────────────────────────────────────
 
 describe("recordEntry", () => {
   it("空数组 + 内容 → prepend", () => {
@@ -114,15 +109,15 @@ describe("recordEntry", () => {
 
   it("连续相同内容 → 不变（Q3a=II dedup）", () => {
     expect(recordEntry(["hello"], "hello")).toEqual(["hello"]);
-    expect(recordEntry(["hello"], "  hello  ")).toEqual(["hello"]); // 也要 trim 后比
+    expect(recordEntry(["hello"], "  hello  ")).toEqual(["hello"]); 
   });
 
   it("超过 MAX_ENTRIES → FIFO 淘汰最旧", () => {
     const initial = Array.from({ length: 100 }, (_, i) => `e${i}`);
     const result = recordEntry(initial, "new");
     expect(result.length).toBe(INPUT_HISTORY_MAX_ENTRIES);
-    expect(result[0]).toBe("new"); // 新条目在顶
-    expect(result[99]).toBe("e98"); // e99 被淘汰
+    expect(result[0]).toBe("new"); 
+    expect(result[99]).toBe("e98"); 
   });
 
   it("正好 100 条 + 新条目 → 长仍是 100", () => {
@@ -130,7 +125,7 @@ describe("recordEntry", () => {
     const result = recordEntry(initial, "new");
     expect(result).toHaveLength(100);
     expect(result[0]).toBe("new");
-    expect(result[1]).toBe("e0"); // 老 0 仍保留
+    expect(result[1]).toBe("e0"); 
   });
 
   it("99 条 + 新条目 → 长变 100,不淘汰", () => {
@@ -144,8 +139,8 @@ describe("recordEntry", () => {
   it("不修改输入数组（pure）", () => {
     const initial = ["a", "b"];
     const result = recordEntry(initial, "c");
-    expect(initial).toEqual(["a", "b"]); // 不变
-    expect(result).not.toBe(initial); // 新 array
+    expect(initial).toEqual(["a", "b"]); 
+    expect(result).not.toBe(initial); 
     expect(result).toEqual(["c", "a", "b"]);
   });
 

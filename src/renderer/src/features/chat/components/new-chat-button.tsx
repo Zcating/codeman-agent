@@ -1,5 +1,3 @@
-//! NewChatButton — used as `header` slot in ChatSidebar.
-//! Click navigates to "/" (back to home for new conversation creation).
 
 import type { JSX } from "solid-js";
 import { Plus } from "lucide-solid";

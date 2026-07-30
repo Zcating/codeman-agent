@@ -85,7 +85,6 @@ describe("formatAppError — new Schema.TaggedError instances (ADR-0025 PR1)", (
     expect(fmt(new ToolCall({ toolCallId: "call_1", message: "failed" }))).toBe("ToolCall: failed");
   });
   it("SandboxViolation without message → 'SandboxViolation: (no message)'", () => {
-    // message collides with Error.prototype.message → "" when omitted; formatter uses `||`.
     expect(fmt(new SandboxViolation({ path: "/etc/passwd", workspaceLabel: "proj" }))).toBe(
       "SandboxViolation: (no message)",
     );

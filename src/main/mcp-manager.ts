@@ -1,12 +1,3 @@
-//! V3.1 MCP — McpManager: multi-server lifecycle.
-//!
-//! Manages multiple McpStdioServer instances (one per configured MCP server).
-//! Loads config from `~/.agents/mcp_servers.json`, starts all enabled servers,
-//! routes tool calls by name, exposes status snapshot for IPC + UI.
-//!
-//! Tool name collision: if two enabled servers expose the same
-//! `mcp_<server>_<tool>` name, the second server is rejected at start time
-//! and marked `protocol_error`.
 
 import { shell } from "electron";
 import { Effect, Exit } from "effect";
@@ -23,7 +14,7 @@ export interface McpServerInfo {
 
 export interface McpToolEntry {
   serverName: string;
-  agentName: string; // mcp_<server>_<tool>
+  agentName: string; 
   toolName: string;
   description: string;
   inputSchema: unknown;
@@ -34,7 +25,6 @@ export class McpManager {
   readonly #configs = new Map<string, McpServerConfig>();
   #started = false;
 
-  /** Start all enabled servers from the config file. Idempotent. */
   async startAll(): Promise<void> {
     if (this.#started) return;
     this.#started = true;
@@ -46,7 +36,7 @@ export class McpManager {
     }
     const config = exit.value;
 
-    const seenAgentNames = new Map<string, string>(); // agentName → serverName
+    const seenAgentNames = new Map<string, string>(); 
 
     for (const cfg of config.servers) {
       this.#configs.set(cfg.name, cfg);
@@ -75,13 +65,11 @@ export class McpManager {
           seenAgentNames.set(agentName, cfg.name);
         }
       } catch (e) {
-        // Catch both start failures and collision errors; server already stopped/removed above
         logger.warn(`[mcp] ${cfg.name} start failed or collision detected: ${String(e)}`);
       }
     }
   }
 
-  /** Stop all running servers. */
   async stopAll(): Promise<void> {
     for (const [, server] of this.#servers) {
       try {
@@ -94,7 +82,6 @@ export class McpManager {
     this.#started = false;
   }
 
-  /** Restart a specific server. Re-reads config and constructs a fresh McpStdioServer. */
   async restart(name: string): Promise<void> {
     const exit = await Effect.runPromiseExit(readMcpConfig());
     if (Exit.isFailure(exit)) {
@@ -117,7 +104,6 @@ export class McpManager {
     await newServer.start();
   }
 
-  /** Get info for all configured servers (enabled + disabled). */
   listServers(): McpServerInfo[] {
     const all = new Set<string>();
     for (const name of this.#configs.keys()) all.add(name);
@@ -140,11 +126,6 @@ export class McpManager {
     });
   }
 
-  /**
-   * Collect all tool entries from connected servers. Each entry's
-   * `agentName` follows D8: `mcp_<server-slug>_<tool-slug>`.
-   * Collisions are already filtered out in startAll().
-   */
   listAllTools(): McpToolEntry[] {
     const out: McpToolEntry[] = [];
     for (const [, server] of this.#servers) {
@@ -163,7 +144,6 @@ export class McpManager {
     return out;
   }
 
-  /** Call a tool on a specific server. */
   async callTool(serverName: string, toolName: string, args: unknown): Promise<McpCallResult> {
     const server = this.#servers.get(serverName);
     if (!server || server.getStatus().kind !== "connected") {
@@ -175,12 +155,10 @@ export class McpManager {
     return server.callTool(toolName, args);
   }
 
-  /** Open `~/.agents/` in the OS file manager. */
   async openConfigDir(): Promise<void> {
     await shell.openPath(MCP_CONFIG_PATH());
   }
 
-  /** Get tools for a specific server. */
   listServerTools(name: string): McpTool[] {
     const server = this.#servers.get(name);
     if (!server || server.getStatus().kind !== "connected") {
@@ -189,11 +167,6 @@ export class McpManager {
     return server.listTools();
   }
 
-  /**
-   * Toggle server enabled state and persist to disk.
-   * If enabling: reads current config, updates server, restarts it.
-   * If disabling: stops the running server (no restart needed).
-   */
   async setEnabled(name: string, enabled: boolean): Promise<void> {
     const readExit = await Effect.runPromiseExit(readMcpConfig());
     if (Exit.isFailure(readExit)) {
@@ -210,7 +183,6 @@ export class McpManager {
     );
     const newConfig = { version: config.version as 1, servers: updatedServers };
 
-    // Persist to disk
     const writeExit = await Effect.runPromiseExit(writeMcpConfig(newConfig));
     if (Exit.isFailure(writeExit)) {
       throw new InvalidConfig({ field: "mcp_servers.json", message: String(writeExit.cause) });
@@ -236,7 +208,6 @@ export class McpManager {
   }
 }
 
-/** Lowercase + non-alphanumeric → `_`. Empty string fallback. */
 function slug(s: string): string {
   return s
     .toLowerCase()

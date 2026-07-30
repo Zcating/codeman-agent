@@ -1,20 +1,3 @@
-//! CodemanSidebar tests (PR 2 — ADR-0033 Layer 2; Q28 reversal — per-MenuGroup Accordion).
-//!
-//! Test strategy: vertical TDD slices per plan seams 13-20.
-//! Each seam: first write a failing test, then implement minimum to pass.
-//!
-//! Slices:
-//!  13. options: CodemanSidebarGroupOption[] — full tree renders
-//!  14. renderMenuGroup — called per MenuGroup
-//!  15. renderGroupHeader — replaces group header
-//!  16. currentValue + isActive — only Menu leaves can be active
-//!  17. onMenuGroupSelect — click MenuGroup triggers handler AND toggles its accordion
-//!  18. onMenuSelect — click Menu leaf triggers handler
-//!  19. Per-MenuGroup Accordion (Q28 reversal) — each MenuGroup has its own accordion
-//!  20. data-value — e2e compat attributes
-//!
-//! Chat-domain-specific seams (hover delete, streaming badge) are tested
-//! in chat-sidebar.test.tsx, NOT here (per ADR-0030 D6).
 
 import { render, cleanup } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -25,7 +8,6 @@ import {
   type CodemanSidebarMenuOption,
 } from "@codeman-frontend/shared/components/internal/codeman-sidebar";
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function makeOptions(): CodemanSidebarGroupOption[] {
   return [
@@ -97,21 +79,16 @@ function renderSidebar(
   ));
 }
 
-// ─── Tests ─────────────────────────────────────────────────────────────────
 
 describe("CodemanSidebar (PR 2)", () => {
   afterEach(() => cleanup());
 
-  // ─── Slice 13: full tree renders ──────────────────────────────────────
   describe("options: CodemanSidebarGroupOption[]", () => {
     it("renders full 3-level tree: group + MenuGroups + Menus", () => {
       const { container } = renderSidebar();
-      // Group label rendered (always visible, NOT a trigger)
       expect(container.textContent).toContain("项目");
-      // MenuGroups rendered
       expect(container.textContent).toContain("Frontend");
       expect(container.textContent).toContain("Backend");
-      // Menus rendered (defaultExpanded=true on all MenuGroups)
       expect(container.textContent).toContain("Chat 1");
       expect(container.textContent).toContain("Chat 2");
       expect(container.textContent).toContain("Chat 3");
@@ -139,13 +116,11 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
-  // ─── Slice 14: renderMenuGroup called per MenuGroup ────────────────────
   describe("renderMenuGroup", () => {
     it("renderMenuGroup is called once per MenuGroup", () => {
       const renderMenuGroup = vi.fn((item: CodemanSidebarMenuGroupOption) => <span data-testid="menu-group-item">{item.label}</span>);
       const opts = makeOptions();
       renderSidebar({ options: opts, renderMenuGroup });
-      // 2 MenuGroups: Frontend and Backend
       expect(renderMenuGroup).toHaveBeenCalledTimes(2);
     });
 
@@ -174,13 +149,11 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
-  // ─── Slice 14b: renderMenu ──────────────────────────────────────────────
   describe("renderMenu", () => {
     it("renderMenu is called once per Menu leaf", () => {
       const renderMenu = vi.fn((menu: CodemanSidebarMenuOption) => <span data-testid="menu-item">{menu.label}</span>);
       const opts = makeOptions();
       renderSidebar({ options: opts, renderMenu });
-      // 3 menus across 2 MenuGroups: c-1, c-2 (ws-1) and c-3 (ws-2)
       expect(renderMenu).toHaveBeenCalledTimes(3);
     });
 
@@ -224,7 +197,6 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
-  // ─── Slice 14c: forceSubMenu ────────────────────────────────────────────
   describe("forceSubMenu", () => {
     it("forceSubMenu item renders inside SidebarMenuSub (data-sidebar=menu-sub-item on parent li)", () => {
       const opts: CodemanSidebarGroupOption[] = [
@@ -238,10 +210,8 @@ describe("CodemanSidebar (PR 2)", () => {
         },
       ];
       const { container } = renderSidebar({ options: opts });
-      // forceSubMenu items should be inside a li with data-sidebar="menu-sub-item"
       const skillsItem = container.querySelector("[data-value='skills']");
       expect(skillsItem).toBeTruthy();
-      // Parent should be a SidebarMenuSubItem li
       const parentLi = skillsItem?.closest("li[data-sidebar='menu-sub-item']");
       expect(parentLi).toBeTruthy();
     });
@@ -260,7 +230,6 @@ describe("CodemanSidebar (PR 2)", () => {
         },
       ];
       renderSidebar({ options: opts, renderMenu });
-      // renderMenu should NOT be called for forceSubMenu items
       expect(renderMenu).not.toHaveBeenCalled();
     });
 
@@ -306,7 +275,7 @@ describe("CodemanSidebar (PR 2)", () => {
           label: "Plugins",
           value: "plugins",
           children: [
-            { label: "Flat", value: "flat" }, // no forceSubMenu
+            { label: "Flat", value: "flat" }, 
           ],
         },
       ];
@@ -316,7 +285,6 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
-  // ─── Slice 15: renderGroupHeader ───────────────────────────────────────
   describe("renderGroupHeader", () => {
     it("renderGroupHeader replaces group header label when provided", () => {
       const renderGroupHeader = vi.fn((group: CodemanSidebarGroupOption) => (
@@ -334,8 +302,6 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
-  // ─── Slice 16: currentValue + isActive ─────────────────────────────────
-  // Only Menu leaves can be active. MenuGroup triggers are never active.
   describe("currentValue + isActive", () => {
     it("MenuGroup button is NEVER active even when isActive predicate returns true", () => {
       const isActive = vi.fn(() => true);
@@ -381,7 +347,6 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
-  // ─── Slice 17: onMenuGroupSelect ────────────────────────────────────────
   describe("onMenuGroupSelect", () => {
     it("clicking MenuGroup triggers onMenuGroupSelect with MenuGroup value", () => {
       const onMenuGroupSelect = vi.fn();
@@ -402,7 +367,6 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
-  // ─── Slice 18: onMenuSelect ─────────────────────────────────────────────
   describe("onMenuSelect", () => {
     it("clicking Menu leaf triggers onMenuSelect with Menu value", () => {
       const onMenuSelect = vi.fn();
@@ -423,14 +387,6 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
-  // ─── Slice 19: per-MenuGroup Accordion (Q28 reversal) ──────────────────
-  // NOTE: jsdom does NOT propagate Solid's delegated click handlers through
-  // direct `.click()` invocations on Ark UI @zag-js components — this is a
-  // known limitation (also why src/renderer/src/shared/components/ui/accordion.test.tsx
-  // does NOT test click toggles). Runtime click behaviour is verified by
-  // Playwright e2e (e2e/helpers.ts::expandWorkspace). Unit tests here focus
-  // on structural correctness + initial-state wiring, which is what jsdom
-  // can deterministically observe.
   describe("per-MenuGroup Accordion (Q28 reversal: group is always visible)", () => {
     it("renders one AccordionItem per MenuGroup", () => {
       const opts = makeOptions();
@@ -442,10 +398,6 @@ describe("CodemanSidebar (PR 2)", () => {
     });
 
     it("MenuGroup button carries BOTH data-value (sidebar) AND data-state (trigger)", () => {
-      // e2e/helpers.ts::expandWorkspace depends on `[data-value=…]` exposing
-      // `data-state="open"` on the SAME element. The wrapper AccordionTrigger
-      // accepts `data-value` as a prop, so it lives on the SAME `<button>` as
-      // the trigger attrs.
       const opts = makeOptions();
       const { container } = renderSidebar({ options: opts });
       const ws1Btn = container.querySelector("[data-value='ws-1']") as HTMLElement;
@@ -496,13 +448,12 @@ describe("CodemanSidebar (PR 2)", () => {
     });
 
     it("Menu leaf (no children field) renders as flat SidebarMenuButton, NO accordion", () => {
-      // Discriminator: presence of `children` field decides accordion wrapping.
       const opts: CodemanSidebarGroupOption[] = [
         {
           label: "Project",
           value: "proj",
           children: [
-            { label: "FlatMenu", value: "flat-menu" }, // Menu leaf (no children)
+            { label: "FlatMenu", value: "flat-menu" }, 
             {
               label: "PopulatedGroup",
               value: "pop-group",
@@ -512,10 +463,8 @@ describe("CodemanSidebar (PR 2)", () => {
         },
       ];
       const { container } = renderSidebar({ options: opts });
-      // Only the MenuGroup gets an accordion item-trigger
       const triggers = container.querySelectorAll("[data-part='item-trigger']");
       expect(triggers.length).toBe(1);
-      // The flat Menu renders as SidebarMenuButton (NOT in AccordionItem)
       const flatBtn = container.querySelector("[data-value='flat-menu']") as HTMLElement;
       expect(flatBtn).toBeTruthy();
       expect(flatBtn.getAttribute("data-part")).not.toBe("item-trigger");
@@ -534,7 +483,6 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
-  // ─── Slice 20: data-value ─────────────────────────────────────────────
   describe("data-value (e2e compat)", () => {
     it("SidebarMenuItem has data-value attribute", () => {
       const opts = makeOptions();
@@ -581,7 +529,6 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
-  // ─── Slots tests ────────────────────────────────────────────────────────
   describe("3 slots (header / footer / children)", () => {
     it("header slot renders inside sidebar at top", () => {
       renderSidebar({ header: <div data-testid="slot-header">SIDEBAR TOP</div> });
@@ -611,7 +558,6 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
-  // ─── class prop ─────────────────────────────────────────────────────────
   describe("class prop", () => {
     it("class prop is applied to root sidebar", () => {
       const { container } = renderSidebar({ class: "border-2 border-red-500" });
@@ -621,11 +567,6 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
-  // ─── Bug B fix regression: sidebar inset scroll boundary ──────────────────
-  // Approved fix: add class="min-h-0 overflow-y-auto" at CodemanSidebar -> SidebarInset outlet.
-  // Root cause: nested scroll — ChatView messages wrapper owned overflow-y-auto, and
-  // SidebarInset (the parent scroll container) did not. Fix moves overflow-y-auto to
-  // SidebarInset and removes it from ChatView messages wrapper.
   describe("SidebarInset scroll boundary (Bug B fix)", () => {
     it("data-slot=sidebar-inset has min-h-0 (allows flex child to shrink)", () => {
       const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });

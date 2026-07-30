@@ -1,7 +1,3 @@
-//! codeman-dialog.test.tsx — Tests for module-level Dialog singleton API.
-//! Verifies the Promise-based API contract and DOM rendering.
-//! Promise resolution via DOM click is limited because @zag-js/ark-ui
-//! dialog events don't fire reliably in jsdom.
 
 import { describe, expect, it, afterEach, beforeEach } from "vitest";
 import { cleanup } from "@solidjs/testing-library";
@@ -9,7 +5,6 @@ import { Dialog } from "@codeman-frontend/shared/components/internal/codeman-dia
 
 describe("Dialog", () => {
   beforeEach(() => {
-    // Ensure #root parent exists in jsdom
     if (!document.getElementById("root")) {
       const root = document.createElement("div");
       root.id = "root";
@@ -19,7 +14,6 @@ describe("Dialog", () => {
 
   afterEach(() => {
     cleanup();
-    // Clean up any Portal-rendered content outside #root
     const root = document.getElementById("root");
     if (root && root.parentElement) {
       const toRemove = Array.from(root.parentElement.children).filter(

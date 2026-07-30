@@ -1,4 +1,3 @@
-//! Button — 6 变体 × 7 尺寸 via cva. Pattern from .repos/shadcn.
 
 import { type VariantProps, cva } from "class-variance-authority";
 import type { Component, ComponentProps } from "solid-js";

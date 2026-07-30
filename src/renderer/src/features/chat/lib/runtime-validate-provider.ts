@@ -2,11 +2,6 @@ import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime
 
 export type ValidationResult = { ok: true } | { ok: false; reason: string };
 
-/**
- * Validates ProviderConfig.defaultModel — non-empty after trim.
- *
- * Out of scope (this wave): apiKey, baseUrl, systemPrompt validation.
- */
 export function validateProvider(cfg: ProviderConfig): ValidationResult {
     if (!cfg.defaultModel || cfg.defaultModel.trim().length === 0) {
         return {

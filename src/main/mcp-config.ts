@@ -1,18 +1,3 @@
-//! V3.1 MCP — `~/.agents/mcp_servers.json` config loader (ADR-0032 D1).
-//!
-//! Format:
-//! ```json
-//! {
-//!   "version": 1,
-//!   "servers": [
-//!     { "name": "github", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"],
-//!       "env": { "GITHUB_TOKEN": "..." }, "enabled": true }
-//!   ]
-//! }
-//! ```
-//!
-//! V1: read-only. Enable toggling writes back to disk (preserves comments — well, no
-//! JSON has no comments, but we preserve the rest of the file structure).
 
 import { Effect, Schema } from "effect";
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
@@ -42,10 +27,8 @@ export interface McpConfigFile {
   servers: McpServerConfig[];
 }
 
-/** Read `~/.agents/mcp_servers.json`. Returns empty config if file doesn't exist. */
 export const readMcpConfig = Effect.fn("readMcpConfig")(function* () {
   const configPath = MCP_CONFIG_PATH();
-  // ENOENT → empty config (no servers configured yet)
   const result = yield* Effect.async<{ raw: string; isEio: boolean }>((resolve) => {
     readFile(configPath, "utf-8")
       .then((raw) => resolve(Effect.succeed({ raw, isEio: false })))
@@ -82,7 +65,6 @@ export const readMcpConfig = Effect.fn("readMcpConfig")(function* () {
   return decoded.right as McpConfigFile;
 });
 
-/** Write `~/.agents/mcp_servers.json`, creating the directory if needed. */
 export const writeMcpConfig = Effect.fn("writeMcpConfig")(function* (config: McpConfigFile) {
   const configPath = MCP_CONFIG_PATH();
   yield* Effect.tryPromise(() => mkdir(dirname(configPath), { recursive: true })).pipe(
@@ -99,7 +81,6 @@ export const writeMcpConfig = Effect.fn("writeMcpConfig")(function* (config: Mcp
   });
 });
 
-/** Convenience: check if config file exists. */
 export async function mcpConfigExists(): Promise<boolean> {
   try {
     await access(MCP_CONFIG_PATH());

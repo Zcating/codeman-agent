@@ -7,9 +7,6 @@ import { FileApi, FileApiLive } from "@codeman-frontend/shared/apis";
 import { InvalidConfig, Unknown, type AppError } from "@codeman-frontend/shared/lib/errors";
 import type { FileMatch } from "@codeman-frontend/shared/lib/types";
 
-// ============================================================================
-// AgentToolResult type (pi-ai 0.9.4 doesn't export this type)
-// ============================================================================
 
 interface TextContent {
   type: "text";
@@ -27,12 +24,6 @@ function pickArgs<T extends Record<string, unknown>, K extends keyof T>(
   return args[key];
 }
 
-/** T27: workspaceId may now be missing from LLM args (schema is
- *  Optional). Return an `Effect.fail(InvalidConfig)` when neither LLM nor the
- *  runtime wrapper provided one — bubbles up via the normal tool error path
- *  and renders cleanly in ToolCallCard. Using `Effect.fail` (not sync
- *  `throw`) so the cause reaches `runFileEffect` as `Cause.Fail`, not
- *  `Cause.Die`. */
 function requireWorkspaceId(args: Record<string, any>): Effect.Effect<string, AppError> {
   const ws = pickArgs(args, "workspaceId");
   if (typeof ws === "string" && ws.length > 0) {
@@ -46,31 +37,8 @@ function requireWorkspaceId(args: Record<string, any>): Effect.Effect<string, Ap
   }));
 }
 
-// ============================================================================
-// Tool Schemas
-// ============================================================================
-
-/**
- * T27 + this PR (Task 4): workspaceId 是 optional.
- *
- * wire-format rename: schema field is camelCase to match the TS IPC
- * layer (`window.codeman.readFile(workspaceId, path)`) and the chat system
- * prompt hint (`chat.store.ts:194-195`). Single source of truth.
- *
- * Runtime injection: `createFileTools(workspaceId)` wraps every tool's `execute`
- * and injects `workspaceId` into args BEFORE schema validation (per
- * `pickArgs` / `createFileTools` block below). LLM may also pass it explicitly
- * (explicit value wins).
- *
- * Centralised here so the 5 sibling `Schema.Struct({...})` definitions stay in
- * sync if the rule ever flips back to required, or to constrain it further
- * (e.g., branded `WorkspaceId` per `src/shared/lib/workspace-id.ts`).
- */
 export const workspaceIdField = Schema.optional(Schema.String);
 
-// T27: workspaceId 改为可选 — runtime (chat.store.sendMessage) 通过
-// `createFileTools(provider.workspaceId)` 自动注入,避免 LLM (或 mock JSON)
-// 不知道 UUID 时校验失败。LLM 也可以显式覆盖(优先用 LLM 传的)。
 const ReadFileSchema = Schema.Struct({
   workspaceId: workspaceIdField,
   path: Schema.String,
@@ -101,9 +69,6 @@ const DeleteFileSchema = Schema.Struct({
   path: Schema.String,
 });
 
-// ============================================================================
-// Helper: run Effect and convert to AgentToolResult
-// ============================================================================
 
 async function runFileEffect<T>(
   effect: Effect.Effect<T, AppError>,
@@ -123,8 +88,6 @@ async function runFileEffect<T>(
       content: [
         {
           type: "text",
-          // 含 kind 标签:让 SandboxViolation / NotFound / Unknown 等错误种类在
-          // text payload 里可见(tool 消费方通常只看 text 不看 details)。
           text: `Error (${err._tag}): ${"message" in err ? err.message : JSON.stringify(err)
             }`,
         },
@@ -140,9 +103,6 @@ async function runFileEffect<T>(
   };
 }
 
-// ============================================================================
-// Tool Definitions
-// ============================================================================
 
 const readFile = Effect.fn(
   function* (typedArgs: Static<typeof readParams>) {
@@ -289,13 +249,6 @@ export const deleteFileTool: AgentTool<typeof deleteParams, void | AppError> = {
   },
 };
 
-/** 所有 file-tools 工具数组（向后兼容 — 调用方无 workspaceId 时仍可使用）。
- *
- *  绝大多数路径请用 `createFileTools(workspaceId)`,它会包装 execute 注入
- *  `workspaceId` 到 args(LLM 省略或 mock JSON 不带时)。`fileTools` 这个
- *  直导数组保留,供测试或一次性脚本调用 — 调用方必须自己在 args 里提供
- *  `workspaceId`,否则工具返回 `InvalidConfig` 错误。 
- **/
 export const fileTools: AgentTool<TSchema, unknown>[] = [
   readFileTool,
   writeFileTool,
@@ -304,17 +257,6 @@ export const fileTools: AgentTool<TSchema, unknown>[] = [
   deleteFileTool,
 ];
 
-/** 创建带 `workspaceId` 自动注入的 file tools 列表(T27)。
- *
- *  pi-agent-core 的 schema 校验在 `execute` 之前运行,因此我们无法在收到
- *  args 后再补 `workspaceId` — 必须**在 schema 校验之前**把 field 填好。
- *  包装层在 Agent 校验后的 execute 调用里,把 `provider.workspaceId` 注入
- *  args(若 LLM 自己传了,以 LLM 为准,允许覆盖)。
- *
- *  @param workspaceId - 当前 conversation 绑定的 workspace UUID。
- *                       若省略 / 空字符串,等价于 `fileTools`(工具接收
- *                       不带 workspaceId 的 args 时返回 InvalidConfig)。
- */
 export function createFileTools(workspaceId?: string): AgentTool<TSchema, unknown>[] {
   const tools: AgentTool<TSchema, unknown>[] = [readFileTool, writeFileTool, editFileTool, searchFilesTool, deleteFileTool];
   if (!workspaceId) {

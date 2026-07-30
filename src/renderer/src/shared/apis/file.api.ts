@@ -1,4 +1,3 @@
-//! FileApi domain — extracted from ipc.ts for domain split.
 
 import { Effect, Layer, Context } from "effect";
 import { invoke } from "./invoke.api";

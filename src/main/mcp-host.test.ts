@@ -1,13 +1,3 @@
-//! ADR-0032 B2 — mcp-host.ts tests (minimal V1, complex cases deferred).
-//!
-//! V1 测试只覆盖 synchronous / 不需要真实子进程等待的路径:
-//! - disabled 状态（start 不 spawn）
-//! - spawn 同步抛错 → spawn_failed
-//! - 配置 + 初始状态 + listTools（未 connected 时为空）
-//! - stop() 在未 start 时不 throw
-//!
-//! 完整 handshake 测试（initialize / tools/list / callTool）需要真实子进程或
-//! PassThrough pipe 在 JsonRpcConnection 构造点注入，V2 重写。
 
 import { describe, it, expect } from "vitest";
 import { McpStdioServer, type McpServerConfig } from "./mcp-host";
@@ -63,7 +53,6 @@ describe("McpStdioServer (minimal)", () => {
     const unsub = server.onStatusChange(handler);
     expect(typeof unsub).toBe("function");
     unsub();
-    // Calling unsub again should be safe (idempotent)
     expect(() => unsub()).not.toThrow();
   });
 

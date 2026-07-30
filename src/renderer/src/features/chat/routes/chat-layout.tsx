@@ -4,7 +4,6 @@ import { ChatSidebar } from "@codeman-frontend/features/chat/components/chat-sid
 import { loadWorkspaces, loadConversations } from "@codeman-frontend/features/chat/stores/chat.store";
 
 export function ChatLayout(): JSX.Element {
-  // Load workspaces + conversations on mount (data fetch stays in layout)
   onMount(() => {
     Effect.runPromiseExit(loadWorkspaces());
     Effect.runPromiseExit(loadConversations());

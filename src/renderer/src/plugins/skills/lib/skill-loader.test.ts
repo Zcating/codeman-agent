@@ -1,6 +1,3 @@
-// Skill loader tests — ADR-0031 Wave A1.
-//
-// vitest + Node fs/promises (无 mockState — 本 feature 无 IPC)。
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Effect, Exit } from "effect";
@@ -125,7 +122,7 @@ describe("scanSkillsDir", () => {
 
 	it("corrupt skill 不阻塞其它有效 skill", async () => {
 		await makeSkill("good", VALID_SKILL("good", "G"));
-		await makeSkill("bad", "---\nname: bad\n"); // 未闭合
+		await makeSkill("bad", "---\nname: bad\n"); 
 		const result = await Effect.runPromise(scanSkillsDir(tempDir));
 		expect(result).toHaveLength(1);
 		expect(result[0]?.name).toBe("good");

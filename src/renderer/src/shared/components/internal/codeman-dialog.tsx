@@ -1,5 +1,3 @@
-//! codeman-dialog.tsx — Imperative alert/confirm/show API for dialogs.
-//! Module-level singleton using render() + Portal from solid-js/web.
 
 import { createSignal, type JSX } from "solid-js";
 import { render, Portal } from "solid-js/web";
@@ -53,7 +51,6 @@ export const Dialog = {
                 if (details.open) {
                   wasOpened = true;
                 } else if (wasOpened) {
-                  // Only handle close after user opened it
                   resolve();
                   dispose();
                   container.remove();
@@ -89,16 +86,10 @@ export const Dialog = {
       const [open, setOpen] = createSignal(true);
       let wasOpened = false;
 
-      // setTimeout cleanup callback: defensive against external DOM mutation
-      // (test teardown may remove container before 300ms elapses). Wrap dispose
-      // in try/catch (Solid unmount may throw on detached subtrees) and check
-      // parentNode before container.remove() (Node.removeChild throws
-      // NOT_FOUND_ERR on already-detached nodes).
       const cleanupDialog = () => {
         try {
           dispose();
         } catch {
-          /* already unmounted */
         }
         if (container.parentNode) {
           container.remove();
@@ -169,16 +160,10 @@ export const Dialog = {
       const [open, setOpen] = createSignal(true);
       let wasOpened = false;
 
-      // setTimeout cleanup callback: defensive against external DOM mutation
-      // (test teardown may remove container before 300ms elapses). Wrap dispose
-      // in try/catch (Solid unmount may throw on detached subtrees) and check
-      // parentNode before container.remove() (Node.removeChild throws
-      // NOT_FOUND_ERR on already-detached nodes).
       const cleanupDialog = () => {
         try {
           dispose();
         } catch {
-          /* already unmounted */
         }
         if (container.parentNode) {
           container.remove();

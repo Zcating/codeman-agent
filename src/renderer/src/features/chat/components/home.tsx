@@ -1,13 +1,3 @@
-// Layout (D6-H4, 保持):
-// - 顶部标题 + 子标题
-// - Textarea (top, full width)
-// - row: workspace picker (200px) + LLM picker (200px)
-// - Send button row: flex justify-end
-//
-// 状态机（保持）：
-// - 0 workspaces → input disabled + "Add workspace" CTA
-// - 1 workspace  → auto-select, input enabled
-// - 2+ workspaces → 无预选, input disabled until user picks
 
 import { createMemo, createEffect, Show, type JSX } from "solid-js";
 import { Send } from "lucide-solid";
@@ -44,7 +34,6 @@ import {
   HomeFormSchema,
   type HomeFormValue,
 } from "@codeman-frontend/features/chat/lib/schemas";
-// ComboTextarea 替代 useSlashTrigger + SlashMenu
 import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
@@ -79,7 +68,6 @@ function LlmPicker(props: {
   );
 }
 
-// ─── HomeAgentForm ──────────────────────────────────────────────────────────────
 
 interface HomeWorkspaceItem {
   id: string;
@@ -102,10 +90,7 @@ export function HomeAgentForm(): JSX.Element {
 
   const navigate = useNavigate();
 
-  // textarea ref + cursor management now owned by ComboTextarea.
-  // No local `textareaEl` needed; ComboTextarea forwards focus internally.
 
-  // ─── Form ──────────────────────────────────────────────────────────────────
   const form = createForm(() => ({
     defaultValues: {
       draft: "",
@@ -113,11 +98,6 @@ export function HomeAgentForm(): JSX.Element {
       workspaceId: initialWorkspaceId(),
     } satisfies HomeFormValue,
     validators: {
-      // onMount + onChange — canSubmit must reflect validation state from
-      // the first render. Without onMount, canSubmit defaults to true even
-      // when draft is empty, leaving the send button enabled and causing
-      // submit-with-no-input (which then calls createConversation with an
-      // empty title). onChange keeps the gate accurate as fields change.
       onMount: effectSchema(HomeFormSchema),
       onChange: effectSchema(HomeFormSchema),
     },
@@ -125,7 +105,6 @@ export function HomeAgentForm(): JSX.Element {
       const text = value.draft.trim();
       const wsId = value.workspaceId;
 
-      // Build ProviderConfig from appStore (always read at submit-time)
       const providerId = appStore.state.value.defaultLlmProviderId;
       const providerConfig = appStore.state.value.providers?.find((p) => p.id === providerId);
       const provider: ProviderConfig = {
@@ -136,40 +115,29 @@ export function HomeAgentForm(): JSX.Element {
         tools: [],
       };
 
-      // Step 1: Create conversation
       const exit = await Effect.runPromiseExit(
         createConversation(wsId, text.slice(0, 30)),
       );
       if (Exit.isFailure(exit)) {
-        // Silent-drop bug fix: surface failure via toast
         codemanToast.error(formatAppError(exit.cause));
         return;
       }
       const convId = exit.value;
 
-      // Step 2: Clear draft + record history entry + navigate
       form.reset({ draft: "", modelId: value.modelId, workspaceId: value.workspaceId });
       recordInputEntry(text);
       navigate({ to: "/conversation/$convId", params: { convId } });
 
-      // Step 3: Start streaming (fire-and-forget)
       void Effect.runPromiseExit(sendMessage(convId, text, provider));
     },
   }));
 
-  // Slash trigger + skills. ComboTextarea owns
-  // the trigger; we only compute enabledSkills for the `skills` prop.
-  /** Enabled skills = manifests ∩ appStore.enabledSkills */
   const enabledSkills = createMemo((): readonly SkillManifest[] => {
     const all = skillsManifests$();
     const enabledNames = new Set(appStore.state.value.enabledSkills ?? []);
     return all.filter((s) => enabledNames.has(s.name));
   });
 
-  // Sync workspace ID from store signal to form field when async load resolves.
-  // Without this, the form field stays "" (captured at createForm time before
-  // loadWorkspaces completes) and the onChange validator rejects it, making
-  // canSubmit=false and the send button permanently disabled.
   createEffect(() => {
     const wsId = selectedWorkspaceId$();
     if (wsId && wsId !== form.state.values.workspaceId) {
@@ -177,12 +145,6 @@ export function HomeAgentForm(): JSX.Element {
     }
   });
 
-  // ─── Helpers ───────────────────────────────────────────────────────────────
-  // Read selectedWorkspaceId$ directly instead of form.state.values.workspaceId so
-  // the gate flips when chat.store.loadWorkspaces() resolves after home mount
-  // (the form's defaultValues are captured once at createForm() time, so they
-  // always see the boot-time `null` state and never the async auto-select).
-  // See src/index.tsx:32-58 for the boot order.
   const isInputDisabled = createMemo(() => {
     if (wsCount() === 0) {return true;}
     if (selectedWorkspaceId$() === null) {return true;}
@@ -191,10 +153,6 @@ export function HomeAgentForm(): JSX.Element {
 
   const placeholder = createMemo(() => {
     if (wsCount() === 0) {return "Add a workspace to start";}
-    // Read workspaceId via form.useSelector so the memo subscribes to form
-    // state changes — the previous form.state.values read was a non-reactive
-    // snapshot, which kept placeholder stuck at "Select a workspace above"
-    // after the async createEffect synced workspaceId from chat.store.
     if (form.useSelector((s) => s.values.workspaceId)() === "") {return "Select a workspace above";}
     return "发条消息…";
   });
@@ -214,7 +172,7 @@ export function HomeAgentForm(): JSX.Element {
           }}
           class="space-y-2"
         >
-          {/* draft field (textarea) — submit-only validation (per UX request) */}
+          {}
           <form.Field name="draft">
             {(field) => (
               <>
@@ -229,11 +187,6 @@ export function HomeAgentForm(): JSX.Element {
                   value={field().state.value}
                   onChange={(v) => field().handleChange(v)}
                   onKeyDown={(e) => {
-                    // ComboTextarea handles `/`, Ctrl+/, ArrowUp/Down/Enter/Esc
-                    // when menu is open. This handler runs unconditionally for
-                    // keys that don't go through the menu:
-                    // - Ctrl/Cmd+Enter: submit form
-                    // - ArrowUp/Down when menu closed: input history
                     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
                       if (e.defaultPrevented) {return;}
                       e.preventDefault();
@@ -257,9 +210,6 @@ export function HomeAgentForm(): JSX.Element {
                   placeholder={placeholder()}
                   skills={enabledSkills()}
                   error={
-                    // submit-only: 错误只在用户提交后才显示。isTouched 在 blur 后变 true,
-                    // 不再用作显示门控(避免 blur 触发校验后立即渲染错误)。
-                    // form.state.isSubmitted 在首次 handleSubmit() 后变 true (TanStack Form)。
                     form.state.isSubmitted
                       ? firstErrorMessage(field().state.meta.errors)
                       : undefined
@@ -269,9 +219,9 @@ export function HomeAgentForm(): JSX.Element {
             )}
           </form.Field>
 
-          {/* row: workspace picker + LLM picker */}
+          {}
           <div class="flex items-center gap-2">
-            {/* workspace picker — bound to form.Field "workspaceId" */}
+            {}
             <form.Field
               name="workspaceId"
               validators={{ onBlur: effectSchema(WorkspaceIdFieldSchema) }}
@@ -283,7 +233,6 @@ export function HomeAgentForm(): JSX.Element {
                     value={field().state.value}
                     onChange={(id) => {
                       field().handleChange(id);
-                      // Keep chatStore.selectedWorkspaceId$ in sync (sidebar / future reads)
                       setSelectedWorkspaceId(id);
                     }}
                     placeholder="Select a workspace…"
@@ -301,8 +250,7 @@ export function HomeAgentForm(): JSX.Element {
                           return;
                         }
                         const ws = exit.value as { id: string } | null;
-                        if (!ws) {return;} // picker cancelled
-                        // Form field picks up the new workspace
+                        if (!ws) {return;} 
                         field().handleChange(ws.id);
                         setSelectedWorkspaceId(ws.id);
                       }}
@@ -314,7 +262,7 @@ export function HomeAgentForm(): JSX.Element {
               )}
             </form.Field>
 
-            {/* LLM picker — bound to form.Field "modelId" + appStore sync */}
+            {}
             <form.Field
               name="modelId"
               validators={{ onBlur: effectSchema(ModelIdFieldSchema) }}
@@ -324,7 +272,6 @@ export function HomeAgentForm(): JSX.Element {
                   value={field().state.value}
                   onChange={(modelId) => {
                     field().handleChange(modelId);
-                    // Sync to appStore so global default updates (ProviderCard / settings)
                     const providers = appStore.state.value.providers ?? [];
                     const provider = buildEnabledProviders(providers).find((p) =>
                       p.models.some((m) => m.id === modelId),
@@ -347,7 +294,7 @@ export function HomeAgentForm(): JSX.Element {
             </form.Field>
           </div>
 
-          {/* Send button — disabled when form not submittable */}
+          {}
           <div class="flex justify-end">
             <form.Subscribe
               selector={(state) => ({
@@ -374,7 +321,6 @@ export function HomeAgentForm(): JSX.Element {
   );
 }
 
-/** Default model id for the form. Falls back to first enabled provider's first model. */
 function initialModelId(): string {
   const providers = appStore.state.value.providers ?? [];
   const enabled = buildEnabledProviders(providers);

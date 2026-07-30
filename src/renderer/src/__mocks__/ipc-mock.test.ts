@@ -1,12 +1,9 @@
-//! Tests for the V3 IPC mock (src/__mocks__/ipc-mock.ts).
-//! These tests verify the V1.5+ mock implementation.
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { invoke, mockState, mockMinimaxProvider, mockDeepseekProvider, mockProvider } from "@codeman-frontend/__mocks__/ipc-mock";
 
 describe("IPC Mock - V1.5+ Schema", () => {
   beforeEach(() => {
-    // Reset mock state before each test
     mockState.rejected = undefined;
     mockState.calls = [];
     mockState.settings = {
@@ -75,8 +72,8 @@ describe("IPC Mock - V1.5+ Schema", () => {
       const result = await invoke("updateSettings", { newSettings: newSettings });
 
       expect((result as any).theme).toBe("light");
-      expect((result as any).userLanguage).toBe("en"); // preserved
-      expect((result as any).providers).toHaveLength(1); // preserved
+      expect((result as any).userLanguage).toBe("en"); 
+      expect((result as any).providers).toHaveLength(1); 
     });
 
     it("always sets schemaVersion to 1.5", async () => {

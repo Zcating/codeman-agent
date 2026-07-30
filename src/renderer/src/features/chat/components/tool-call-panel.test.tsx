@@ -1,17 +1,8 @@
-//! ToolCallPanel 组件契约测试。
-//!
-//! 纯 UI,不依赖 chat.store (props 流式)。
-//! 契约:
-//!  - 默认 <details> 折叠(关闭)— 用户可点 summary 手动展开查看 args/result
-//!  - summary 反映 status:running → "正在调用工具…",success → "已调用工具",error → "工具调用失败"
-//!  - data-testid="tool-call-panel" + data-message-id + data-tool-call-id 是稳定锚点
-//!  - 内嵌 ToolCallCard 渲染 args + result(由 mock 验证)
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import type { ToolCall, ToolResult } from "@codeman-frontend/shared/lib/types";
 
-// Mock ToolCallCard — 让 ToolCallPanel 测试聚焦容器契约,无需展开 args/result 子树
 vi.mock("./tool-call-card", () => ({
 	ToolCallCard: (props: { toolCall: ToolCall; result?: ToolResult }) => (
 		<div
@@ -96,9 +87,6 @@ describe("ToolCallPanel", () => {
 		expect(card?.getAttribute("data-has-result")).toBe("true");
 	});
 
-	// 回归断言:W3.x (commit 036e7cd) 把外层 assistant bubble 改成 w-full,
-	// 内嵌的 ToolCallPanel 也必须跟上 — 不再被 max-w-prose 卡片宽度限制。
-	// 防止以后 W3.x 宽度契约被无声回滚。
 	it("regression: <details> 没有 max-w-prose — 跟外层 assistant bubble (w-full) 同宽", () => {
 		const { container } = render(() => (
 			<ToolCallPanel toolCall={toolCall} messageId="msg-w3x" />

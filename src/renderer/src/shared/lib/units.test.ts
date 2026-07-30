@@ -1,8 +1,3 @@
-//! units.ts 单元测试 — 紧凑数字与千分位格式化边界。
-//!
-//! 覆盖矩阵:
-//! - compactNumber: NaN / Infinity / 0 / <1k 整数 / 1k-1M / 1M-1B / ≥1B / 负数 / 小数
-//! - formatWithCommas: NaN / Infinity / 0 / 千分位 / 大数
 
 import { describe, it, expect } from "vitest";
 import { compactNumber, formatWithCommas } from "@codeman-frontend/shared/lib/units";

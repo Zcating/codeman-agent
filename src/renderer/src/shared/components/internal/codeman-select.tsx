@@ -16,7 +16,7 @@ export interface CodemanSelectProps {
   disabled?: boolean;
   "aria-label"?: string;
   "data-testid"?: string;
-  children?: JSX.Element; // Action slot
+  children?: JSX.Element; 
 }
 
 export const CodemanSelect: Component<CodemanSelectProps> = (props) => {
@@ -24,7 +24,6 @@ export const CodemanSelect: Component<CodemanSelectProps> = (props) => {
     createListCollection({ items: props.options })
   );
 
-  // Ark UI Select passes { value: T[], items: T[] } to onValueChange
   const handleValueChange = (details: { value: string[] }) => {
     if (details.value.length > 0) {
       props.onChange(details.value[0]);
@@ -44,10 +43,6 @@ export const CodemanSelect: Component<CodemanSelectProps> = (props) => {
       value={props.value ? [props.value] : []}
       onValueChange={handleValueChange}
       disabled={props.disabled}
-      // sameWidth:false lets the dropdown size to its longest option, so long
-      // labels are not clipped against a narrow trigger.
-      // SelectContent uses w-max min-w-(--anchor-width) min-w-36 (in ui/select.tsx)
-      // to auto-expand the dropdown while keeping a sensible minimum width.
       positioning={{ sameWidth: false }}
     >
       <SelectTrigger

@@ -5,17 +5,12 @@ import type {
     ToolCall,
 } from "@earendil-works/pi-ai";
 
-/** Strict assistant check */
 export function isAssistantMessage(
     m: { role?: string } | null | undefined,
 ): m is AssistantMessage {
     return !!m && m.role === "assistant";
 }
 
-/** Lenient assistant check — preserves existing isAssistantLike semantics for fixtures
- *  lacking `role` field (mock test fixtures use bare objects). Acts as type guard
- *  since the lenient path only accepts messages whose content blocks are valid
- *  TextContent / ThinkingContent / ToolCall shapes. */
 export function isAssistantLikeMessage(m: unknown): m is AssistantMessage {
     if (!m || typeof m !== "object") {
         return false;
@@ -52,13 +47,6 @@ export function isToolCallBlock(b: unknown): b is ToolCall {
     return block.type === "toolCall" && typeof block.id === "string";
 }
 
-/**
- * Safely extract `.content` as an array of unknown blocks. Returns `[]` for
- * non-objects, null/undefined, missing `content`, string `content` (UserMessage
- * may carry string content), or any non-array `content`. Single source of
- * truth — replaces 3+ inline `m.content as unknown[]` casts (and the OLD
- * format fallback at runtime.ts that used `as unknown as { content?: ... }`).
- */
 export function contentOf(m: unknown): unknown[] {
     if (!m || typeof m !== "object") {
         return [];

@@ -1,4 +1,3 @@
-//! select.test.tsx — Contract tests for Select primitive
 import { render, screen, fireEvent, waitFor } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
 import { createListCollection } from "@ark-ui/solid";
@@ -64,12 +63,6 @@ describe("SelectItem", () => {
     expect(screen.getByTestId("item")).toHaveAttribute("data-slot", "select-item");
   });
 
-  // Regression (2026-07-26): SelectItem had focus:bg-accent but no hover:bg-accent,
-  // so mouse hover over an option was visually inert — no background change to
-  // signal which option would be picked. Focus style (keyboard nav) worked fine,
-  // mouse users got nothing. Fix: add hover:bg-accent hover:text-accent-foreground
-  // to match the focus state, so both keyboard and mouse users see the same
-  // visual feedback on the active option.
   it("applies hover:bg-accent so mouse hover on an option shows visual feedback", () => {
     render(() => (
       <SelectRoot collection={sampleCollection} open>
@@ -80,7 +73,6 @@ describe("SelectItem", () => {
       </SelectRoot>
     ));
     const item = screen.getByTestId("item");
-    // The fix adds hover:bg-accent + hover:text-accent-foreground to mirror focus.
     expect(item.className).toContain("hover:bg-accent");
     expect(item.className).toContain("hover:text-accent-foreground");
   });
@@ -159,12 +151,10 @@ describe("SelectScrollUpButton", () => {
       </SelectRoot>
     ));
     const content = screen.getByTestId("content");
-    // jsdom does not compute layout — mock overflow geometry.
     Object.defineProperty(content, "scrollHeight", { configurable: true, value: 500 });
     Object.defineProperty(content, "clientHeight", { configurable: true, value: 200 });
     fireEvent.scroll(content);
     await waitFor(() => {
-      // scrollTop=0 → up hidden, down visible
       expect(screen.getByTestId("up")).toHaveAttribute("data-hidden");
       expect(screen.getByTestId("down")).not.toHaveAttribute("data-hidden");
     });
@@ -209,7 +199,6 @@ describe("SelectScrollUpButton", () => {
       </SelectRoot>
     ));
     const content = screen.getByTestId("content");
-    // No overflow: scrollHeight === clientHeight
     Object.defineProperty(content, "scrollHeight", { configurable: true, value: 200 });
     Object.defineProperty(content, "clientHeight", { configurable: true, value: 200 });
     fireEvent.scroll(content);

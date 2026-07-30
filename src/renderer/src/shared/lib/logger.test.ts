@@ -1,6 +1,3 @@
-//! logger 单测（ADR-0018 D1）。
-//!
-//! 验证 4 个 level 方法都打到对应 `console.*` 且 prefix 正确。
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { logger, type LogLevel } from "@codeman-frontend/shared/lib/logger";
@@ -25,7 +22,6 @@ describe("logger", () => {
     errorSpy.mockRestore();
   });
 
-  /** 根据 method 拿到对应 spy（避免在 beforeEach 之前就引用 spy）。 */
   function spyFor(method: LogLevel): ReturnType<typeof vi.spyOn> {
     switch (method) {
       case "debug":

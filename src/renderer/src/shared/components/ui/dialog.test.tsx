@@ -1,4 +1,3 @@
-//! dialog.test.tsx — Contract tests for Dialog primitive
 import { render, screen } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -21,11 +20,9 @@ describe("Dialog", () => {
       </Dialog>
     ));
 
-    // Trigger should be visible
     expect(screen.getByTestId("trigger")).toBeInTheDocument();
     expect(screen.getByText("Open")).toBeInTheDocument();
 
-    // Content components should be in DOM
     expect(screen.getByTestId("content")).toBeInTheDocument();
     expect(screen.getByText("Title")).toBeInTheDocument();
     expect(screen.getByText("Description")).toBeInTheDocument();
@@ -50,7 +47,6 @@ describe("Dialog", () => {
 
     await user.click(screen.getByTestId("trigger"));
 
-    // onOpenChange should have been called when trigger is clicked
     expect(openChangeCalled).toBe(true);
   });
 
@@ -66,7 +62,6 @@ describe("Dialog", () => {
       </Dialog>
     ));
 
-    // Content should be in DOM but with closed state
     const content = screen.getByTestId("content");
     expect(content).toBeInTheDocument();
     expect(content).toHaveAttribute("data-state", "closed");

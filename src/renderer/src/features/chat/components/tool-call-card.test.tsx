@@ -1,7 +1,3 @@
-//! ToolCallCard 组件测试。
-//!
-//! 状态：running（无结果）、success（result，无 error）、error（result 带 error）。
-//! 纯 UI 组件。无 Effect 导入。无 store mocks 需要。
 
 import { describe, it, expect, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
@@ -18,7 +14,6 @@ describe("ToolCallCard", () => {
       args: { path: "/tmp/x.txt" },
     };
     const { container } = render(() => <ToolCallCard toolCall={toolCall} />);
-    // Polish: border 改走 shadcn token `border-border` (前是 border-zinc-300)
     const card = container.querySelector("[class*='border-border']");
     expect(card).toBeTruthy();
     const icon = card?.querySelector("[data-testid='icon-running']");
@@ -39,12 +34,10 @@ describe("ToolCallCard", () => {
       error: null,
     };
     const { container } = render(() => <ToolCallCard toolCall={toolCall} result={result} />);
-    // Polish: 成功态 border 走 `border-success/40` (前是 border-green-300)
     const card = container.querySelector("[class*='border-success']");
     expect(card).toBeTruthy();
     const icon = card?.querySelector("[data-testid='icon-success']");
     expect(icon?.getAttribute("aria-label")).toBe("success");
-    // V3.1: result section 不再折叠,直接拿 data-testid 断言
     const resultPre = card?.querySelector("[data-testid='tool-call-result']");
     expect(resultPre?.textContent).toContain("file content here");
   });
@@ -61,12 +54,10 @@ describe("ToolCallCard", () => {
       error: "File not found",
     };
     const { container } = render(() => <ToolCallCard toolCall={toolCall} result={result} />);
-    // Polish: 错误态 border 走 `border-destructive/40` (前是 border-red-300)
     const card = container.querySelector("[class*='border-destructive']");
     expect(card).toBeTruthy();
     const icon = card?.querySelector("[data-testid='icon-error']");
     expect(icon?.getAttribute("aria-label")).toBe("error");
-    // Polish: 错误消息容器走 `bg-destructive/10` (前是 bg-red-100)
     const errorDiv = card?.querySelector("[class*='bg-destructive']");
     expect(errorDiv?.textContent).toBe("File not found");
   });
@@ -78,7 +69,6 @@ describe("ToolCallCard", () => {
       args: { path: "/tmp/x.txt", encoding: "utf-8" },
     };
     const { container } = render(() => <ToolCallCard toolCall={toolCall} />);
-    // V3.1: args section 不再折叠,直接拿 data-testid 断言
     const argsPre = container.querySelector("[data-testid='tool-call-args']");
     expect(argsPre).toBeTruthy();
     expect(argsPre?.textContent).toContain("/tmp/x.txt");
@@ -94,7 +84,6 @@ describe("ToolCallCard", () => {
     const { container } = render(() => <ToolCallCard toolCall={toolCall} />);
     const card = container.querySelector("[class*='border-border']");
     expect(card).toBeTruthy();
-    // 验证路径标签存在
     const pathLabel = card?.querySelector("[class*='bg-primary/10']");
     expect(pathLabel?.textContent).toBe("/workspace/src/index.ts");
   });
@@ -106,10 +95,8 @@ describe("ToolCallCard", () => {
       args: { path: "/workspace/src/app.ts" },
     };
     const { container } = render(() => <ToolCallCard toolCall={toolCall} />);
-    // 验证有 SVG 图标渲染（FileText for read_file）
     const svgIcons = container.querySelectorAll("svg");
     expect(svgIcons.length).toBeGreaterThan(0);
-    // 验证工具名称
     const name = container.querySelector("code");
     expect(name?.textContent).toBe("read_file");
   });
@@ -121,7 +108,6 @@ describe("ToolCallCard", () => {
       args: {},
     };
     const { container } = render(() => <ToolCallCard toolCall={toolCall} />);
-    // 应该仍然渲染 SVG 图标（Wrench 回退）
     const svgIcons = container.querySelectorAll("svg");
     expect(svgIcons.length).toBeGreaterThan(0);
   });

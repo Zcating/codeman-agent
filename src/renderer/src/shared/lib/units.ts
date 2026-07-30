@@ -1,5 +1,3 @@
-//! 紧凑显示单位。供 PlanQuotaView 渲染剩余/总量时使用，
-//! 以 `1.2M` / `500k` 形式呈现，适用于 280x100 widget。
 
 export function compactNumber(n: number): string {
   if (!Number.isFinite(n)) {

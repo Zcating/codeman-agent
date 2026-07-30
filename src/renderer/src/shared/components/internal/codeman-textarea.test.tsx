@@ -55,7 +55,6 @@ describe("CodemanTextarea", () => {
     expect(container.textContent).toContain("内容不能为空");
   });
 
-  // ─── IME 安全 (Bug Fix regression:与 codeman-input 同源) ─────────────
   it("IME composition 期间 onInput 不触发 onValueChange", () => {
     const onChange = vi.fn();
     const { container } = render(() => (

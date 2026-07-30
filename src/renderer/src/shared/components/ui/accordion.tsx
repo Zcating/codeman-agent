@@ -1,4 +1,3 @@
-//! accordion.tsx — shadcn-style Accordion primitive wrapping @ark-ui/solid.
 
 import {
   AccordionItem as ArkAccordionItem,

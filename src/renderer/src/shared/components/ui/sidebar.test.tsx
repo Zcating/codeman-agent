@@ -1,6 +1,3 @@
-//! sidebar.test.tsx — TDD contract tests for Layer 1 sidebar primitive (shadcn-aligned).
-//! Covers 12 TDD seams: SidebarProvider context, controlled mode, CSS vars, variants,
-//! collapsible, MenuButton isActive/tooltip, MenuSub nesting, SidebarInset.
 import { render, screen, cleanup } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
@@ -123,8 +120,6 @@ describe("SidebarProvider controlled mode — seam 2", () => {
     const onOpenChange = vi.fn();
     const Consumer = () => {
       const ctx = useSidebar()!;
-      // Use effect-equivalent tracking by reading the open value inside JSX
-      // to ensure reactive update after setOpen
       return (
         <>
           <span data-testid="open">{String(ctx.open)}</span>
@@ -144,14 +139,11 @@ describe("SidebarProvider controlled mode — seam 2", () => {
     expect(screen.getByTestId("state").textContent).toBe("expanded");
     await user.click(screen.getByTestId("close"));
     expect(onOpenChange).toHaveBeenCalledWith(false);
-    // useSidebar() open is synchronously updated after setOpen
     expect(screen.getByTestId("open").textContent).toBe("false");
     expect(screen.getByTestId("state").textContent).toBe("collapsed");
   });
 
   it("A5: setOpen function reference is stable when state does not change", () => {
-    // When open state stays the same, the contextValue memo should not recompute,
-    // so setOpen (a closure over stable values) should keep the same reference.
     let setOpenRef1: ((v: boolean) => void) | undefined;
     let setOpenRef2: ((v: boolean) => void) | undefined;
     const Consumer1 = () => {
@@ -170,7 +162,6 @@ describe("SidebarProvider controlled mode — seam 2", () => {
         <Consumer2 />
       </SidebarProvider>
     ));
-    // Both consumers see the same setOpen reference (stable across contextValue memo)
     expect(setOpenRef1).toBe(setOpenRef2);
   });
 });
@@ -190,10 +181,6 @@ describe("SidebarProvider CSS vars injection — seam 3", () => {
   });
 
   it("CSS vars from index.css are declared in the stylesheet", () => {
-    // CSS vars --sidebar-width, --sidebar-width-icon, --sidebar-width-mobile
-    // are defined in index.css at :root level and inherited via CSS cascade.
-    // We verify this by checking that a Sidebar element (which uses these vars)
-    // renders correctly without errors.
     const { container } = render(() => (
       <SidebarProvider defaultOpen={true}>
         <Sidebar collapsible="none">
@@ -218,8 +205,6 @@ describe("Sidebar variants — seam 4", () => {
         </Sidebar>
       </SidebarProvider>
     ));
-    // The floating sidebar inner should have rounded-lg and shadow
-    // The aside should have the rounded and shadow class at the container level
     const aside = container.querySelector("aside");
     expect(aside?.className).toMatch(/rounded-lg/);
     expect(aside?.className).toMatch(/shadow/);
@@ -249,8 +234,6 @@ describe("Sidebar collapsible — seam 5", () => {
         </Sidebar>
       </SidebarProvider>
     ));
-    // When collapsible=none, no gap element should be present
-    // The sidebar should NOT have a collapsible gap div inside it
     const aside = container.querySelector("aside");
     expect(aside?.children.length).toBeLessThanOrEqual(1);
   });
@@ -265,7 +248,6 @@ describe("Sidebar collapsible — seam 5", () => {
     ));
     const aside = container.querySelector("aside");
     expect(aside).toBeTruthy();
-    // offcanvas should have some kind of structure
   });
 });
 
@@ -302,10 +284,8 @@ describe("SidebarMenuButton tooltip — seam 7", () => {
         <SidebarMenuButton tooltip="Hello tooltip">Item</SidebarMenuButton>
       </SidebarProvider>
     ));
-    // Button should be present
     const btn = screen.getByRole("menuitem");
     expect(btn).toBeInTheDocument();
-    // The button text should be there
     expect(btn.textContent).toContain("Item");
   });
 });
@@ -331,13 +311,11 @@ describe("SidebarMenuSub nesting — seam 8", () => {
         </SidebarMenu>
       </SidebarProvider>
     ));
-    // All levels should be present
     expect(screen.getByText("Workspace")).toBeInTheDocument();
     expect(screen.getByText("Conv 1")).toBeInTheDocument();
     expect(screen.getByText("Conv 2")).toBeInTheDocument();
-    // Sub items should have proper tag
     const subItems = document.querySelectorAll("li");
-    expect(subItems.length).toBeGreaterThanOrEqual(3); // 1 menuitem + 2 subitems
+    expect(subItems.length).toBeGreaterThanOrEqual(3); 
   });
 
   it("SidebarMenuButton exposes 'group/row' so descendants can use group-hover/row:", () => {
@@ -409,7 +387,6 @@ describe("Shell slots — structural", () => {
 
   it("SidebarSeparator renders hr/div separator", () => {
     const { container } = render(() => <SidebarSeparator />);
-    // separator renders as a div or hr
     const sep = container.querySelector("[class*='bg-sidebar-border']");
     expect(sep).toBeTruthy();
   });
@@ -472,17 +449,13 @@ describe("Shell slots — structural", () => {
     expect(container.querySelector("ul")).toBeTruthy();
   });
 
-  // ─── subItem right-edge alignment with Item (2026-07-25) ───────────────────
   describe("subItem right-edge alignment", () => {
     it("SidebarMenuSub ul has NO right-side indent (no mx-*, no pr-*)", () => {
       const { container } = render(() => <SidebarMenuSub><li>sub</li></SidebarMenuSub>);
       const ul = container.querySelector('[data-slot="sidebar-menu-sub"]') as HTMLElement;
       expect(ul).toBeTruthy();
-      // No mx-* (would right-indent ul by 14px)
       expect(ul.className).not.toMatch(/\bmx-/);
-      // No px-* (would right-pad ul content by 10px)
       expect(ul.className).not.toMatch(/\bpx-/);
-      // No pr-* (any explicit right padding)
       expect(ul.className).not.toMatch(/\bpr-/);
     });
 

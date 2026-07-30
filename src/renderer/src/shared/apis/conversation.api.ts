@@ -1,4 +1,3 @@
-// ConversationApi - rendered ConversationApi Tag + Live Layer for conversation domain IPC.
 import { Effect, Context, Layer } from "effect";
 import type { Conversation } from "../lib/types";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";

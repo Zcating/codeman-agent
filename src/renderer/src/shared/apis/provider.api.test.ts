@@ -1,4 +1,3 @@
-// provider Api IPC 测试，搬迁自 shared/lib/ipc.test.ts
 import { it, expect, beforeEach } from "@effect/vitest";
 import { describe } from "vitest";
 import { Effect, Layer, Exit } from "effect";
@@ -9,7 +8,6 @@ import {
 import type { Provider } from "../lib/types";
 import { TauriError } from "./invoke.api";
 
-// ─── Mock Data ────────────────────────────────────────────────
 
 const mockProvider: Provider = {
   id: "minimax",
@@ -35,7 +33,6 @@ const mockProvider: Provider = {
 
 const mockProviderList: Provider[] = [mockProvider];
 
-// ─── Mock Layers ──────────────────────────────────────────────
 
 const MockProviderApiLive = Layer.succeed(ProviderApi, {
   list: () => Effect.succeed(mockProviderList.filter((p) => p.enabled)),

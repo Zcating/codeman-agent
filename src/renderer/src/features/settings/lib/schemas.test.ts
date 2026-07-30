@@ -44,7 +44,6 @@ describe("settings schemas (ADR-0025 PR 4)", () => {
 
   it("SettingsSchema rejects missing required field", () => {
     const invalid = {
-      // missing user_language
       theme: "system" as const,
       start_at_login: false,
       window: {},
@@ -56,10 +55,6 @@ describe("settings schemas (ADR-0025 PR 4)", () => {
   });
 });
 
-// Task 9 (Phase-3 review J1): SettingsSchema's `window`, `system_prompt`,
-// `conversations` fields are typed against WindowSettings /
-// SystemPromptSettings / ConversationSettings from src/shared/lib/types.ts.
-// Partial / malformed entries reject at decode time.
 describe("SettingsSchema — opaque sub-schemas typed (ADR-0025 review J1)", () => {
   it("rejects partial settings when window is missing required fields", () => {
     const partialSettings = {
@@ -67,7 +62,6 @@ describe("SettingsSchema — opaque sub-schemas typed (ADR-0025 review J1)", () 
       user_language: "auto" as const,
       theme: "system" as const,
       start_at_login: false,
-      // missing remember_size / default_size / min_size
       window: { remember_position: true },
       system_prompt: { default: "", user_can_edit: true },
       conversations: { auto_archive_after_days: 30, max_history: 1000 },

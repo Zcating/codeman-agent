@@ -1,51 +1,11 @@
-//! Mock LLM provider helper for e2e tests.
-//!
-//! Registers a Provider record whose `baseUrl` points at the Electron Main
-//! started local mock server (`http://127.0.0.1:50000/mock/anthropic`, per
-//! CONTEXT.md 「Fake LLM Provider」). The mock server (`src/main/mock-server.ts`)
-//! reads Q→A entries from the shared dev seed `src/assets/qa.dev.json`
-//! (per ADR-0027) — a single source of truth shared between dev mode and
-//! e2e tests. Tests send user messages whose substring matches a `question:`
-//! field in that file (e2e spec keys like "04::hello-intro" / "08::sandbox"
-//! are positioned before generic dev keys like "hello" so substring
-//! first-wins match picks the more specific e2e entry first).
-//!
-//! Usage:
-//!   await useMockProvider(page);
-//!   // user sends a message whose substring is in qa.dev.json#question entry
-//!
-//! Per ADR-0027: 4 Playwright workers each load the same `qa.dev.json` in
-//! their own mock-server process (port `50000 + parallelIndex` to avoid
-//! EADDRINUSE). Workers do NOT need per-worker isolation of the Q→A table —
-//! spec keys are uniquely prefixed (`XX::`) so cross-worker substring
-//! overlap is impossible by construction.
-//!
-//! Field-name policy: e2e fixture writes camelCase to match V15 Settings JSON
-//! wire format (per ADR-0024 D10). See `src/main/settings-schema.ts:5`.
 
 import { TauriPage } from "./cdp-driver";
 import { invoke } from "./helpers";
 
 const MOCK_PROVIDER_ID = "mock";
-/**
- * Per-worker mock-server URL. `window.__mockBaseUrl` is injected by the
- * per-worker fixture (e2e/fixtures.ts) via `Page.addScriptToEvaluateOnNewDocument`
- * so each worker fetches its own mock-server port (50000 + parallelIndex).
- * Falls back to the legacy hardcoded URL when the global is absent.
- */
 const MOCK_BASE_URL_FALLBACK = "http://127.0.0.1:50000/mock/anthropic";
 const MOCK_MODEL = "mock-model";
 
-/**
- * Switch settings to use the mock provider. Sets the mock provider as the
- * default LLM with baseUrl pointing at the local mock server.
- *
- * The mock provider accepts any non-empty apiKey (Authorization header is sent
- * but the local server ignores it; this is real fetch, no JS shim).
- *
- * Per-worker mock port: the renderer uses `window.__mockBaseUrl` (injected by
- * the per-worker fixture) so it can fetch the worker-specific mock server.
- */
 export async function useMockProvider(page: TauriPage): Promise<void> {
   const current = await invoke<any>(page, "getSettings");
   const mockBaseUrl: string = await page.evaluate(() => {
@@ -73,7 +33,6 @@ export async function useMockProvider(page: TauriPage): Promise<void> {
       modelsEndpoint: "",
     },
   };
-  // Add mock provider to the list (or replace if already exists), then make it default.
   const existing = (current.providers ?? []).filter((p: any) => p.id !== MOCK_PROVIDER_ID);
   const newSettings: any = {
     ...current,
@@ -82,10 +41,6 @@ export async function useMockProvider(page: TauriPage): Promise<void> {
   };
 
   await invoke(page, "updateSettings", { newSettings });
-  // 关键: updateSettings 是 raw IPC,只更新后端。chat-view 的 handleSend 读
-  // appStore.state.value(内存 Solid signal),这 signal 不会因为 IPC 而变。
-  // 必须显式调 appStore.refreshAsync() 把后端新值拉回前端,否则 send 时还用旧 provider。
-  // appStore 通过 window.__appStore 暴露(只在 webview dev 模式有效)。
   await page.evaluate(async () => {
     const w = window as unknown as {
       __appStore?: { refreshAsync: () => Promise<unknown> };

@@ -1,15 +1,9 @@
-// 默认折叠:thinking 文本属于 agent 内部推理过程,默认对用户不可见,需要时点 summary 手动展开。
-// streaming 期间也保持折叠 — 用户通过正文 Markdown 流式输出感知 agent 进度。
-// summary 标签反映 streaming 状态("思考中…" vs "已思考")。
 
 import { Brain } from "lucide-solid";
 
 export interface ThinkingPanelProps {
-	/** 累积 thinking 文本内容 */
 	thinking: string;
-	/** 是否仍处于 streaming (仅影响 summary label: "思考中…" vs "已思考") */
 	streaming: boolean;
-	/** message 的 id,作为 data-message-id 锚点 */
 	messageId: string;
 }
 

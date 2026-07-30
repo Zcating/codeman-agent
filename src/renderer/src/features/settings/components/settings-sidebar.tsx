@@ -1,12 +1,3 @@
-//! SettingsSidebar — settings-domain wrapper for the universal CodemanSidebar.
-//!
-//! 4 flat nav items: LLM / App / Window / Advanced. URL is single source of
-//! truth: `currentValue` derived from `/settings/$tab` route param.
-//! `onMenuSelect` navigates to `/settings/{value}`.
-//!
-//! Renders `<Outlet />` inside CodemanSidebar's children slot — this makes
-//! SettingsSidebar the layout component (the router uses it directly as
-//! `/settings` route's `component`).
 
 import { type JSX } from "solid-js";
 import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/solid-router";
@@ -24,14 +15,6 @@ import {
   type CodemanSidebarMenuOption,
 } from "@codeman-frontend/shared/components/internal/codeman-sidebar";
 
-/**
- * Static config for the 4 settings nav items.
- * Tab icons chosen per V2.5 design:
- * - LLM       → Brain       (mental model: AI configuration)
- * - App       → SlidersHorizontal (behavior toggles)
- * - Window    → AppWindow   (window sizing)
- * - Advanced  → Terminal    (danger zone, low-level)
- */
 const SETTINGS_NAV: readonly CodemanSidebarMenuOption[] = [
   { label: "LLM", value: "llm", icon: <Brain class="h-4 w-4" aria-hidden="true" /> },
   {
@@ -53,14 +36,7 @@ const SETTINGS_NAV: readonly CodemanSidebarMenuOption[] = [
 
 export function SettingsSidebar(): JSX.Element {
   const navigate = useNavigate();
-  // Read `from` from router state — the chat sidebar's "设置" link passes
-  // `state={{ from: location.pathname }}` so the Back button returns to
-  // the page the user was on before entering settings (e.g. /conversation/c-1)
-  // instead of a settings subpage (e.g. /settings/llm).
   const location = useLocation();
-  // TanStack Router's `useParams` returns a typed accessor; we read `tab`
-  // with a single cast through a named alias (instead of `as unknown as`)
-  // so the type narrows consistently for downstream consumers.
   type SettingsParams = { tab?: string };
   const params = useParams({ strict: false });
   const currentTab = (): string | undefined =>
@@ -79,9 +55,6 @@ export function SettingsSidebar(): JSX.Element {
 
   const handleBack = (): void => {
     const state = location().state as { from?: string } | undefined;
-    // Fallback to "/" when no `from` is set (deep-link entry, browser refresh,
-    // or direct URL paste). Don't use window.history.back() because that
-    // would land on a settings subpage if the user has navigated between tabs.
     const target = state?.from ?? "/";
     navigate({ to: target });
   };
@@ -90,8 +63,6 @@ export function SettingsSidebar(): JSX.Element {
     {
       label: "Settings",
       value: "settings",
-      // Flat nav: each tab is a Menu leaf directly under the group. No
-      // MenuGroups (Accordion) needed.
       children: SETTINGS_NAV.map(tab => ({
         label: tab.label,
         value: tab.value,

@@ -1,5 +1,3 @@
-//! sidebar.tsx — Layer 1 shadcn-style sidebar primitive.
-//! Pure layout, ZERO business logic. Wraps @ark-ui/solid for Accordion/Tooltip.
 
 import type { JSX } from "solid-js";
 import { createSignal, createContext, useContext, mergeProps, splitProps, Show } from "solid-js";
@@ -31,17 +29,13 @@ export interface SidebarProviderProps {
 export function SidebarProvider(props: SidebarProviderProps): JSX.Element {
   const merged = mergeProps({ defaultOpen: true }, props);
 
-  // Internal state for uncontrolled mode
   const [internalOpen, setInternalOpen] = createSignal(merged.defaultOpen);
 
-  // Controlled: use props.open if provided, otherwise use internal
   const isControlled = () => props.open !== undefined;
   const open = () => (isControlled() ? props.open! : internalOpen());
 
   const setOpen = (value: boolean) => {
-    // Always notify if onOpenChange is provided
     props.onOpenChange?.(value);
-    // Only update internal state if not controlled
     if (!isControlled()) {
       setInternalOpen(value);
     }
@@ -49,9 +43,6 @@ export function SidebarProvider(props: SidebarProviderProps): JSX.Element {
 
   const toggleSidebar = () => setOpen(!open());
 
-  // isMobile is an intentional stub — plan Q6=A deferred mobile Sheet support.
-  // If mobile support is added later: createMemo(() => matchMedia('(max-width: 768px)').matches)
-  // + effect to sync on media change.
 
   return (
     <SidebarContext.Provider
@@ -383,9 +374,6 @@ export function SidebarMenuSub(props: { class?: string; children?: JSX.Element }
       data-slot="sidebar-menu-sub"
       data-sidebar="menu-sub"
       class={cn(
-        // Codeman override: left-only indent so subItem right edge aligns
-        // with Item buttons (Rename + Delete line up across rows). shadcn's
-        // default uses symmetric mx-3.5 + px-2.5.
         "ml-3.5 flex min-w-0 flex-col gap-1 border-l border-sidebar-border pl-2.5 py-0.5",
         "group-data-[collapsible=icon]:hidden",
         local.class,

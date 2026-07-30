@@ -1,7 +1,3 @@
-//! 05 — 文件工具 E2E (mock LLM): workspace 创建 + 增删改查 + 沙箱隔离。
-//!
-//! 使用 mock LLM provider (e2e/mock-provider.ts),不依赖 .env 真实 key。
-//! Mock 队列由 e2e mock LLM 消费,确定性返回 tool call + text,不依赖网络。
 
 import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
 import type { Workspace } from "../src/renderer/shared/lib/types";
@@ -22,8 +18,6 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
 
-    // D8-W: workspace provisioned via WorkspaceService IPC (workspace not referenced
-    // by name in tests; mock-server 不调真实 file tool — workspace 仅保证 chat-view 渲染)
     await invoke<Workspace>(page, "addWorkspace", {
       label: "Mock E2E Test Workspace",
       rootPath: e2eRoot,
@@ -45,10 +39,7 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
     });
     await cancelRunningAgent(page);
     await clearAllHistory(page);
-    // clickNewConversationAndWait title send → default Q→A entry (warning SSE)
     await clickNewConversationAndWait(page);
-    // Wait for streaming from clickNewConversationAndWait to complete
-    // (Send button reappears when streamingMessageId is cleared)
     try {
       await page.locator('button[type="submit"]').waitFor({ state: "visible", timeout: 10_000 });
     } catch {
@@ -68,7 +59,6 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
     fs.writeFileSync(targetFile, "TODO: fix bug\nDONE: ok", "utf-8");
 
     const textarea = page.locator('textarea[placeholder="发条消息…"]');
-    // Q→A: 05f::ambiguous-edit → tool_use(edit_file) + 05f::ambiguous-error → error text
     await textarea.fill("05f::ambiguous-edit Try edit_file with ambiguous match");
     await submitForm(page);
 
@@ -97,12 +87,10 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
 
   test("mock plain text response appears (diagnostic)", async ({ tauriEnv }) => {
     const { page } = tauriEnv;
-    // Q→A: 05f::plain-text → text response
     const textarea = page.locator('textarea[placeholder="发条消息…"]');
     await textarea.fill("05f::plain-text Test plain text response");
     await submitForm(page);
 
-    // Wait for assistant bubble (up to 15s)
     const deadline = Date.now() + 15_000;
     let bodyText = "";
     while (Date.now() < deadline) {
@@ -126,24 +114,20 @@ test.describe("05 — 文件工具 (mock LLM)", () => {
 
     const textarea = page.locator('textarea[placeholder="发条消息…"]');
 
-    // Q→A: 05f::search-todo → tool_use(search_files) + 05f::search-results → text
     await textarea.fill("05f::search-todo Find all .ts files containing 'TODO'");
     await submitForm(page);
 
-    // Wait for user message to appear (confirms sendMessage was called)
     try {
       await page.locator('textarea[placeholder="发条消息…"]').waitFor({ state: "visible", timeout: 5_000 });
-    } catch { /* ok */ }
+    } catch {  }
     await new Promise((r) => setTimeout(r, 1000));
 
-    // DIAGNOSE: check if assistant stub exists
     const hasAssistant = await page.evaluate(() => {
       const body = document.body.textContent ?? "";
       return { bodyPreview: body.slice(0, 500), thinkingEl: document.querySelector("[data-testid='thinking-indicator']") !== null };
     });
     console.log("[diag/search_files] state after 1s:", JSON.stringify(hasAssistant));
 
-    // Wait for the mock to be consumed (up to 30s)
     const deadline = Date.now() + 30_000;
     let finalText = "";
     while (Date.now() < deadline) {

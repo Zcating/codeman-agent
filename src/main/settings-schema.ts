@@ -1,6 +1,5 @@
 import { Schema } from "effect";
 
-// ─── V15 Schema definitions ────────────────
 
 const ModelMetaStruct = Schema.Struct({
   id: Schema.String,
@@ -17,7 +16,6 @@ const ProviderBillingStruct = Schema.Struct({
 const ProviderLlmStruct = Schema.Struct({
   defaultModel: Schema.String,
   baseUrl: Schema.String,
-  /** V1 only supports anthropic-messages protocol */
   apiType: Schema.Literal("anthropic-messages"),
   contextWindow: Schema.optional(Schema.Number),
   models: Schema.Array(ModelMetaStruct),
@@ -28,7 +26,6 @@ const ProviderStruct = Schema.Struct({
   id: Schema.String,
   label: Schema.String,
   enabled: Schema.Boolean,
-  /** plaintext in Settings JSON */
   apiKey: Schema.String,
   llm: ProviderLlmStruct,
   billing: Schema.optional(ProviderBillingStruct),
@@ -55,12 +52,9 @@ export const SettingStruct = Schema.Struct({
     autoArchiveAfterDays: Schema.Number,
     maxHistory: Schema.Number,
   }),
-  // V3.1: 已启用的 skill 名字列表 (按名字, 不含整个 manifest)。
-  // 用于 runtime 在 system prompt 注入 <available_skills>...</available_skills> 段。
   enabledSkills: Schema.optional(Schema.Array(Schema.String)),
 });
 
-// ─── Derived types (preserves downstream `import type { Settings }`) ──
 
 export type ModelMeta = Schema.Schema.Type<typeof ModelMetaStruct>;
 export type ProviderBilling = Schema.Schema.Type<typeof ProviderBillingStruct>;
@@ -68,7 +62,6 @@ export type ProviderLlm = Schema.Schema.Type<typeof ProviderLlmStruct>;
 export type Provider = Schema.Schema.Type<typeof ProviderStruct>;
 export type Settings = Schema.Schema.Type<typeof SettingStruct>;
 
-// ─── Constants ──────────────────────────────────────────────────
 
 const MIN_SIZE_WIDTH = 100;
 const MIN_SIZE_HEIGHT = 100;
@@ -92,8 +85,6 @@ export const DEFAULT_SETTINGS: Settings = {
         baseUrl: MINIMAX_BASE_URL,
         apiType: "anthropic-messages",
         contextWindow: 200_000,
-        // Pre-populate with the default model so the LLM picker has at least
-        // one option out of the box (matches app.store.ts default).
         models: [
           {
             id: MINIMAX_DEFAULT_MODEL,
@@ -123,14 +114,7 @@ export const DEFAULT_SETTINGS: Settings = {
   enabledSkills: ["commit-helper", "code-review", "explain-error", "summarize"],
 };
 
-// ─── sanitize() ──────────────────────────────────────────────────
 
-/**
- * Clamp settings to documented invariants. Per amendment: V15 fields
- * use camelCase on disk and in IPC payload.
- * Uses Schema.decodeUnknownEither for input validation — falls back to
- * DEFAULT_SETTINGS on parse failure.
- */
 export function sanitize(input: Partial<Settings>): Settings {
   const decoded = Schema.decodeUnknownEither(SettingStruct)(input);
   const safe: Settings =

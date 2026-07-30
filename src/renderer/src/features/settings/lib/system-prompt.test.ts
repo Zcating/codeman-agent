@@ -2,15 +2,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Effect } from "effect";
 import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 
-// Mock solid-js/store before importing app.store (same as app.store.test.ts)
-// 必须支持 Solid setStore 的两种签名：
-//   - 1-arg: setStore(valueOrFn) — 整体替换
-//   - 2-arg: setStore("path", valueOrFn) — 路径更新（app.store.ts 用的就是这种）
-// 不在 vitest.setup.ts 全局注册:见 settings.test.tsx 同位置注释。
 vi.mock("solid-js/store", () => {
   let store: { value: unknown } = { value: null };
   const setStore = vi.fn((...args: unknown[]) => {
-    // 取正确的 updater 参数：2-arg 时是 args[1]，1-arg 时是 args[0]
     const updater = args.length === 2 ? args[1] : args[0];
     if (typeof updater === "function") {
       store.value = (updater as (prev: unknown) => unknown)(store.value);

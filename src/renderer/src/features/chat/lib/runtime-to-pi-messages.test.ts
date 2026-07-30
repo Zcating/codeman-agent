@@ -320,7 +320,6 @@ describe("toPiMessages()", () => {
       ],
       MODEL,
     );
-    // 2 users only — system skipped (lives in Context.systemPrompt)
     expect(result).toHaveLength(2);
     expect(result.map((m) => m.role)).toEqual(["user", "user"]);
   });
@@ -359,9 +358,7 @@ describe("toPiMessages()", () => {
       "toolResult",
       "assistant",
     ]);
-    // Check toolName lookup works across message boundary
     expect((result[2] as ToolResultMessage).toolName).toBe("calc");
-// Check final assistant synthesized correctly
         const finalAssistant = result[3] as AssistantMessage;
         expect(finalAssistant.content).toEqual([{ type: "text", text: "4" }]);
         expect(finalAssistant.usage.input).toBe(10);
@@ -376,22 +373,6 @@ describe("toPiMessages()", () => {
   });
 });
 
-// ─── G32: assistant.toolResults (ADR-0028) — 不再是 role:'tool' 单独 message ──────
-//
-// ADR-0028 把 toolResults 从独立的 role:'tool' message 搬到
-// assistant message 自身 (per-turn bubble boundary)。handleTurnEnd 把 turn 的
-// toolResults 聚到 done.event.message.toolResults → chat.store 持久化到
-// assistant.role 的 .toolResults 字段 (snake_case ToolResult[])。
-//
-// Bug: runtime-to-pi-messages.ts 的 assistant case 只 push mapAssistant
-// (返回 AssistantMessage 不带 toolResults),不调用 mapToolResult →
-// toPiMessages 输出丢 toolResults → anthropic-transport.buildAnthropicRequestBody
-// 发到 API 的请求里 assistant(tool_use) 后**没有** user(tool_result) →
-// Anthropic API 400: "tool call result does not follow tool call (2013)"。
-//
-// 修复: assistant case 检测 m.toolResults 非空时,逐条 emit ToolResultMessage
-// 在 AssistantMessage 之后 (顺序: assistant → toolResult1 → toolResult2 → ...)。
-// 保留 legacy 'tool' role case 不变 (老 DB 灰度迁移)。
 describe("toPiMessages() — G32: assistant.toolResults (ADR-0028)", () => {
   it("assistant with toolResults:[{tc1}] → AssistantMessage + 1 ToolResultMessage", () => {
     const result = toPiMessages(
@@ -410,7 +391,7 @@ describe("toPiMessages() — G32: assistant.toolResults (ADR-0028)", () => {
     expect(result[1].role).toBe("toolResult");
     const trMsg = result[1] as ToolResultMessage;
     expect(trMsg.toolCallId).toBe("tc1");
-    expect(trMsg.toolName).toBe("read_file"); // 从同 message 的 toolCalls lookup
+    expect(trMsg.toolName).toBe("read_file"); 
     expect(trMsg.content).toEqual([{ type: "text", text: "file content" }]);
   });
 
@@ -469,14 +450,9 @@ describe("toPiMessages() — G32: assistant.toolResults (ADR-0028)", () => {
       "toolResult",
       "user",
     ]);
-    // 关键: 关键 — assistant(tool_use) 后**紧跟** toolResult(tc1),然后 user 新 prompt
-    // 这是 Anthropic API 协议要求: tool_use 后必须紧跟 tool_result,否则 400 报
-    // "tool call result does not follow tool call (2013)"
   });
 
   it("toolName lookup prefers own toolCalls over lastAssistantToolCalls (per-turn ownership)", () => {
-    // 之前的 assistant 有 toolCalls=[tc_OLD],当前 assistant 有 tc_NEW
-    // 当前 assistant.toolResults 里 tc_NEW 的 toolName 必须 lookup 自己的 toolCalls
     const result = toPiMessages(
       [
         assistantMsg({

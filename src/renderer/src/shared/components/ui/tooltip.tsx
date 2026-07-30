@@ -1,4 +1,3 @@
-//! tooltip.tsx — shadcn-style Tooltip primitive wrapping @ark-ui/solid Tooltip.
 
 import type { JSX } from "solid-js";
 import { splitProps } from "solid-js";
@@ -46,9 +45,7 @@ export function TooltipTrigger(props: TooltipTriggerProps): JSX.Element {
 }
 
 export interface TooltipContentProps {
-  /** @deprecated placement is handled by @ark-ui/solid internally */
   side?: never;
-  /** @deprecated alignment is handled by @ark-ui/solid internally */
   align?: never;
   class?: string;
   children?: JSX.Element;

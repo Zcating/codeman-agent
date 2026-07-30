@@ -1,9 +1,3 @@
-// Data flow:
-// - Reads `workspaces$()` + `conversations$()` from chat.store (Solid Accessors)
-// - Builds `CodemanSidebarGroupOption[]` tree (one project group with workspaces as
-//   MenuGroups, conversations as Menus inside each MenuGroup's `children`)
-// - Wires all chat-domain handlers (select / delete / rename / new conv / empty ws)
-// - Passes URL-derived `selectedConvId` as `currentValue` for active highlight
 
 import { type JSX } from "solid-js";
 import { Outlet, useLocation, useNavigate, useParams, Link } from "@tanstack/solid-router";
@@ -27,7 +21,6 @@ import { RowActions } from "@codeman-frontend/features/chat/components/row-actio
 import { NewChatButton } from "@codeman-frontend/features/chat/components/new-chat-button";
 import { getPluginMetadata } from "@codeman-frontend/plugins";
 
-/** Maps registry icon string identifiers to lucide-solid JSX elements. */
 function renderPluginIcon(pluginId: string, iconName: string): JSX.Element {
   switch (iconName) {
     case "WandSparkles":
@@ -39,36 +32,27 @@ function renderPluginIcon(pluginId: string, iconName: string): JSX.Element {
   }
 }
 
-// ─── ChatSidebar ───────────────────────────────────────────────────────────
 
 export function ChatSidebar(): JSX.Element {
   const navigate = useNavigate();
-  // Capture the current pathname so the settings "Back" button can return
-  // to the page the user was on before entering settings (not to a
-  // settings subpage like /settings/llm or /settings/app).
   const location = useLocation();
 
-  // URL-derived active conv id (URL is single source of truth)
   const params = useParams({ strict: false });
   const selectedConvId = (): string | null =>
     (params() as { convId?: string }).convId ?? null;
 
-  // Current pathname for plugin route active detection
   const currentPathname = (): string => location().pathname;
 
   const wsList = (): Workspace[] => workspaces$() ?? [];
 
-  // ─── Handlers ────────────────────────────────────────────────────────────
 
   const handleSelectConv = (id: string): void => {
-    // Handle plugin navigation using registry metadata
     const metadata = getPluginMetadata();
     const pluginMeta = metadata.get(id);
     if (pluginMeta) {
       navigate({ to: pluginMeta.route.path });
       return;
     }
-    // Handle conversation navigation
     navigate({ to: `/conversation/${id}` });
   };
 
@@ -80,8 +64,6 @@ export function ChatSidebar(): JSX.Element {
     navigate({ to: "/" });
   };
 
-  // Simplified workspace rename — directly calls chatSidebarActions.renameWorkspace
-  // (no showRenameDialog modal; inline edit is handled by RowActions)
   const handleRenameWorkspaceSimple = async (
     workspaceId: string,
     newLabel: string,
@@ -92,10 +74,6 @@ export function ChatSidebar(): JSX.Element {
     }
   };
 
-  // Workspace delete — directly calls chatSidebarActions.removeWorkspace.
-  // RowActions manages the inline-confirm UI; this handler performs the
-  // deletion and handles navigation side effect (if deleting the workspace
-  // that owns the currently-viewed conversation, navigate home).
   const handleDeleteWorkspace = async (workspaceId: string): Promise<void> => {
     const ok = await chatSidebarActions.removeWorkspace(workspaceId);
     if (!ok) {
@@ -111,9 +89,6 @@ export function ChatSidebar(): JSX.Element {
     }
   };
 
-  // Conversation delete — calls chatSidebarActions.deleteConversation.
-  // If deleting the currently-viewed conversation, navigates home to avoid
-  // staying on a deleted conv view.
   const handleConvDelete = async (convId: string): Promise<void> => {
     await chatSidebarActions.deleteConversation(convId);
     const currentConvId = selectedConvId();
@@ -122,22 +97,15 @@ export function ChatSidebar(): JSX.Element {
     }
   };
 
-  // Conversation rename — calls chatSidebarActions.renameConversation.
-  // Mirrors handleRenameWorkspaceSimple error-handling pattern.
   const handleConvRename = async (
     convId: string,
     newTitle: string,
   ): Promise<void> => {
     await chatSidebarActions.renameConversation(convId, newTitle);
-    // Note: chatSidebarActions.renameConversation swallows errors internally
-    // (runEffect pattern). If failure notification is needed in future,
-    // mirror the logger.error pattern from handleRenameWorkspaceSimple.
   };
 
-  // ─── Sidebar tree builders ───────────────────────────────────────────────
 
   const options = (): CodemanSidebarGroupOption[] => {
-    // Build plugin group from registry metadata
     const metadata = getPluginMetadata();
     const pluginChildren = Array.from(metadata.values())
       .filter((plugin) => plugin.sidebar.visible)
@@ -157,7 +125,6 @@ export function ChatSidebar(): JSX.Element {
       children: pluginChildren,
     };
 
-    // Project group only included when there are workspaces
     if (wsList().length === 0) {
       return [pluginGroup];
     }
@@ -168,10 +135,6 @@ export function ChatSidebar(): JSX.Element {
       children: wsList().map((ws): CodemanSidebarMenuGroupOption => ({
         label: ws.label,
         value: ws.id,
-        // Per-group Accordion (sidebar-reshim Q28 reversal): default-expanded
-        // so all workspaces' conv lists are visible at first render (matches
-        // the previous per-group expanded-by-default behavior). Users can
-        // collapse individual workspaces by clicking them.
         defaultExpanded: true,
         children: conversations$()
           ?.filter((c) => c.workspaceId === ws.id)
@@ -207,18 +170,13 @@ export function ChatSidebar(): JSX.Element {
     />
   );
 
-  // ─── Render ──────────────────────────────────────────────────────────────
 
-  // Custom active predicate: handles both conversation active state (by convId)
-  // and plugin route active state (by pathname match when on /plugins pages)
   const isActive = (value: string | undefined): boolean => {
     if (!value) return false;
     const pathname = currentPathname();
-    // Plugin routes: match by pathname when on /plugins pages
     if (pathname.startsWith("/plugins")) {
       return pathname.includes(value);
     }
-    // Conversation routes: match by convId
     return value === selectedConvId();
   };
 

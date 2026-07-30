@@ -1,11 +1,3 @@
-//! createProviderFormDialog() — Settings UI imperative dialog for adding a new Provider.
-//!
-//! Implementation: thin wrapper around `Dialog.show<Provider>` from
-//! `shared/components/internal/codeman-dialog.tsx`.
-//! Dismiss path (Cancel / ESC / overlay click) resolves `null`.
-//! Form state lives inside renderFn closure; each call opens fresh.
-//! Mock (dev) radio pre-fills via buildMockDevTemplate(); Real API clears fields.
-//! All IPC + persistence stays outside the dialog — caller owns provider storage.
 
 import { createSignal } from "solid-js";
 import {
@@ -81,7 +73,7 @@ export function createProviderFormDialog(): Promise<Provider | null> {
           <DialogDescription>Choose a provider type</DialogDescription>
         </DialogHeader>
 
-        {/* Radio */}
+        {}
         <div class="flex flex-col gap-2">
           <label class="flex items-center gap-2 text-sm">
             <input type="radio" name="provider-type" value="real" checked={type() === "real"} onChange={() => handleTypeChange("real")} data-testid="provider-type-real" />
@@ -93,7 +85,7 @@ export function createProviderFormDialog(): Promise<Provider | null> {
           </label>
         </div>
 
-        {/* Fields */}
+        {}
         <div class="flex flex-col gap-3 mt-4">
           <div><label class="text-xs text-muted-foreground">Label</label>
             <CodemanInput

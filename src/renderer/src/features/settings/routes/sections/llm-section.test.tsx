@@ -1,12 +1,3 @@
-//! LlmSection — `/settings/llm` route component tests.
-//!
-//! Migrated from settings.test.tsx (V1.5 provider rendering tests).
-//! Verifies:
-//! - Renders 1 card for 1 provider
-//! - Renders 2 cards for 2 providers
-//! - Shows empty state when providers[] is empty
-//! - Footer has Save button
-//! - Add provider button is visible
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, cleanup } from "@solidjs/testing-library";
@@ -15,8 +6,6 @@ import { LlmSection } from "@codeman-frontend/features/settings/routes/sections/
 import { mockState, SettingsV15 } from "@codeman-frontend/__mocks__/ipc-mock";
 import type { Provider } from "@codeman-frontend/shared/lib/types";
 
-// Mock solid-js/store — LlmSection imports appStore, appStore uses createStore.
-// jsdom lacks Solid reactive context, this mock provides minimal proxy.
 vi.mock("solid-js/store", () => {
   let store: { value: unknown } = { value: null };
   const setStore = vi.fn((...args: unknown[]) => {
@@ -46,7 +35,6 @@ vi.mock("solid-js/store", () => {
 
 import { appStore, _resetAppStoreForTest } from "@codeman-frontend/shared/stores/app.store";
 
-// V1.5 mock providers
 const mockMiniMaxProvider: Provider = {
   id: "minimax",
   label: "MiniMax",

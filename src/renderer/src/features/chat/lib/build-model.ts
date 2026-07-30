@@ -1,5 +1,3 @@
-// NOTE: pi-ai 的 getModel() 仅适用于内置注册表 providers (openai/anthropic/google 等)。
-// V1.5 自定义 providers (minimax/deepseek) 需要手动构造 Model 对象。
 import type { Model } from "@earendil-works/pi-ai";
 import type { Provider, ModelMeta } from "@codeman-frontend/shared/lib/types";
 
@@ -10,18 +8,6 @@ export class BuildModelError extends Error {
   }
 }
 
-/**
- * 从 V1.5 Provider 配置构建 pi-ai Model 对象。
- *
- * @param provider - V1.5 Provider 对象（包含 llm 配置）
- * @param modelId - 要使用的模型 ID（必须存在于 provider.llm.models 中）
- * @returns Model<'anthropic-messages'> 对象
- * @throws BuildModelError - 当模型不存在或 API key ref 缺失时
- *
- * T14: 使用 provider.llm.base_url 作为 baseUrl，
- * provider.api_key 做 API key 存在性验证（实际 key 由 runtime 运行时从 Provider.api_key 读取），
- * provider.llm.api_type 固定为 "anthropic-messages"。
- */
 export function buildModel(provider: Provider, modelId: string): Model<"anthropic-messages"> {
   if (!provider.apiKey) {
     throw new BuildModelError(`No API key configured for provider '${provider.id}'`);
@@ -36,8 +22,6 @@ export function buildModel(provider: Provider, modelId: string): Model<"anthropi
     );
   }
 
-  // NOTE: API key 实际值由 runtime 运行时从 Provider.api_key 读取，
-  // 此处仅返回 Model 对象结构，apiKey 字段由 ProviderTransport.getApiKey 回调填充。
   const model: Model<"anthropic-messages"> = {
     id: meta.id,
     name: meta.label,
@@ -45,7 +29,7 @@ export function buildModel(provider: Provider, modelId: string): Model<"anthropi
     provider: provider.id,
     baseUrl: provider.llm.baseUrl ?? "",
     reasoning: meta.thinking,
-    input: ["text"], // V1.5 models 目前仅支持文本输入
+    input: ["text"], 
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: meta.contextWindow ?? 128000,
     maxTokens: 8192,

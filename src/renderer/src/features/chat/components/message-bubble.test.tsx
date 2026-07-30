@@ -1,24 +1,15 @@
-//! MessageBubble 组件测试 — 每个角色一个（user, assistant, tool, system）。
-//!
-//! 纯 UI 组件。无 Effect 导入。
-//!
-//! V3 重构:tool_calls 不再委托 ToolCallsPanel,直接在 assistant bubble 内 inline
-//! 渲染 ToolCallCard。thinking section (Brain 图标 + 可折叠 pre) 新增,仅在
-//! message.thinking 非空时出现。
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 import { MessageBubble } from "@codeman-frontend/features/chat/components/message-bubble";
 import type { Message, ToolCall, ToolResult, FileMatch } from "@codeman-frontend/shared/lib/types";
 
-// Mock chat.store (MessageBubble 内部用 isStreaming memo 读 store.byId[…].streamingMessageId)
 vi.mock("../stores/chat.store", () => ({
   store: {
     byId: {} as Record<string, { streamingMessageId: string | null }>,
   },
 }));
 
-// Mock ToolCallCard — 让 inline tool_call 渲染断言更聚焦,无需展开 args/result 子树
 vi.mock("./tool-call-card", () => ({
   ToolCallCard: (props: { toolCall: ToolCall; result?: ToolResult }) => (
     <div
@@ -32,7 +23,6 @@ vi.mock("./tool-call-card", () => ({
   ),
 }));
 
-// ─── Helpers ────────────────────────────────────────────────────────
 
 function makeUserMsg(overrides: Partial<Message> = {}): Message {
   return {
@@ -71,7 +61,6 @@ function makeAssistantMsg(overrides: Partial<Message> = {}): Message {
 describe("MessageBubble", () => {
   afterEach(() => cleanup());
 
-  // ─── user 角色 ─────────────────────────────────────────────────────
 
   it("user 角色：HTML 转义内容", () => {
     const msg = makeUserMsg({
@@ -84,7 +73,6 @@ describe("MessageBubble", () => {
     expect(bubble?.textContent).toContain("<script>alert('xss')</script>");
   });
 
-  // ─── assistant 角色 ────────────────────────────────────────────────
 
   it("assistant 角色：Markdown 渲染加粗", () => {
     const msg = makeAssistantMsg({ content: "Hello **world**" });
@@ -193,7 +181,6 @@ describe("MessageBubble", () => {
     const children = Array.from(bubble!.children).map(
       (c) => c.getAttribute("data-testid") ?? c.tagName,
     );
-    // 顺序:thinking → tool calls → text content
     expect(children.indexOf("thinking-panel")).toBeLessThan(
       children.indexOf("inline-tool-calls"),
     );
@@ -202,7 +189,6 @@ describe("MessageBubble", () => {
     );
   });
 
-  // ─── tool 角色 (保留 V2 既有行为,这块无重构) ─────────────────────
 
   it("tool 角色：显示 Tool 结果摘要", () => {
     const toolResults: ToolResult[] = [{ toolCallId: "tc-1", result: { ok: true }, error: null }];
@@ -221,7 +207,6 @@ describe("MessageBubble", () => {
     expect(container.querySelector("[data-testid='tool-success']")).toBeTruthy();
   });
 
-  // ─── system 角色 ────────────────────────────────────────────────────
 
   it("system 角色：静音文本", () => {
     const msg: Message = makeUserMsg({
@@ -236,7 +221,6 @@ describe("MessageBubble", () => {
     expect(bubble?.textContent).toContain("You are a helpful assistant.");
   });
 
-  // ─── tool_results error/success 分支测试 (V2 既有) ─────────────────
 
   it("tool_results[0].error 存在时用 text-destructive + ❌", () => {
     const toolResults: ToolResult[] = [
@@ -276,7 +260,6 @@ describe("MessageBubble", () => {
     expect(container.querySelector("[data-testid='tool-success']")).toBeTruthy();
   });
 
-  // ─── 长字符串 tool result 渲染 details 测试 (V2 既有) ────────────
 
   it("tool result string.length > 200 渲染 details + 行数", () => {
     const longResult = "a".repeat(250);
@@ -297,7 +280,6 @@ describe("MessageBubble", () => {
     expect(nestedDetails?.length).toBeGreaterThan(1);
   });
 
-  // ─── FileMatch[] array 渲染测试 (V2 既有) ─────────────────────────
 
   it("tool result array (FileMatch[]) 渲染 match list", () => {
     const toolResults: ToolResult[] = [

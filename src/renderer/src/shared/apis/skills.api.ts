@@ -1,6 +1,3 @@
-//! SkillsApi domain — extracted from ipc.ts for domain split.
-//!
-//! Wraps the 2 skills IPC channels: skillsScan, skillsLoad.
 
 import { Effect, Layer, Context } from "effect";
 import { invoke } from "./invoke.api";

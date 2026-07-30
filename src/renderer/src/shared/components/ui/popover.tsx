@@ -1,14 +1,3 @@
-//! popover.tsx -- shadcn-style Popover primitive wrapping @ark-ui/solid Popover.
-//!
-//! Compound components: Popover, PopoverAnchor, PopoverTrigger, PopoverContent,
-//! PopoverTitle, PopoverDescription, PopoverClose.
-//!
-//! Notes on the API:
-//! - Popover is controlled via `open` / `defaultOpen` + `onOpenChange`.
-//! - PopoverContent renders inside a Portal; positioning is delegated to
-//!   PopoverPositioner, which handles viewport collision and flipping.
-//! - PopoverAnchor accepts a virtual `getBoundingClientRect()` ref (the anchor
-//!   rect) so callers can re-anchor when the trigger is not a real element.
 
 import type { JSX } from "solid-js";
 import { splitProps } from "solid-js";
@@ -28,40 +17,11 @@ export interface PopoverProps {
   open?: ArkPopoverRootProps["open"];
   defaultOpen?: ArkPopoverRootProps["defaultOpen"];
   onOpenChange?: (details: { open: boolean }) => void;
-  /** Optional id passed to @ark-ui for deterministic ids. */
   id?: ArkPopoverRootProps["id"];
-  /**
-   * Positioning options forwarded to @ark-ui/solid. Use this instead of
-   * passing `side` / `align` to PopoverContent; positioning is configured
-   * on the root, not the positioner.
-   */
   positioning?: ArkPopoverRootProps["positioning"];
-  /**
-   * Whether @ark-ui/solid should auto-focus the popover content on open.
-   * Default in @ark-ui is `true`, which steals focus from any trigger
-   * outside the popover. For "anchored to a text input" use cases (slash
-   * menus, mention pickers) set this to `false` so the input keeps focus
-   * and keystrokes continue to flow into it.
-   */
   autoFocus?: ArkPopoverRootProps["autoFocus"];
-  /**
-   * Whether @ark-ui/solid should restore focus to the trigger when the
-   * popover closes. Default is `true`. Set to `false` if there is no
-   * trigger (controlled via `open` prop) or if you manage focus yourself.
-   */
   restoreFocus?: ArkPopoverRootProps["restoreFocus"];
-  /**
-   * Whether the popover should close when the user clicks outside of it.
-   * @ark-ui default is `true`. Set to `false` if outside-click should be
-   * handled by the caller (e.g. when the popover is anchored to a text
-   * input and the user is expected to keep interacting with it).
-   */
   closeOnInteractOutside?: ArkPopoverRootProps["closeOnInteractOutside"];
-  /**
-   * Whether the popover should close when the user presses Escape.
-   * @ark-ui default is `true`. Useful to disable if Escape is handled
-   * at a higher level (e.g. closing the parent dialog).
-   */
   closeOnEscape?: ArkPopoverRootProps["closeOnEscape"];
   children?: JSX.Element;
 }
@@ -101,7 +61,6 @@ export function Popover(props: PopoverProps): JSX.Element {
 }
 
 export interface PopoverAnchorProps extends ArkPopoverAnchorProps {
-  /** Optional class for the anchor wrapper. */
   class?: string;
 }
 

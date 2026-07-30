@@ -1,16 +1,9 @@
-//! 04 — 流式 LLM 非空文本验收。
-//!
-//! 验证 V1 chat 域的流式 LLM 输出。使用 mock LLM provider（不依赖 .env 真实 key）。
-//! Mock 提供确定性流式响应，验证 assistant bubble 包含 ≥5 char 文本。
-//!
-//! 与 spec 07 结构一致：mock provider → enqueue 响应 → 发送消息 → 验证气泡。
 
 import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
 import { useMockProvider } from "./mock-provider";
 import * as path from "node:path";
 import * as os from "node:os";
 
-// Q→A question substring: 04::hello-intro
 const USER_PROMPT = "04::hello-intro 用一句话介绍你自己";
 
 test.describe("04 — 流式 LLM 非空文本", () => {
@@ -19,13 +12,11 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
 
-    // D8-W: provision workspace
     await invoke(page, "addWorkspace", {
       label: "E2E Mock Test Workspace",
       rootPath: path.join(os.tmpdir(), `codeman-e2e-mock-${process.pid}-${Math.random().toString(36).slice(2, 8)}`),
     });
 
-    // 使用 mock provider，不依赖真实 API key
     await useMockProvider(page);
   });
 
@@ -33,7 +24,6 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     const { page } = tauriEnv;
     await cancelRunningAgent(page);
     await clearAllHistory(page);
-    // clickNewConversationAndWait 走 UI 发送标题时会触发 LLM（用 default Q→A entry）
     await clickNewConversationAndWait(page);
   });
 
@@ -41,26 +31,20 @@ test.describe("04 — 流式 LLM 非空文本", () => {
     test.setTimeout(60_000);
     const { page } = tauriEnv;
 
-    // Q→A entry 04::hello-intro 输出 "你好！我是一个 AI 助手，很高兴认识你。"
-    // ADR-0027 D2: per-worker fixtures removed — single seed now.
 
-    // 等待 Send 按钮出现（clickNewConversationAndWait 触发的 mock 完成后）
     try {
       await page.locator('button[type="submit"]').waitFor({ state: "visible", timeout: 10_000 });
     } catch {
       await cancelRunningAgent(page);
     }
 
-    // textarea 应启用
     const textarea = page.locator('textarea[placeholder="发条消息\u2026"]');
     await assert.visible(textarea, { timeout: 10_000 });
     await assert.enabled(textarea);
 
-    // 输入并发送
     await textarea.fill(USER_PROMPT);
     await submitForm(page);
 
-    // 30s 内观察到 ≥5 char assistant 文本
     const deadline = Date.now() + 30_000;
     let ok = false;
     while (Date.now() < deadline) {

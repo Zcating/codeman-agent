@@ -17,7 +17,6 @@ import {
 } from "@codeman-frontend/plugins/mcp/stores/store";
 import type { McpServerStatus, McpServerInfo } from "@codeman-frontend/shared/lib/types";
 
-// ─── Status pill ────────────────────────────────────────────────
 
 const STATUS_LABEL: Record<McpServerStatus["kind"], string> = {
   disabled: "Disabled",
@@ -74,7 +73,6 @@ function StatusPill(props: { status: McpServerStatus }): JSX.Element {
   );
 }
 
-// ─── Server row ────────────────────────────────────────────────
 
 interface ServerRowProps {
   server: McpServerInfo;
@@ -144,10 +142,8 @@ function ServerRow(props: ServerRowProps): JSX.Element {
   );
 }
 
-// ─── Main component ─────────────────────────────────────────────
 
 export interface McpSettingsTabProps {
-  /** Called when openConfigDir is triggered */
   onOpenConfigDir?: () => void;
 }
 

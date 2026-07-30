@@ -1,4 +1,3 @@
-//! Tests for FileApi — migrated from ipc.test.ts lines 206-215.
 
 import { it, expect } from "@effect/vitest";
 import { describe } from "vitest";
@@ -10,7 +9,6 @@ describe("FileApi", () => {
     Effect.gen(function* () {
       const svc = yield* FileApi;
       const result = yield* svc.readFile("main", "/tmp/x.txt");
-      // mockState.resolved is undefined by default, so result is undefined
       expect(result).toBeUndefined();
     }).pipe(Effect.provide(FileApiLive)),
   );

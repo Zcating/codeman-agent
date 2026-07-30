@@ -1,7 +1,3 @@
-//! V3.1 MCP — JSON-RPC 2.0 client tests (ADR-0032 Phase B mini-1).
-//!
-//! Uses Node `stream.PassThrough` for in-memory Readable + Writable simulation
-//! (no real child process spawning — that's tested separately in mcp-host.test.ts).
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { PassThrough } from "node:stream";
@@ -14,23 +10,17 @@ interface Pair {
   conn: JsonRpcConnection;
 }
 
-/** Simulate a child process: readable = child's stdout (we read from), writable = child's stdin (we write to). */
 function makePair(timeoutMs?: number): Pair {
-  // Two-way pipeline:
-  //   writable (parent writes)  →  readable (parent reads via conn)
-  // We use a PassThrough that we write to and the conn reads from.
   const readable = new PassThrough();
   const writable = new PassThrough();
   const conn = new JsonRpcConnection(readable, writable, { timeoutMs });
   return { readable, writable, conn };
 }
 
-/** Helper: feed a complete JSON-RPC line into the readable side. */
 function feedLine(readable: PassThrough, response: object): void {
   readable.write(JSON.stringify(response) + "\n");
 }
 
-/** Helper: wait one microtask tick. */
 async function tick(): Promise<void> {
   await Promise.resolve();
 }
@@ -46,7 +36,6 @@ describe("JsonRpcConnection", () => {
     await pair.conn.close();
   });
 
-  // ─── framing ─────────────────────────────────────
 
   it("writes newline-delimited JSON request", async () => {
     const writeSpy = vi.spyOn(pair.writable, "write");
@@ -65,7 +54,6 @@ describe("JsonRpcConnection", () => {
     expect(written).not.toContain("params");
   });
 
-  // ─── request/response matching ─────────────────────────────
 
   it("resolves request when matching response arrives", async () => {
     const p = pair.conn.request<string>("echo", { x: 1 });
@@ -90,26 +78,22 @@ describe("JsonRpcConnection", () => {
     expect(JSON.parse(writes[0]!).id).toBe(1);
     expect(JSON.parse(writes[1]!).id).toBe(2);
     expect(JSON.parse(writes[2]!).id).toBe(3);
-    // Resolve all so jest doesn't complain about unhandled rejections.
     feedLine(pair.readable, { jsonrpc: "2.0", id: 1, result: "x" });
     feedLine(pair.readable, { jsonrpc: "2.0", id: 2, result: "y" });
     feedLine(pair.readable, { jsonrpc: "2.0", id: 3, result: "z" });
     await expect(Promise.all([p1, p2, p3])).resolves.toEqual(["x", "y", "z"]);
   });
 
-  // ─── timeout ──────────────────────────────
 
   it("rejects with JsonRpcTimeoutError when no response within timeoutMs", async () => {
     const { conn } = makePair(20);
     const p = conn.request("slow");
-    // Use p.catch directly — avoids double-handling via expect.rejects + p.catch.
     const err = await p.catch((e: unknown) => e);
     expect(err).toBeInstanceOf(JsonRpcTimeoutError);
     expect(err).toMatchObject({ method: "slow", timeoutMs: 20 });
-    conn.close(); // cleanup; no pending requests left
+    conn.close(); 
   });
 
-  // ─── error response ──────────────────────────────
 
   it("rejects with JsonRpcProtocolError when response carries error object", async () => {
     const p = pair.conn.request("fail");
@@ -124,12 +108,10 @@ describe("JsonRpcConnection", () => {
     expect(err).toMatchObject({ code: -32600, message: "Invalid Request" });
   });
 
-  // ─── partial-line buffering ─────────────────────────────
 
   it("buffers partial JSON until newline", async () => {
     const p = pair.conn.request("slow");
     await tick();
-    // Split the response across two chunks: `{...}` split mid-message
     pair.readable.write('{"jsonrpc":"2.0","id":1,');
     pair.readable.write('"result":"done"}\n');
     await expect(p).resolves.toBe("done");
@@ -145,10 +127,8 @@ describe("JsonRpcConnection", () => {
     await expect(Promise.all([p1, p2])).resolves.toEqual(["A", "B"]);
   });
 
-  // ─── malformed input ─────────────────────────────
 
   it("rejects with JsonRpcProtocolError on malformed JSON", () => {
-    // The error is thrown synchronously inside the data handler — wrap in try/catch.
     expect(() => pair.readable.write("not valid json\n")).toThrow(JsonRpcProtocolError);
   });
 
@@ -158,7 +138,6 @@ describe("JsonRpcConnection", () => {
     ).toThrow(JsonRpcProtocolError);
   });
 
-  // ─── notifications ──────────────────────────────
 
   it("notify() writes a notification without id", () => {
     const writeSpy = vi.spyOn(pair.writable, "write");
@@ -176,7 +155,6 @@ describe("JsonRpcConnection", () => {
     expect(received).toEqual([{ method: "log", params: { msg: "hi" } }]);
   });
 
-  // ─── close + EOF ──────────────────────────────
 
   it("close() rejects all pending requests", async () => {
     const p = pair.conn.request("never");
@@ -197,16 +175,12 @@ describe("JsonRpcConnection", () => {
     await expect(p).rejects.toBeInstanceOf(JsonRpcProtocolError);
   });
 
-  // ─── late/unknown response ─────────────────────────────
 
   it("ignores responses with unknown id (e.g. late after timeout)", async () => {
-    // Use a short timeout pair to avoid 60s default in this scenario.
     const { conn, readable } = makePair(50);
     const p = conn.request("slow");
-    // Wait for timeout to fire
     const err = await p.catch((e: unknown) => e);
     expect(err).toBeInstanceOf(JsonRpcTimeoutError);
-    // Late response after timeout — should be silently dropped, not throw
     expect(() =>
       readable.write('{"jsonrpc":"2.0","id":1,"result":"late"}\n'),
     ).not.toThrow();

@@ -1,7 +1,3 @@
-// 纯 UI。读取 Message prop。不导入 effect。
-//
-// assistant bubble 走 `w-full`，去卡片宽度限制和卡片背景，与右侧 user bubble 的 `bg-primary` 卡片
-// 形成"流式文档 + 消息气泡"对照。
 
 import { Show, For, createMemo } from "solid-js";
 import { XCircle, CheckCircle2 } from "lucide-solid";
@@ -11,7 +7,6 @@ import type { Message, ToolResult, FileMatch, ToolCall } from "@codeman-frontend
 import { store } from "@codeman-frontend/features/chat/stores/chat.store";
 import { renderMarkdown } from "@codeman-frontend/features/chat/lib/markdown";
 
-/** Escape user-provided text to prevent XSS. */
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -21,11 +16,6 @@ function escapeHtml(s: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** 把 message 内的 tool_calls 与 tool_results 配对,产出 render-ready 列表。
- *
- *  顺序保持 tool_calls 数组顺序,跟 LLM 决策顺序一致。
- *  没匹配的 tool_call result 为 undefined (→ ToolCallCard 走 running 态)。
- */
 function pairToolCalls(message: Message): Array<{ toolCall: ToolCall; result: ToolResult | undefined }> {
   if (!message.toolCalls) {return [];}
   const resultsById = new Map<string, ToolResult>();
@@ -41,7 +31,6 @@ function pairToolCalls(message: Message): Array<{ toolCall: ToolCall; result: To
 export function MessageBubble(props: { message: Message }) {
   const role = () => props.message.role;
 
-  // 该 message 是否还在 streaming (用于 ThinkingPanel summary 文案"思考中…"vs"已思考"区分)
   const isStreaming = createMemo(() => {
     const cs = store.byId[props.message.conversationId];
     return cs?.streamingMessageId === props.message.id;
@@ -60,17 +49,10 @@ export function MessageBubble(props: { message: Message }) {
         />
       </Show>
       <Show when={role() === "assistant"}>
-        {/* V3: 单个 bubble div 包住 thinking + tool calls + markdown。
-            之前这里写的是 sibling div + ToolCallsPanel,在 flex 父容器里两个 flex item
-            会 side-by-side 排列 — 视觉 broken。
-            W3.x: w-full 去 max-w-prose 宽度限制 + 去 rounded-lg/bg-card/border 卡片样式,
-            左侧 assistant 流式全宽,见 module doc 顶部 W3.x 段。 */}
         <div
           class="w-full p-3 leading-relaxed break-words text-foreground space-y-2"
           data-testid="agent-bubble"
         >
-          {/* 1. 思考过程 (仅 assistant + 非空) — ThinkingPanel 是可折叠 details,
-              默认折叠(streaming 与否都收起),用户可点 summary 手动展开 */}
           <Show when={hasThinking()}>
             <ThinkingPanel
               thinking={props.message.thinking ?? ""}
@@ -79,8 +61,6 @@ export function MessageBubble(props: { message: Message }) {
             />
           </Show>
 
-          {/* 2. 工具调用 (顺序:跟 LLM 决策顺序一致) — ToolCallPanel 是 details 容器,
-              默认折叠,summary 行携带工具名 + status,需要看 args/result 才点开 */}
           <Show when={hasTools()}>
             <div class="space-y-1.5" data-testid="inline-tool-calls">
               <For each={pairedTools()}>
@@ -95,7 +75,6 @@ export function MessageBubble(props: { message: Message }) {
             </div>
           </Show>
 
-          {/* 3. 正文 Markdown — typeset 样式系统,见 src/renderer/src/typeset.css */}
           <Show when={hasContent()}>
             <div
               class="typeset typeset-chat"
@@ -104,7 +83,6 @@ export function MessageBubble(props: { message: Message }) {
             />
           </Show>
 
-          {/* fallback: 三块全空 (e.g. abort 在第一个 token 之前) — 渲染占位 */}
           <Show when={!hasThinking() && !hasTools() && !hasContent()}>
             <div class="text-xs text-muted-foreground italic">(空响应)</div>
           </Show>
@@ -142,7 +120,6 @@ export function MessageBubble(props: { message: Message }) {
                       </pre>
                     </details>
                   </Show>
-                  {/* search_files result: render match list */}
                   <Show when={Array.isArray(tr.result) && (tr.result as unknown[]).length > 0}>
                     <div class="mt-2 space-y-1">
                       <For each={tr.result as FileMatch[]}>
@@ -169,8 +146,6 @@ export function MessageBubble(props: { message: Message }) {
         </details>
       </Show>
       <Show when={role() === "system"}>
-        {/* Polish C2: system 消息用 lab-warning 替代 amber(避免 cream/warm 默认)。
-            不写 border + shadow 组合(只有 border)。 */}
         <div class="max-w-prose p-3 rounded-lg leading-relaxed break-words bg-warning/10 text-warning-foreground italic border border-warning/30">
           {props.message.content}
         </div>

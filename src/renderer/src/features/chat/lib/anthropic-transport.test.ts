@@ -15,7 +15,6 @@ import type {
 } from "@earendil-works/pi-ai";
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
 
-// ─── helpers ─────────────────────────────────────────────────────────────────
 
 function makeMessage(role: Message["role"], content: unknown): Message {
     return {
@@ -29,7 +28,6 @@ function makeMessage(role: Message["role"], content: unknown): Message {
     } as unknown as Message;
 }
 
-/** Build a ReadableStream from a string (UTF-8). */
 function makeSseStream(text: string): ReadableStream<Uint8Array> {
     const encoder = new TextEncoder();
     return new ReadableStream({
@@ -40,7 +38,6 @@ function makeSseStream(text: string): ReadableStream<Uint8Array> {
     });
 }
 
-// ─── Test fixtures ───────────────────────────────────────────────────────────
 
 const testModel: Model<"anthropic-messages"> = {
     id: "test-model",
@@ -65,7 +62,6 @@ const testOptions: SimpleStreamOptions = {
     apiKey: "test-key",
 };
 
-// ─── Group A — parseSseLine ──────────────────────────────────────────────────
 
 describe("parseSseLine -- SSE line parser", () => {
     it("A1: empty string returns {}", () => {
@@ -89,7 +85,6 @@ describe("parseSseLine -- SSE line parser", () => {
     });
 });
 
-// ─── Group B -- buildAnthropicRequestBody ─────────────────────────────────────
 
 describe("buildAnthropicRequestBody -- Anthropic request body", () => {
     it("B1: user role + string content -> role:'user', content:string", () => {
@@ -146,7 +141,6 @@ describe("buildAnthropicRequestBody -- Anthropic request body", () => {
         const assistantMsg = makeMessage("assistant", []);
         const messages: Message[] = [makeMessage("user", "hello"), assistantMsg];
         const result = buildAnthropicRequestBody(model, "system", messages, []);
-        // only the user message should be present
         expect(result.messages.length).toBe(1);
         expect(result.messages[0].role).toBe("user");
     });
@@ -171,18 +165,6 @@ describe("buildAnthropicRequestBody -- Anthropic request body", () => {
         });
     });
 
-    // ─── G33: Multi tool_use → batch tool_results into ONE user message ────────
-    //
-    // Anthropic API 协议: assistant(tool_use A, tool_use B) 后,所有对应的
-    // tool_result 必须**全部**放在紧跟的**同一个** user message 里 (batch)。
-    // 拆成多个 user message 会让第二个 tool_result 的 tool_use 不在 immediate
-    // preceding assistant,API 400: "tool call result does not follow tool call
-    // (2013)"。
-    //
-    // 触发场景: pi-agent-core Agent 处理一个 turn 里 N 个并行 tool_use
-    // (例如 read_file + search_files 同时),handleTurnEnd 把所有 tool_results
-    // 聚到 assistant.toolResults。toPiMessages (G32 fix) 拆出 N 个
-    // ToolResultMessage,anthropic-transport 必须把它们 batch 进 1 个 user。
     it("G33: 2 consecutive toolResult messages → batched into 1 user message with 2 tool_results", () => {
         const model = { id: "test-model" };
         const tr1 = makeMessage("toolResult", [
@@ -237,7 +219,6 @@ describe("buildAnthropicRequestBody -- Anthropic request body", () => {
     });
 });
 
-// ─── Group G -- anthropicStream HTTP path (mocked fetch + ReadableStream) ─────
 
 describe("anthropicStream -- real HTTP path (mocked fetch + ReadableStream)", () => {
     let fetchSpy: ReturnType<typeof vi.spyOn>;
@@ -356,11 +337,9 @@ describe("anthropicStream -- real HTTP path (mocked fetch + ReadableStream)", ()
 
         const stream = await anthropicStream(testModel, testContext, testOptions);
         const events: AssistantMessageEvent[] = [];
-        // Should NOT throw; invalid JSON is swallowed
         for await (const evt of stream) {
             events.push(evt);
         }
-        // Stream should still close via done with empty content
         const doneEvent = events.find((e) => e.type === "done");
         expect(doneEvent).toBeDefined();
     });
@@ -423,7 +402,6 @@ describe("anthropicStream -- real HTTP path (mocked fetch + ReadableStream)", ()
     });
 
     it("G7: response.body=null -> push error event containing 'Anthropic API 200'", async () => {
-        // Use a plain object that has ok=true but body=null
         const mockResp = { ok: true, status: 200, body: null, text: async () => "" };
         fetchSpy = vi
             .spyOn(globalThis, "fetch")
@@ -442,13 +420,6 @@ describe("anthropicStream -- real HTTP path (mocked fetch + ReadableStream)", ()
         }
     });
 
-    // Regression: mock-server (qa.dev.json "hello" entry) emits abbreviated SSE
-    //   event: message_start
-    //   event: content_block_delta (NO content_block_start preceding)
-    //   event: message_stop
-    // The lenient fix auto-inits the text block on first content_block_delta so
-    // assistantMsg.content[0].text is defined. Before the fix, this threw
-    // TypeError "Cannot read properties of undefined (reading 'text')".
     it("G8: lenient init -- content_block_delta WITHOUT preceding content_block_start still produces text block", async () => {
         const sse =
             "event: message_start\n" +
@@ -484,7 +455,6 @@ describe("anthropicStream -- real HTTP path (mocked fetch + ReadableStream)", ()
     });
 });
 
-// ─── Group H -- parseSseStream abort-during-cleanup (bug fix regression test) ───
 
 describe("parseSseStream -- abort during cleanup race", () => {
     const testModel: Model<"anthropic-messages"> = {
@@ -500,22 +470,8 @@ describe("parseSseStream -- abort during cleanup race", () => {
         maxTokens: 8192,
     };
 
-    /**
-     * Regression test for the abort-during-cleanup bug.
-     *
-     * Bug: parseSseStream() reads all SSE chunks and accumulates content blocks.
-     * If signal.aborted becomes true AFTER the reader loop exits (done: true)
-     * but BEFORE the final return check, accumulated content is discarded and
-     * replaced with makeAbortedMessage (content: []).
-     *
-     * The fix: if content has been accumulated, return it even when aborted.
-     * Only return makeAbortedMessage when content is truly empty.
-     */
 
     it("H1: non-empty content → returns accumulated content regardless of abort state", async () => {
-        // This test verifies the fix by checking that non-empty content is returned.
-        // We simulate a stream that completes normally (no abort during reading),
-        // then abort fires AFTER the stream is consumed. The content should be preserved.
         const sse =
             "event: message_start\ndata: {\"type\":\"message_start\"}\n\n" +
             "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n" +
@@ -536,25 +492,17 @@ describe("parseSseStream -- abort during cleanup race", () => {
         const { signal } = abortController;
         const eventStream = createAssistantMessageEventStream();
 
-        // Abort after stream is consumed - using setTimeout to defer
-        // The key assertion: content should be preserved even when abort fires
-        // after stream completion but before function returns.
         setTimeout(() => abortController.abort(), 0);
 
         const result = await parseSseStream(readableStream, testModel, signal, eventStream);
 
-        // The fix ensures content is preserved even when aborted after stream completion
         const textBlock = result.content.find(
             (b) => b.type === "text",
         ) as { type: "text"; text: string } | undefined;
         expect(textBlock?.text).toBe("hello world");
-        // stopReason may be 'stop' (normal) or 'aborted' depending on timing,
-        // but content MUST be preserved either way
     });
 
     it("H2: empty content + abort → returns makeAbortedMessage (content: [])", async () => {
-        // Edge case: stream yields no content, then abort fires.
-        // Since there's no content to preserve, makeAbortedMessage is correct.
         const emptySse = "";
 
         const encoder = new TextEncoder();
@@ -573,13 +521,10 @@ describe("parseSseStream -- abort during cleanup race", () => {
 
         const result = await parseSseStream(readableStream, testModel, signal, eventStream);
 
-        // Empty content + abort = makeAbortedMessage is appropriate
         expect(result.content).toHaveLength(0);
-        // stopReason reflects abort state (timing dependent, so we check content is empty)
     });
 
     it("H3: normal completion (no abort) → returns accumulated content with normal stopReason", async () => {
-        // Sanity check: normal completion without abort should work as before
         const sse =
             "event: message_start\ndata: {\"type\":\"message_start\"}\n\n" +
             "event: content_block_start\ndata: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n" +
@@ -596,7 +541,6 @@ describe("parseSseStream -- abort during cleanup race", () => {
             },
         });
 
-        // No abort - use a fresh signal that is never aborted
         const eventStream = createAssistantMessageEventStream();
         const result = await parseSseStream(readableStream, testModel, undefined, eventStream);
 
@@ -608,7 +552,6 @@ describe("parseSseStream -- abort during cleanup race", () => {
     });
 });
 
-// ─── Group I -- parseSseStream usage tracking from message_delta ───────────────
 
 describe("parseSseStream -- usage tracking from message_delta", () => {
     const testModel: Model<"anthropic-messages"> = {

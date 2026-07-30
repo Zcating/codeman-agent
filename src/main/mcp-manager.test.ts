@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { InvalidConfig, JsonRpcProtocolError } from "../renderer/src/shared/lib/errors";
 
-// Mock electron — shell.openPath is called by openConfigDir (not tested here)
 vi.mock("electron", () => ({
   shell: { openPath: vi.fn().mockResolvedValue("") },
 }));
@@ -15,7 +14,6 @@ describe("McpManager", () => {
 
   it("listServers returns empty when no servers configured", () => {
     const manager = new McpManager();
-    // Don't call startAll — no servers configured
     const servers = manager.listServers();
     expect(servers).toEqual([]);
   });

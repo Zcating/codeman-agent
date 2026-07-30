@@ -1,7 +1,3 @@
-//! McpApi domain — extracted from ipc.ts for domain split.
-//!
-//! Wraps the 6 MCP IPC channels: mcpListServers, mcpGetTools, mcpGetAllTools,
-//! mcpEnable, mcpRestart, mcpCallTool, mcpOpenConfigDir.
 
 import { Effect, Layer, Context } from "effect";
 import { invoke } from "./invoke.api";

@@ -1,4 +1,3 @@
-// MessageApi - rendered MessageApi Tag + Live Layer for message domain IPC.
 import { Effect, Context, Layer } from "effect";
 import type { Message } from "../lib/types";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";

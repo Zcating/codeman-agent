@@ -1,7 +1,3 @@
-//! B2 — MCP Stdio Server (single subprocess lifecycle).
-//!
-//! McpStdioServer: spawn → initialize → tools/list → ready → tools/call.
-//! All communication over stdio JSON-RPC. No McpManager here (mini-3).
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { PassThrough, type Readable, type Writable } from "node:stream";
@@ -9,14 +5,13 @@ import { JsonRpcConnection } from "./jsonrpc";
 import { logger } from "./logger";
 import { JsonRpcProtocolError } from "../renderer/src/shared/lib/errors";
 
-// ─── Config & Types ─────────────────────────────────────────
 
 export interface McpServerConfig {
-  name: string;                     // unique id (slug, no path separators)
-  command: string;                  // e.g. "npx"
-  args: string[];                   // e.g. ["-y", "@modelcontextprotocol/server-filesystem"]
-  env?: Record<string, string>;    // merged on top of process.env
-  enabled: boolean;                // V1: only spawn if true
+  name: string;                     
+  command: string;                  
+  args: string[];                   
+  env?: Record<string, string>;    
+  enabled: boolean;                
 }
 
 export type McpServerStatus =
@@ -30,7 +25,6 @@ export type McpServerStatus =
 export interface McpTool {
   name: string;
   description: string;
-  /** MCP server returns JSON Schema; we keep it as unknown and pass through. */
   inputSchema: unknown;
 }
 
@@ -41,7 +35,6 @@ export interface McpCallResult {
 
 export type StatusChangeHandler = (status: McpServerStatus) => void;
 
-// ─── Internal JSON-RPC shapes ─────────────────────────────────────────────────
 
 interface InitializeResult {
   protocolVersion: string;
@@ -57,13 +50,7 @@ interface ToolsCallResult {
   content: Array<{ type: string; text?: string }>;
 }
 
-// ─── McpStdioServer ───────────────────────────────────────────────────────────
 
-/**
- * One MCP server subprocess + its JSON-RPC connection.
- * Lifecycle: start() → (initialize handshake) → tools/list → connected.
- * On any error → status reflects failure; tools/call rejects.
- */
 export class McpStdioServer {
   private child: ChildProcess | null = null;
   private connection: JsonRpcConnection | null = null;
@@ -76,16 +63,11 @@ export class McpStdioServer {
     private readonly spawnFn: typeof spawn = spawn,
   ) {}
 
-  // ── Public API ─────────────────────────────────────────────────────────────
 
   getConfig(): McpServerConfig { return this.config; }
   getStatus(): McpServerStatus { return this.status; }
   listTools(): McpTool[] { return this.tools; }
 
-  /**
-   * Start the MCP server: spawn + initialize handshake + tools/list.
-   * Idempotent: calling start() on an already-started server is a no-op.
-   */
   async start(): Promise<void> {
     if (!this.config.enabled) {
       this.setStatus({ kind: "disabled" });
@@ -93,7 +75,7 @@ export class McpStdioServer {
     }
 
     if (this.status.kind === "connected") {
-      return; // already started
+      return; 
     }
 
     this.setStatus({ kind: "starting" });
@@ -115,10 +97,8 @@ export class McpStdioServer {
       return;
     }
 
-    // Wire child stdout → connection input, child stdin → connection output
     this.connection = new JsonRpcConnection(this.child.stdout, this.child.stdin);
 
-    // Step 2: child exit unexpectedly → mark crashed
     this.child.on("exit", (code, signal) => {
       if (this.status.kind === "connected") {
         this.setStatus({
@@ -131,13 +111,11 @@ export class McpStdioServer {
       this.cleanup();
     });
 
-    // Step 3: child error (ENOENT, etc.) → mark spawn_failed
     this.child.on("error", (err) => {
       this.setStatus({ kind: "spawn_failed", error: err.message });
       this.cleanup();
     });
 
-    // Step 4: send initialize request
     try {
       const initResult = await this.connection.request<InitializeResult>("initialize", {
         protocolVersion: "2024-11-05",
@@ -152,10 +130,8 @@ export class McpStdioServer {
       return;
     }
 
-    // Step 5: send notifications/initialized (fire-and-forget)
     this.connection.notify("notifications/initialized", {});
 
-    // Step 6: send tools/list → cache tools
     try {
       const toolsResult = await this.connection.request<ToolsListResult>("tools/list", {});
       this.tools = (toolsResult.tools ?? []).map((t) => ({
@@ -174,12 +150,10 @@ export class McpStdioServer {
     logger.info(`[mcp] ${this.config.name} started with ${this.tools.length} tools`);
   }
 
-  /** Stop the server gracefully. Idempotent. */
   async stop(): Promise<void> {
     this.connection?.close();
     if (this.child && !this.child.killed) {
       this.child.kill("SIGTERM");
-      // Give it 5s to die gracefully, then SIGKILL
       setTimeout(() => {
         if (this.child && !this.child.killed) {
           this.child.kill("SIGKILL");
@@ -187,14 +161,8 @@ export class McpStdioServer {
       }, 5_000);
     }
     this.cleanup();
-    // Note: do NOT change status here — stop is voluntary; status was already
-    // set by the error/exit handlers if something went wrong.
   }
 
-  /**
-   * Call a tool by name with arguments.
-   * @throws JsonRpcProtocolError if not connected
-   */
   async callTool(name: string, args: unknown): Promise<McpCallResult> {
     if (!this.connection || this.status.kind !== "connected") {
       throw new JsonRpcProtocolError({
@@ -214,13 +182,11 @@ export class McpStdioServer {
     };
   }
 
-  /** Register a status change listener. Returns an unsubscribe function. */
   onStatusChange(handler: StatusChangeHandler): () => void {
     this.statusHandlers.add(handler);
     return () => { this.statusHandlers.delete(handler); };
   }
 
-  // ── Internal ───────────────────────────────────────────────────────────────
 
   private setStatus(status: McpServerStatus): void {
     this.status = status;
@@ -229,7 +195,7 @@ export class McpStdioServer {
 
   private cleanup(): void {
     if (this.child && !this.child.killed) {
-      try { this.child.kill("SIGTERM"); } catch { /* ignore */ }
+      try { this.child.kill("SIGTERM"); } catch {  }
     }
     this.child = null;
     this.connection = null;
@@ -237,9 +203,7 @@ export class McpStdioServer {
   }
 }
 
-// ─── Test helpers (exported for use by mcp-host.test.ts) ─────────────────────
 
-/** A fake child process whose stdio can be wired to JsonRpcConnection. */
 export class FakeChildProcess {
   readonly stdin: Writable;
   readonly stdout: Readable;
@@ -254,16 +218,11 @@ export class FakeChildProcess {
     this.stderr = new PassThrough();
   }
 
-  /** Simulate child exit. */
   emitExit(_code: number | null, _signal: NodeJS.Signals | null): void {
     this.stdout.destroy();
     this.stdin.destroy();
-    // Simulate exit by calling any registered exit handler
-    // (In real ChildProcess, exit is emitted once)
   }
 
-  /** Simulate child error. */
   emitError(_err: Error): void {
-    // Would emit 'error' event
   }
 }

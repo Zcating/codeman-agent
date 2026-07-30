@@ -22,14 +22,11 @@ vi.mock("electron", () => ({
   shell: fakeShell,
 }));
 
-// better-sqlite3 is built for Electron's ABI; node test env can't load it.
-// Mock db/mod so registerIpcHandlers can call dbInit() without touching native binding.
 vi.mock("./db/mod", () => ({
   initDatabase: () => ({ prepare: () => ({ all: () => [], get: () => undefined, run: () => undefined }), exec: () => undefined, pragma: () => undefined }),
   getDatabase: () => ({ prepare: () => ({ all: () => [], get: () => undefined, run: () => undefined }), exec: () => undefined, pragma: () => undefined }),
 }));
 
-// Mock mcp-host so McpManager can be instantiated without spawning
 vi.mock("./mcp-host", () => ({
   McpStdioServer: vi.fn().mockImplementation(function () {
     return {
@@ -43,7 +40,6 @@ vi.mock("./mcp-host", () => ({
   }),
 }));
 
-// Mock mcp-config to return empty servers
 vi.mock("./mcp-config", () => ({
   readMcpConfig: vi.fn().mockReturnValue({
     _tag: "Some",
@@ -58,44 +54,34 @@ vi.mock("./features/webfetch/index", () => ({
 }));
 
 const EXPECTED_CHANNELS = [
-  // Settings
   "getSettings",
   "updateSettings",
   "clearAllHistory",
-  // Conversations
   "listConversations",
   "getConversation",
   "createConversation",
   "archiveConversation",
   "deleteConversation",
   "renameConversation",
-  // Messages
   "listMessages",
   "appendMessage",
   "searchMessages",
-  // Workspaces
   "listWorkspaces",
   "addWorkspace",
   "renameWorkspace",
   "deleteWorkspace",
   "pickWorkspacePath",
-  // Filesystem
   "readFile",
   "writeFile",
   "editFile",
   "searchFiles",
   "deleteFile",
-  // Native shims
   "setLoginItem",
   "notify",
   "openExternal",
   "getLogPath",
-  // Provider CRUD
   "deleteProvider",
-  // Abort
   "abortRequest",
-  // QA 表由 src/main/mock-server.ts 直接经 qa-loader.ts 读,不暴露 IPC
-  // MCP plugin (ADR-0032)
   "mcp:list-servers",
   "mcp:get-tools",
   "mcp:get-all-tools",
@@ -181,7 +167,6 @@ describe("T3 — src/main/ipc.ts", () => {
       (c: unknown[]) => c[0] === "renameConversation",
     );
     expect(renameHandler).toBeDefined();
-    // ipcMain.handle(channel, listener) — handler is at index 1
     const handler = renameHandler?.[1] as (e: unknown, args: { id: string; title: string }) => void;
     expect(typeof handler).toBe("function");
   });
@@ -234,16 +219,11 @@ describe("applyEdit helper", () => {
     expect(result.kind).toBe("notFound");
     if (result.kind === "notFound") {
       expect(result.message).toContain("...");
-      // The snippet should be 200 chars + "..."
       expect(result.message).toContain("a".repeat(200));
       expect(result.message).not.toContain("a".repeat(201));
     }
   });
 
-  // ─── CRLF regression: LLM emits LF-only oldText, file on disk is CRLF ───
-  //
-  // Repro: agent reads `line1\r\nline2\r\nline3`, then tries to edit `oldText`
-  // = "line1\nline2" (the LLM's normal output). Strict string match fails.
 
   it("matches LF-only oldText against CRLF content and preserves CRLF on rewrite", async () => {
     const { applyEdit } = await import("./ipc");
@@ -277,7 +257,6 @@ describe("applyEdit helper", () => {
 
   it("replaceAll=true replaces all CRLF occurrences when LLM emits LF", async () => {
     const { applyEdit } = await import("./ipc");
-    // Two `foo<br>bar` pairs separated by CRLF; the LLM emits LF in oldText.
     const content = "foo\r\nbar\r\nfoo\r\nbar";
     const result = applyEdit(content, "foo\nbar", "FOOBAR", true, "/fake/path.txt");
     expect(result.kind).toBe("ok");

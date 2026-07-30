@@ -1,4 +1,3 @@
-//! Pure-function spec for the Mock (dev) template used by createProviderFormDialog().
 
 import { describe, it, expect } from "vitest";
 import type { Provider } from "@codeman-frontend/shared/lib/types";
@@ -38,7 +37,6 @@ describe("buildMockDevTemplate", () => {
 
   it("返回对象结构匹配 Provider interface", () => {
     const result = buildMockDevTemplate("mock-test");
-    // Structural check: result satisfies Provider interface
     const _provider: Provider = result;
     expect(_provider).toBeDefined();
     expect(typeof _provider.id).toBe("string");

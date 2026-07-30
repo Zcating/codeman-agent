@@ -1,14 +1,3 @@
-//! combo-textarea.test.tsx — ComboTextarea state machine + focus + keyboard tests.
-//!
-//! 覆盖:
-//! 1. 输入 `/` → 菜单打开,焦点保留 textarea
-//! 2. ArrowDown / ArrowUp → 高亮切换
-//! 3. Enter → 选中并写入 /<skill-name> ,关闭菜单
-//! 4. Escape → 关闭菜单 + userDismissed=true
-//! 5. Ctrl/Cmd+/ → 强制重开 (绕过 userDismissed)
-//! 6. backspace 清空 `/` → userDismissed 重置,下一次 `/` 重新打开
-//! 7. `/` 在非空白字符后 → 不触发菜单
-//! 8. 过滤:按 query 子串过滤候选
 
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, cleanup, fireEvent } from "@solidjs/testing-library";
@@ -16,7 +5,6 @@ import { createSignal, type JSX } from "solid-js";
 import { ComboTextarea } from "@codeman-frontend/features/chat/components/combo-textarea";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
-// ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 const makeSkill = (
   name: string,
@@ -35,7 +23,6 @@ const FIXTURE_SKILLS: readonly SkillManifest[] = [
   makeSkill("test-driven-development", "user"),
 ];
 
-// ─── Test wrapper ─────────────────────────────────────────────────────────────
 
 interface WrapperProps {
   initialValue?: string;
@@ -69,10 +56,8 @@ function TestWrapper(props: WrapperProps): JSX.Element {
   );
 }
 
-// ─── Setup ────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
-  // Mock getBoundingClientRect so Popover positioning has something to read.
   vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue(
     new DOMRect(50, 100, 320, 50),
   );
@@ -83,9 +68,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Get the textarea inside the ComboTextarea wrapper. */
 function getTextarea(): HTMLTextAreaElement {
   const ta = document.querySelector("textarea");
   if (!ta) {
@@ -94,7 +77,6 @@ function getTextarea(): HTMLTextAreaElement {
   return ta;
 }
 
-// ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe("ComboTextarea — slash trigger", () => {
   it("does not open menu when value has no `/`", () => {
@@ -144,12 +126,9 @@ describe("ComboTextarea — focus management", () => {
     const { getByTestId } = render(() => <TestWrapper initialValue="/" />);
     expect(getByTestId("slash-menu")).toBeInTheDocument();
 
-    // Caller has focused the textarea (chat-view does this on mount); the
-    // popover's autoFocus={false} contract means focus must NOT migrate.
     getByTestId("focus-textarea").click();
     expect(document.activeElement?.tagName).toBe("TEXTAREA");
 
-    // Trigger a re-render by firing input — activeElement should still be TEXTAREA
     fireEvent.input(getTextarea(), { target: { value: "/x" } });
     expect(document.activeElement?.tagName).toBe("TEXTAREA");
   });
@@ -169,7 +148,6 @@ describe("ComboTextarea — keyboard navigation", () => {
     render(() => <TestWrapper initialValue="/" />);
     const textarea = getTextarea();
 
-    // From index 0 → ArrowUp → index 3 (wrap-around)
     fireEvent.keyDown(textarea, { key: "ArrowUp" });
     const options = document.querySelectorAll('[role="option"]');
     expect(options[3]?.getAttribute("data-highlighted")).toBe("true");
@@ -181,11 +159,9 @@ describe("ComboTextarea — keyboard navigation", () => {
     ));
     const textarea = getTextarea();
 
-    // Highlight second item
     fireEvent.keyDown(textarea, { key: "ArrowDown" });
     fireEvent.keyDown(textarea, { key: "Enter" });
 
-    // Menu closed (userDismissed=true)
     expect(queryByTestId("slash-menu")).toBeNull();
     expect(getByTestId("current-value").textContent).toBe("/code-review ");
   });
@@ -198,7 +174,6 @@ describe("ComboTextarea — keyboard navigation", () => {
 
     fireEvent.keyDown(textarea, { key: "Escape" });
     expect(queryByTestId("slash-menu")).toBeNull();
-    // Value still has `/` but menu is closed (userDismissed=true)
     expect(getByTestId("current-value").textContent).toBe("/");
   });
 
@@ -206,15 +181,12 @@ describe("ComboTextarea — keyboard navigation", () => {
     const { queryByTestId } = render(() => <TestWrapper initialValue="/" />);
     const textarea = getTextarea();
 
-    // Esc → dismiss
     fireEvent.keyDown(textarea, { key: "Escape" });
     expect(queryByTestId("slash-menu")).toBeNull();
 
-    // Backspace clears the `/` (value goes from "/" to "")
     fireEvent.input(textarea, { target: { value: "" } });
     expect(queryByTestId("slash-menu")).toBeNull();
 
-    // Type `/` again — should reopen
     fireEvent.input(textarea, { target: { value: "/" } });
     expect(queryByTestId("slash-menu")).toBeInTheDocument();
   });
@@ -223,11 +195,9 @@ describe("ComboTextarea — keyboard navigation", () => {
     const { queryByTestId } = render(() => <TestWrapper initialValue="/" />);
     const textarea = getTextarea();
 
-    // Esc → dismiss
     fireEvent.keyDown(textarea, { key: "Escape" });
     expect(queryByTestId("slash-menu")).toBeNull();
 
-    // Ctrl+/ → force reopen
     fireEvent.keyDown(textarea, { key: "/", ctrlKey: true });
     expect(queryByTestId("slash-menu")).toBeInTheDocument();
   });
@@ -250,7 +220,6 @@ describe("ComboTextarea — keyboard navigation", () => {
     const textarea = getTextarea();
     expect(queryByTestId("slash-menu")).toBeNull();
 
-    // ArrowDown / ArrowUp should NOT preventDefault — let native behaviour run.
     fireEvent.keyDown(textarea, { key: "ArrowDown" });
     fireEvent.keyDown(textarea, { key: "ArrowUp" });
     expect(queryByTestId("slash-menu")).toBeNull();
@@ -265,7 +234,6 @@ describe("ComboTextarea — selection", () => {
     const items = document.querySelectorAll('[data-testid="slash-menu-item"]');
     expect(items.length).toBeGreaterThan(0);
 
-    // Click first item (commit-helper)
     fireEvent.click(items[0] as HTMLElement);
 
     expect(getByTestId("current-value").textContent).toBe("/commit-helper ");
@@ -279,10 +247,8 @@ describe("ComboTextarea — selection", () => {
     const items = document.querySelectorAll('[data-testid="slash-menu-item"]');
     expect(items.length).toBe(2);
 
-    // Click first matching item (commit-helper)
     fireEvent.click(items[0] as HTMLElement);
 
-    // "co" query gets replaced with "commit-helper "
     expect(getByTestId("current-value").textContent).toBe(
       "hello /commit-helper ",
     );
@@ -290,9 +256,6 @@ describe("ComboTextarea — selection", () => {
   });
 
   it("popover width tracks the textarea wrapper width (not hardcoded 320px)", () => {
-    // Override the global mock from beforeEach so every element — including
-    // the textarea wrapper that ComboTextarea reads width from — reports
-    // 640px instead of 320px.
     vi.mocked(Element.prototype.getBoundingClientRect).mockReturnValue(
       new DOMRect(50, 100, 640, 50),
     );
@@ -308,12 +271,6 @@ describe("ComboTextarea — selection", () => {
   });
 
   it("caps popover height to available vertical space (no clipping when <320px)", () => {
-    // ark-ui's Popover positioner exposes `--available-height` as a CSS
-    // variable (see bug HTML: --available-height: 273px). ComboTextarea
-    // hardcodes height: 320px, so when --available-height is smaller (e.g.
-    // textarea sits near top of viewport, or window is short), the popover
-    // overflows and gets clipped. The fix caps max-height to the available
-    // space, leaving the 320px preferred height intact.
     const { queryByTestId } = render(() => <TestWrapper initialValue="/" />);
     expect(queryByTestId("slash-menu")).toBeInTheDocument();
 
@@ -327,14 +284,6 @@ describe("ComboTextarea — selection", () => {
   });
 
   it("popover width is not stolen by an empty PopoverAnchor (0px wide)", () => {
-    // Production scenario: <PopoverAnchor> is an empty inline-block div with
-    // 0 width. ComboTextarea used to share wrapperEl between the textarea
-    // wrapper div and the PopoverAnchor (see <div ref={wrapperEl}> +
-    // <PopoverAnchor ref={wrapperEl} />). When PopoverAnchor mounted it
-    // reassigned wrapperEl to the empty anchor div, so the popover width
-    // ended up at 0px instead of matching its textarea. The fix gives
-    // PopoverAnchor its own ref so the wrapperEl ref keeps pointing at the
-    // textarea wrapper div.
     vi.mocked(Element.prototype.getBoundingClientRect).mockImplementation(
       function (this: Element): DOMRect {
         const el = this as HTMLElement;

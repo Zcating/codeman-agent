@@ -1,4 +1,3 @@
-// ProviderApi - rendered ProviderApi Tag + Live Layer for provider domain IPC.
 import { Effect, Context, Layer } from "effect";
 import type { Provider, ModelMeta } from "../lib/types";
 import { invoke } from "./invoke.api";
@@ -16,8 +15,6 @@ export class ProviderApi extends Context.Tag("ProviderApi")<
   }
 >() {}
 
-// ProviderApi uses settings.providers (V1.5 unified schema) — calls
-// getSettings via the codeman dispatch.
 export const ProviderApiLive = Layer.effect(
   ProviderApi,
   Effect.gen(function* () {
@@ -64,9 +61,6 @@ export const ProviderApiLive = Layer.effect(
             );
           }
           const apiKey = provider.apiKey;
-          // fetch + JSON parse happens in the Effect body; the unknown-shape
-          // response is normalized via parseModelsApiResponse (handles both
-          // OpenAI `{ id, name? }` and MiniMax `{ id }`-only shapes).
           const response = yield* Effect.tryPromise({
             try: async () => {
               const res = await fetch(modelsEndpoint, {

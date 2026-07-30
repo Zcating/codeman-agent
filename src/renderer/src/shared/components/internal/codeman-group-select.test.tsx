@@ -1,10 +1,8 @@
-//! codeman-group-select — Ark UI Select with ItemGroup wrapper tests.
 
 import { render, screen, fireEvent } from "@solidjs/testing-library";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { CodemanGroupSelect, CodemanGroupSelectGroup } from "@codeman-frontend/shared/components/internal/codeman-group-select";
 
-// Mock state - plain values, not reactive
 let mockIsOpen = false;
 let sharedOnValueChange: ((details: { value: string[] }) => void) | null = null;
 let sharedPositioning: Record<string, unknown> | undefined;
@@ -102,7 +100,6 @@ vi.mock("@ark-ui/solid", async () => {
   };
 });
 
-// Reset state before each test
 beforeEach(() => {
   mockIsOpen = false;
   sharedOnValueChange = null;
@@ -127,7 +124,6 @@ const defaultGroups: CodemanGroupSelectGroup[] = [
 ];
 
 describe("CodemanGroupSelect", () => {
-  // 1. renders trigger with placeholder
   it("renders trigger with placeholder", () => {
     render(() => (
       <CodemanGroupSelect
@@ -143,7 +139,6 @@ describe("CodemanGroupSelect", () => {
     expect(valueText?.textContent).toBe("Select an option");
   });
 
-  // 2. shows grouped options with ItemGroupLabel headers
   it("shows grouped options with ItemGroupLabel headers", () => {
     render(() => (
       <CodemanGroupSelect
@@ -154,18 +149,15 @@ describe("CodemanGroupSelect", () => {
         data-testid="test-select"
       />
     ));
-    // Verify group labels exist
     const groupLabels = document.querySelectorAll('[data-part="item-group-label"]');
     expect(groupLabels.length).toBe(2);
     expect(groupLabels[0].textContent).toBe("Group A");
     expect(groupLabels[1].textContent).toBe("Group B");
 
-    // Verify items exist under each group
     const items = document.querySelectorAll('[data-part="item"]');
     expect(items.length).toBe(4);
   });
 
-  // 3. calls onChange with selected value when item clicked
   it("calls onChange with selected value when item clicked", () => {
     const onChange = vi.fn();
     render(() => (
@@ -177,13 +169,11 @@ describe("CodemanGroupSelect", () => {
         data-testid="test-select"
       />
     ));
-    // Click item with value "b1"
     const itemB1 = document.querySelector('[data-value="b1"]');
     fireEvent.click(itemB1!);
     expect(onChange).toHaveBeenCalledWith("b1");
   });
 
-  // 4. closes when item selected
   it("closes when item selected", () => {
     render(() => (
       <CodemanGroupSelect
@@ -194,14 +184,11 @@ describe("CodemanGroupSelect", () => {
         data-testid="test-select"
       />
     ));
-    // Click item with value "a1"
     const itemA1 = document.querySelector('[data-value="a1"]');
     fireEvent.click(itemA1!);
-    // The mock's isOpen is now false - verify item is still in DOM
     expect(itemA1).toBeInTheDocument();
   });
 
-  // 5. disabled state prevents interaction
   it("disabled state prevents interaction", () => {
     const onChange = vi.fn();
     render(() => (
@@ -216,12 +203,10 @@ describe("CodemanGroupSelect", () => {
     ));
     const trigger = screen.getByTestId("test-select-trigger");
     expect(trigger).toBeDisabled();
-    // Clicking disabled trigger should not open
     fireEvent.click(trigger);
     expect(trigger).toHaveAttribute("data-state", "closed");
   });
 
-  // 6. empty groups state (all groups with 0 items) shows empty state
   it("empty groups state shows empty state", () => {
     const emptyGroups: CodemanGroupSelectGroup[] = [
       { label: "Empty Group 1", options: [] },
@@ -236,18 +221,13 @@ describe("CodemanGroupSelect", () => {
         data-testid="test-select"
       />
     ));
-    // Group labels should still exist
     const groupLabels = document.querySelectorAll('[data-part="item-group-label"]');
     expect(groupLabels.length).toBe(2);
 
-    // But no items should be rendered
     const items = document.querySelectorAll('[data-part="item"]');
     expect(items.length).toBe(0);
   });
 
-  // 7. regression: visual chrome (border / ring / shadow) must live on Content,
-  //    not Positioner. Otherwise Positioner's always-mounted div leaves a ghost
-  //    outlined box on the page when the select is closed.
   it("places visual chrome on Content, not Positioner (no ghost chrome when closed)", () => {
     render(() => (
       <CodemanGroupSelect
@@ -263,23 +243,12 @@ describe("CodemanGroupSelect", () => {
     expect(positioner).toBeInTheDocument();
     expect(content).toBeInTheDocument();
 
-    // Positioner is always mounted — it must not carry visual chrome.
     const chrome = /\b(border|ring|shadow)\b/;
     expect(positioner.className).not.toMatch(chrome);
 
-    // Content (the part that toggles data-state + hidden) owns the visible chrome.
     expect(content.className).toMatch(chrome);
   });
 
-  // 8. regression: dropdown must NOT use sameWidth positioning.
-  //    Root cause (2026-07-26): `positioning={{ sameWidth: true }}` locked dropdown
-  //    width to trigger width. Combined with `w-(--anchor-width) min-w-36
-  //    overflow-x-hidden` on SelectContent, long option labels (e.g.
-  //    "MiniMax-M2.7-highspeed") were clipped to ~144px and hidden on the
-  //    right edge — provider picker rendered broken text in chat-view.tsx.
-  //    Fix: pass `sameWidth: false` so @ark-ui positions the dropdown sized
-  //    to its content; SelectContent then uses `w-max min-w-(--anchor-width)`
-  //    so the dropdown auto-expands to fit the widest option.
   it("passes sameWidth: false to SelectRoot so long option labels are not clipped", () => {
     render(() => (
       <CodemanGroupSelect

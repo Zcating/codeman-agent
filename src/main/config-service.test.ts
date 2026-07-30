@@ -1,12 +1,3 @@
-//! config-service.test.ts — 单测 src/main/config-service.ts.
-//!
-//! Strategy: 用 in-memory `EnvReader` mock(不 mutate process.env),验证:
-//! - 默认值(空 env)
-//! - 每个 env var 的覆盖 + 范围校验
-//! - 非法值 fallback + 触发 logger.warn
-//! - isProduction / forceEnableInProduction 的 bool 语义
-//!
-//! 这些测试独立于 mock-server 的集成测试 — 服务层可以独立验证。
 
 import { describe, it, expect } from "vitest";
 import {
@@ -16,14 +7,11 @@ import {
   type ConfigLogger,
 } from "./config-service";
 
-// ─── 测试 fixture ──────────────────────────────────────────────────────────
 
-/** 从 plain object 构造 EnvReader(mock 代替 process.env)。 */
 function readerFromMap(map: Record<string, string | undefined>): EnvReader {
   return { get: (k) => map[k] };
 }
 
-/** 收集 warn 调用而不输出 — 测试断言 “是否触发 warn”。 */
 function silentLogger(): { logger: ConfigLogger; warnings: string[] } {
   const warnings: string[] = [];
   return {
@@ -32,7 +20,6 @@ function silentLogger(): { logger: ConfigLogger; warnings: string[] } {
   };
 }
 
-// ─── Defaults ──────────────────────────────────────────────────────────────
 
 describe("readMockServerConfig — defaults (empty env)", () => {
   it("空 env → port=50000, host=127.0.0.1, streamDelayMs=1, deltaSize=1", () => {
@@ -61,12 +48,11 @@ describe("readMockServerConfig — defaults (empty env)", () => {
     expect(cfg.port).toBe(50000);
     expect(cfg.streamDelayMs).toBe(1);
     expect(cfg.deltaSize).toBe(1);
-    expect(cfg.host).toBe("127.0.0.1"); // empty string still falsy → default
+    expect(cfg.host).toBe("127.0.0.1"); 
     expect(warnings).toEqual([]);
   });
 });
 
-// ─── Numeric env vars + range validation ───────────────────────────────────
 
 describe("readMockServerConfig — CODEMAN_MOCK_PORT", () => {
   it("valid integer → parsed", () => {
@@ -165,7 +151,6 @@ describe("readMockServerConfig — CODEMAN_MOCK_DELTA_SIZE", () => {
   });
 });
 
-// ─── String env vars ──────────────────────────────────────────────────────
 
 describe("readMockServerConfig — CODEMAN_MOCK_HOST", () => {
   it("valid IP → parsed", () => {
@@ -181,7 +166,6 @@ describe("readMockServerConfig — CODEMAN_MOCK_HOST", () => {
   });
 });
 
-// ─── Boolean env vars ─────────────────────────────────────────────────────
 
 describe("readMockServerConfig — isProduction", () => {
   it("NODE_ENV=production → true", () => {
@@ -198,7 +182,7 @@ describe("readMockServerConfig — isProduction", () => {
 
   it("NODE_ENV=staging (or any non-production) → false (严格 === 比较)", () => {
     expect(readMockServerConfig(readerFromMap({ NODE_ENV: "staging" })).isProduction).toBe(false);
-    expect(readMockServerConfig(readerFromMap({ NODE_ENV: "PRODUCTION" })).isProduction).toBe(false); // case-sensitive
+    expect(readMockServerConfig(readerFromMap({ NODE_ENV: "PRODUCTION" })).isProduction).toBe(false); 
   });
 });
 
@@ -219,18 +203,14 @@ describe("readMockServerConfig — forceEnableInProduction", () => {
   });
 });
 
-// ─── Default reader wired to real process.env ──────────────────────────────
 
 describe("processEnvReader — wires to real process.env", () => {
   it("get(key) returns process.env[key]", () => {
-    // Sanity check on the exported default reader — production code uses this.
-    // We use a known env var that's typically set in any Node process: PATH.
     expect(processEnvReader.get("PATH")).toBe(process.env["PATH"]);
     expect(processEnvReader.get("__DEFINITELY_NOT_SET_XYZ__")).toBeUndefined();
   });
 
   it("readMockServerConfig() with no args uses processEnvReader", () => {
-    // Smoke test: defaults are populated when env is empty in the test process.
     const cfg = readMockServerConfig();
     expect(typeof cfg.port).toBe("number");
     expect(typeof cfg.host).toBe("string");
@@ -241,7 +221,6 @@ describe("processEnvReader — wires to real process.env", () => {
   });
 });
 
-// ─── Pure function semantics ───────────────────────────────────────────────
 
 describe("readMockServerConfig — purity", () => {
   it("同一 reader 调用两次 → 同样结果 (无内部缓存副作用)", () => {

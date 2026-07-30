@@ -15,17 +15,14 @@ const debouncedFlushFn = debounce(() => {
 }, DEBOUNCE_MS);
 
 export const settingsSaver = {
-  /** 调度 500ms 后 flush 到后端。多次调用会重置 timer。 */
   scheduleSave(): void {
     debouncedFlushFn();
   },
 
-  /** 取消 pending debounce timer，不触发 flush。 */
   cancelPending(): void {
     debouncedFlushFn.cancel();
   },
 
-  /** 跳过 debounce，立即 flush 到后端（footer Save 用）。返回 Promise<void>。 */
   flushNow(): Promise<void> {
     return Effect.runPromiseExit(appStore.forceFlush()).then((exit) => {
       if (Exit.isFailure(exit)) {
@@ -35,7 +32,6 @@ export const settingsSaver = {
   },
 };
 
-/** Test-only: reset internal state (called from settings-saver.test.ts). */
 export function _resetSettingsSaverForTest(): void {
   debouncedFlushFn.cancel();
 }
