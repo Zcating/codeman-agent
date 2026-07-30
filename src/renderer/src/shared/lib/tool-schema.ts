@@ -153,7 +153,7 @@ export type SchemaToTypeBox<S extends Schema.Struct<any>> = S extends Schema.Sch
  * | `Union`            | `Type.Union(...)`      |
  * | `TypeLiteral`      | `Type.Object({...})`   | (TypeBox 自动从 `[OptionalKind]` symbol 推导 `required` 数组)
  *
- * Unsupported nodes (Refinement / Transformation / Suspend / TemplateLiteral /
+ * Previously-unsupported nodes (Transformation / Suspend / TemplateLiteral /
  * Enums / Declaration / VoidKeyword / NeverKeyword / BigIntKeyword /
  * ObjectKeyword / AnyKeyword / UnknownKeyword / UniqueSymbol / SymbolKeyword /
  * IndexSignature) throw with a clear error so future tool schemas using them
@@ -228,6 +228,10 @@ function walkAST(node: AST.AST): TSchema {
       return Type.Union(
         node.types.map(walkAST) as [TSchema, TSchema, ...TSchema[]],
       );
+    case "Refinement":
+      return walkAST(node.from);
+    case "Transformation":
+      return walkAST(node.to);
     case "TypeLiteral": {
       const properties: TProperties = {};
       for (const prop of node.propertySignatures) {
