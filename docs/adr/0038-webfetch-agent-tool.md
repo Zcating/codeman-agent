@@ -52,8 +52,20 @@ SSRF 防护在 main 端 `ssrf.ts` 实施:
 - URL scheme 校验: 仅允许 `http:` / `https:`
 - DNS 预解析: `node:dns/promises` 预解析域名
 - IP 黑名单: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16, 0.0.0.0/8, ::1, fc00::/7, fe80::/10
-- 响应限: 5MB (`MAX_BYTES = 5 * 1024 * 1024`)
+  - 响应限: 5MB (`MAX_BYTES = 5 * 1024 * 1024`)
 - 超时: 默认 30s, 可配 5–120s
+
+**响应内容类型限制:** main 端 `handler.ts` 拒绝非文本响应:
+- `NON_TEXT_TYPES = /^image\/(?!svg\+xml)/` 拒绝 `image/png`, `image/jpeg` 等
+- 例外: `image/svg+xml` 允许(纯 XML,可走 markdown 转换)
+- 视频 / 音频 / 二进制全部拒绝,避免 LLM context 被 base64 撑爆
+- HTTP 4xx/5xx 抛 `Network` AppError
+- 响应体超 5MB 抛 `Network` AppError (含 content-length 头预检 + arrayBuffer 后双重 check)
+
+**重定向拦截 (SSRF 防护):** main 端 fetch 配置 `redirect: "error"`,**拒绝所有 3xx 重定向**。
+- 理由: 攻击者可构造 302 → `http://192.168.1.1/admin` 绕过 SSRF 防护(初始 URL 合法,跳转到内网)
+- 代价: 合法 HTTP→HTTPS 重定向也被拒绝,LLM 需手动复制最终 URL 重试
+- V2 评估: `redirect: "manual"` + 跳转头 SSRF 重校验(更复杂但 UX 更友好)
 
 ### D2 — HTML 处理: turndown
 
@@ -62,7 +74,11 @@ SSRF 防护在 main 端 `ssrf.ts` 实施:
 - codeBlockStyle: "fenced" (```)
 - bulletListMarker: "-"
 - emDelimiter: "*"
-- 移除标签: `script`, `style`, `meta`, `link`
+- 移除标签 (turndown config + htmlToText regex 双层防护):
+  - `script`, `style`, `noscript`, `iframe`, `object`, `embed`, `svg`, `math`, `audio`, `video`, `picture`, `form`, `button`(共 13 种,含 XSS 攻击向量)
+  - turndown config 移除 9 种: `script, style, meta, link, noscript, iframe, object, embed, svg`
+  - htmlToText regex 移除 13 种: 上述 + `math, audio, video, picture, form, button`
+  - turndown 不支持数学标签(`<math>`, `<mi>` 等),原样通过 — 已知 turndown 限制
 
 同时提供 `htmlToText()` 纯文本提取（regex 剥离标签 + HTML entity 解码）用于 `format: "text"` 模式。
 
@@ -156,6 +172,37 @@ DNS 预解析: `dns.lookup(url.hostname)` 获取 IP 后逐 CIDR 比对。解析�
 
 与 ADR-0032 D6 一致: LLM 不会 abuse 自己，permission 弹窗无意义。无频率限制、无用户确认。SSRF 是唯一安全边界。
 
+## Known Limitations (V1)
+
+以下限制 V1 接受,留作 V2 评估:
+
+1. **IPC 错误类型区分在真实路径中丢失 (pre-existing)**
+   - main 端 `sandboxHandler` (`src/main/ipc.ts:437`) 将 `{_tag, message, ...}` 转换为 `{kind, message, ...}` 跨 IPC 序列化
+   - renderer 端 `decodeAppError` (`src/renderer/src/shared/lib/decode-app-error.ts:48`) 用 `Schema.Union` of `TaggedError`,每个 TaggedError schema 期望 `_tag` 字段
+   - 实际路径: `_tag` → `kind` 转换后,renderer 解码失败,降级为 `new Unknown({message: "..."})`
+   - 影响: LLM 看到的错误信息丢失类型细分(Network / InvalidConfig / SandboxViolation 都显示为 Unknown)
+   - 影响范围: file-tools + webfetch + 任何抛 `new AppError(...)` 的 IPC handler
+   - 修复方向: 跨 IPC 用 `_tag` 而非 `kind`,或 renderer 端 `decodeAppError` 同时支持 `kind` 字段。**留作独立 ADR** (pre-existing bug,本 PR scope 外)
+
+2. **DNS rebinding 窗口 (5-10ms)**
+   - 见 D5 行 159-163
+   - V2 评估: `dns.lookup` + 同 tick 内 `fetch`,或 socket-level IP 绑定拦截
+
+3. **Charset 解析缺失**
+   - `webfetch.api.ts:20` `new TextDecoder()` 默认 UTF-8,忽略 Content-Type 的 `charset` 参数
+   - 非 UTF-8 页面(`shift-jis`, `gbk`, `iso-8859-1`)显示乱码
+   - 修复: 解析 `content-type` 头取 charset 参数,fallback UTF-8
+
+4. **XHTML content-type 识别不全**
+   - `webfetch.api.ts:18` `includes("text/html")` 不匹配 `application/xhtml+xml`
+   - 有效 XHTML 内容不被识别为 HTML,turndown 不转换
+   - 修复: 同时检查 `application/xhtml+xml`,加 content-type 集合检查
+
+5. **合法重定向被 SSRF 防护静默阻塞**
+   - `redirect: "error"` 拒绝所有 3xx,包括合法 HTTP→HTTPS 升级
+   - 用户体验差,LLM 需手动复制最终 URL
+   - V2 评估: `redirect: "manual"` + 跳转头 SSRF 重校验
+
 ## Considered Options
 
 ### D1 reject: 纯 renderer 端 fetch
@@ -183,7 +230,7 @@ file-tools 后续考虑从 `features/file-tools` 迁到 `tools/file-ops`，使 `
 
 ### 代价
 
-- 增加 IPC 通道 `webfetch:fetch`（35 → 36 channels，无新增 net channel 增量）
+- 增加 IPC 通道 `webfetch:fetch`（35 → 36 channels，+1 net channel 增量）
 - package.json 新增 `turndown` + `@types/turndown` 依赖（约 50KB gzipped）
 - file-ops import 路径变更需同步改 runtime.ts 及测试文件（共 5 处 import path 更新）
 - ADR-0010 需要 amendment
@@ -197,12 +244,13 @@ file-tools 后续考虑从 `features/file-tools` 迁到 `tools/file-ops`，使 `
 
 ## Rollout Plan
 
-4 commits:
+5 commits (+1 fix pass):
 
-1. **Task A** (commit `a61a744`): webfetch renderer tool + schemas + html-to-markdown
-2. **Task B** (commit `ad54f5d`): main SSRF + IPC handler + preload bridge + ipc.ts
-3. **Task C** (commit after B): webfetch.api.ts + invoke.api.ts + tool-schema.ts + ipc-mock.ts
-4. **Task D** (this task): file-tools → file-ops migration + runtime.ts injection + 6+1 docs + ADR-0038
+1. **Task A** (commit `211af79`): webfetch Effect Schema + html-to-markdown (renderer 纯函数层)
+2. **Task B** (commit `a61a744`): main 端 SSRF + IPC handler + preload bridge + ipc-mock
+3. **Task C** (commit `ad54f5d`): webfetch.api.ts Service + invoke.api.ts + tool-schema.ts AST walker 扩展
+4. **Task D** (commits `bdbf056` + `e63f32a`): file-tools → file-ops migration + barrel + runtime.ts 注入 webfetchTool + 5+1 → 6+1 docs + ADR-0038 草拟
+5. **Fix pass** (commit `59b3ef0`): 12 reviewer findings (AppError 包装、SSRF redirect、XSS 标签、lint、ADR 数字修正)
 
 ## References
 
