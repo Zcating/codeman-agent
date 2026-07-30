@@ -1,22 +1,22 @@
-//! e2e/cdp-driver.ts — 直接通过 Chrome DevTools Protocol 驱动 Electron 的 Chromium。
-//!
-//! V3 背景：V2 走 WebView2，现在 V3 走 Electron 43 自带的 Chromium 134。
-//! 同样的原因 — Playwright `chromium.connectOverCDP` 不工作（`Browser.setDownloadBehavior`
-//! 在受管 webview 中受限），改为直接连 CDP WS endpoint + 用 `Runtime.evaluate` 驱动页面
-//! + 包装 Playwright 风格的 Page/Locator API。
-//!
-//! 注入策略：connect 时把 `__cdp` 工具对象挂到 `window`，所有 Locator 操作
-//! 都通过 `__cdp.resolve(selector)` 在页面里跑 JS 找元素 + 触发动作。
-//! 这样不依赖 CDP 的 DOM 协议，纯 Runtime.evaluate。
-//!
-//! V3 命名：类名/类型/导出名以 Electron* 为主，Tauri* 是 V2 留下的 deprecated alias
-//! （spec 还没全迁，但 fixtures.ts 全 re-export）。
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 import { setTimeout as sleep } from "node:timers/promises";
 
 const CDP_HOST = "127.0.0.1";
 
-/** 注入到页面的工具对象。所有 Locator 操作最终调它。导出供 helpers 在 page reload 后 re-inject。 */
+
 export const CDP_INJECT_SCRIPT = `
 window.__cdp = (() => {
   function resolveLocator(sel) {
@@ -96,7 +96,7 @@ window.__cdp = (() => {
 })();
 `;
 
-/** Locator — 支持 Playwright 风格链式。 */
+
 export class ElectronLocator {
   constructor(
     readonly page: ElectronPage,
@@ -115,7 +115,7 @@ export class ElectronLocator {
     return new ElectronLocator(this.page, `${this.selector} >> ${inner}`);
   }
 
-  /** 过滤匹配的元素 — 用 `hasText` 缩小范围。 */
+  
   filter(opts: { hasText: string | RegExp }): ElectronLocator {
     const re = opts.hasText instanceof RegExp ? opts.hasText.source : escapeRe(opts.hasText);
     return new ElectronLocator(this.page, `${this.selector} >> __filterText__${re}`);
@@ -170,22 +170,16 @@ export class ElectronLocator {
   }
 }
 
-/** Page — 包装 CDP 连接 + 提供 Playwright 风格的查询/事件 API。 */
+
 export class ElectronPage {
   constructor(
     readonly conn: CDPConnection,
     readonly sessionId: string,
   ) {}
 
-  /** 重新注入 __cdp helper(page reload 后 window.__cdp 会丢失)。
-   *
-   * 原来只调 `Runtime.evaluate` 一次性注入 — 但页面 reload 后新文档里
-   * `__cdp` 又没了,得再 reinject 一次。现在加 `Page.addScriptToEvaluateOnNewDocument`:
-   * 把脚本注册成"每个新文档创建时自动执行",reload 后 __cdp 立即可用,
-   * 后续 e2e helper 不需要每次手动 reinject。
-   */
+  
   async reinjectCdp(): Promise<void> {
-    // 1. 当前页注入(立即生效)。
+    
     const currentResult = await this.conn.send(
       "Runtime.evaluate",
       {
@@ -202,10 +196,10 @@ export class ElectronPage {
           "reinjectCdp current page failed",
       );
     }
-    // 2. 注册到 Page.addScriptToEvaluateOnNewDocument — 之后每次新文档
-    //    创建(reload / goto 触发 full nav)都会自动执行,window.__cdp 不会丢。
-    //    幂等:CDP 允许重复注册同名脚本,后注册的覆盖前注册的。
-    //    ⚠️ 参数名是 `source`(不是 `expression` — 那是 Runtime.evaluate 的)。
+    
+    
+    
+    
     const futureResult = await this.conn.send(
       "Page.addScriptToEvaluateOnNewDocument",
       {
@@ -222,7 +216,7 @@ export class ElectronPage {
     }
   }
 
-  /** 在页面里跑 JS。函数会被序列化后通过 Runtime.evaluate 传过去。 */
+  
   async evaluate<T = unknown>(fn: (...args: any[]) => T | Promise<T>, ...args: any[]): Promise<T> {
     const expr = `(${fn.toString()})(${args.map((a) => JSON.stringify(a)).join(", ")})`;
     const result = await this.conn.send(
@@ -244,14 +238,7 @@ export class ElectronPage {
     return await this.evaluate(() => location.href);
   }
 
-  /** 导航到指定 URL — 走 history.pushState 让 TanStack Router 接住。
-   *
-   * V3 Electron 启动时 document 可能是 `about:blank` (origin=null,URL=空),
-   * `history.pushState` 会抛 `SecurityError: A history state object with URL ''
-   * cannot be created in a document with origin 'null' and URL 'about:blank'`
-   * — 必须先等 preload 注入完,`window.codeman` 可用了,再 pushState。
-   * 这里轮询直到 ready(最多 30s)再导航。
-   */
+  
   async goto(path: string): Promise<void> {
     await this.evaluate((p: string) => {
       return new Promise<void>((resolve, reject) => {
@@ -265,11 +252,11 @@ export class ElectronPage {
             );
             return;
           }
-          // V3 readiness check: window.codeman (set by preload) + URL not about:blank.
+          
           const w = window as unknown as { codeman?: unknown; __router?: { navigate: (args: { to: string }) => void } };
           if (document.URL !== "about:blank" && w.codeman) {
-            // V3: file:// URL pathname is absolute Windows path; history.pushState
-            // can't update it cleanly. Use the router's navigate() instead.
+            
+            
             if (w.__router) {
               w.__router.navigate({ to: p });
             } else {
@@ -317,13 +304,13 @@ export class ElectronPage {
   }
 }
 
-// 在 Runtime.evaluate 字符串里跑的函数体（被 toString 后注入到页面）
+
 const __cdpClick = (sel: string) => (window as any).__cdp.click(sel);
 const __cdpFill = (sel: string, value: string) => (window as any).__cdp.fill(sel, value);
 const __cdpText = (sel: string) => (window as any).__cdp.textContent(sel);
 const __cdpCount = (sel: string) => (window as any).__cdp.count(sel);
 
-// ---- 断言工具 ----
+
 
 type Locator = ElectronLocator;
 type Page = ElectronPage;
@@ -396,7 +383,7 @@ export const assert = {
   },
 };
 
-// ---- 内部 ----
+
 
 function roleSelFor(role: "link" | "button" | "textbox"): string {
   if (role === "link") {
@@ -412,7 +399,7 @@ function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// ---- CDP 传输 ----
+
 
 class CDPConnection {
   private ws: WebSocket;
@@ -443,7 +430,7 @@ class CDPConnection {
         }
       }
     } catch {
-      // ignore parse errors
+      
     }
   }
 
@@ -467,19 +454,19 @@ class CDPConnection {
     try {
       this.ws.close();
     } catch {
-      // ignore
+      
     }
   }
 }
 
-/** 顶层入口 — 连 Chromium CDP,attach 页面,返回 ElectronPage。 */
+
 export async function connectElectron(opts: {
   cdpUrl?: string;
   pageUrlPattern?: RegExp;
 } = {}): Promise<ElectronPage> {
   const cdpUrl = opts.cdpUrl ?? `http://${CDP_HOST}:9222`;
-    // V3 Electron: page URL is `app://./` (custom protocol). Match any page
-    // target to be robust against URL scheme changes.
+    
+    
     const pageUrlPattern = opts.pageUrlPattern ?? /.*/;
   const res = await fetch(`${cdpUrl}/json/version`);
   if (!res.ok) {
@@ -498,8 +485,8 @@ export async function connectElectron(opts: {
 
   const conn = new CDPConnection(ws);
 
-  // 找 V3 Electron 页面 target。V3 用 app:// (custom protocol) 或 file:// 加载。
-  // 取第一个 type="page" target — 单一 BrowserWindow 下只有一个 page target。
+  
+  
   const { targetInfos } = (await conn.send("Target.getTargets")) as {
     targetInfos: Array<{ targetId: string; type: string; url: string; title?: string }>;
   };
@@ -512,7 +499,7 @@ export async function connectElectron(opts: {
         .join(", ")}`,
     );
   }
-  // If a pattern is given, use it; otherwise take the first page.
+  
   const target =
     pageUrlPattern.source === ".*"
       ? pageTargets[0]!
@@ -527,8 +514,8 @@ export async function connectElectron(opts: {
 
   const page = new ElectronPage(conn, sessionId);
 
-  // 注入 __cdp 工具 — 同时设到当前页 + 注册成"每个新文档自动注入",
-  // 这样后续 page.reload() 后 __cdp 不会丢。
+  
+  
   await page.evaluate(new Function(CDP_INJECT_SCRIPT) as any);
   await conn.send(
     "Page.addScriptToEvaluateOnNewDocument",
@@ -538,7 +525,7 @@ export async function connectElectron(opts: {
     sessionId,
   );
 
-  // 转发 console / pageerror
+  
   conn.on("Runtime.consoleAPICalled", (params) => {
     const text = (params.args ?? []).map((a: any) => a.value ?? a.description ?? "").join(" ");
     (page as any).consoleHandler?.({ type: params.type, text });
@@ -554,13 +541,12 @@ export async function connectElectron(opts: {
   return page;
 }
 
-/** @deprecated V2 name — use `connectElectron` (V3). Kept as alias so spec files
- * that haven't migrated yet (none in our suite, but defensive) still work. */
+
 export const connectTauri = connectElectron;
 
-/** @deprecated V2 alias — use `ElectronPage` (V3). */
+
 export type TauriPage = ElectronPage;
-/** @deprecated V2 alias — use `ElectronLocator` (V3). */
+
 export type TauriLocator = ElectronLocator;
-/** @deprecated V2 alias — use `ElectronPage` (V3) class. */
+
 export { ElectronPage as TauriPageClass };

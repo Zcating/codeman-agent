@@ -1,16 +1,16 @@
-//! 06 — Mock LLM round-trip: 1 user + 1 assistant = 2 bubble。
-//!
-//! 使用 mock LLM provider（不依赖 .env 真实 key）。验证:
-//!  1. 用户输入消息 → user bubble 出现
-//!  2. mock LLM 返回预置文本 → assistant bubble 出现
-//!  3. DOM 里恰好 1 user + 1 assistant = 合计 2 个 bubble
+
+
+
+
+
+
 
 import { test, expect, assert, cancelRunningAgent, clearAllHistory, clickNewConversationAndWait, invoke, submitForm } from "./fixtures";
 import { useMockProvider } from "./mock-provider";
 import * as path from "node:path";
 import * as os from "node:os";
 
-// Q→A question substring: 06::user-prompt
+
 const USER_PROMPT = "06::user-prompt 用一句话介绍你自己";
 
 test.describe("06 — LLM round-trip (mock)", () => {
@@ -19,13 +19,13 @@ test.describe("06 — LLM round-trip (mock)", () => {
     await page.goto("/");
     await assert.visible(page.locator('a[href="/settings"]'), { timeout: 15_000 });
 
-    // D8-W: provision workspace via direct IPC
+    
     await invoke(page, "addWorkspace", {
       label: "E2E Mock Test Workspace",
       rootPath: path.join(os.tmpdir(), `codeman-e2e-mock-${process.pid}-${Math.random().toString(36).slice(2, 8)}`),
     });
 
-    // 切换到 mock provider — 不依赖 .env 里的真实 LLM key
+    
     await useMockProvider(page);
   });
 
@@ -33,7 +33,7 @@ test.describe("06 — LLM round-trip (mock)", () => {
     const { page } = tauriEnv;
     await cancelRunningAgent(page);
     await clearAllHistory(page);
-    // clickNewConversationAndWait 走 UI 发送标题时会触发 LLM（用 default Q→A entry）
+    
     await clickNewConversationAndWait(page);
   });
 
@@ -41,23 +41,23 @@ test.describe("06 — LLM round-trip (mock)", () => {
     test.setTimeout(60_000);
     const { page } = tauriEnv;
 
-    // 预置 mock 响应（通过 Q→A table: user text → 06::user-prompt → SSE response）
+    
     const cannedText = "你好！这是 mock LLM 的回复。";
 
-    // 等待 Send 按钮重新出现（clickNewConversationAndWait 的 mock 完成）
+    
     try {
       await page.locator('button[type="submit"]').waitFor({ state: "visible", timeout: 10_000 });
     } catch {
       await cancelRunningAgent(page);
     }
 
-    // textarea 启用 + 输入 + 提交
+    
     const textarea = page.locator('textarea[placeholder="发条消息\u2026"]');
     await assert.enabled(textarea);
     await textarea.fill(USER_PROMPT);
     await submitForm(page);
 
-    // 严格:user bubble 出现（本地 store 同步写,5s 内必现）
+    
     const userBubble = page
       .locator("div.justify-end > div.bg-primary.text-primary-foreground")
       .filter({ hasText: USER_PROMPT });
@@ -65,8 +65,8 @@ test.describe("06 — LLM round-trip (mock)", () => {
     const userText = await userBubble.textContent();
     expect(userText, "bubble 必须包含用户输入").toContain(USER_PROMPT);
 
-    // 严格:assistant bubble 出现且包含完整 mock 预置文本
-    // 等待完整文本而非第一块 chunk（mock 按 4 字 chunk stream，必须等全部送达）
+    
+    
     const textDeadline = Date.now() + 15_000;
     let foundText = "";
     while (Date.now() < textDeadline) {
@@ -84,9 +84,9 @@ test.describe("06 — LLM round-trip (mock)", () => {
     }
     expect(foundText, "assistant bubble 应包含完整 mock 预置文本").toContain(cannedText);
 
-    // 核心断言:包含用户输入的 user bubble + 包含 mock 预置文本的 assistant bubble 都存在
-    //（clickNewConversationAndWait 在 beforeEach 已产生一个 user bubble（标题），
-    //  所以不计数绝对数量，只按文本内容验证）
+    
+    
+    
     const userBubbleWithText = page
       .locator("div.justify-end > div.bg-primary.text-primary-foreground")
       .filter({ hasText: USER_PROMPT });
