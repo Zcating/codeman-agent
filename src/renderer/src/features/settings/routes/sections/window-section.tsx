@@ -1,8 +1,3 @@
-//! WindowSection — `/settings/window` route component.
-//!
-//! Migrated from settings.tsx (lines 215-221). Placeholder copy describing
-//! current window defaults. No state, no handlers.
-
 import type { JSX } from "solid-js";
 
 export function WindowSection(): JSX.Element {

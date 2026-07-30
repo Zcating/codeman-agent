@@ -1,4 +1,4 @@
-//! 全局 app-store (ADR-0015 + ADR-0016).
+//! 全局 app-store.
 //!
 //! Settings 的全局 reactive 桥接层。UI 通过 `appStore.state.value` 读，
 //! 通过 `appStore.set(patch)` / `appStore.forceFlush()` / `appStore.refresh()`
@@ -8,7 +8,7 @@
 //! - **store 函数返回类型二选一**：`void` 或 `Effect<A, E, never>`。绝不返回 Promise。
 //! - **本模块不接 debounce 逻辑**。`set()` 是同步 state mutation；debounce 由 Settings
 //!   feature 层（`src/features/settings/lib/settings-saver.ts`）用 es-toolkit 实现。
-//! - **D4 硬规则**（ADR-0016）：所有 service 操作（IPC / ProviderApi / SettingsApi /
+//! - **D4 硬规则**：所有 service 操作（IPC / ProviderApi / SettingsApi /
 //!   WorkspaceService）必须包成 store method，组件层只调 `Effect.runPromiseExit(store.method())`。
 //!
 //! 设计要点：
@@ -40,9 +40,7 @@ import {
 } from "@codeman-frontend/shared/apis";
 import { WorkspaceService, WorkspaceServiceLive } from "@codeman-frontend/shared/lib/workspace-service";
 import { lookupContextWindow } from "@codeman-frontend/features/chat/lib/context-window-fallback";
-// Note: settingsSaver import removed - was used by deprecated addWorkspace method
-
-// ─── Default Settings (ADR-0015) ──────────────────────────────────────
+// ─── Default Settings ─────────────────────────────────────────────────
 const DEFAULT_MINIMAX_PROVIDER: Provider = {
   id: "minimax",
   label: "MiniMax",
@@ -129,19 +127,10 @@ const refreshImpl = Effect.fn(function* () {
   return fresh;
 });
 
-/**
- * V1.8+ ADR-0016 D1 + D2: 拉 models 列表 + 写 state + 强制执行 Default Model Invariant。
- *
- * Invariant: `Provider.llm.default_model` 始终是 `Provider.llm.models` 中某元素 id 或 `""`。
- *  若 default_model 不在新数组中且数组非空 → 改 models[0].id
- *  若数组为空 → 改 `""`
- *  已经在数组里 → 不动
- */
 const refreshProviderModelsImpl = Effect.fn(
   function* (id: string) {
     const svc = yield* ProviderApi;
     const models = yield* svc.fetchModels(id);
-    // V2.6.1: Backfill contextWindow from three-layer lookup
     const provider = (settings.value.providers ?? []).find((p) => p.id === id);
     if (provider) {
       for (const m of models) {
@@ -171,7 +160,6 @@ const refreshProviderModelsImpl = Effect.fn(
   Effect.mapError((e: unknown) => toAppError(e)),
 );
 
-/** V1.8+ ADR-0016 D4: 弹 OS folder picker，返回选中路径或 null。 */
 const pickWorkspacePathImpl = Effect.fn(
   function* () {
     const svc = yield* WorkspaceService;
@@ -181,13 +169,10 @@ const pickWorkspacePathImpl = Effect.fn(
   Effect.mapError((e: unknown) => toAppError(e)),
 );
 
-/** V1.8+ ADR-0016 D4: 从 providers[] 移除指定记录 + 触发后端 delete IPC (V0 占位)。 */
 const deleteProviderImpl = Effect.fn(
   function* (id: string) {
-    // 1. client-side state mutation (实际删除)
     const providers = (settings.value.providers ?? []).filter((p) => p.id !== id);
     setSettings("value", (prev) => ({ ...prev, providers }));
-    // 2. 后端 IPC (V0 占位, 失败不阻塞 — Rust 端无此命令但前端调用不 throw)
     const svc = yield* ProviderApi;
     yield* svc.delete(id);
   },
@@ -195,7 +180,6 @@ const deleteProviderImpl = Effect.fn(
   Effect.mapError((e: unknown) => toAppError(e)),
 );
 
-/** V1.8+ ADR-0016 D4 + D5: 清 SQLite conversation 表。 */
 const clearAllHistoryImpl = Effect.fn(
   function* () {
     const svc = yield* SettingsApi;
@@ -236,7 +220,7 @@ export const appStore = {
   },
 
   /**
-   * V1.8+ ADR-0016 D1: 拉指定 provider 的 models 列表，写入 store。
+   * V1.8+ D1: 拉指定 provider 的 models 列表，写入 store。
    * 包含 D2 Default Model Invariant 强制执行。
    * 组件用 `Effect.runPromiseExit(appStore.refreshProviderModels(id))` + Exit.match 处理。
    * 注意: settingsSaver.scheduleSave() 仍由组件调用 (shared → feature 单向依赖)。
@@ -246,7 +230,7 @@ export const appStore = {
   },
 
   /**
-   * V1.8+ ADR-0016 D4: 弹 OS folder picker，返回选中路径或 null。
+   * V1.8+ D4: 弹 OS folder picker，返回选中路径或 null。
    * 组件用 `Effect.runPromiseExit(appStore.pickWorkspacePath())` + Exit.match。
    */
   pickWorkspacePath(): Effect.Effect<string | null, AppError> {
@@ -259,14 +243,12 @@ export const appStore = {
    * This method is kept for backward compatibility and will be removed in a future wave.
    */
   addWorkspace(_rootPath: string): Workspace | null {
-    // D8-W: Workspaces are now managed by Rust backend via WorkspaceService
-    // The UI should use WorkspaceService.pickPath() + WorkspaceService.add() instead
     logger.warn("appStore.addWorkspace is deprecated - use WorkspaceService instead");
     return null;
   },
 
   /**
-   * V1.8+ ADR-0016 D4: 从 providers[] 移除 + 后端 delete IPC。
+   * V1.8+ D4: 从 providers[] 移除 + 后端 delete IPC。
    * 组件用 `Effect.runPromiseExit(appStore.deleteProvider(id))` + Exit.match。
    */
   deleteProvider(id: string): Effect.Effect<void, AppError> {
@@ -274,7 +256,7 @@ export const appStore = {
   },
 
   /**
-   * V1.8+ ADR-0016 D4 + D5: 清 SQLite conversation 表。
+   * V1.8+ D4 + D5: 清 SQLite conversation 表。
    * 组件用 `Effect.runPromiseExit(appStore.clearAllHistory())` + Exit.match。
    */
   clearAllHistory(): Effect.Effect<void, AppError> {
@@ -286,7 +268,6 @@ export const appStore = {
    * Workspace selection is now transient (in-memory only) in the chat domain.
    */
   setLastUsedWorkspaceId(_id: string | null): void {
-    // D8-W: last_used_workspace_id removed - workspace selection is now in-memory only
   },
 
   /**
@@ -294,7 +275,6 @@ export const appStore = {
    * Always returns null - workspace selection is now transient.
    */
   getLastUsedWorkspaceId(): string | null {
-    // D8-W: last_used_workspace_id removed
     return null;
   },
 
@@ -303,8 +283,6 @@ export const appStore = {
    * This method always returns null - workspace selection is now done via WorkspaceService.list().
    */
   selectedWorkspaceId(): string | null {
-    // D8-W: Workspaces are now managed by Rust backend via WorkspaceService
-    // Home should use WorkspaceService.list() and manage selection in-memory
     return null;
   },
 };

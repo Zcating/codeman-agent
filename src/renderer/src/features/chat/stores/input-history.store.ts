@@ -1,15 +1,9 @@
-//! 输入历史 — Solid 反应式桥接层 (V2.4+ 输入历史功能)。
-//!
-//! 暴露给 UI：
-//!   - inputHistory$ — newest-first 数组（栈顶最新）
-//!   - inputHistoryCursor$ — `-1` = 不在历史；`0..N-1` = 历史位置
-//!   - recordInputEntry — 提交后调用，自动重置 cursor 并持久化
-//!   - navigateInputHistoryPrev / navigateInputHistoryNext — cursor 推移
-//!   - handleArrowUp / handleArrowDown — UI 集成辅助：是否阻止默认键行为
-//!
-//! 跨 Home + ChatView 两输入框共享同一份历史（Q1=A）。
-//!
-//! 持久化走 `lib/input-history.ts` 的 localStorage 助手（Q2=B）。
+// 暴露给 UI：
+//   - inputHistory$ — newest-first 数组
+//   - inputHistoryCursor$ — `-1` = 不在历史；`0..N-1` = 历史位置
+//   - recordInputEntry — 提交后调用，自动重置 cursor 并持久化
+//   - navigateInputHistoryPrev / navigateInputHistoryNext — cursor 推移
+//   - handleArrowUp / handleArrowDown — UI 集成辅助
 
 import { createSignal, type Accessor } from "solid-js";
 import {
@@ -151,7 +145,7 @@ export function handleArrowDown(setInput: (value: string) => void): boolean {
   return true;
 }
 
-// ─── form.Field-aware wrappers (ADR-0029 PR 5) ─────────────────────────────────
+// ─── form.Field-aware wrappers ─────────────────────────────────
 //
 // TanStack Form 的 `form.Field` render prop 暴露一个 FieldApi 实例，
 // 包含 `state.value` + `handleChange(v)`。调用方不必手写 closure 来把

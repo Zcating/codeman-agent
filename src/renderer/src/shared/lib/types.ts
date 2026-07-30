@@ -3,10 +3,6 @@
 //! boundary so DB column names stay snake_case. New fields added here MUST
 //! use camelCase.
 
-// ============================================================================
-// V1.5 Unified Provider Schema (ADR-0012)
-// ============================================================================
-
 export interface ModelMeta {
   id: string;
   label: string;
@@ -18,7 +14,7 @@ export interface ModelMeta {
 export interface ProviderLlm {
   defaultModel: string;
   baseUrl: string;
-  /** ADR-0011: V1 only supports anthropic-messages protocol */
+  /** V1 only supports anthropic-messages protocol */
   apiType: "anthropic-messages";
   contextWindow?: number;
   models: ModelMeta[];
@@ -29,13 +25,9 @@ export interface Provider {
   id: string;
   label: string;
   enabled: boolean;
-  apiKey: string; // ADR-0015: plaintext in Settings JSON
+  apiKey: string;
   llm: ProviderLlm;
 }
-
-// ============================================================================
-// Settings (V1.5)
-// ============================================================================
 
 export interface Settings {
   /** V1.5: unified providers array. Optional for V1 backward-compat. */
@@ -49,7 +41,7 @@ export interface Settings {
   window: WindowSettings;
   systemPrompt: SystemPromptSettings;
   conversations: ConversationSettings;
-  /** V3.1 ADR-0031: 已启用的 skill 名字列表。空 = 不在 system prompt 注入 skills。 */
+  /** V3.1: 已启用的 skill 名字列表。空 = 不在 system prompt 注入 skills。 */
   enabledSkills?: string[];
   /** @deprecated Use providers instead. Kept for V1 consumer backward-compatibility. */
   llmProviders: LLMProvider[];
@@ -74,10 +66,6 @@ export interface LLMProvider {
   apiKeyRef: string;
 }
 
-// ============================================================================
-// Window & System Prompt Settings (preserved from V1)
-// ============================================================================
-
 export interface WindowSettings {
   rememberPosition: boolean;
   rememberSize: boolean;
@@ -93,10 +81,6 @@ export interface ConversationSettings {
   maxHistory: number; // default 1000
 }
 
-// ============================================================================
-// V2 File IO Tools (ADR-0013)
-// ============================================================================
-
 export interface Workspace {
   id: string;
   label: string;
@@ -110,10 +94,6 @@ export interface FileMatch {
   lineNumber: number | null;
   lineContent: string | null;
 }
-
-// ============================================================================
-// Domain Types (preserved)
-// ============================================================================
 
 export type Role = "user" | "assistant" | "tool" | "system";
 export interface Conversation {
@@ -153,11 +133,7 @@ export interface ToolResult {
 }
 
 // ============================================================================
-// AppError moved to ./errors.ts (ADR-0025 PR 2)
-// ============================================================================
-
-// ============================================================================
-// V2 Local Dev Mock LLM Pipeline (ADR-TBD)
+// V2 Local Dev Mock LLM Pipeline
 // ============================================================================
 
 /**
@@ -172,7 +148,7 @@ export interface QaEntry {
 }
 
 // ============================================================================
-// V3.1 Skills Plugin (ADR-0031)
+// V3.1 Skills Plugin
 // ============================================================================
 
 /** Skill 来源标识 — preinstalled (ship-with-app) 或 user (用户添加)。 */
@@ -194,7 +170,7 @@ export interface SkillManifest {
 }
 
 // ============================================================================
-// V3.1 MCP Client (ADR-0032)
+// V3.1 MCP Client
 // ============================================================================
 
 export type McpServerStatus =

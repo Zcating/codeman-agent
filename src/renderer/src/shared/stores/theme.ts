@@ -18,13 +18,11 @@ let intervalId: ReturnType<typeof setInterval> | null = null;
 let mediaQuery: MediaQueryList | null = null;
 let mediaQueryListener: ((e: MediaQueryListEvent) => void) | null = null;
 
-// 已解析主题 signal — 只会是 "light" 或 "dark"（绝不是 "system"）
 const [theme, setTheme] = createSignal<"light" | "dark">("light");
 
 /** UI 暴露的已解析主题访问器。*/
 export const theme$: Accessor<"light" | "dark"> = theme;
 
-/** 将系统偏好解析为 "light" 或 "dark"。*/
 function resolveSystemTheme(): "light" | "dark" {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
     return "light";
@@ -32,7 +30,6 @@ function resolveSystemTheme(): "light" | "dark" {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-/** 将 Settings.theme 值解析为有效的 "light" 或 "dark"。*/
 function resolveTheme(themeSetting: "light" | "dark" | "system"): "light" | "dark" {
   if (themeSetting === "system") {
     return resolveSystemTheme();
@@ -40,7 +37,6 @@ function resolveTheme(themeSetting: "light" | "dark" | "system"): "light" | "dar
   return themeSetting;
 }
 
-/** 根据已解析主题对 <html> 应用 .dark class。*/
 function applyDarkClass(isDark: boolean): void {
   if (typeof document === "undefined") {
     return;
@@ -52,13 +48,11 @@ function applyDarkClass(isDark: boolean): void {
   }
 }
 
-/** 设置单个 matchMedia listener 监听系统主题。幂等 — 先清理旧 listener。*/
 function setupMediaQueryListener(): void {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
     return;
   }
 
-  // 清理之前的 listener
   if (mediaQuery && mediaQueryListener) {
     mediaQuery.removeEventListener("change", mediaQueryListener);
     mediaQueryListener = null;

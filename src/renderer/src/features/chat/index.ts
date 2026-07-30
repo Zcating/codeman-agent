@@ -1,8 +1,3 @@
-//! Chat feature 公共 API。
-//!
-//! **Chat feature 的 barrel 导出。** Components、runtime、stores 和 types
-//! 都可从这单一入口点访问。内部实现细节（如 Effect Context tags）**不**导出。
-
 export { ChatView } from "@codeman-frontend/features/chat/components/chat-view";
 export { MessageBubble } from "@codeman-frontend/features/chat/components/message-bubble";
 export { ToolCallCard } from "@codeman-frontend/features/chat/components/tool-call-card";

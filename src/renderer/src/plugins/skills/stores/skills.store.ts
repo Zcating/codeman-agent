@@ -1,11 +1,3 @@
-//! Skills store — Solid signal bridge layer (ADR-0031 Wave A2/A5)。
-//!
-//! 暴露给 UI:
-//!   - `skillsManifests$` — SkillManifest[] reactive accessor (默认 [])
-//!   - `setManifests(list)` — 替换整个 manifest 列表
-//!   - `resetManifests()` — 清空列表
-//!   - `refreshManifests(): Effect<...>` — Wave A5: 调 IPC `skillsScan` 拉磁盘列表 + 写 store
-
 import { createSignal, type Accessor } from "solid-js";
 import { Effect } from "effect";
 import { SkillsApi, SkillsApiLive } from "@codeman-frontend/shared/apis";

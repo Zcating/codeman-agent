@@ -1,6 +1,5 @@
 //! codeman-toast.tsx — Imperative codemanToast.error / .success API.
 //! Module-level singleton toaster shared between ToasterMount and codemanToast.
-//! Per ADR-0029 D5: based on @ark-ui/solid Toast primitive.
 
 import { type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
@@ -24,8 +23,6 @@ const toaster = createToaster({
   overlap: false,
   duration: 5000,
 });
-
-// ─── Public API ─────────────────────────────────────────────────────────────
 
 export interface CodemanToastOptions {
   duration?: number;

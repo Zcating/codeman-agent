@@ -1,9 +1,3 @@
-//! LlmSection — `/settings/llm` route component.
-//!
-//! Migrated from settings.tsx (lines 117-153). Renders ProviderCard list +
-//! Add provider button + Footer Save button (force flush). The Save button
-//! is LLM-specific in the new design since it only persists provider edits.
-
 import { For, Show, type JSX } from "solid-js";
 import { Plus } from "lucide-solid";
 import { ProviderCard } from "@codeman-frontend/features/settings/components/provider-card";

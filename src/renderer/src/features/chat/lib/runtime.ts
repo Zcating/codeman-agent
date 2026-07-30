@@ -1,24 +1,20 @@
-//! AgentRuntime — pi-agent-core 0.80.3 的 Effect Stream 包装 (V2 ADR-0019 重构)。
-//!
-//! 工厂模式,无 Context.Tag / 无 Layer DI / 无 Ref<Map<ConvId, Agent>>:
-//! - `createAgentRuntime()` 返回 `AgentRuntime` 接口,closure 持有 per-run 状态
-//! - `run({ context, provider })`: context 是 store messages 浅拷贝(含最新 user msg)
-//! - 每次 run 新建 pi-agent-core Agent + Stream.async fiber
-//! - `cancel()`: 调 closure 内 `currentAgent.abort()` 触发 Agent 内部 signal
-//!
-//! 详细架构见 ADR-0019。
-//!
-//! 0.80.3 迁移要点 (vs 0.9.0):
-//!   - `transport: AgentTransport` (旧,自己跑 agent loop) → `streamFn: anthropicStream`
-//!   - `initialState.thinkingLevel` 必填,默认 "medium"(开 thinking,显示思考过程)
-//!   - `model.reasoning: true` (跟 thinkingLevel 联动,Claude 等推理模型才能产出 thinking blocks)
-//!   - `subscribe((evt) => ...)` → `subscribe((evt, signal) => ...)`
-//!   - 旧 anthropic-transport.ts 的 agent loop 全部删除(由 Agent 内部处理)
-//!
-//! V3.1 Skills integration (ADR-0031):
-//!   - ProviderConfig.enabledSkills: SkillManifest[] — caller (chat.store) 提供
-//!   - systemPrompt 自动追加 `<available_skills>...</available_skills>` 段
-//!   - tools[] 数组添加 `_load_skill` meta-tool (LLM 主动调用拉全文)
+// 工厂模式,无 Context.Tag / 无 Layer DI / 无 Ref<Map<ConvId, Agent>>:
+// - `createAgentRuntime()` 返回 `AgentRuntime` 接口,closure 持有 per-run 状态
+// - `run({ context, provider })`: context 是 store messages 浅拷贝(含最新 user msg)
+// - 每次 run 新建 pi-agent-core Agent + Stream.async fiber
+// - `cancel()`: 调 closure 内 `currentAgent.abort()` 触发 Agent 内部 signal
+//
+// 0.80.3 迁移要点 (vs 0.9.0):
+//   - `transport: AgentTransport` (旧,自己跑 agent loop) → `streamFn: anthropicStream`
+//   - `initialState.thinkingLevel` 必填,默认 "medium"(开 thinking,显示思考过程)
+//   - `model.reasoning: true` (跟 thinkingLevel 联动,Claude 等推理模型才能产出 thinking blocks)
+//   - `subscribe((evt) => ...)` → `subscribe((evt, signal) => ...)`
+//   - 旧 anthropic-transport.ts 的 agent loop 全部删除(由 Agent 内部处理)
+//
+// V3.1 Skills integration:
+//   - ProviderConfig.enabledSkills: SkillManifest[] — caller (chat.store) 提供
+//   - systemPrompt 自动追加 `<available_skills>...</available_skills>` 段
+//   - tools[] 数组添加 `_load_skill` meta-tool (LLM 主动调用拉全文)
 
 import { Effect, Exit, Stream } from "effect";
 import { match } from "ts-pattern";
@@ -46,7 +42,7 @@ import { toPiMessages } from "@codeman-frontend/features/chat/lib/runtime-to-pi-
 import { AppError } from "@codeman-frontend/shared/lib/errors";
 import type { TSchema } from "@sinclair/typebox";
 
-// ─── MCP tools builder (ADR-0032 D4) ────────────────────────────────────────
+// ─── MCP tools builder ────────────────────────────────────────
 
 /** Convert MCP tool entries to pi-agent AgentTool definitions. */
 function buildMcpTools(entries: readonly McpToolEntry[]): AgentTool<TSchema, unknown>[] {
@@ -92,7 +88,7 @@ function buildMcpTools(entries: readonly McpToolEntry[]): AgentTool<TSchema, unk
   }));
 }
 
-// ─── Runtime event types (6 variants,ADR-0017 + thinking) ──────────────────
+// ─── Runtime event types ──────────────────
 
 export type RuntimeEvent =
 | { type: "token"; content: string }
@@ -102,7 +98,7 @@ export type RuntimeEvent =
 | { type: "done"; message: Message }
 /**
  * V2.8: per-message 终止信号(对应 agent_end)。与 `done`(per-turn)区分:
- * - `done`: 每个 turn 触发一次,ADR-0028 Bubble Boundary。chat.store 替换 stub 累积内容,**不**清 streamingMessageId。
+ * - `done`: 每个 turn 触发一次,Bubble Boundary。chat.store 替换 stub 累积内容,**不**清 streamingMessageId。
  * - `message_stop`: 整个 message 真正结束时触发一次(agent_end)。chat.store 清 streamingMessageId → isRunning → Send 按钮恢复。
  * 多 turn 场景(turn-1 tool + turn-2 text)下,`done` 在中间 turn 触发不会让 UI 抖动(Stop→Send→Stop),只有 `message_stop` 才终止 running 状态。
  */
@@ -129,12 +125,12 @@ export interface ProviderConfig {
   systemPrompt: string;
   tools: unknown[];
   /**
-   * ADR-0013 / T27: per-run workspace context — 当工具 schema 接受 `workspace_id`
+   * per-run workspace context — 当工具 schema 接受 `workspace_id`
    * 但 LLM 没传时,`createFileTools()` 自动注入。空 = 不注入(保留 LLM 传的或让工具报错)。
    */
   workspaceId?: string;
   /**
-   * V3.1 ADR-0031: 已启用的 skill manifest 列表。Runtime 在每次 run() 入口自动
+   * V3.1: 已启用的 skill manifest 列表。Runtime 在每次 run() 入口自动
    * 拼成 `<available_skills>...</available_skills>` 段追加到 system prompt。
    * 空 / undefined = 不注入该段。
    */
@@ -156,7 +152,7 @@ export interface AgentRuntime {
   cancel(): void;
 }
 
-// ─── Bubble Boundary helpers (ADR-0028) ───────────────────────────────────────
+// ─── Bubble Boundary helpers ───────────────────────────────────────
 //
 // V3.1 cross-turn aggregation REMOVED. Runtime now emits one `done` event per
 // turn (at `turn_end`), not one aggregated `done` at `agent_end`. Each turn's
@@ -165,10 +161,8 @@ export interface AgentRuntime {
 //
 // Old contract (V3.1, removed): agent_end.messages[] aggregated across all
 // turns → 1 final done with cross-turn thinking + tool_calls.
-// New contract (ADR-0028): turn_end.message (per turn) → 1 done per turn.
+// New contract: turn_end.message (per turn) → 1 done per turn.
 // agent_end is now cleanup-only (emit.end() + unsubscribe).
-
-/** contentOf moved to runtime-type-guards.ts (typed signature, runtime-safe). */
 
 // ─── Per-event handlers (file-level, closure-free) ──────────────
 // Extracted from the inner subscribe callback to reduce nesting (5-6 levels
@@ -258,7 +252,7 @@ function handleToolExecutionEnd(
 }
 
 /**
- * turn_end handler (ADR-0028 Bubble Boundary): emits ONE `done` event for the
+ * turn_end handler (Bubble Boundary): emits ONE `done` event for the
  * turn that just ended. The done.message owns ONLY this turn's content blocks:
  * text / thinking / toolCalls extracted from `evt.message`; toolResults from
  * `evt.toolResults` (NOT cross-turn aggregated).
@@ -350,7 +344,7 @@ function extractResultText(content: unknown): string {
 }
 
 /**
- * agent_end handler (ADR-0028 + V2.8): per-turn `done` events already fired
+ * agent_end handler: per-turn `done` events already fired
  * via handleTurnEnd. V2.8: emit `message_stop` BEFORE emit.end() so chat.store
  * can clear streamingMessageId (isRunning → Send 按钮恢复) only at the true
  * per-message boundary, not at every turn_end. This prevents the Send/Stop
@@ -409,7 +403,7 @@ export function createAgentRuntime(): AgentRuntime {
         // 顺序: file tools 先, MCP tools 中, skills meta-tool 末 (便于 LLM 先看到主要工具)
         const tools = [...fileTools, ...mcpTools, loadSkillTool];
 
-        // V3.1 ADR-0031 D3: 拼接 enabled skills manifest 到 system prompt。
+        // V3.1 D3: 拼接 enabled skills manifest 到 system prompt。
         // 空数组 → formatSkillsManifestSection 返回 "" → 原 systemPrompt 不变。
         const skillsSection = formatSkillsManifestSection(provider.enabledSkills ?? []);
         const finalSystemPrompt = skillsSection
@@ -426,7 +420,7 @@ export function createAgentRuntime(): AgentRuntime {
             // 用户后续可在 settings 里加 provider-level thinkingLevel 配置来覆盖默认值。
             thinkingLevel: "medium",
             tools,
-            // ADR-0019 D2 + bridge: our DB Message (snake_case, flat) → pi-ai Message
+            // D2 + bridge: our DB Message (snake_case, flat) → pi-ai Message
             // (camelCase, content[] blocks). See runtime-to-pi-messages.ts for the
             // mapping rules + edge cases (Usage synthesis, toolName lookup, etc.).
             messages: toPiMessages(context, model),
@@ -451,10 +445,10 @@ export function createAgentRuntime(): AgentRuntime {
               .with({ type: "message_update" }, (e) => handleMessageUpdate(e, emit))
               .with({ type: "tool_execution_end" }, (e) => handleToolExecutionEnd(e, emit))
               .with({ type: "turn_end" }, (e) =>
-                // ADR-0028 Bubble Boundary: per-turn done (1 turn = 1 bubble)
+                // Bubble Boundary: per-turn done (1 turn = 1 bubble)
                 handleTurnEnd(e, emit, provider.defaultModel))
               .with({ type: "agent_end" }, (e) =>
-                // ADR-0028: cleanup-only (per-turn done already fired via turn_end)
+                // cleanup-only (per-turn done already fired via turn_end)
                 handleAgentEnd(e, emit, unsubscribeAndClear))
               .otherwise(() => {
                 // agent_start / turn_start / message_start / message_end /

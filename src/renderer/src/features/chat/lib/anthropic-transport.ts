@@ -1,19 +1,12 @@
-//! anthropic-stream — 自定义 streamFn 适配 pi-agent-core 0.80.3。
-//!
-//! 替代之前的 AnthropicTransport 类。pi-agent-core 0.80.3 重构后,
-//! Agent 不再接受 AgentTransport (自己跑 agent loop),改为接受 streamFn
-//! (只负责单次 LLM 调用,agent loop / 工具执行 / abort 都由 Agent 内部处理)。
-//!
-//! 这里实现 streamFn:把 pi-ai 的 Context (model + messages + tools)
-//! 转成 Anthropic /v1/messages SSE 请求,parse SSE 流,emit
-//! AssistantMessageEvent 事件。最后 push 一个 `done` event 终结 stream,
-//! Agent 从 `result()` 拿到 final AssistantMessage。
-//!
-//! 重要 CORS 行为:
-//!   ProviderTransport 走 pi-ai 的 anthropic provider → Anthropic SDK → 发
-//!   `x-api-key` header,在 `api.minimaxi.com` CORS preflight whitelist 之外,
-//!   webview fetch 报 TypeError。Authorization header 在 whitelist 里,
-//!   所以这里走 `Authorization: Bearer` 路径。
+// 替代之前的 AnthropicTransport 类。pi-agent-core 0.80.3 重构后,
+// Agent 不再接受 AgentTransport (自己跑 agent loop),改为接受 streamFn
+// (只负责单次 LLM 调用,agent loop / 工具执行 / abort 都由 Agent 内部处理)。
+//
+// 重要 CORS 行为:
+//   ProviderTransport 走 pi-ai 的 anthropic provider → Anthropic SDK → 发
+//   `x-api-key` header,在 `api.minimaxi.com` CORS preflight whitelist 之外,
+//   webview fetch 报 TypeError。Authorization header 在 whitelist 里,
+//   所以这里走 `Authorization: Bearer` 路径。
 
 import {
     createAssistantMessageEventStream,
@@ -34,8 +27,6 @@ import {
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import { logger } from "@codeman-frontend/shared/lib/logger";
 
-// ─── SSE 行解析 ─────────────────────────────────────────────────────
-
 export function parseSseLine(line: string): { event?: string; data?: string } {
     const trimmed = line.trim();
     if (trimmed.length === 0) {
@@ -55,8 +46,6 @@ export function parseSseLine(line: string): { event?: string; data?: string } {
     }
     return {};
 }
-
-// ─── Anthropic request body 构造 ─────────────────────────────────────
 
 interface AnthropicMessageParam {
     role: "user" | "assistant";
@@ -184,8 +173,6 @@ export function buildAnthropicRequestBody(
     };
 }
 
-// ─── streamFn 实现 ─────────────────────────────────────────────────
-
 /**
  * pi-agent-core 0.80.3 的 streamFn:把 pi-ai Context 转成 Anthropic SSE,
  * emit AssistantMessageEvent。Agent 内部处理 abort / agent loop /
@@ -218,7 +205,7 @@ async function runAnthropicStream(
         context.tools,
     );
 
-    // G34: dump the actual Anthropic-format messages array on every request.
+    // dump the actual Anthropic-format messages array on every request.
     // 帮助 debug "tool call result does not follow tool call (2013)" — 直接看到
     // 发到 API 的 messages 序列。Api key 不在这条 log (Authorization 在 header,
     // 不在 body 里),只是 messages JSON。失败时 dump 出来给 Anthropic support
@@ -384,7 +371,6 @@ function makeErrorEvent(model: Model<string>, message: string): AssistantMessage
     return { type: "error", reason: "error", error: makeErrorMessage(model, message) };
 }
 
-// Map Anthropic stop_reason values to pi-ai StopReason
 function mapStopReason(anthropicReason: string | undefined): StopReason {
     switch (anthropicReason) {
         case "end_turn":
@@ -400,8 +386,6 @@ function mapStopReason(anthropicReason: string | undefined): StopReason {
             return "stop";
     }
 }
-
-// ─── SSE 流解析 + AssistantMessage 累积 ────────────────────────────
 
 export async function parseSseStream(
     body: ReadableStream<Uint8Array>,

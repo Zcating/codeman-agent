@@ -5,7 +5,7 @@ import type {
     ToolCall,
 } from "@earendil-works/pi-ai";
 
-/** Strict assistant check — role === "assistant" */
+/** Strict assistant check */
 export function isAssistantMessage(
     m: { role?: string } | null | undefined,
 ): m is AssistantMessage {

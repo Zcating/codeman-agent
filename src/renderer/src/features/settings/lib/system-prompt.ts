@@ -1,8 +1,3 @@
-//! System prompt 配置读取 (ADR-0015).
-//!
-//! V1.7+ 后通过 appStore 直接读 Settings，不再走 Effect Service 层。
-//! Settings JSON 内 `system_prompt.default` 与 `system_prompt.user_can_edit` 字段。
-
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
 import type { Conversation } from "@codeman-frontend/shared/lib/types";
 

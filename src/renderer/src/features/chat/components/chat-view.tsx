@@ -1,39 +1,3 @@
-//! ChatView — 消息列表 + 输入框 + store 订阅 (V2.5+, ADR-0029; V2.8 见末尾)。
-//!
-//! V2.5 (ADR-0029): 从 `createSignal` + 原生 `<form onSubmit>` 切换到 `@tanstack/solid-form`
-//! 的 `createForm` + 2 个 `form.Field`（`draft` / `modelId`）。running 状态由 `isRunning()`
-//! 派生；form-level `disabled` 在 streaming 时切。
-//!
-//! V2 ADR-0019: 不再 import messages.store / agent.store, 全部走 chat.store。
-//! V2.5 (ADR-0029 D5): 移除 inline `role="alert" data-testid="chat-error-banner"` banner，
-//! runtime 错误改走 `codemanToast.error(formatAppError(...))`。
-//!
-//! V2.6 (2026-07-26, 决议自 `/prototype/context-ring` 路线 C): 发送按钮**左侧**新增
-//! `ContextRing` 圆形上下文进度条 + 双行 label（百分比 + 已用/总额 tokens）。
-//! 实现已拆到 `./context-ring.tsx`;本文件只持有 ringInfo memo(派生 state)
-//! + cluster wrapper。
-//!
-//! V2.7 (ADR-0037): textarea + slash menu 合并为 `<ComboTextarea>`。移除
-//! `useSlashTrigger` + `<SlashMenu>` + `handleSkillSelect` + `enabledSkills`
-//! memo(部分保留用于传入 ComboTextarea 的 skills prop)。
-//!
-//! V2.8 (2026-07-29, 决议自 `/prototype/chat-textarea-fixed` route A): messages wrapper
-//! 重新拥有 `overflow-y-auto`(撤销 V2.7.1 "Bug B" 把滚动移到 SidebarInset 的修复)。
-//! 用户反馈"下方 textarea 不要连带滚动",需要 form 与 messages 在不同滚动上下文;
-//! Variant A(内嵌滚动)以"messages 自己滚,form sibling 占底部"实现,改动最小。
-//! 副作用:SidebarInset 仍带 `overflow-y-auto`,但因 ConversationRoute 的内容恰好占满
-//! 视口高度,outer 滚动不再触发 — 嵌套滚动仅在 messages 自身高度溢出时激活。
-//!
-//! V2.8 (2026-07-29, 来自 `fix/chat-view-merge-send-cancel`): Send/Cancel 按钮
-//! 合并到同一位置 — running 时 Send 切 Stop (`type=button`, `variant=destructive`,
-//! `<Square>` 图标, "停止"),通过 `<Show when={isRunning()} fallback={Send}>` 切换。
-//! 覆盖 ADR-0029 D3/D6 "Cancel 必须为 form 外部 sibling" 的旧约束。
-//!
-//! V2.8 同步: `isRunning()` 改读 `ConversationState.isAgentActive` (per-message)
-//! 而非 `streamingMessageId` (per-turn)。多 turn 场景下 turn 间不再抖动,
-//! Send/Stop 按钮只在 `message_stop` (对应 agent_end) 切回 Send。详见
-//! ADR-0028 末尾 V2.8 关联说明。
-
 import { createEffect, createMemo, For, Show, onMount, type JSX } from "solid-js";
 import { Effect, Exit } from "effect";
 import { Square, Send } from "lucide-solid";
@@ -66,7 +30,6 @@ import {
   ChatViewFormSchema,
   type ChatViewFormValue,
 } from "@codeman-frontend/features/chat/lib/schemas";
-// ADR-0037: ComboTextarea 替代 useSlashTrigger + SlashMenu
 import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
@@ -132,7 +95,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
   const isRunning = (): boolean => {
     const id = convId();
     if (!id) { return false; }
-    // V2.8: 读 isAgentActive 而非 streamingMessageId。streamingMessageId 是
+    // 读 isAgentActive 而非 streamingMessageId。streamingMessageId 是
     // per-turn stub id(`done` 时清,turn 切换时让下一个 token 创建新 stub),
     // 多 turn 场景下中间 done 会让 streamingMessageId 在 turn 间反复 null 切换
     // → isRunning 抖动 → Send/Stop 按钮闪。isAgentActive 是 per-message 信号
@@ -192,7 +155,6 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     hasScrolledInitially = true;
   });
 
-  // Runtime error → toast (ADR-0029 D5 — banner removed; toast replaces it)
   // Tracks prev error to avoid duplicate toasts when lastError stays non-null across renders.
   const currentLastError = (): string | null => {
     const id = convId();
@@ -219,7 +181,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
       const id = convId();
       if (!text || !id || isRunning()) { return; }
 
-      // Build ProviderConfig from appStore (read at submit-time, per ADR-0019 D2)
+      // Build ProviderConfig from appStore (read at submit-time)
       const providerId = appStore.state.value.defaultLlmProviderId;
       const providerConfig = appStore.state.value.providers?.find((p) => p.id === providerId);
       const provider: ProviderConfig = {
@@ -250,7 +212,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     cancel(id);
   };
 
-  // ─── ADR-0037: skills for ComboTextarea ──────────────────────────────────
+  // ─── skills for ComboTextarea ──────────────────────────────────
   /** Enabled skills = manifests ∩ appStore.enabledSkills */
   const enabledSkills = createMemo((): readonly SkillManifest[] => {
     const all = skillsManifests$();
@@ -380,7 +342,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
               totalTokens={ringInfo().total}
             />
 
-            {/* V2.8: Send/Stop 同位置切换 — running 时变 Stop(type=button, destructive) */}
+            {/* Send/Stop 同位置切换 — running 时变 Stop(type=button, destructive) */}
             <form.Subscribe
               selector={(state) => ({
                 canSubmit: state.canSubmit,

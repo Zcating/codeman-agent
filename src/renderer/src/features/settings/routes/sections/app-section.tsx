@@ -1,8 +1,3 @@
-//! AppSection — `/settings/app` route component.
-//!
-//! Migrated from settings.tsx (lines 154-173). Renders `startAtLogin` checkbox.
-//! appStore.set() triggers debounced auto-save (settingsSaver.scheduleSave).
-
 import type { JSX } from "solid-js";
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
 

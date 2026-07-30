@@ -1,9 +1,3 @@
-//! context-window-fallback — three-layer context window resolution.
-//!
-//! Priority: model.contextWindow → provider.llm.contextWindow → family table → 0.
-//! Used by ringInfo (chat-view) and parseModelsApiResponse to fill missing
-//! context window data from API responses that don't include context_window.
-
 import type { ModelMeta, Provider } from "@codeman-frontend/shared/lib/types";
 
 /** Provider-family → known context window. Key is a prefix match against model id. */

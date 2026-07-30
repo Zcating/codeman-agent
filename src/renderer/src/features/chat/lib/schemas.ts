@@ -1,16 +1,9 @@
-//! ADR-0025 Phase 3 PR 4 — chat Branded IDs: ConversationId, ToolCallId.
-//!
-//! 两个 ID 都是 chat feature 专用（ADR-0025 D6 feature 自治）。
-//! 无 Refinement：backend 生成（SQLite TEXT 列），LLM tool_call_id 来自 pi-ai runtime。
-//!
-//! 用法:
-//!   const convId = ConversationIdSchema.make(row.id);
-//!   const tcId = ToolCallIdSchema.make(llmResponse.toolCallId);
-//!
-//! ADR-0029 PR 1 — TanStack Form schemas (D2).
-//! 严格 schema（field-level 和 form-level 一致），"" 哨兵只在 defaultValues 层
-//! （data layer），不在 schema 层。form-level schema 用于 onChange validator，
-//! field-level schema 用于 onBlur validator。
+// 两个 ID 都是 chat feature 专用。无 Refinement：backend 生成（SQLite TEXT 列），
+// LLM tool_call_id 来自 pi-ai runtime。
+//
+// 严格 schema（field-level 和 form-level 一致），"" 哨兵只在 defaultValues 层
+// （data layer），不在 schema 层。form-level schema 用于 onChange validator，
+// field-level schema 用于 onBlur validator。
 import { Schema } from "effect";
 
 /** ConversationId: chat conversation PK. */
@@ -21,7 +14,7 @@ export type ConversationId = Schema.Schema.Type<typeof ConversationIdSchema>;
 export const ToolCallIdSchema = Schema.String.pipe(Schema.brand("ToolCallId"));
 export type ToolCallId = Schema.Schema.Type<typeof ToolCallIdSchema>;
 
-// ─── Form schemas (ADR-0029 PR 1, D2) ────────────────────────────────────────
+// ─── Form schemas ────────────────────────────────────────
 
 /** 共享 strict 非空串：field-level & form-level 都用这个（保持 ProviderCard 模板一致深度）。
  *

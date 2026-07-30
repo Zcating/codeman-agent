@@ -1,17 +1,6 @@
-//! ThinkingPanel — assistant message 内 thinking 展示块(details 容器,默认折叠)。
-//!
-//! V3.x 决策:thinking 渲染从 message-bubble 内的 inline ThinkingSection(<div>)
-//! 迁出到独立 ThinkingPanel 组件(<details>)。
-//!
-//! 默认折叠(本页"页面优化"诉求 — WX-OPT-2026-07-16):thinking 文本属于 agent
-//! 内部推理过程,默认对用户不可见,需要时点 summary 手动展开。streaming 期间
-//! 也保持折叠 — 用户通过正文 Markdown 流式输出感知 agent 进度,thinking 仅在
-//! 显式需要时查看(降低 chat 视觉密度)。
-//!
-//! summary 标签反映 streaming 状态("思考中…" vs "已思考"),即使折叠也提示
-//! agent 状态。独立组件便于 unit test,不被 message-bubble 的 render tree
-//! 污染。由 MessageBubble 在 assistant bubble 内 thinking 位置渲染,data-message-id
-//! 跟 bubble 同 message id,便于 e2e harness 锚定。
+// 默认折叠:thinking 文本属于 agent 内部推理过程,默认对用户不可见,需要时点 summary 手动展开。
+// streaming 期间也保持折叠 — 用户通过正文 Markdown 流式输出感知 agent 进度。
+// summary 标签反映 streaming 状态("思考中…" vs "已思考")。
 
 import { Brain } from "lucide-solid";
 

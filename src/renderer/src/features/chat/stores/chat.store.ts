@@ -1,11 +1,6 @@
-//! Effect → Solid 会话桥接层 (V2 ADR-0019: 吸收 messages.store + agent.store)。
-//!
-//! 唯一响应式源: Solid `createStore<{ activeId, byId: Record<ConvId, ConversationState> }>`。
-//! ConversationState = DB fields + messages + streamingMessageId + runtime。
-//! UI 读 store.byId[activeId()].messages,Solid proxy 按路径细粒度反应式。
-//!
-//! Task 4 范围: ConversationState 类型 + createStore + setupConvState + accessors。
-//! 后续 Task 5/6/7 加 sendMessage / cancel / archive / delete / loadConversations / createConversation。
+// 唯一响应式源: Solid `createStore<{ activeId, byId: Record<ConvId, ConversationState> }>`。
+// ConversationState = DB fields + messages + streamingMessageId + runtime。
+// UI 读 store.byId[activeId()].messages,Solid proxy 按路径细粒度反应式。
 
 import { createSignal, type Accessor } from "solid-js";
 import { createStore, produce } from "solid-js/store";
@@ -37,7 +32,7 @@ import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills
 // ─── ConversationState 类型 (inline 在 chat.store) ──────
 
 export interface ConversationState {
-  // DB-backed fields (mirror shared/lib/types.ts Conversation)
+  // DB-backed fields
   id: string;
   title: string;
   systemPrompt: string | null;
@@ -80,7 +75,7 @@ export { store, setStore };
 const [conversations, setConversationsSignal] = createSignal<ConversationState[]>([]);
 export const conversations$: Accessor<ConversationState[]> = conversations;
 
-// ─── Workspace state (D8-W) ──────────────────────────────────────────
+// ─── Workspace state ──────────────────────────────────────────
 
 const [workspaces, setWorkspacesSignal] = createSignal<Workspace[]>([]);
 export const workspaces$: Accessor<Workspace[]> = workspaces;
@@ -117,14 +112,6 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
 }
 
 // ─── DB 持久化辅助 (Effect.fn) ───────────────────────────────
-//
-// 与公共 store API (sendMessage / archiveConversation / ...) 不同,这两个是
-// sendMessage 的紧耦合内部分支,嵌套在已 traced 的 sendMessage span 内。
-// 按上游 .repos/effect/.patterns/effect.md "Prefer Effect.fn over
-// functions that only return Effect.gen" 改写:
-//  - 复用 generator body(避免每次 sendMessage 重新分配 closure)
-//  - 跳过 trace span(嵌套 span 价值低,加 span 是 noise)
-//  - 提供 MessageApiLive 通过 fnUntraced 第二参数 transform,与 Effect.provide 同效
 //
 // 注意:必须 const + module-top,不能 function 声明 — sendMessage 在 line 110
 // 引用这俩,const 没有 hoisting,TDZ 会炸。
@@ -183,7 +170,7 @@ export const sendMessage = Effect.fn(
     setStore("byId", convId, "messages", (msgs) => [...msgs, userMsg]);
     yield* persistUserMessage(userMsg);
 
-    // V2.8: mark agent as active BEFORE first event arrives. isAgentActive is
+    // mark agent as active BEFORE first event arrives. isAgentActive is
     // the per-message running signal (cleared by message_stop / error / cancel).
     // streamingMessageId is the per-turn stub id (cleared by done / cancel).
     setStore("byId", convId, "isAgentActive", true);
@@ -196,11 +183,11 @@ export const sendMessage = Effect.fn(
     //    calling file tools. Without this, LLM picks e.g. "miniMax-workspace"
     //    (the workspace label derived from the folder name) and the IPC
     //    write_file/read_file/etc. fails with "Workspace not found: <label>".
-    //    T27: 同时把 workspaceId 通过 ProviderConfig 传给 runtime,作为兜底 —
+    //    同时把 workspaceId 通过 ProviderConfig 传给 runtime,作为兜底 —
     //    即使 LLM 没传 workspaceId(系统 prompt 是 hint,不是 contract),
     //    `createFileTools(workspaceId)` 包装层会在 schema 校验后注入到 args。
     //
-    //    V3.1 ADR-0031 D3: 同时附 enabled skills manifest。Runtime 会拼成
+    // 同时附 enabled skills manifest。Runtime 会拼成
     //    `<available_skills>...</available_skills>` 段注入 system prompt,
     //    LLM 读 manifest 后主动 `_load_skill` 拉全文。
     const enabledNames = appStore.state.value.enabledSkills ?? [];
@@ -399,7 +386,7 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
           );
         }
       }
-      // V2.8: `done` (per-turn, ADR-0028) 保留 stub 替换 + 内容累积 + 持久化。
+      // `done` 保留 stub 替换 + 内容累积 + 持久化。
       // **清** streamingMessageId(否则 turn-2 的 token 会 append 到 turn-1 的
       // finalized 消息 — stubId 仍指向 turn-1,`msgs.map(m => m.id === stubId ...)`
       // 会命中 turn-1)。
@@ -414,9 +401,8 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       break;
     }
     case "message_stop": {
-      // V2.8: per-message 终止信号(对应 agent_end)。清 isAgentActive +
+      // per-message 终止信号(对应 agent_end)。清 isAgentActive +
       // streamingMessageId → isRunning() → Send/Stop 按钮恢复 Send。
-      // 同步清,UI 立即看到 non-running 状态(参考 e2e spec 09 D2 经验)。
       setStore("byId", convId, "streamingMessageId", null);
       setStore("byId", convId, "isAgentActive", false);
       setConversationsSignal(Object.values(store.byId));
@@ -439,13 +425,13 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
 // ─── cancel: 调 runtime.cancel() 中断 in-flight stream ───────
 
 export function cancel(convId: string): void {
-  // Bug B fix (e2e spec 09 D2): synchronously clear streamingMessageId + isAgentActive
-  // so the UI (chat-view's isRunning() + sidebar's isStreaming badge) sees the conv as
-  // non-streaming IMMEDIATELY after cancel(), without waiting for the error event to
-  // propagate through the Effect fiber. Without this, the textarea stays disabled for
-  // ~1 render frame between cancel() and the error event handler, causing D2
-  // ("Cancel → Send 按钮恢复") to flake in CI environments with slower Effect fiber
-  // scheduling. V2.8: also clear isAgentActive (the per-message running signal).
+      // Bug B fix (e2e spec 09 D2): synchronously clear streamingMessageId + isAgentActive
+      // so the UI (chat-view's isRunning() + sidebar's isStreaming badge) sees the conv as
+      // non-streaming IMMEDIATELY after cancel(), without waiting for the error event to
+      // propagate through the Effect fiber. Without this, the textarea stays disabled for
+      // ~1 render frame between cancel() and the error event handler, causing D2
+      // ("Cancel → Send 按钮恢复") to flake in CI environments with slower Effect fiber
+      // scheduling. Also clear isAgentActive (the per-message running signal).
   const cs = store.byId[convId];
   if (!cs) { return; }
   cs.runtime.cancel();

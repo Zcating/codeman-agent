@@ -1,17 +1,13 @@
-//! ADR-0025 Phase 3 PR 4 — settings domain schemas.
+//! Phase 3 PR 4 — settings domain schemas.
 //!
 //! Mirror of `Provider` / `Settings` interfaces in `src/shared/lib/types.ts` (TS 镜像）。
 //! 校验逻辑：src/main/settings-schema.ts 在 Rust-IPC 边界把关；本文件提供
 //! TS 层入口（外部 JSON 反序列化、runtime validation）的 Schema。
 //!
-//! 拒绝理由（"electron-side Zod 镜像对齐" 的 ADR-0025 误解修正）：
+//! 拒绝理由（"electron-side Zod 镜像对齐" 的 误解修正）：
 //! electron 侧只有 `src/main/settings-schema.ts`（普通 JSON schema），
 //! 无 Zod。本文件与该 JSON schema 字段一一对齐即可，不假设存在跨进程 Zod bridge。
 import { Schema } from "effect";
-
-// ============================================================================
-// Provider (TS mirror of types.ts:26-32)
-// ============================================================================
 
 const ProviderLlmSchema = Schema.Struct({
   default_model: Schema.String,
@@ -36,10 +32,6 @@ export const ProviderSchema = Schema.Struct({
 
 export type Provider = Schema.Schema.Type<typeof ProviderSchema>;
 
-// ============================================================================
-// Settings (TS mirror of types.ts:38-52; field-by-field with optional defaults)
-// ============================================================================
-
 export const SettingsSchema = Schema.Struct({
   providers: Schema.optional(Schema.Array(ProviderSchema)),
   schema_version: Schema.optional(Schema.Literal("1.5")),
@@ -47,9 +39,6 @@ export const SettingsSchema = Schema.Struct({
   user_language: Schema.Literal("zh", "en", "auto"),
   theme: Schema.Literal("light", "dark", "system"),
   start_at_login: Schema.Boolean,
-  // WindowSettings / SystemPromptSettings / ConversationSettings shapes mirrored
-  // from `src/shared/lib/types.ts`. Each is a typed Schema.Struct so partial /
-  // malformed entries fail at decode time (was `Schema.Struct({})`).
   window: Schema.Struct({
     remember_position: Schema.Boolean,
     remember_size: Schema.Boolean,

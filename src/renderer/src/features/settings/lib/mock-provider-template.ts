@@ -1,5 +1,3 @@
-//! Mock (dev) template — used by createProviderFormDialog() when user picks "Mock (dev)" radio.
-
 import type { Provider } from "@codeman-frontend/shared/lib/types";
 
 export const MOCK_DEV_TEMPLATE_CONSTANTS = {

@@ -1,22 +1,13 @@
-//! HomeAgentForm — Home 页：无 active conv 时渲染的居中表单 (V2.5, ADR-0029)。
-//!
-//! V2.5 (ADR-0029): 从 `createSignal` + 原生 `<form onSubmit>` 切换到 `@tanstack/solid-form` 的
-//! `createForm` + 3 个 `form.Field`（`draft` / `modelId` / `workspaceId`）。typing 期间不写
-//! appStore / chatStore；提交时 form-level validator + onSubmit handler 走 3 步流程。
-//!
-//! Layout (D6-H4, 保持):
-//! - 顶部标题 + 子标题
-//! - Textarea (top, full width)
-//! - row: workspace picker (200px) + LLM picker (200px)
-//! - Send button row: flex justify-end
-//!
-//! 状态机（保持）：
-//! - 0 workspaces → input disabled + "Add workspace" CTA
-//! - 1 workspace  → auto-select, input enabled
-//! - 2+ workspaces → 无预选, input disabled until user picks
-//!
-//! V2.6 (ADR-0037): textarea + slash menu 合并为 `<ComboTextarea>`。移除
-//! `useSlashTrigger` + `<SlashMenu>` + `handleSkillSelect`。
+// Layout (D6-H4, 保持):
+// - 顶部标题 + 子标题
+// - Textarea (top, full width)
+// - row: workspace picker (200px) + LLM picker (200px)
+// - Send button row: flex justify-end
+//
+// 状态机（保持）：
+// - 0 workspaces → input disabled + "Add workspace" CTA
+// - 1 workspace  → auto-select, input enabled
+// - 2+ workspaces → 无预选, input disabled until user picks
 
 import { createMemo, createEffect, Show, type JSX } from "solid-js";
 import { Send } from "lucide-solid";
@@ -53,11 +44,9 @@ import {
   HomeFormSchema,
   type HomeFormValue,
 } from "@codeman-frontend/features/chat/lib/schemas";
-// ADR-0037: ComboTextarea 替代 useSlashTrigger + SlashMenu
+// ComboTextarea 替代 useSlashTrigger + SlashMenu
 import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
-
-// ─── LlmPicker (D6-H5) ─────────────────────────────────────────────────────────
 
 function LlmPicker(props: {
   value: string;
@@ -113,7 +102,7 @@ export function HomeAgentForm(): JSX.Element {
 
   const navigate = useNavigate();
 
-  // ADR-0037: textarea ref + cursor management now owned by ComboTextarea.
+  // textarea ref + cursor management now owned by ComboTextarea.
   // No local `textareaEl` needed; ComboTextarea forwards focus internally.
 
   // ─── Form ──────────────────────────────────────────────────────────────────
@@ -136,7 +125,7 @@ export function HomeAgentForm(): JSX.Element {
       const text = value.draft.trim();
       const wsId = value.workspaceId;
 
-      // Build ProviderConfig from appStore (always read at submit-time, per ADR-0019 D2)
+      // Build ProviderConfig from appStore (always read at submit-time)
       const providerId = appStore.state.value.defaultLlmProviderId;
       const providerConfig = appStore.state.value.providers?.find((p) => p.id === providerId);
       const provider: ProviderConfig = {
@@ -152,7 +141,7 @@ export function HomeAgentForm(): JSX.Element {
         createConversation(wsId, text.slice(0, 30)),
       );
       if (Exit.isFailure(exit)) {
-        // Silent-drop bug fix (ADR-0029 D5): surface failure via toast
+        // Silent-drop bug fix: surface failure via toast
         codemanToast.error(formatAppError(exit.cause));
         return;
       }
@@ -168,7 +157,7 @@ export function HomeAgentForm(): JSX.Element {
     },
   }));
 
-  // Wave A7 (legacy): Slash trigger + skills. ADR-0037 — ComboTextarea owns
+  // Slash trigger + skills. ComboTextarea owns
   // the trigger; we only compute enabledSkills for the `skills` prop.
   /** Enabled skills = manifests ∩ appStore.enabledSkills */
   const enabledSkills = createMemo((): readonly SkillManifest[] => {
@@ -384,8 +373,6 @@ export function HomeAgentForm(): JSX.Element {
     </div>
   );
 }
-
-// ─── Helpers (module-level) ────────────────────────────────────────────────────
 
 /** Default model id for the form. Falls back to first enabled provider's first model. */
 function initialModelId(): string {

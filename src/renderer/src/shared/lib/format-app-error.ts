@@ -1,6 +1,6 @@
-//! 格式化 Effect 错误 (ADR-0016 D3 + ADR-0025 Phase 3).
+//! 格式化 Effect 错误.
 //!
-//! 把 `Cause.Cause<AppError>` 拍平成人类可读字符串。ADR-0025 PR 2 起单源：
+//! 把 `Cause.Cause<AppError>` 拍平成人类可读字符串。PR 2 起单源：
 //!   - Schema.TaggedError 实例 → 用 `_tag` 判别 (isAppError)。
 //!   - TauriError ({ kind: "IPC" }) → fallback 格式化为 `IPC: <message>`。
 //! 解决 `String(e)` 打出 "[object Object]" 的反模式。
@@ -34,8 +34,8 @@ function formatOne(e: AppError | TauriError): string {
   if (isAppError(e)) {
     return `${e._tag}: ${e.message || "(no message)"}`;
   }
-  // TauriError fallback ({ kind: "IPC" }) — not part of AppError union.
   // ADR-0025 PR 2: TauriError stays as-is with kind: "IPC" literal.
+  // TauriError fallback ({ kind: "IPC" }) — not part of AppError union.
   if (
     e &&
     typeof e === "object" &&

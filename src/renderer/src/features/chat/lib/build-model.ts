@@ -1,10 +1,5 @@
-//! buildModel — 从 V1.5 Provider 配置构建 pi-ai Model 对象。
-//!
-//! T14: 接受 Provider + modelId，从 provider.llm.models 查找 ModelMeta 获取
-//! context_window / thinking 标志，并验证 api_key 存在。
-//!
-//! NOTE: pi-ai 的 getModel() 仅适用于内置注册表 providers (openai/anthropic/google 等)。
-//! V1.5 自定义 providers (minimax/deepseek) 需要手动构造 Model 对象。
+// NOTE: pi-ai 的 getModel() 仅适用于内置注册表 providers (openai/anthropic/google 等)。
+// V1.5 自定义 providers (minimax/deepseek) 需要手动构造 Model 对象。
 import type { Model } from "@earendil-works/pi-ai";
 import type { Provider, ModelMeta } from "@codeman-frontend/shared/lib/types";
 
@@ -25,7 +20,7 @@ export class BuildModelError extends Error {
  *
  * T14: 使用 provider.llm.base_url 作为 baseUrl，
  * provider.api_key 做 API key 存在性验证（实际 key 由 runtime 运行时从 Provider.api_key 读取），
- * provider.llm.api_type 固定为 "anthropic-messages" (ADR-0011)。
+ * provider.llm.api_type 固定为 "anthropic-messages"。
  */
 export function buildModel(provider: Provider, modelId: string): Model<"anthropic-messages"> {
   if (!provider.apiKey) {
@@ -41,8 +36,7 @@ export function buildModel(provider: Provider, modelId: string): Model<"anthropi
     );
   }
 
-  // ADR-0011: api_type 固定为 "anthropic-messages"
-  // NOTE: API key 实际值由 runtime 运行时从 Provider.api_key 读取（ADR-0015 后明文进 Settings JSON），
+  // NOTE: API key 实际值由 runtime 运行时从 Provider.api_key 读取，
   // 此处仅返回 Model 对象结构，apiKey 字段由 ProviderTransport.getApiKey 回调填充。
   const model: Model<"anthropic-messages"> = {
     id: meta.id,

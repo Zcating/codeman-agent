@@ -1,21 +1,3 @@
-// Skills system prompt injector (ADR-0031 D3)。
-//
-// 把 enabled SkillManifest 列表格式化为 system prompt 注入段。
-// LLM 读 manifest 列表后, 主动决定调用 `_load_skill` 拉全文 (per ADR-0031 D4)。
-//
-// 输出格式 (locked per ADR-0031 D3):
-//   <available_skills>
-//   You have access to the following skills. When a user's request matches a
-//   skill's purpose, call the `_load_skill` tool with the skill name to load
-//   its full instructions.
-//
-//   <skill>
-//   <name>commit-helper</name>
-//   <description>Generate a conventional commit message from staged changes.</description>
-//   </skill>
-//   ...
-//   </available_skills>
-
 import type { SkillManifest } from "@codeman-frontend/plugins/skills/lib/skill-loader-schema";
 
 /**

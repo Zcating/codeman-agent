@@ -1,8 +1,5 @@
-//! ToolCallCard — 单个工具调用卡片。
-//!
-//! 状态：running（尚无结果）、success（有结果无错误）、error（有错误的结果）。
-//! 纯 UI。不导入 effect。
-//! Polish C3: 中文 labels (参数 / 结果) + 走 shadcn 语义 token。
+// 状态：running（尚无结果）、success（有结果无错误）、error（有错误的结果）。
+// 纯 UI。不导入 effect。
 
 import { Show, type Component } from "solid-js";
 import {

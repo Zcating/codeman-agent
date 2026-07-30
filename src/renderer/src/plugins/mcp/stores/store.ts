@@ -1,8 +1,3 @@
-//! MCP store — Solid signal bridge layer (ADR-0032 Phase B mini-4).
-//!
-//! Exposes Accessors for UI consumption, bridges Effect-TS results to Solid signals.
-//! UI components import from this file only — no direct Effect imports in components.
-
 import { createSignal, type Accessor } from "solid-js";
 import { Effect } from "effect";
 import { McpApi, McpApiLive } from "@codeman-frontend/shared/apis";

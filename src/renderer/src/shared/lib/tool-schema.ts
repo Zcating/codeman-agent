@@ -1,4 +1,4 @@
-//! ADR-0025 D8 — Schema.Struct ↔ pi-mono `AgentTool` 桥.
+//! D8 — Schema.Struct ↔ pi-mono `AgentTool` 桥.
 //!
 //! pi-mono 的 `AgentTool<TParameters extends TSchema = TSchema>` 强制 typebox 的
 //! `TSchema` 类型符号。`execute: (id, params: Static<TParameters>, ...)` 用 TypeBox
@@ -18,12 +18,12 @@
 //!   - 无 `[Kind]` symbol → 走自定义 `coerceWithJsonSchema`（plain JSON Schema
 //!     兼容分支）+ 同样的 `Compile`
 //!
-//! 旧实现（ADR-0025 D8-R，`JsonSchema.fromAST`）落在第二条路径。TypeBox 路径与
+//! 旧实现（D8-R，`JsonSchema.fromAST`）落在第二条路径。TypeBox 路径与
 //! plain JSON Schema 路径的 coerce 行为不一致 —— 以 file-tools 当前 schema 现状
 //! （无 default value / 无 transform）无可观测差异，但属于已存在的语义分歧。
 //! 切到 walker 走第一条路径消除该分歧。
 //!
-//! 类型层（per ADR-0025 D8-A / D8-B / D8-C）：
+//! 类型层（per D8-A / D8-B / D8-C）：
 //! - `SchemaToTypeBox<S>` 把 `Schema.Struct` 的 value shape 映射到 TypeBox brand
 //! - `Static<typeof toToolParameters(S)>` 自动推导 schema 的 value shape
 //! - 调用方写 `AgentTool<typeof params, ...>` 后，execute 的 params 不再是 unknown
@@ -251,7 +251,7 @@ function walkAST(node: AST.AST): TSchema {
     }
     default:
       throw new Error(
-        `toToolParameters: unsupported AST node "${node._tag}". See ADR-0025 D8-B for the supported node list, or extend the walker.`
+        `toToolParameters: unsupported AST node "${node._tag}". See D8-B for the supported node list, or extend the walker.`
       );
   }
 }
@@ -267,6 +267,6 @@ export function toToolParameters<S extends Schema.Struct<any>>(
   // Same-shape cast: walker output is already a TSchema that TypeScript
   // resolves to TObject<ShapeToTypeBox<valueShape>>. The cast narrows from
   // the broader TSchema union to the specific SchemaToTypeBox<S> brand —
-  // no `unknown` hop (replaces ADR-0025 D8-R `as unknown as SchemaToTypeBox<S>`).
+  // no `unknown` hop (replaces D8-R `as unknown as SchemaToTypeBox<S>`).
   return walkAST(schema.ast) as SchemaToTypeBox<S>;
 }

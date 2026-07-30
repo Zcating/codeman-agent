@@ -1,16 +1,3 @@
-// Skills loader — scan ~/.agents/skills/ + parse SKILL.md YAML frontmatter (ADR-0031)。
-//
-// 公开 API:
-//   - scanSkillsDir(skillsDir): Effect<SkillManifest[], AppError, never>
-//       列出所有有效 skill (corrupt 静默跳过)。ENOENT 视为空目录([])。
-//   - loadSkillContent(skillsDir, skillName): Effect<string, AppError, never>
-//       读 SKILL.md 全文(含 frontmatter), 不存在 → NotFound。
-//
-// 错误复用 AppError union:
-//   - NotFound: skill 不存在
-//   - InvalidConfig: 目录不可读 / 文件权限错误 / frontmatter 损坏
-// 解析错误不外抛, 扫描时静默跳过(per ADR-0031 D1: "corrupt 在 list 中省略")。
-
 import { Effect, Schema } from "effect";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
@@ -51,7 +38,7 @@ export function parseFrontmatter(
 
 /**
  * 判断 skill 目录来源。V1 简化: 路径含 `.preinstalled/` 子段 → preinstalled,
- * 否则 user。后续可改为基于 hash 列表 (per ADR-0031 D7 deferred)。
+ * 否则 user。后续可改为基于 hash 列表。
  */
 function detectSource(skillDir: string): SkillSource {
 	const normalized = skillDir.replace(/\\/g, "/");

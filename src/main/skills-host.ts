@@ -1,4 +1,4 @@
-// Skills host — Electron main process module (ADR-0031 Wave A3).
+// Skills host — Electron main process module.
 //
 // 职责:
 //   1. 计算 ~/.agents/skills/ 路径
@@ -80,7 +80,6 @@ export async function ensurePreinstalledSkills(): Promise<void> {
 			await access(targetFile);
 			continue;
 		} catch {
-			// not exists, proceed to copy
 		}
 
 		await mkdir(targetDir, { recursive: true });
