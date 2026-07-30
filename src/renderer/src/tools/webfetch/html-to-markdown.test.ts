@@ -54,4 +54,14 @@ describe("htmlToText", () => {
     expect(out).not.toMatch(/iframe/);
     expect(out).toMatch(/hi/);
   });
+
+it("htmlToText strips unclosed script tag (XSS protection)", () => {
+  expect(htmlToText("<script>alert(1)<p>hi</p>")).not.toMatch(/alert/);
+  expect(htmlToText("<script>alert(1)<p>hi</p>")).toMatch(/hi/);
+});
+
+it("htmlToText strips unclosed iframe tag", () => {
+  expect(htmlToText("<iframe src=evil><p>safe</p>")).toMatch(/safe/);
+  expect(htmlToText("<iframe src=evil><p>safe</p>")).not.toMatch(/iframe/);
+});
 });

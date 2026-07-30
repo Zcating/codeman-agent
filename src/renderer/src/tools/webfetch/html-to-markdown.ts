@@ -14,7 +14,7 @@ export function htmlToMarkdown(html: string): string {
   return turndown.turndown(html);
 }
 
-const TAG_RE = /<\/?(script|style|noscript|iframe|object|embed|svg|math|audio|video|picture|form|button)\b[^>]*>[\s\S]*?<\/\1>/gi;
+const TAG_RE = /<\/?(script|style|noscript|iframe|object|embed|svg|math|audio|video|picture|form|button)\b[^>]*>[\s\S]*?(?:<\/\1>|(?=<[a-z/])|$)/gi;
 const TAG_STRIP_RE = /<[^>]*>/g;
 const ENTITY_MAP: Record<string, string> = {
   "&amp;": "&",

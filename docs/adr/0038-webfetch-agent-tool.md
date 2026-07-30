@@ -56,7 +56,7 @@ SSRF 防护在 main 端 `ssrf.ts` 实施:
 - 超时: 默认 30s, 可配 5–120s
 
 **响应内容类型限制:** main 端 `handler.ts` 拒绝非文本响应:
-- `NON_TEXT_TYPES = /^image\/(?!svg\+xml)/` 拒绝 `image/png`, `image/jpeg` 等
+- `const NON_TEXT_TYPES = /^(image\/(?!svg\+xml)|audio\/|video\/|application\/(octet-stream|pdf|zip|x-(gzip|bzip2|7z-compressed|tar|rar)))/i;` 拒绝非文本类型
 - 例外: `image/svg+xml` 允许(纯 XML,可走 markdown 转换)
 - 视频 / 音频 / 二进制全部拒绝,避免 LLM context 被 base64 撑爆
 - HTTP 4xx/5xx 抛 `Network` AppError
