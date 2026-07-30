@@ -163,48 +163,122 @@ describe("T3 — src/main/ipc.ts", () => {
   });
 });
 
-describe("checkPatternMatch helper", () => {
+describe("applyEdit helper", () => {
   it("returns notFound when content has no occurrences", async () => {
-    const { checkPatternMatch } = await import("./ipc");
-    const result = checkPatternMatch("needle", false, "/fake/path.txt", "no match here");
+    const { applyEdit } = await import("./ipc");
+    const result = applyEdit("no match here", "needle", "hay", false, "/fake/path.txt");
     expect(result.kind).toBe("notFound");
-    expect(result.message).toBeDefined();
-    expect(result.message).toContain("/fake/path.txt");
-    expect(result.message).toContain("needle");
+    if (result.kind === "notFound") {
+      expect(result.message).toContain("/fake/path.txt");
+      expect(result.message).toContain("needle");
+    }
   });
 
   it("returns ambiguous when content has 2+ occurrences and replaceAll=false", async () => {
-    const { checkPatternMatch } = await import("./ipc");
-    const result = checkPatternMatch("needle", false, "/fake/path.txt", "needle and needle again");
+    const { applyEdit } = await import("./ipc");
+    const result = applyEdit("needle and needle again", "needle", "hay", false, "/fake/path.txt");
     expect(result.kind).toBe("ambiguous");
-    expect(result.message).toBeDefined();
-    expect(result.message).toContain("/fake/path.txt");
-    expect(result.message).toContain("needle");
-    expect(result.message).toContain("2");
+    if (result.kind === "ambiguous") {
+      expect(result.message).toContain("/fake/path.txt");
+      expect(result.message).toContain("needle");
+      expect(result.message).toContain("2");
+    }
   });
 
   it("returns ok when content has exactly 1 occurrence", async () => {
-    const { checkPatternMatch } = await import("./ipc");
-    const result = checkPatternMatch("needle", false, "/fake/path.txt", "found my needle here");
+    const { applyEdit } = await import("./ipc");
+    const result = applyEdit("found my needle here", "needle", "hay", false, "/fake/path.txt");
     expect(result.kind).toBe("ok");
-    expect(result.message).toBeUndefined();
+    if (result.kind === "ok") {
+      expect(result.newContent).toBe("found my hay here");
+    }
   });
 
   it("returns ok when content has 2+ occurrences and replaceAll=true", async () => {
-    const { checkPatternMatch } = await import("./ipc");
-    const result = checkPatternMatch("needle", true, "/fake/path.txt", "needle and needle again");
+    const { applyEdit } = await import("./ipc");
+    const result = applyEdit("needle and needle again", "needle", "hay", true, "/fake/path.txt");
     expect(result.kind).toBe("ok");
-    expect(result.message).toBeUndefined();
+    if (result.kind === "ok") {
+      expect(result.newContent).toBe("hay and hay again");
+    }
   });
 
   it("truncates oldText longer than 200 chars and includes ... in message", async () => {
-    const { checkPatternMatch } = await import("./ipc");
+    const { applyEdit } = await import("./ipc");
     const longPattern = "a".repeat(250);
-    const result = checkPatternMatch(longPattern, false, "/fake/path.txt", "no match");
+    const result = applyEdit("no match", longPattern, "hay", false, "/fake/path.txt");
     expect(result.kind).toBe("notFound");
-    expect(result.message).toContain("...");
-    // The snippet should be 200 chars + "..."
-    expect(result.message).toContain("a".repeat(200));
-    expect(result.message).not.toContain("a".repeat(201));
+    if (result.kind === "notFound") {
+      expect(result.message).toContain("...");
+      // The snippet should be 200 chars + "..."
+      expect(result.message).toContain("a".repeat(200));
+      expect(result.message).not.toContain("a".repeat(201));
+    }
+  });
+
+  // ─── CRLF regression: LLM emits LF-only oldText, file on disk is CRLF ───
+  //
+  // Repro: agent reads `line1\r\nline2\r\nline3`, then tries to edit `oldText`
+  // = "line1\nline2" (the LLM's normal output). Strict string match fails.
+
+  it("matches LF-only oldText against CRLF content and preserves CRLF on rewrite", async () => {
+    const { applyEdit } = await import("./ipc");
+    const content = "line1\r\nline2\r\nline3";
+    const result = applyEdit(content, "line1\nline2", "REPLACED", false, "/fake/path.txt");
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") {
+      expect(result.newContent).toBe("REPLACED\r\nline3");
+    }
+  });
+
+  it("matches CRLF oldText against CRLF content (no regression on existing happy path)", async () => {
+    const { applyEdit } = await import("./ipc");
+    const content = "line1\r\nline2\r\nline3";
+    const result = applyEdit(content, "line1\r\nline2", "REPLACED", false, "/fake/path.txt");
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") {
+      expect(result.newContent).toBe("REPLACED\r\nline3");
+    }
+  });
+
+  it("preserves LF when content is LF and oldText is LF (no EOL drift on happy path)", async () => {
+    const { applyEdit } = await import("./ipc");
+    const content = "line1\nline2\nline3";
+    const result = applyEdit(content, "line1\nline2", "REPLACED", false, "/fake/path.txt");
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") {
+      expect(result.newContent).toBe("REPLACED\nline3");
+    }
+  });
+
+  it("replaceAll=true replaces all CRLF occurrences when LLM emits LF", async () => {
+    const { applyEdit } = await import("./ipc");
+    // Two `foo<br>bar` pairs separated by CRLF; the LLM emits LF in oldText.
+    const content = "foo\r\nbar\r\nfoo\r\nbar";
+    const result = applyEdit(content, "foo\nbar", "FOOBAR", true, "/fake/path.txt");
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") {
+      expect(result.newContent).toBe("FOOBAR\r\nFOOBAR");
+    }
+  });
+
+  it("notFound on CRLF content when oldText does not exist (real miss, not EOL mismatch)", async () => {
+    const { applyEdit } = await import("./ipc");
+    const content = "line1\r\nline2\r\nline3";
+    const result = applyEdit(content, "nonexistent", "REPLACED", false, "/fake/path.txt");
+    expect(result.kind).toBe("notFound");
+    if (result.kind === "notFound") {
+      expect(result.message).toContain("nonexistent");
+    }
+  });
+
+  it("ambiguous on CRLF content when oldText matches multiple times", async () => {
+    const { applyEdit } = await import("./ipc");
+    const content = "needle\r\nneedle\r\nneedle";
+    const result = applyEdit(content, "needle", "REPLACED", false, "/fake/path.txt");
+    expect(result.kind).toBe("ambiguous");
+    if (result.kind === "ambiguous") {
+      expect(result.message).toContain("3");
+    }
   });
 });
