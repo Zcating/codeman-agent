@@ -1,7 +1,3 @@
-//! McpSection — `/settings/mcp` route component (ADR-0032 Phase B mini-4).
-//!
-//! Mounts the MCP settings UI and triggers initial data load.
-
 import { type JSX, onMount } from "solid-js";
 import { Effect, Exit } from "effect";
 import { McpSettingsTab } from "@codeman-frontend/plugins/mcp/components/settings-tab";

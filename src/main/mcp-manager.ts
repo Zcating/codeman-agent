@@ -1,4 +1,4 @@
-//! V3.1 MCP — McpManager: multi-server lifecycle (ADR-0032 D3).
+//! V3.1 MCP — McpManager: multi-server lifecycle.
 //!
 //! Manages multiple McpStdioServer instances (one per configured MCP server).
 //! Loads config from `~/.agents/mcp_servers.json`, starts all enabled servers,
@@ -6,7 +6,7 @@
 //!
 //! Tool name collision: if two enabled servers expose the same
 //! `mcp_<server>_<tool>` name, the second server is rejected at start time
-//! and marked `protocol_error` (per ADR-0032 D8).
+//! and marked `protocol_error`.
 
 import { shell } from "electron";
 import { Effect, Exit } from "effect";
@@ -46,7 +46,6 @@ export class McpManager {
     }
     const config = exit.value;
 
-    // Track seen agentNames for collision detection (ADR-0032 D3)
     const seenAgentNames = new Map<string, string>(); // agentName → serverName
 
     for (const cfg of config.servers) {
@@ -59,16 +58,14 @@ export class McpManager {
       try {
         await server.start();
 
-        // Collision detection: check tools against already-connected servers (per ADR-0032 D3)
         for (const tool of server.listTools()) {
           const agentName = `mcp_${slug(server.getConfig().name)}_${slug(tool.name)}`;
           if (seenAgentNames.has(agentName)) {
             const firstServer = seenAgentNames.get(agentName)!;
-            // Stop the conflicting server and remove from active servers
             await server.stop();
             this.#servers.delete(cfg.name);
             logger.warn(
-              `[mcp] tool name collision: "${agentName}" — first server="${firstServer}", duplicate server="${cfg.name}"; duplicate stopped per ADR-0032 D3`,
+              `[mcp] tool name collision: "${agentName}" — first server="${firstServer}", duplicate server="${cfg.name}"; duplicate stopped per D3`,
             );
             throw new JsonRpcProtocolError({
               message: `duplicate tool name: ${agentName}`,
@@ -99,7 +96,6 @@ export class McpManager {
 
   /** Restart a specific server. Re-reads config and constructs a fresh McpStdioServer. */
   async restart(name: string): Promise<void> {
-    // Re-read config from disk
     const exit = await Effect.runPromiseExit(readMcpConfig());
     if (Exit.isFailure(exit)) {
       throw new InvalidConfig({ field: "mcp_servers.json", message: String(exit.cause) });
@@ -110,7 +106,6 @@ export class McpManager {
       throw new NotFound({ message: `MCP server not found in config: ${name}` });
     }
 
-    // Stop old instance if exists
     const oldServer = this.#servers.get(name);
     if (oldServer) {
       try { await oldServer.stop(); } catch (e) { logger.warn(`[mcp] ${name} stop failed: ${String(e)}`); }
@@ -147,8 +142,8 @@ export class McpManager {
 
   /**
    * Collect all tool entries from connected servers. Each entry's
-   * `agentName` follows ADR-0032 D8: `mcp_<server-slug>_<tool-slug>`.
-   * Collisions are already filtered out in startAll() (per ADR-0032 D3).
+   * `agentName` follows D8: `mcp_<server-slug>_<tool-slug>`.
+   * Collisions are already filtered out in startAll().
    */
   listAllTools(): McpToolEntry[] {
     const out: McpToolEntry[] = [];
@@ -185,7 +180,7 @@ export class McpManager {
     await shell.openPath(MCP_CONFIG_PATH());
   }
 
-  /** Get tools for a specific server (per ADR-0032 D7). */
+  /** Get tools for a specific server. */
   listServerTools(name: string): McpTool[] {
     const server = this.#servers.get(name);
     if (!server || server.getStatus().kind !== "connected") {
@@ -200,7 +195,6 @@ export class McpManager {
    * If disabling: stops the running server (no restart needed).
    */
   async setEnabled(name: string, enabled: boolean): Promise<void> {
-    // Read current config
     const readExit = await Effect.runPromiseExit(readMcpConfig());
     if (Exit.isFailure(readExit)) {
       throw new InvalidConfig({ field: "mcp_servers.json", message: String(readExit.cause) });
@@ -225,7 +219,6 @@ export class McpManager {
     this.#configs.set(name, { ...config.servers[serverIdx], enabled });
 
     if (enabled) {
-      // Restart the server (stop old if running, start new)
       const oldServer = this.#servers.get(name);
       if (oldServer) {
         try { await oldServer.stop(); } catch (e) { logger.warn(`[mcp] ${name} stop failed: ${String(e)}`); }
@@ -234,7 +227,6 @@ export class McpManager {
       this.#servers.set(name, newServer);
       await newServer.start();
     } else {
-      // Disable: stop running server if any
       const server = this.#servers.get(name);
       if (server) {
         try { await server.stop(); } catch (e) { logger.warn(`[mcp] ${name} stop failed: ${String(e)}`); }

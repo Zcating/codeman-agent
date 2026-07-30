@@ -1,10 +1,3 @@
-//! SkillsSection — `/settings/skills` route component.
-//!
-//! Lists all skills (from src/plugins/skills/stores/skills.store) with toggle
-//! controls. Writes to `appStore.settings.enabledSkills` array.
-//!
-//! V3.1 ADR-0031 Wave A6.
-
 import { Show, For, type JSX } from "solid-js";
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
 import { settingsSaver } from "@codeman-frontend/features/settings/lib/settings-saver";

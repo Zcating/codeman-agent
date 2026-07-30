@@ -1,8 +1,3 @@
-//! File Tools — 5 个 AgentTool 定义（V2 文件 IO，ADR-0013）。
-//!
-//! T11-T15：read_file / write_file / edit_file / search_files / delete_file。
-//! 每个工具调用 FileApi 方法，FileApi 通过 Effect.provide(Layer) 提供（Effect v3 API）。
-
 import { Schema } from "effect";
 import { toToolParameters } from "@codeman-frontend/shared/lib/tool-schema";
 import type { Static, TSchema } from "@sinclair/typebox";
@@ -25,11 +20,6 @@ interface AgentToolResult<T> {
   content: TextContent[];
   details: T;
 }
-// ============================================================================
-// Args accessor — ADR-0013.1: schema field = IPC arg key = chat system prompt
-// hint, single camelCase truth source. Returns the property's type as declared
-// in `T`, so optional fields stay `T | undefined` and required fields stay `T`.
-// ============================================================================
 function pickArgs<T extends Record<string, unknown>, K extends keyof T>(
   args: T,
   key: K,
@@ -37,7 +27,7 @@ function pickArgs<T extends Record<string, unknown>, K extends keyof T>(
   return args[key];
 }
 
-/** T27 + ADR-0013.1: workspaceId may now be missing from LLM args (schema is
+/** T27: workspaceId may now be missing from LLM args (schema is
  *  Optional). Return an `Effect.fail(InvalidConfig)` when neither LLM nor the
  *  runtime wrapper provided one — bubbles up via the normal tool error path
  *  and renders cleanly in ToolCallCard. Using `Effect.fail` (not sync
@@ -61,9 +51,9 @@ function requireWorkspaceId(args: Record<string, any>): Effect.Effect<string, Ap
 // ============================================================================
 
 /**
- * T27 + ADR-0025 PR 3 + ADR-0013.1 + this PR (Task 4): workspaceId 是 optional.
+ * T27 + this PR (Task 4): workspaceId 是 optional.
  *
- * ADR-0013.1 wire-format rename: schema field is camelCase to match the TS IPC
+ * wire-format rename: schema field is camelCase to match the TS IPC
  * layer (`window.codeman.readFile(workspaceId, path)`) and the chat system
  * prompt hint (`chat.store.ts:194-195`). Single source of truth.
  *
@@ -78,7 +68,7 @@ function requireWorkspaceId(args: Record<string, any>): Effect.Effect<string, Ap
  */
 export const workspaceIdField = Schema.optional(Schema.String);
 
-// T27 + ADR-0013.1: workspaceId 改为可选 — runtime (chat.store.sendMessage) 通过
+// T27: workspaceId 改为可选 — runtime (chat.store.sendMessage) 通过
 // `createFileTools(provider.workspaceId)` 自动注入,避免 LLM (或 mock JSON)
 // 不知道 UUID 时校验失败。LLM 也可以显式覆盖(优先用 LLM 传的)。
 const ReadFileSchema = Schema.Struct({
@@ -314,7 +304,7 @@ export const fileTools: AgentTool<TSchema, unknown>[] = [
   deleteFileTool,
 ];
 
-/** 创建带 `workspaceId` 自动注入的 file tools 列表(T27 + ADR-0013.1)。
+/** 创建带 `workspaceId` 自动注入的 file tools 列表(T27)。
  *
  *  pi-agent-core 的 schema 校验在 `execute` 之前运行,因此我们无法在收到
  *  args 后再补 `workspaceId` — 必须**在 schema 校验之前**把 field 填好。
@@ -333,9 +323,6 @@ export function createFileTools(workspaceId?: string): AgentTool<TSchema, unknow
   return tools.map((tool) => ({
     ...tool,
     execute: async (toolCallId: string, params: unknown, signal?: AbortSignal) => {
-      // 若 LLM 已显式给 workspaceId,优先用 LLM 的(允许覆盖默认值 — 比如
-      // 未来多 workspace 场景)。否则注入 runtime 提供的值。
-      // ADR-0013.1: schema field 唯一 = workspaceId,不需要 dual-form 桥。
       const args = (params && typeof params === "object"
         ? (params as Record<string, unknown>)
         : {}) as Record<string, unknown>;

@@ -1,13 +1,3 @@
-// T4a — src/main/settings-schema.ts: Settings schema (canonical V1.5 / camelCase) + sanitize.
-//
-// Ports src-tauri/src/settings.rs to TypeScript. Settings persist via
-// electron-store (T3 wires readSettings/writeSettings to IPC). Per
-// ADR-0024 D10 (V3.1 amend): V15 fields use camelCase on disk and in IPC
-// payload.
-//
-// V0 historical shape is no longer supported — disk must contain V1.5
-// camelCase or loadSettings() falls back to DEFAULT_SETTINGS.
-
 import { Schema } from "effect";
 
 // ─── V15 Schema definitions ────────────────
@@ -27,7 +17,7 @@ const ProviderBillingStruct = Schema.Struct({
 const ProviderLlmStruct = Schema.Struct({
   defaultModel: Schema.String,
   baseUrl: Schema.String,
-  /** ADR-0011: V1 only supports anthropic-messages protocol */
+  /** V1 only supports anthropic-messages protocol */
   apiType: Schema.Literal("anthropic-messages"),
   contextWindow: Schema.optional(Schema.Number),
   models: Schema.Array(ModelMetaStruct),
@@ -38,7 +28,7 @@ const ProviderStruct = Schema.Struct({
   id: Schema.String,
   label: Schema.String,
   enabled: Schema.Boolean,
-  /** ADR-0015: plaintext in Settings JSON */
+  /** plaintext in Settings JSON */
   apiKey: Schema.String,
   llm: ProviderLlmStruct,
   billing: Schema.optional(ProviderBillingStruct),
@@ -65,7 +55,7 @@ export const SettingStruct = Schema.Struct({
     autoArchiveAfterDays: Schema.Number,
     maxHistory: Schema.Number,
   }),
-  // V3.1 ADR-0031: 已启用的 skill 名字列表 (按名字, 不含整个 manifest)。
+  // V3.1: 已启用的 skill 名字列表 (按名字, 不含整个 manifest)。
   // 用于 runtime 在 system prompt 注入 <available_skills>...</available_skills> 段。
   enabledSkills: Schema.optional(Schema.Array(Schema.String)),
 });
@@ -130,20 +120,18 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   systemPrompt: { default: "", userCanEdit: true },
   conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
-  // V3.1 ADR-0031: 默认启用全部 4 个 ship-with-app Skills
   enabledSkills: ["commit-helper", "code-review", "explain-error", "summarize"],
 };
 
 // ─── sanitize() ──────────────────────────────────────────────────
 
 /**
- * Clamp settings to documented invariants. Per ADR-0024 amendment: V15 fields
+ * Clamp settings to documented invariants. Per amendment: V15 fields
  * use camelCase on disk and in IPC payload.
  * Uses Schema.decodeUnknownEither for input validation — falls back to
  * DEFAULT_SETTINGS on parse failure.
  */
 export function sanitize(input: Partial<Settings>): Settings {
-  // Validate input via Schema. Falls back to DEFAULT_SETTINGS on Left.
   const decoded = Schema.decodeUnknownEither(SettingStruct)(input);
   const safe: Settings =
     decoded._tag === "Right"

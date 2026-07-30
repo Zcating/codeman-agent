@@ -1,5 +1,3 @@
-//! buildEnabledProviders — pure filter helper for ProviderSelect.
-
 export interface EnabledProvider {
   id: string;
   label: string;

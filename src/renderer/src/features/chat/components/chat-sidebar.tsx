@@ -1,20 +1,9 @@
-//! ChatSidebar — chat-domain wrapper for the universal CodemanSidebar.
-//!
-//! Per ADR-0030 D7: chat feature owns workspace/conversation data mapping
-//! + chat-domain actions (delete, rename, new conv, settings link). The
-//! universal CodemanSidebar stays generic — chat-specific features
-//! (ConvDeleteAction / hover rename+delete / NewChatButton) are rendered as
-//! `renderMenuGroup` / slots.
-//!
-//! Data flow:
-//! - Reads `workspaces$()` + `conversations$()` from chat.store (Solid Accessors)
-//! - Builds `CodemanSidebarGroupOption[]` tree (one project group with workspaces as
-//!   MenuGroups, conversations as Menus inside each MenuGroup's `children`)
-//! - Wires all chat-domain handlers (select / delete / rename / new conv / empty ws)
-//! - Passes URL-derived `selectedConvId` as `currentValue` for active highlight
-//!
-//! Layout: ChatSidebar wraps CodemanSidebar which owns the two-column
-//! (sidebar + main) shell. Children slot is `<Outlet />` from TanStack Router.
+// Data flow:
+// - Reads `workspaces$()` + `conversations$()` from chat.store (Solid Accessors)
+// - Builds `CodemanSidebarGroupOption[]` tree (one project group with workspaces as
+//   MenuGroups, conversations as Menus inside each MenuGroup's `children`)
+// - Wires all chat-domain handlers (select / delete / rename / new conv / empty ws)
+// - Passes URL-derived `selectedConvId` as `currentValue` for active highlight
 
 import { type JSX } from "solid-js";
 import { Outlet, useLocation, useNavigate, useParams, Link } from "@tanstack/solid-router";
@@ -37,8 +26,6 @@ import { chatSidebarActions } from "@codeman-frontend/features/chat/lib/chat-sid
 import { RowActions } from "@codeman-frontend/features/chat/components/row-actions";
 import { NewChatButton } from "@codeman-frontend/features/chat/components/new-chat-button";
 import { getPluginMetadata } from "@codeman-frontend/plugins";
-
-// ─── Icon mapping (UI layer maps registry icon identifiers to JSX) ──────────────
 
 /** Maps registry icon string identifiers to lucide-solid JSX elements. */
 function renderPluginIcon(pluginId: string, iconName: string): JSX.Element {

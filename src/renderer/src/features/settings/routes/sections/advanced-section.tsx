@@ -1,8 +1,3 @@
-//! AdvancedSection — `/settings/advanced` route component.
-//!
-//! Migrated from settings.tsx (lines 174-214). Clear-history flow with
-//! two-step confirm UI (initial button → confirm overlay).
-
 import { Show, createSignal, type JSX } from "solid-js";
 import { Trash2 } from "lucide-solid";
 import { clearAllHistoryBridge } from "@codeman-frontend/features/settings/lib/clear-all-history-bridge";

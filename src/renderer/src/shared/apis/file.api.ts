@@ -5,8 +5,6 @@ import { invoke } from "./invoke.api";
 import type { FileMatch } from "@codeman-frontend/shared/lib/types";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
 
-// ─── FileApi tag ─────────────────────────────────────────
-
 export class FileApi extends Context.Tag("FileApi")<
   FileApi,
   {
@@ -31,8 +29,6 @@ export class FileApi extends Context.Tag("FileApi")<
     readonly deleteFile: (workspaceId: string, path: string) => Effect.Effect<void, AppError>;
   }
 >() {}
-
-// ─── FileApi live layer ──────────────────────────────────
 
 export const FileApiLive = Layer.succeed(FileApi, {
   readFile: (workspaceId: string, path: string) =>

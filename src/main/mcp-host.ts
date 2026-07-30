@@ -1,4 +1,4 @@
-//! ADR-0032 B2 — MCP Stdio Server (single subprocess lifecycle).
+//! B2 — MCP Stdio Server (single subprocess lifecycle).
 //!
 //! McpStdioServer: spawn → initialize → tools/list → ready → tools/call.
 //! All communication over stdio JSON-RPC. No McpManager here (mini-3).
@@ -9,7 +9,7 @@ import { JsonRpcConnection } from "./jsonrpc";
 import { logger } from "./logger";
 import { JsonRpcProtocolError } from "../renderer/src/shared/lib/errors";
 
-// ─── Config & Types (ADR-0032 D1-D3) ─────────────────────────────────────────
+// ─── Config & Types ─────────────────────────────────────────
 
 export interface McpServerConfig {
   name: string;                     // unique id (slug, no path separators)
@@ -98,7 +98,6 @@ export class McpStdioServer {
 
     this.setStatus({ kind: "starting" });
 
-    // Step 1: spawn
     try {
       this.child = this.spawnFn(this.config.command, this.config.args, {
         env: { ...process.env, ...this.config.env },

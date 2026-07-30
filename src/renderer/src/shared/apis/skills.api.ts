@@ -1,4 +1,4 @@
-//! SkillsApi domain (ADR-0031 Wave A3) — extracted from ipc.ts for domain split.
+//! SkillsApi domain — extracted from ipc.ts for domain split.
 //!
 //! Wraps the 2 skills IPC channels: skillsScan, skillsLoad.
 
@@ -7,9 +7,6 @@ import { invoke } from "./invoke.api";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
 
-// ─── SkillsApi tag ───────────────────────────────────────
-
-// Skills plugin service (ADR-0031 Wave A3) — wraps the 2 skills IPC channels.
 export class SkillsApi extends Context.Tag("SkillsApi")<
   SkillsApi,
   {
@@ -17,8 +14,6 @@ export class SkillsApi extends Context.Tag("SkillsApi")<
     readonly load: (name: string) => Effect.Effect<string, AppError>;
   }
 >() {}
-
-// ─── SkillsApi live layer ────────────────────────────────
 
 export const SkillsApiLive = Layer.succeed(SkillsApi, {
   scan: () => invoke<SkillManifest[]>("skillsScan"),

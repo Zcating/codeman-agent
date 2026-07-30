@@ -14,10 +14,7 @@ import type {
   Usage,
 } from "@earendil-works/pi-ai";
 
-/**
- * API identity used to synthesize required fields on `AssistantMessage`.
- * Both come from the runtime's `model` config (per-run, not closure).
- */
+/** API identity used to synthesize required fields on `AssistantMessage`. */
 interface ModelIdentity {
   readonly api: string;
   readonly provider: ProviderId;
@@ -27,7 +24,7 @@ interface ModelIdentity {
  * Bridge from app DB `Message[]` (snake_case, flat) to pi-ai `Message[]`
  * (camelCase, Content[] blocks).
  *
- * Mapping decisions (ADR-0019 D2 + pi-ai version drift):
+ * Mapping decisions:
  * - UserMessage: `content` is always string (our DB doesn't support image blocks).
  * - AssistantMessage: `content[]` assembled from `content` (TextContent) +
  *   `thinking` (ThinkingContent, if non-null) + `toolCalls[]` (ToolCall blocks).
@@ -40,8 +37,6 @@ interface ModelIdentity {
  *   `toolCalls[]` (best-effort lookup); falls back to "" if orphan.
  * - System messages: skipped (system prompt lives in `Context.systemPrompt`,
  *   not in messages).
- *
- * Replaces the 2-hop `as unknown as PiMessage[]` cast at runtime.ts:281.
  */
 export function toPiMessages(
   messages: DbMessage[],
@@ -62,7 +57,7 @@ export function toPiMessages(
 
       case "assistant":
         result.push(mapAssistant(m, model));
-        // ADR-0028 Bubble Boundary: toolResults 现在挂在 assistant message 自身
+        // toolResults 现在挂在 assistant message 自身
         // (per-turn done emission 把 turn 内的 toolResults 聚合到
         // done.event.message.toolResults)。必须在 AssistantMessage 之后 emit 一一对应
         // 的 ToolResultMessage,才能让 anthropic-transport 产出

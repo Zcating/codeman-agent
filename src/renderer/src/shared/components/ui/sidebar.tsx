@@ -1,14 +1,10 @@
 //! sidebar.tsx — Layer 1 shadcn-style sidebar primitive.
 //! Pure layout, ZERO business logic. Wraps @ark-ui/solid for Accordion/Tooltip.
-//! Per ADR-0023 D8-W6 Dialog case precedent (single authorized instance) and `.omo/plans/sidebar-reshim.md` Q10=B / Q28 v5=A decisions (plan-driven authorization for sidebar/accordion/tooltip wrapper atoms): ui/ atoms MAY wrap @ark-ui/solid when the wrapper is a shadcn/ui-style primitive (per codeman-agent project context).
-//! Per ADR-0022 D3: Layer 1 = this file; Layer 2 = internal/codeman-sidebar.tsx.
 
 import type { JSX } from "solid-js";
 import { createSignal, createContext, useContext, mergeProps, splitProps, Show } from "solid-js";
 import { cn } from "@codeman-frontend/shared/lib/cn";
 import { Tooltip as TooltipRoot, TooltipTrigger, TooltipContent } from "@codeman-frontend/shared/components/ui/tooltip";
-
-// ─── SidebarContext & SidebarProvider ─────────────────────────────────────────
 
 interface SidebarContextValue {
   state: "expanded" | "collapsed";
@@ -77,8 +73,6 @@ export function SidebarProvider(props: SidebarProviderProps): JSX.Element {
     </SidebarContext.Provider>
   );
 }
-
-// ─── Shell ────────────────────────────────────────────────────────────────────
 
 export interface SidebarProps {
   side?: "left" | "right";
@@ -180,8 +174,6 @@ export function SidebarSeparator(props: { class?: string; children?: JSX.Element
   );
 }
 
-// ─── Group ─────────────────────────────────────────────────────────────────────
-
 export function SidebarGroup(props: { class?: string; children?: JSX.Element }): JSX.Element {
   const [local, rest] = splitProps(props, ["class", "children"]);
   return (
@@ -232,8 +224,6 @@ export function SidebarGroupAction(props: { class?: string; children?: JSX.Eleme
     </button>
   );
 }
-
-// ─── Menu ──────────────────────────────────────────────────────────────────────
 
 export function SidebarMenu(props: { class?: string; children?: JSX.Element }): JSX.Element {
   const [local, rest] = splitProps(props, ["class", "children"]);
@@ -386,8 +376,6 @@ export function SidebarMenuSkeleton(props: { showIcon?: boolean; class?: string 
   );
 }
 
-// ─── Sub ───────────────────────────────────────────────────────────────────────
-
 export function SidebarMenuSub(props: { class?: string; children?: JSX.Element }): JSX.Element {
   const [local, rest] = splitProps(props, ["class", "children"]);
   return (
@@ -454,8 +442,6 @@ export function SidebarMenuSubButton(props: SidebarMenuSubButtonProps): JSX.Elem
     </a>
   );
 }
-
-// ─── Inset + Input + Rail + Trigger ───────────────────────────────────────────
 
 export function SidebarInset(props: { class?: string; children?: JSX.Element }): JSX.Element {
   const [local, rest] = splitProps(props, ["class", "children"]);

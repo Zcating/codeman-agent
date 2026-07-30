@@ -1,19 +1,13 @@
-//! ComboTextarea — textarea + slash-menu popup (production home for Variant A).
-//!
-//! ADR-0037: 取代 `plugins/skills/components/slash-menu.tsx` +
-//! `plugins/skills/lib/use-slash-trigger.ts` 的双文件模型。textarea + 状态机 +
-//! Popover 三者合一,集中处理焦点陷阱 + `userDismissed` 防 flicker。
-//!
-//! 设计要点:
-//! - 内部用 `CodemanTextarea`(IME-safe),不绕过。
-//! - `autoFocus={false}` / `restoreFocus={false}` / `closeOnInteractOutside={false}`
-//!   三个 ark-ui prop 透传给内部 `<Popover>`,保留 textarea 焦点 + 自管关闭路径。
-//! - `userDismissed` 信号:一旦显式关闭(选 / Esc / Ctrl+/ 之外的关闭),菜单
-//!   持续关闭直至输入框中所有 `/` 被 backspace 清空。下一次 `/` 由 deriveTrigger
-//!   自然触发,无需手动 reset。
-//! - Ctrl/Cmd+/:忽略 IME,显式强制重开(即便 userDismissed=true)。
-//! - Enter:菜单开着 → 选中并关闭 + userDismissed=true;菜单关着 →
-//!   不 preventDefault,原生表单 submit 透传(由外层 `<form onSubmit>` 接管)。
+// 设计要点:
+// - 内部用 `CodemanTextarea`(IME-safe),不绕过。
+// - `autoFocus={false}` / `restoreFocus={false}` / `closeOnInteractOutside={false}`
+//   三个 ark-ui prop 透传给内部 `<Popover>`,保留 textarea 焦点 + 自管关闭路径。
+// - `userDismissed` 信号:一旦显式关闭(选 / Esc / Ctrl+/ 之外的关闭),菜单
+//   持续关闭直至输入框中所有 `/` 被 backspace 清空。下一次 `/` 由 deriveTrigger
+//   自然触发,无需手动 reset。
+// - Ctrl/Cmd+/:忽略 IME,显式强制重开(即便 userDismissed=true)。
+// - Enter:菜单开着 → 选中并关闭 + userDismissed=true;菜单关着 →
+//   不 preventDefault,原生表单 submit 透传(由外层 `<form onSubmit>` 接管)。
 
 import {
   createSignal,
@@ -31,8 +25,6 @@ import {
 } from "@codeman-frontend/shared/components/ui/popover";
 import { CodemanTextarea } from "@codeman-frontend/shared/components/internal/codeman-textarea";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
-
-// ─── Types ─────────────────────────────────────────────────────────────────────
 
 export interface ComboTextareaProps {
   /** Controlled textarea value (from form.Field / signal). */
@@ -76,11 +68,7 @@ interface TriggerState {
   rect: DOMRect | null;
 }
 
-// ─── Constants ─────────────────────────────────────────────────────────────────
-
 const POPOVER_HEIGHT = 320;
-
-// ─── SlashMenuItem (private) ───────────────────────────────────────────────────
 
 interface SlashMenuItemProps {
   skill: SkillManifest;
@@ -161,8 +149,6 @@ function SlashMenuItem(props: SlashMenuItemProps): JSX.Element {
     </div>
   );
 }
-
-// ─── ComboTextarea ─────────────────────────────────────────────────────────────
 
 export function ComboTextarea(props: ComboTextareaProps): JSX.Element {
   // State

@@ -1,9 +1,3 @@
-//! ConversationRoute — Conversation route component (V2.2 + Q1 patch).
-//!
-//! Renders ChatView only. convId comes from route params.
-//! Q1 (2026-07-04): removed the "← 返回首页" button. The CodemanSidebar
-//! (always-show after V2.3) is the primary way to navigate back to Home.
-
 import type { JSX } from "solid-js";
 import { useParams } from "@tanstack/solid-router";
 import { ChatView } from "@codeman-frontend/features/chat/components/chat-view";

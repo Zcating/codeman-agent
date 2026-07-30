@@ -1,13 +1,3 @@
-//! Central renderer plugin barrel — ADR-0035 / plugin-registry-startup-initialization.md Task A.
-//!
-//! This barrel is the SOLE concrete plugin registration point. It:
-//! - Registers skills and mcp descriptors with their real initializer Effects
-//! - Re-exports public registry APIs for bootstrap/sidebar consumers
-//! - Avoids duplicate registration via module-level guard
-//!
-//! NOTE: This file is the ONLY concrete registration point. The registry core
-//! pre-registers placeholder descriptors; this barrel replaces them with real ones.
-
 import { Effect } from "effect";
 import { pluginRegistry } from "@codeman-frontend/plugins/lib/plugin-registry";
 import type { PluginDescriptor } from "@codeman-frontend/plugins/lib/plugin-registry";

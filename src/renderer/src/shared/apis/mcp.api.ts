@@ -1,4 +1,4 @@
-//! McpApi domain (ADR-0032) — extracted from ipc.ts for domain split.
+//! McpApi domain — extracted from ipc.ts for domain split.
 //!
 //! Wraps the 6 MCP IPC channels: mcpListServers, mcpGetTools, mcpGetAllTools,
 //! mcpEnable, mcpRestart, mcpCallTool, mcpOpenConfigDir.
@@ -12,9 +12,6 @@ import type {
 } from "@codeman-frontend/shared/lib/types";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
 
-// ─── McpApi tag ─────────────────────────────────────────
-
-// MCP client service (ADR-0032) — wraps the 6 MCP IPC channels.
 export class McpApi extends Context.Tag("McpApi")<
   McpApi,
   {
@@ -27,8 +24,6 @@ export class McpApi extends Context.Tag("McpApi")<
     readonly openConfigDir: () => Effect.Effect<void, AppError>;
   }
 >() {}
-
-// ─── McpApi live layer ──────────────────────────────────
 
 export const McpApiLive = Layer.succeed(McpApi, {
   listServers: () => invoke<McpServerInfo[]>("mcpListServers"),

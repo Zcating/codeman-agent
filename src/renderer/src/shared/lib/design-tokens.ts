@@ -1,4 +1,4 @@
-//! V2.1 Design Tokens (ADR-0022 D2)
+//! V2.1 Design Tokens
 //!
 //! 双层设计：
 //! - **CSS 颜色**（`@theme` 块，src/index.css）：layout 颜色 token（bg-sidebar / text-sidebar-foreground 等）

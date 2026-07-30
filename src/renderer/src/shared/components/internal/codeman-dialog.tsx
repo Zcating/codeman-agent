@@ -1,6 +1,5 @@
 //! codeman-dialog.tsx — Imperative alert/confirm/show API for dialogs.
 //! Module-level singleton using render() + Portal from solid-js/web.
-//! Follows ADR-0023 D8-W6 pattern for imperative modal API.
 
 import { createSignal, type JSX } from "solid-js";
 import { render, Portal } from "solid-js/web";
@@ -13,8 +12,6 @@ import {
   DialogFooter,
 } from "@codeman-frontend/shared/components/ui/dialog";
 import { Button } from "@codeman-frontend/shared/components/ui/button";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface DialogAlertOptions {
   title: string;
@@ -30,8 +27,6 @@ export interface DialogConfirmOptions {
   destructive?: boolean;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 function getMountTarget(): HTMLElement {
   return document.getElementById("root")?.parentElement ?? document.body;
 }
@@ -41,8 +36,6 @@ function createContainer(): HTMLDivElement {
   getMountTarget().appendChild(el);
   return el;
 }
-
-// ─── Dialog API ──────────────────────────────────────────────────────────────
 
 export const Dialog = {
   alert(opts: DialogAlertOptions): Promise<void> {

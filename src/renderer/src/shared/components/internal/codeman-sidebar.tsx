@@ -1,7 +1,5 @@
-//! CodemanSidebar — universal render-driven sidebar (ADR-0030, ADR-0033).
+//! CodemanSidebar — universal render-driven sidebar.
 //! Layer 2 prop-driven composition over `ui/sidebar` + `ui/accordion` primitives.
-
-//! ADR-0022 D3: zero business logic, zero feature/store imports.
 
 import { For, Show, type JSX } from "solid-js";
 import {
@@ -27,8 +25,6 @@ import {
   SidebarMenuSubButton,
   SidebarInset,
 } from "@codeman-frontend/shared/components/ui/sidebar";
-
-// ─── Types ─────────────────────────────────────────────────────────────────
 
 /** Top-level group. `children` is heterogeneous — MenuGroups (accordion-controlled) and Menus (flat) can coexist. */
 export interface CodemanSidebarGroupOption {
@@ -91,7 +87,6 @@ export interface CodemanSidebarProps {
   /** Called when an empty group is clicked (no children) */
   onEmptyGroupClick?: (groupValue: string) => void;
 
-  // ─── 3 slots (per ADR-0030 D3) ────────────────────────────────────────
   /** Top slot — inside sidebar shell, above menu */
   header?: JSX.Element;
   /** Bottom slot — inside sidebar shell, below menu */
@@ -104,8 +99,6 @@ export interface CodemanSidebarProps {
   /** Tailwind utility class merged into the root sidebar */
   class?: string;
 }
-
-// ─── Sub-component props (file-local, not exported) ────────────────────────
 
 interface CodemanSidebarEmptyStateProps {
   message?: string;
@@ -143,8 +136,6 @@ interface CodemanSidebarGroupViewProps {
   onEmptyGroupClick?: ((groupValue: string) => void);
   isMenuActive: (menu: CodemanSidebarMenuOption) => boolean;
 }
-
-// ─── Internal sub-components (file-local, not exported) ────────────────────
 
 /** Empty-state placeholder when `options.length === 0`. */
 function CodemanSidebarEmptyState(
@@ -356,8 +347,6 @@ function CodemanSidebarGroupView(
   );
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
-
 /** Bound active predicate for Menu leaves (closes over currentValue + isActiveFn). */
 function makeIsMenuActive(
   currentValue: string | undefined,
@@ -368,8 +357,6 @@ function makeIsMenuActive(
   }
   return (menu) => menu.value === currentValue;
 }
-
-// ─── Component ─────────────────────────────────────────────────────────────
 
 export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
   const isMenuActive = makeIsMenuActive(props.currentValue, props.isActive);

@@ -1,7 +1,3 @@
-//! McpSettingsTab — MCP server management UI (ADR-0032 Phase B mini-4).
-//!
-//! Uses `useMcpStore` for reactive state; Effect actions run via store functions.
-
 import { For, Show, type JSX } from "solid-js";
 import { Effect } from "effect";
 import {

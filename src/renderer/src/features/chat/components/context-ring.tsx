@@ -1,21 +1,13 @@
-//! ContextRing — chat-view 发送按钮左侧的 context window 进度指示器 (V2.6)。
-//!
-//! 几何参数(per user 2026-07-26, 由 prototype skill `/prototype/context-ring`
-//! 选中路线 C 后固定):
-//!   - 外径 (visible outer diameter of stroke) = 20px
-//!   - stroke 宽度 = 2px
-//!   - 圆环与发送按钮的距离 = 16px (`CTX_RING_SEND_GAP_PX`,exported 给 chat-view 用来 wrap cluster)
-//!
-//! 形态(prototype 变体 C 选中):
-//!   - 环左侧双行 label:粗体百分比 / 灰色紧凑 token 数(已用 / 总额)
-//!   - 阈值配色:此版本用 `stroke-primary` 单色 + 进度环 fill 表达;
-//!     warn/crit 配色留给后续 ADR。
-//!
-//! Token 计算(`computeUsedTokensEst`):fallback 路径,粗估字符/4。
-//! 优先路径是 chat-view 的 ringInfo memo 用 `inputTokens` (LLM 真实回报)。
-//!
-//! 决议出处:`docs/adr/0036-chat-context-ring-detailed.md`;原型已合并,
-//! `/prototype/context-ring` 路由在 V2.6 落地后删除。
+// 几何参数:
+//   - 外径 = 20px
+//   - stroke 宽度 = 2px
+//   - 圆环与发送按钮的距离 = 16px (`CTX_RING_SEND_GAP_PX`)
+//
+// 形态:
+//   - 环左侧双行 label:粗体百分比 / 灰色紧凑 token 数(已用 / 总额)
+//
+// Token 计算(`computeUsedTokensEst`):fallback 路径,粗估字符/4。
+// 优先路径是 chat-view 的 ringInfo memo 用 `inputTokens` (LLM 真实回报)。
 
 import { createMemo, type JSX } from "solid-js";
 import type { Message } from "@codeman-frontend/shared/lib/types";
@@ -35,14 +27,10 @@ function formatTokensShort(n: number): string {
 /** 圆环与发送按钮之间的距离(px)。chat-view 用这个常量 wrap cluster。 */
 export const CTX_RING_SEND_GAP_PX = 16;
 
-// ─── 几何常量(模块内,不导出) ────────────────────────────────────────────
-
 const CTX_RING_DIAMETER = 20;
 const CTX_RING_STROKE = 2;
 const CTX_RING_BOX = CTX_RING_DIAMETER + CTX_RING_STROKE; // 22 (含 stroke 边距)
 const CTX_RING_ARC_R = (CTX_RING_DIAMETER - CTX_RING_STROKE) / 2; // 9 (stroke 中心线位置)
-
-// ─── Token 粗估(fallback) ──────────────────────────────────────────────
 
 /**
  * 用消息列表粗估已用 token 数。**仅**在 LLM API 没返回 `inputTokens`
@@ -73,8 +61,6 @@ export function computeUsedTokensEst(msgs: readonly Message[]): number {
   }
   return Math.ceil(chars / 4);
 }
-
-// ─── 组件 ──────────────────────────────────────────────────────────────
 
 /** ContextRing props — 数据驱动,无状态。空态由调用方用 `<Show>` 控制。 */
 export interface ContextRingProps {

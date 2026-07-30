@@ -171,7 +171,6 @@ app.whenReady().then(() => {
 		console.error("[skills-host] ensurePreinstalledSkills failed:", e);
 	});
 
-	// V3.1 MCP — instantiate manager + register handlers.
 	const mcpManager = new McpManager();
 	registerMcpIpcHandlers(mcpManager);
 	void mcpManager.startAll().catch((e) => {

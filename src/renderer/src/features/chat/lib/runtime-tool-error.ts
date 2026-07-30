@@ -1,13 +1,7 @@
-//! Extract human-readable error text from a tool result.
-//!
-//! pi-agent-core's tool failure wraps the error in `AgentToolResult<{content:[{type:"text",text:"..."}],details:{}}>`
-//! with `isError: true`. Calling `String(result)` on that shape yields the unhelpful `"[object Object]"`
-//! which leaks into the UI error banner. This helper pulls the actual text out of `content[0].text`.
-//!
-//! Backward compat:
-//!   - If result is an Error instance, returns its message
-//!   - If result is an AgentToolResult with at least one TextContent block, concatenates their text
-//!   - Otherwise falls back to String(result)
+// Extract human-readable error text from a tool result.
+// pi-agent-core's tool failure wraps the error in AgentToolResult with isError: true.
+// Calling String(result) on that shape yields "[object Object]".
+// This helper pulls the actual text out of content[0].text.
 
 import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import { isTextBlock } from "@codeman-frontend/features/chat/lib/runtime-type-guards";

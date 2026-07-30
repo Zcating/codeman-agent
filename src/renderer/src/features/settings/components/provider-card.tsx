@@ -1,9 +1,9 @@
-//! ProviderCard — V1.8+ ADR-0015/0016 unified provider card.
+//! ProviderCard — V1.8+ unified provider card.
 //! 1 card per provider with LLM subform (always).
-//! V1.8+ ADR-0016: all writes go through appStore (debounced 500ms auto-flush);
+//! V1.8+: all writes go through appStore (debounced 500ms auto-flush);
 //! handleRefreshModels + handleDelete 走 appStore.refreshProviderModels / appStore.deleteProvider,
 //! 不用 Effect.gen + ProviderApi 也不再裸 invoke "delete_provider"。
-//! Uses Tailwind v4 utility classes only (ADR-0006). No BEM, no <style> blocks.
+//! Uses Tailwind v4 utility classes only. No BEM, no <style> blocks.
 //!
 //! ## Form 模式 (2026-07, Plan C: @tanstack/solid-form)
 //!
@@ -122,7 +122,6 @@ export function ProviderCard(props: ProviderCardProps) {
   const handleRefreshModels = async (): Promise<void> => {
     setIsRefreshing(true);
     setRefreshMsg(null);
-    // V1.8+ ADR-0016 D1: store refreshProviderModels 已经写 state + 强制 D2 不变量。
     const exit = await Effect.runPromiseExit(
       appStore.refreshProviderModels(props.provider.id),
     );
@@ -140,7 +139,6 @@ export function ProviderCard(props: ProviderCardProps) {
       return;
     }
     setIsDeleting(true);
-    // V1.8+ ADR-0016 D4: delete 走 appStore (含 state mutation + 后端 delete IPC)。
     const exit = await Effect.runPromiseExit(
       appStore.deleteProvider(props.provider.id),
     );

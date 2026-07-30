@@ -1,13 +1,5 @@
-//! 输入历史 — 纯函数 (Q1–Q6 设计契约)。
-//!
-//! 不依赖 Solid / Effect。当前历史存储用 localStorage (Q2=B) 而非 SQLite/IPC，
-//! 原因：100 条 × 几 KB 的小规模 + 单进程单窗口假设 + 不引新 SQL migration。
-//!
-//! 数据布局：
-//!   - newest-first 数组（栈顶 = 最新一次提交）
-//!   - 最多 MAX_ENTRIES (100) 条，超出 FIFO 淘汰最旧的
-//!   - 连续相同内容去重 (Q3a=II)
-//!   - trim() 后空内容不记 (Q3b=I)
+// 不依赖 Solid / Effect。当前历史存储用 localStorage 而非 SQLite/IPC，
+// 原因：100 条 × 几 KB 的小规模 + 单进程单窗口假设 + 不引新 SQL migration。
 
 const STORAGE_KEY = "codeman.input-history.v1";
 const MAX_ENTRIES = 100;

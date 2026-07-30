@@ -1,11 +1,11 @@
-//! ADR-0025 — Effect Schema-based AppError model.
+//! Effect Schema-based AppError model.
 //!
 //! Eight INDEPENDENT `Schema.TaggedError` leaf classes, each carrying its own
 //! instance `_tag`, exported as the `AppError` union + an `isAppError` type guard.
 //! Replaces the legacy `{ kind }` union that previously lived in `./types`
 //! (deleted in PR 2).
 //!
-//! DESIGN NOTE (ADR-0025 D4 correction): the ADR proposed a common base class with
+//! DESIGN NOTE: the ADR proposed a common base class with
 //! `static _tag` overrides. That is BROKEN on Effect 3.x — `Schema.TaggedError()`
 //! bakes the INSTANCE `_tag` to the literal tag passed to the base ctor, so a
 //! subclass `static _tag` never reaches the instance and `Effect.catchTag` never
@@ -54,7 +54,7 @@ export class Unknown extends Schema.TaggedError<Unknown>()("Unknown", {
   message: Schema.String,
 }) {}
 
-// V3.1 MCP — JSON-RPC client errors (ADR-0032 Phase B).
+// V3.1 MCP — JSON-RPC client errors.
 // jsonrpc codes follow the JSON-RPC 2.0 spec: -32700 (parse), -32600
 // (invalid request), -32601 (method not found), -32602 (invalid params),
 // -32603 (internal error). See https://www.jsonrpc.org/specification.
@@ -75,7 +75,7 @@ export class JsonRpcTimeoutError extends Schema.TaggedError<JsonRpcTimeoutError>
   },
 ) {}
 
-/** New Schema-based application error union (ADR-0025). Discriminate via `_tag`. */
+/** New Schema-based application error union. Discriminate via `_tag`. */
 export type AppError =
   | NotFound
   | Unauthorized

@@ -32,8 +32,6 @@ import type {
   McpToolEntry,
 } from "../lib/types";
 
-// ─── StreamSubscription (extracted from CodemanApi) ──────────────
-
 /**
  * Streaming side-channel — `onStreamChunk` is a callback subscription
  * (returns `() => void`, not a Promise), so it does not fit CodemanApi's
@@ -43,8 +41,6 @@ import type {
 export interface StreamSubscription {
   readonly onStreamChunk: (handler: (evt: unknown) => void) => () => void;
 }
-
-// ─── CodemanApi (mirror of preload; single-object args, typed returns) ───
 
 /**
  * Hand-mirror of `src/preload/index.ts` `CodemanApi`. Every method takes a
@@ -91,13 +87,10 @@ export interface CodemanApi {
   readonly deleteWorkspace: (args: { id: string }) => Promise<void>;
   readonly pickWorkspacePath: () => Promise<string | null>;
 
-  // Provider CRUD (V3+ ADR-0023 D8-W)
   readonly deleteProvider: (args: { id: string }) => Promise<Provider[]>;
 
-  // ADR-0024 D7: abort in-flight LLM request
   readonly abortRequest: (args: { requestId: string }) => Promise<null>;
 
-  // Filesystem (V2 ADR-0013)
   readonly readFile: (args: { workspaceId: string; path: string }) => Promise<string>;
   readonly writeFile: (args: { workspaceId: string; path: string; content: string }) => Promise<void>;
   readonly editFile: (args: {
@@ -120,11 +113,9 @@ export interface CodemanApi {
   readonly setLoginItem: (args: { enabled: boolean }) => Promise<void>;
   readonly getLogPath: () => Promise<string | null>;
 
-  // Skills plugin (ADR-0031)
   readonly skillsScan: () => Promise<SkillManifest[]>;
   readonly skillsLoad: (args: { name: string }) => Promise<string>;
 
-  // MCP plugin (ADR-0032)
   readonly mcpListServers: () => Promise<McpServerInfo[]>;
   readonly mcpGetTools: (args: { serverName: string }) => Promise<McpTool[]>;
   readonly mcpGetAllTools: () => Promise<McpToolEntry[]>;
@@ -139,8 +130,6 @@ declare global {
   var codeman: (CodemanApi & StreamSubscription) | undefined;
 }
 
-// ─── Internal: API accessor ─────────────────────────────────────
-
 function getApi(): CodemanApi & StreamSubscription {
   if (typeof window === "undefined" || !window.codeman) {
     throw new Error(
@@ -149,8 +138,6 @@ function getApi(): CodemanApi & StreamSubscription {
   }
   return window.codeman;
 }
-
-// ─── TauriError (kept for provider.api.ts internal use) ─────────
 
 /**
  * Tauri-Electron IPC error — distinct from AppError, used by ProviderApi
@@ -166,8 +153,6 @@ export interface TauriError {
 export const TauriError = {
   IPC: (message: string): TauriError => ({ kind: "IPC" as const, message }),
 };
-
-// ─── Internal: IPC error → AppError mapping ─────────────────────
 
 /**
  * Map an IPC rejection to AppError. Tries to extract AppError from
@@ -205,8 +190,6 @@ function mapIpcError(e: unknown): AppError {
   }
   return new Unknown({ message: String(e) });
 }
-
-// ─── invoke<T> (typed channel + args + return) ──────────────────
 
 /**
  * Type-safe IPC invoke.
@@ -249,8 +232,6 @@ export const invoke = <
       Effect.sync(() => logger.error("IPC 调用失败", channel, e)),
     ),
   );
-
-// ─── streamChunks (uses StreamSubscription directly) ────────────
 
 /**
  * Stream consumer — wraps `window.codeman.onStreamChunk` in an Effect
