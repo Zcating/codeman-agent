@@ -220,10 +220,33 @@ function matchGlob(relPath: string, glob: string): boolean {
   return new RegExp(`^${escaped}$`).test(relPath);
 }
 
-// ─── editFile pattern validation ────────────────────────────────────
+// ─── editFile pattern validation + EOL tolerance ───────────────────
+//
+// LLMs emit LF-only oldText; Windows files are CRLF. Without normalization,
+// `content.replace(oldText, newText)` fails on the first \r\n it hits.
+// We normalize CRLF→LF for matching, then restore the file's original EOL
+// on write so .bat/.ps1 files (which require CRLF) round-trip cleanly.
 
-export function checkPatternMatch(oldText: string, replaceAll: boolean, path: string, content: string): { kind: "ok" | "notFound" | "ambiguous"; message?: string } {
-  const occurrences = content.split(oldText).length - 1;
+export function applyEdit(
+  content: string,
+  oldText: string,
+  newText: string,
+  replaceAll: boolean,
+  path: string,
+):
+  | { kind: "ok"; newContent: string }
+  | { kind: "notFound" | "ambiguous"; message: string } {
+  // Detect dominant EOL: file is CRLF if more CRLF than lone LF, else LF.
+  const crlfCount = (content.match(/\r\n/g) ?? []).length;
+  const loneLfCount = (content.match(/(?<!\r)\n/g) ?? []).length;
+  const eol: "\n" | "\r\n" = crlfCount > loneLfCount ? "\r\n" : "\n";
+
+  // Normalize CRLF → LF for matching (LLMs typically emit LF).
+  const normalized = content.replace(/\r\n/g, "\n");
+  const normalizedOld = oldText.replace(/\r\n/g, "\n");
+  const normalizedNew = newText.replace(/\r\n/g, "\n");
+
+  const occurrences = normalized.split(normalizedOld).length - 1;
   const snippet = oldText.length > 200 ? oldText.slice(0, 200) + "..." : oldText;
   const quoted = JSON.stringify(snippet);
   if (occurrences === 0) {
@@ -232,7 +255,14 @@ export function checkPatternMatch(oldText: string, replaceAll: boolean, path: st
   if (occurrences > 1 && !replaceAll) {
     return { kind: "ambiguous", message: `Pattern matches ${occurrences} times in ${path}. Searched for: ${quoted}. Use replaceAll=true or make the pattern more specific.` };
   }
-  return { kind: "ok" };
+
+  const replaced = replaceAll
+    ? normalized.split(normalizedOld).join(normalizedNew)
+    : normalized.replace(normalizedOld, normalizedNew);
+
+  // Restore original EOL on write.
+  const newContent = eol === "\r\n" ? replaced.replace(/\n/g, "\r\n") : replaced;
+  return { kind: "ok", newContent };
 }
 
 // ─── Handler registration ──────────────────────────────────────────
@@ -455,14 +485,11 @@ export function registerIpcHandlers(_deps: {
     const ws = await getWorkspaceById(wsId);
     const abs = await validatePathInWorkspace(args.path, ws.root_path);
     const content = await readFile(abs, "utf-8");
-    const match = checkPatternMatch(args.oldText, args.replaceAll ?? false, args.path, content);
-    if (match.message) {
-      throw new Error(match.message);
+    const result = applyEdit(content, args.oldText, args.newText, args.replaceAll ?? false, args.path);
+    if (result.kind !== "ok") {
+      throw new Error(result.message);
     }
-    const newContent = args.replaceAll
-      ? content.split(args.oldText).join(args.newText)
-      : content.replace(args.oldText, args.newText);
-    await writeFileInWorkspace(ws.root_path, args.path, newContent);
+    await writeFileInWorkspace(ws.root_path, args.path, result.newContent);
   }));
   ipcMain.handle("searchFiles", async (_e, args: { workspaceId?: string; glob: string; contentPattern?: string | null }) => {
     dbInit();
