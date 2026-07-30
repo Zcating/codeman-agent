@@ -12,7 +12,7 @@ import {
   writeFileInWorkspace,
 } from "./file-sandbox";
 
-// ─── Settings store (JSON file under app.getPath("userData")) ─────────
+
 
 let settingsCache: Settings | null = null;
 
@@ -33,7 +33,7 @@ function loadSettings(): Settings {
       raw = {};
     }
   }
-  // Schema.decodeUnknownEither inside sanitize() validates; malformed JSON → DEFAULT_SETTINGS.
+  
   settingsCache = sanitize(raw as Partial<Settings>);
   saveSettings();
   return settingsCache;
@@ -51,7 +51,7 @@ function updateSettings(patch: Partial<Settings>): Settings {
   return settingsCache!;
 }
 
-// ─── DB init flag ─────────────────────────────────────────────────────
+
 
 let dbReady = false;
 function dbInit(): void {
@@ -61,7 +61,7 @@ function dbInit(): void {
   }
 }
 
-// ─── Row types + mappers ────────────────────────────────────────────
+
 
 interface RawConvRow {
   id: string;
@@ -144,7 +144,7 @@ async function getWorkspaceById(id: string): Promise<RawWorkspace> {
   return row;
 }
 
-// ─── File search ────────────────────────────────────────────────────
+
 
 async function searchFilesInWorkspace(
   root: string,
@@ -173,7 +173,7 @@ async function searchFilesInWorkspace(
 }
 
 async function walkDir(root: string, visit: (relPath: string) => Promise<void>): Promise<void> {
-  // Skip dotfiles + node_modules + dist for sanity.
+  
   const skip = new Set([".git", "node_modules", "dist", "dist-electron", ".electron-builder-cache"]);
   const stack: Array<{ abs: string; rel: string }> = [{ abs: root, rel: "" }];
   while (stack.length > 0) {
@@ -209,12 +209,12 @@ function matchGlob(relPath: string, glob: string): boolean {
   return new RegExp(`^${escaped}$`).test(relPath);
 }
 
-// ─── editFile pattern validation + EOL tolerance ───────────────────
-//
-// LLMs emit LF-only oldText; Windows files are CRLF. Without normalization,
-// `content.replace(oldText, newText)` fails on the first \r\n it hits.
-// We normalize CRLF→LF for matching, then restore the file's original EOL
-// on write so .bat/.ps1 files (which require CRLF) round-trip cleanly.
+
+
+
+
+
+
 
 export function applyEdit(
   content: string,
@@ -225,12 +225,12 @@ export function applyEdit(
 ):
   | { kind: "ok"; newContent: string }
   | { kind: "notFound" | "ambiguous"; message: string } {
-  // Detect dominant EOL: file is CRLF if more CRLF than lone LF, else LF.
+  
   const crlfCount = (content.match(/\r\n/g) ?? []).length;
   const loneLfCount = (content.match(/(?<!\r)\n/g) ?? []).length;
   const eol: "\n" | "\r\n" = crlfCount > loneLfCount ? "\r\n" : "\n";
 
-  // Normalize CRLF → LF for matching (LLMs typically emit LF).
+  
   const normalized = content.replace(/\r\n/g, "\n");
   const normalizedOld = oldText.replace(/\r\n/g, "\n");
   const normalizedNew = newText.replace(/\r\n/g, "\n");
@@ -249,12 +249,12 @@ export function applyEdit(
     ? normalized.split(normalizedOld).join(normalizedNew)
     : normalized.replace(normalizedOld, normalizedNew);
 
-  // Restore original EOL on write.
+  
   const newContent = eol === "\r\n" ? replaced.replace(/\n/g, "\r\n") : replaced;
   return { kind: "ok", newContent };
 }
 
-// ─── Handler registration ──────────────────────────────────────────
+
 
 export function registerIpcHandlers(_deps: {
   getMainWindow: () => BrowserWindow | null;
@@ -264,7 +264,7 @@ export function registerIpcHandlers(_deps: {
 
   ipcMain.handle("getSettings", () => loadSettings());
   ipcMain.handle("updateSettings", (_e, args: unknown) => {
-    // V2 spec convention: args may be { newSettings } OR just the patch object.
+    
     const rawPatch =
       (args && typeof args === "object" && ("newSettings" in args ? (args as { newSettings: unknown }).newSettings : args)) ?? {};
     const patch = rawPatch as Partial<Settings>;
@@ -275,7 +275,7 @@ export function registerIpcHandlers(_deps: {
     getDatabase().exec("DELETE FROM conversations");
   });
 
-  // Conversations
+  
   ipcMain.handle("listConversations", (_e, args: { includeArchived?: boolean } | null | undefined) => {
     const include = !!(args && typeof args === "object" && args.includeArchived);
     return getConv(include);
@@ -324,7 +324,7 @@ export function registerIpcHandlers(_deps: {
     getDatabase().prepare("UPDATE conversations SET title = ? WHERE id = ?").run(args.title, args.id);
   });
 
-  // Messages
+  
   ipcMain.handle("listMessages", (_e, args: { conversationId?: string }) => {
     dbInit();
     const convId = args.conversationId;
@@ -394,7 +394,7 @@ export function registerIpcHandlers(_deps: {
     }
   });
 
-  // Workspaces
+  
   ipcMain.handle("listWorkspaces", () => {
     dbInit();
     const rows = getDatabase()
@@ -424,7 +424,7 @@ export function registerIpcHandlers(_deps: {
   });
   ipcMain.handle("deleteWorkspace", (_e, args: { id: string }) => {
     dbInit();
-    // CASCADE: conversations in this workspace are deleted.
+    
     getDatabase().prepare("DELETE FROM workspaces WHERE id = ?").run(args.id);
   });
   ipcMain.handle("pickWorkspacePath", async () => {
@@ -432,15 +432,7 @@ export function registerIpcHandlers(_deps: {
     return r.canceled ? null : r.filePaths[0] ?? null;
   });
 
-  /**
-   * Wrap a sandbox-calling handler so AppError plain objects (thrown by
-   * file-sandbox.ts) become proper Error instances BEFORE they reach Electron
-   * IPC serialization. Without this, Electron serializes them as "[object Object]",
-   * the renderer can't parse the error kind, and tool_execution etc. lose error context.
-   *
-   * Encodes the AppError as JSON in the Error message. The renderer's `invoke()`
-   * (src/shared/lib/ipc.ts) reconstructs the AppError from this JSON.
-   */
+  
   const sandboxHandler = <A extends unknown[], R>(fn: (...args: A) => Promise<R>) =>
     async (...args: A): Promise<R> => {
       try {
@@ -454,7 +446,7 @@ export function registerIpcHandlers(_deps: {
       }
     };
 
-  // Filesystem
+  
   ipcMain.handle("readFile", sandboxHandler(async (_e, args: { workspaceId?: string; path: string }) => {
     dbInit();
     const wsId = args.workspaceId ?? "";
@@ -494,7 +486,7 @@ export function registerIpcHandlers(_deps: {
     await unlink(abs);
   }));
 
-  // Native shims
+  
   ipcMain.handle("setLoginItem", (_e, args: { enabled?: boolean } | null | undefined) => {
     app.setLoginItemSettings({ openAtLogin: !!(args && args.enabled) });
   });
@@ -531,13 +523,7 @@ export function registerIpcHandlers(_deps: {
   });
 }
 
-/**
- * Forward a raw RuntimeEvent from main-process pi-mono subscription
- * to the renderer's preload-exposed onStreamChunk handler.
- * Per V3 consensus 1.1: main process owns the subscription lifecycle;
- * no intermediate queue. Sends to the first non-destroyed BrowserWindow
- * (single-window app, but resilient to mid-render destruction).
- */
+
 export function emitStreamChunk(evt: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) {

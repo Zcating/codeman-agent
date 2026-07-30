@@ -1,9 +1,9 @@
-// T4b — src/main/db/mod.ts: better-sqlite3 connection + migration runner.
-//
-// Per ADR-0024 D1: schema verbatim from src-tauri/src/db/migrations/.
-// Per V3 consensus 1.4: better-sqlite3 (Node 22 ABI) for V3 (Node 22.18+).
-// TDD-exempt: integration-tested via e2e (T7). Unit tests are impractical for
-// file I/O + native binding.
+
+
+
+
+
+
 
 import Database, { type Database as DB } from "better-sqlite3";
 import { join, dirname } from "node:path";
@@ -17,16 +17,16 @@ function dbPath(): string {
 }
 
 function migrationsDir(): string {
-  // Migrations are bundled with main process at src/main/db/migrations/*.sql
-  // After electron-vite build: dist-electron/main/db/migrations/*.sql
-  // In dev: relative to source.
+  
+  
+  
   const distPath = join(__dirname, "db", "migrations");
   if (existsSync(distPath)) {return distPath;}
   return join(__dirname, "..", "..", "src", "main", "db", "migrations");
 }
 
 function applyMigrations(db: DB): void {
-  // Bootstrap migration tracking table.
+  
   db.exec(`
     CREATE TABLE IF NOT EXISTS _migrations (
       name TEXT PRIMARY KEY,
@@ -56,7 +56,7 @@ function applyMigrations(db: DB): void {
 export function initDatabase(): DB {
   if (_db) {return _db;}
   const path = dbPath();
-  // Ensure parent dir exists.
+  
   const parent = dirname(path);
   if (!existsSync(parent)) {
     require("node:fs").mkdirSync(parent, { recursive: true });

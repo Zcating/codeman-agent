@@ -1,51 +1,51 @@
-//! src/main/mock-server.ts — 本地 mock LLM HTTP 服务器。
-//!
-//! 监听 `127.0.0.1:50000`(`CODEMAN_MOCK_PORT` 可覆盖)。POST `/mock/anthropic/v1/messages`
-//! 收到 `AnthropicTransport` 的 fetch 请求,按 user message 末条做 substring match
-//! Q→A Table(由 `qa-loader.ts` 提供),命中后用 `entry.turns[N]` 合成标准 Anthropic
-//! SSE 协议响应(per-character streaming for text),**N = 请求中 `role: "assistant"`
-//! 消息数**,即 agent loop 的轮次索引 — 支持 scripted 多 turn 连续工作模式。
-//! `res.write()` per-event + 可配置 delay (`CODEMAN_MOCK_STREAM_DELAY_MS`,
-//! 默认 1ms / event)让 transport 看到多个 `reader.read()` chunk。
-//!
-//! **Last-user-msg lookup**(2026-07-07 update): entry 由 user 最新一条 message 的
-//! substring 决定,而不是首条 — 这样用户在续接的旧 conversation 里新输入 entry key
-//! (如 "three-blocks")也能命中对应的 canned response,无需开新会话。
-//! scripted 多 turn 本身仍按 `asstCount` 顺序推进(同一 entry 内 turn 切换不依赖 lookup)。
-//!
-//! 启动由 `src/main/index.ts` 的 `app.whenReady()` 钩入。
-//!
-//! 设计要点(per CONTEXT.md 「Mock Server」):
-//! - Stateless HTTP responder — 不接 provider record / settings / IPC
-//! - 不识别 mock 性质 — user 配啥 base_url 都受理
-//! - Production `NODE_ENV === "production"` 不启 server(节省资源,但用户若主动
-//!   配 `http://127.0.0.1:50000/...` provider 仍能向本地 server 发请求)
-//! - CORS 全开(`*`)— server 假定只 listen 在 loopback,renderer fetch 命中即可。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { loadQaTable, type QaEntry, type QaTurn } from "./qa-loader";
 import { readMockServerConfig } from "./config-service";
 
-// ─── Logger (avoid pulling in shared/lib/logger which is renderer-side) ────
+
 
 const logger = {
   warn(msg: string): void {
-    // eslint-disable-next-line no-console
+    
     console.warn(msg);
   },
   info(msg: string): void {
-    // eslint-disable-next-line no-console
+    
     console.log(msg);
   },
 };
 
-// ─── CORS headers (loopback-only server, so wildcard is safe) ──────────────
-//
-// Renderer fetches from `http://127.0.0.1:1420` (Vite dev server) to
-// `http://127.0.0.1:50000` (mock LLM). Different origin → triggers CORS
-// preflight. Without `Access-Control-Allow-Origin` on every response,
-// browser kills the request with `net::ERR_FAILED`. We return * since the
-// server only listens on loopback — wildcard is safe regardless of caller.
+
+
+
+
+
+
+
 
 const CORS_HEADERS: Readonly<Record<string, string>> = Object.freeze({
   "Access-Control-Allow-Origin": "*",
@@ -62,44 +62,44 @@ function writeHeadWithCors(
   res.writeHead(status, { ...CORS_HEADERS, ...extra });
 }
 
-// ─── Q→A match (replicates qa-table-lookup semantics for the server) ────────
+
 
 interface QaMiss { readonly _tag: "QaMiss"; readonly question: string }
 type QaResult = { readonly _tag: "Right"; readonly right: QaEntry } | { readonly _tag: "Left"; readonly left: QaMiss };
 
 function lookupQaAnswer(table: QaEntry[], userText: string): QaResult {
-  // Phase 1: substring match, first-wins
+  
   for (const entry of table) {
     if (userText.includes(entry.question)) {
       return { _tag: "Right", right: entry };
     }
   }
-  // Phase 2: default fallback
+  
   for (const entry of table) {
     if (entry.default === true) {
       return { _tag: "Right", right: entry };
     }
   }
-  // Phase 3: miss
+  
   return { _tag: "Left", left: { _tag: "QaMiss", question: userText } };
 }
 
-// ─── SSE synthesis: full Anthropic protocol from QaTurn ─────────────────────
-//
-// Synthesize a complete Anthropic-protocol SSE response from a single QaTurn.
-// Supports optional blocks in this fixed order:
-//   1. thinking     (turn.thinking, optional) — single thinking_delta + signature_delta
-//   2. text         (turn.text)               — N text_delta events (per-char streaming)
-//   3. tool_use[]   (turn.toolUses, optional) — one full block per tool, single input_json_delta
-//
-// Returns an array of event-blocks (each ends with \n\n) so the caller can res.write()
-// each one separately with optional delay.
+
+
+
+
+
+
+
+
+
+
 
 function buildSseTurnEvents(turn: QaTurn, deltaSize: number): string[] {
   const events: string[] = [];
   const msgId = `msg_mock_${Date.now()}`;
 
-  // 1) message_start (always)
+  
   events.push(
     `event: message_start\n` +
       `data: {"type":"message_start","message":{"id":"${msgId}","type":"message","role":"assistant","content":[],"model":"mock-default","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}}}\n` +
@@ -108,8 +108,8 @@ function buildSseTurnEvents(turn: QaTurn, deltaSize: number): string[] {
 
   let blockIdx = 0;
 
-  // 2) Optional thinking block (sent before text per Anthropic convention).
-  //    Single thinking_delta + signature_delta (no per-char streaming — not user-visible).
+  
+  
   if (turn.thinking && turn.thinking.length > 0) {
     events.push(
       `event: content_block_start\n` +
@@ -134,8 +134,8 @@ function buildSseTurnEvents(turn: QaTurn, deltaSize: number): string[] {
     blockIdx++;
   }
 
-  // 3) Text block (skipped entirely if empty text + no thinking/toolUses).
-  //    One content_block_delta per N characters.
+  
+  
   if (turn.text.length > 0) {
     events.push(
       `event: content_block_start\n` +
@@ -158,9 +158,9 @@ function buildSseTurnEvents(turn: QaTurn, deltaSize: number): string[] {
     blockIdx++;
   }
 
-  // 4) Optional tool_use blocks (one per QaToolUse, after text).
-  //    Each emits a full tool_use content block: start (with id+name+empty input) +
-  //    single input_json_delta with the JSON-serialized input + stop.
+  
+  
+  
   if (turn.toolUses && turn.toolUses.length > 0) {
     for (const tu of turn.toolUses) {
       const toolId = `toolu_mock_${blockIdx}_${Date.now()}`;
@@ -169,8 +169,8 @@ function buildSseTurnEvents(turn: QaTurn, deltaSize: number): string[] {
           `data: {"type":"content_block_start","index":${blockIdx},"content_block":{"type":"tool_use","id":"${toolId}","name":${JSON.stringify(tu.name)},"input":{}}}\n` +
           "\n",
       );
-      // partial_json is a JSON-encoded string of the input object (real Anthropic
-      // streams this; we send as one chunk for simplicity).
+      
+      
       events.push(
         `event: content_block_delta\n` +
           `data: {"type":"content_block_delta","index":${blockIdx},"delta":{"type":"input_json_delta","partial_json":${JSON.stringify(JSON.stringify(tu.input))}}}\n` +
@@ -185,12 +185,12 @@ function buildSseTurnEvents(turn: QaTurn, deltaSize: number): string[] {
     }
   }
 
-  // 5) message_delta — stop_reason + usage.
-  //    Real Anthropic: "tool_use" if any tool_use was emitted, else "end_turn".
+  
+  
   const stopReason = turn.toolUses && turn.toolUses.length > 0 ? "tool_use" : "end_turn";
   const outputTokens = turn.text.length + (turn.thinking?.length ?? 0);
-  // V2.6.1: 粗略估算 input_tokens (chars/4)。mock 无真实 tokenizer,
-  //        仅用于验证 inputTokens 主路径在 mock 环境可走通。
+  
+  
   const inputTokens = Math.ceil((turn.text.length + (turn.thinking?.length ?? 0)) / 4);
   events.push(
     `event: message_delta\n` +
@@ -198,7 +198,7 @@ function buildSseTurnEvents(turn: QaTurn, deltaSize: number): string[] {
       "\n",
   );
 
-  // 6) message_stop
+  
   events.push(
     `event: message_stop\n` +
       `data: {"type":"message_stop"}\n` +
@@ -208,15 +208,12 @@ function buildSseTurnEvents(turn: QaTurn, deltaSize: number): string[] {
   return events;
 }
 
-/** Backward-compatible wrapper: synthesizes events for `entry.turns[0]` only.
- *  Multi-turn entries should be served via `buildSseTurnEvents(entry.turns[N], ...)`
- *  directly from the handler. Kept exported for tests that exercise the per-turn
- *  SSE shape with a one-turn entry. */
+
 function buildSseEvents(entry: QaEntry, deltaSize: number): string[] {
   return buildSseTurnEvents(entry.turns[0], deltaSize);
 }
 
-// ─── Request parsing ────────────────────────────────────────────────────────
+
 
 interface AnthropicMessagesBody {
   model?: string;
@@ -265,11 +262,7 @@ function extractLastUserText(body: unknown): string {
   return "";
 }
 
-/** Extract the FIRST user message text from the request. NOT used by the
- *  main handler (which uses `extractLastUserText` to honor follow-up entry-key
- *  switches in resumed conversations) — kept exported as a utility for callers
- *  that want the original query, e.g. for telemetry or alternative lookup
- *  strategies. Tests in `mock-server.test.ts` cover the helper in isolation. */
+
 function extractFirstUserText(body: unknown): string {
   if (!body || typeof body !== "object") {
     return "";
@@ -292,9 +285,7 @@ function extractFirstUserText(body: unknown): string {
   return "";
 }
 
-/** Count `role: "assistant"` messages in the request body. Each prior turn
- *  that produced a tool_use block leaves one assistant message in the next
- *  request, so this equals the next scripted turn index to serve. */
+
 function countAssistantMessages(body: unknown): number {
   if (!body || typeof body !== "object") {return 0;}
   const b = body as AnthropicMessagesBody;
@@ -307,40 +298,20 @@ function countAssistantMessages(body: unknown): number {
   return n;
 }
 
-/** Count `role: "assistant"` messages that belong to the CURRENT agent run
- *  (after the last plain user prompt), not the whole conversation history.
- *
- *  Pi-agent-core 0.80.3 的 Agent class 把整个 DB context 塞进 initialState.messages,
- *  然后每次 LLM call 都把 currentContext.messages 整个发给 LLM。
- *  resumed conversation (existingAssistantCount=20) 会让第一个 LLM call 的 request
- *  body 里也有 20+ assistant messages — naive countAssistantMessages 把它们都算进
- *  asstCount,触发 "isPastLastTurn=true" 短路,turn 0 的 tool_use 永远到不了 UI。
- *
- *  heuristic:
- *  1. 从末尾往回扫,跳过 tool_result 容器 (role="user" 但 content 含 tool_result blocks),
- *     找到最后一条 plain user prompt = current run 起点 index (lastPlainUserIdx)
- *  2. 从 lastPlainUserIdx+1 数到末尾的 assistant 数量 = current run 的 assistant 数
- *
- *  边界:
- *  — turn 1 LLM call:        body=[...history, userPrompt]
- *    lastPlainUserIdx 指向 userPrompt;之后没 assistant → currentRunAsst=0
- *  — turn 2 LLM call:        body=[...history, userPrompt, assistant_turn1, user(tool_result)]
- *    lastPlainUserIdx 指向 userPrompt;之后 [assistant_turn1, user(tool_result)]
- *    → 1 assistant → currentRunAsst=1
- */
+
 function countCurrentRunAssistants(body: unknown): number {
   if (!body || typeof body !== "object") {return 0;}
   const b = body as AnthropicMessagesBody;
   const msgs = b.messages;
   if (!Array.isArray(msgs)) {return 0;}
 
-  // Step 1: 找最后一条 plain user prompt (current run 起点)
+  
   let lastPlainUserIdx = -1;
   for (let i = msgs.length - 1; i >= 0; i--) {
     const m = msgs[i];
     if (!m || m.role !== "user") {continue;}
     const c = m.content;
-    // Anthropic format: tool_result 容器是 user role 但 content 是 tool_result blocks
+    
     if (
       Array.isArray(c) &&
       c.some(
@@ -358,7 +329,7 @@ function countCurrentRunAssistants(body: unknown): number {
 
   if (lastPlainUserIdx < 0) {return 0;}
 
-  // Step 2: 数 lastPlainUserIdx 之后的 assistant 数
+  
   let n = 0;
   for (let i = lastPlainUserIdx + 1; i < msgs.length; i++) {
     const m = msgs[i];
@@ -367,10 +338,9 @@ function countCurrentRunAssistants(body: unknown): number {
   return n;
 }
 
-// ─── Streaming write helper ─────────────────────────────────────────────────
 
-/** Write events one at a time with optional delay between writes.
- *  Uses res.write() per event so the transport sees multiple reader.read() chunks. */
+
+
 function writeSseStream(
   res: ServerResponse,
   events: string[],
@@ -394,12 +364,12 @@ function writeSseStream(
   writeNext();
 }
 
-// ─── HTTP request handler ───────────────────────────────────────────────────
+
 
 const SHORT_CIRCUIT_TEXT = "(mock) Script complete.";
 
 function handleRequest(req: IncomingMessage, res: ServerResponse): void {
-  // CORS preflight — short-circuit before method/path checks.
+  
   if (req.method === "OPTIONS") {
     writeHeadWithCors(res, 204, { "Content-Length": "0" });
     res.end();
@@ -411,8 +381,8 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
     res.end("Method Not Allowed");
     return;
   }
-  // Accept both `/mock/anthropic/v1/messages` and `/v1/messages` (in case future
-  // dev users pick a path prefix other than `/mock/anthropic/`).
+  
+  
   const url = req.url ?? "";
   if (!/^\/(?:mock\/anthropic\/)?v1\/messages\/?$/.test(url)) {
     writeHeadWithCors(res, 404, { "Content-Type": "text/plain" });
@@ -422,28 +392,28 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
 
   readJsonBody(req)
     .then((body) => {
-      // Scripted multi-turn dispatch. Turn index N = count of prior assistant
-      // messages in the request (0 for initial request). Substring match against
-      // the LAST user message so resumed conversations can switch scripts by
-      // typing the new entry key (e.g. "three-blocks") in a follow-up msg.
-      //
-      // Capped turn index (v2026-07-07+): `turnIdx = min(asstCount, length-1)`.
-      // Single-turn entries thus ALWAYS serve `turns[0]` regardless of how
-      // many prior asst msgs exist (resumed chats work — no more
-      // "(mock) Script complete." short-circuit breaking canned-response
-      // UX). Multi-turn entries still advance via asstCount and cap at the
-      // last turn instead of short-circuiting. The agent loop terminates
-      // naturally because tool execution changes the LAST user msg to
-      // toolResult content, which fails lookup and falls back to `*`
-      // default (end_turn) — no infinite loops.
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
       const asstCount = countAssistantMessages(body);
       const lastUserText = extractLastUserText(body);
       const qaTable = loadQaTable();
       const result = lookupQaAnswer(qaTable, lastUserText);
 
-      // DIAG: print which entry was matched against the LAST user text — this
-      // surfaces substring-match misfires (e.g. "three-blocks" being misread
-      // as the "read" canned answer).
+      
+      
+      
       logger.info(
         `[mock-server/diag] lastUserText="${lastUserText.slice(0, 200)}"` +
           (lastUserText.length > 200 ? "..." : "") +
@@ -454,9 +424,9 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
       );
 
       if (result._tag === "Left") {
-        // Substring miss (and no default fallback). Emit a warning SSE so
-        // tests don't silently leak — the same path is taken for any turn
-        // index when no script entry is configured.
+        
+        
+        
         const fallbackText =
           asstCount > 0
             ? `${SHORT_CIRCUIT_TEXT} (turn=${asstCount}, no entry matched)`
@@ -479,20 +449,20 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
       const turnIdx = Math.min(asstCount, entry.turns.length - 1);
       const turn = entry.turns[turnIdx];
 
-      // T28 Stop operation: 显式 done:true 短路。
-      // 单 toolUse entry 的 turns.length === 1,turnIdx 永远 = 0 — 工具执行后
-      // agent 再调 LLM 时如果不做短路,会回到同 toolUse 死循环。
-      //
-      // 重要:short-circuit 必须用 `currentRunAsstCount`(只数当前 agent run 的 assistant),
-      // 不能用 `asstCount`(数整个 conversation history)。
-      // Pi-agent-core 0.80.3 把整个 DB context 塞进 LLM request body,resumed conversation
-      // 第一个 LLM call 的 asstCount 就 >=20+ — naive 检查会立刻 short-circuit,turn 0
-      // 的 tool_use 永远到不了 UI。
-      // currentRunAsstCount 只数 current run 起点 user prompt 之后的 assistant:
-      //  — turn 1 LLM call:  currentRunAsstCount=0 → 不触发 short-circuit → serve turns[0]
-      //  — turn 2 LLM call:  currentRunAsstCount=1 → 触发 short-circuit → "(mock) Script complete."
-      // 保留 lastTurn.thinking(如有) — 否则后续短路响应丢失 reasoning,bubble
-      // 看不到思考过程,UI 不一致。
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
       const lastTurn = entry.turns[entry.turns.length - 1];
       const currentRunAsstCount = countCurrentRunAssistants(body);
       const isPastLastTurn = currentRunAsstCount >= entry.turns.length;
@@ -543,22 +513,22 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
     });
 }
 
-// ─── Server lifecycle ───────────────────────────────────────────────────────
+
 
 let server: ReturnType<typeof createServer> | null = null;
 
-/** Start the local mock server (idempotent — safe to call multiple times). */
+
 export function startMockServer(): void {
   if (server) {
     return;
   }
 
-  // Snapshot config at startup — host/port don't change after bind.
-  // Per-request values (streamDelayMs / deltaSize) are read inside handleRequest
-  // so tests can flip env between requests.
+  
+  
+  
   const cfg = readMockServerConfig();
 
-  // Production: skip — 节省资源(user 不大可能配 127.0.0.1:50000 mock provider 在生产)
+  
   if (cfg.isProduction && !cfg.forceEnableInProduction) {
     logger.info(`[mock-server] production mode, skipping (set CODEMAN_MOCK_FORCE=1 to override)`);
     return;
@@ -582,7 +552,7 @@ export function startMockServer(): void {
   }
 }
 
-/** Stop the local mock server (used in test cleanup). */
+
 export function stopMockServer(): Promise<void> {
   return new Promise((resolve) => {
     if (!server) {
@@ -595,7 +565,7 @@ export function stopMockServer(): Promise<void> {
   });
 }
 
-// Re-exports for testing.
+
 export {
   lookupQaAnswer,
   buildSseEvents,

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { rm } from "node:fs/promises";
 
-// Mock electron app
+
 const fakeApp = { getPath: vi.fn() };
 vi.mock("electron", () => ({ app: fakeApp }));
 
@@ -20,17 +20,17 @@ describe("mcp-config", () => {
   afterEach(async () => {
     try {
       await rm(join(tempDir, ".agents"), { recursive: true, force: true });
-    } catch { /* ignore */ }
+    } catch {  }
     vi.restoreAllMocks();
   });
 
   it("readMcpConfig returns empty config when file does not exist", async () => {
     const { Effect } = await import("effect");
-    // Ensure file doesn't exist
+    
     const configPath = join(tempDir, ".agents", "mcp_servers.json");
     try {
       await rm(configPath, { force: true });
-    } catch { /* ignore */ }
+    } catch {  }
     const result = await Effect.runPromise(readMcpConfig());
     expect(result).toEqual({ version: 1, servers: [] });
   });

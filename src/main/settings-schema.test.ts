@@ -92,10 +92,10 @@ describe("T4a — src/main/settings-schema.ts", () => {
     });
 
     it("preserves defaultLlmProviderId even when other fields fall back to defaults", () => {
-      // `providers: "not-an-array"` makes sanitize() take the Schema decode
-      // Left path → DEFAULT_SETTINGS for the providers array. The caller-provided
-      // defaultLlmProviderId must still be returned (it's a top-level optional
-      // field that callers like the mock provider E2E spec rely on).
+      
+      
+      
+      
       const r = sanitize({
         providers: "not-an-array",
         defaultLlmProviderId: "minimax",
