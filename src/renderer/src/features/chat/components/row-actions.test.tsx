@@ -1,33 +1,16 @@
-//! RowActions — unified "row operation" component for workspace + conv rows.
-//!
-//! Encapsulates delete (inline-confirm) + rename (inline-edit-in-place).
-//! Mirrors ConvDeleteAction idle + confirming-delete visual patterns and
-//! WorkspaceActions rename + delete aria-label conventions.
-//!
-/*
- * State machine:
- * ───────────────────────────────────────────────────────────────────────────
- *  Mode               │ Entry condition          │ Exit to idle        │ Exit to other
- * ────────────────────┼──────────────────────────┼─────────────────────┼────────────────
- *  idle               │ initial                 │ —                   │ click trash → confirming-delete
- *                     │                          │                     │ click pencil → editing
- * ────────────────────┼──────────────────────────┼─────────────────────┼────────────────
- *  confirming-delete  │ click Trash2 button     │ click 取消 → idle   │ click 删除 → idle (calls onDelete)
- *                     │                          │                     │ (no other exit)
- * ────────────────────┼──────────────────────────┼─────────────────────┼────────────────
- *  editing            │ click Pencil button     │ Enter (trim≠"")    │ click 取消 → idle
- *                     │                          │   → idle (calls     │ Escape → idle
- *                     │                          │   onRename)         │ blur → idle
- *                     │                          │ Enter (trim==="")   │
- *                     │                          │   → idle (no call)  │
- * ───────────────────────────────────────────────────────────────────────────
- */
+
+
+
+
+
+
+
 
 import { cleanup, fireEvent, render, waitFor } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RowActions, RowActionsProps } from "@codeman-frontend/features/chat/components/row-actions";
 
-// ─── Shared render helper ───────────────────────────────────────────────────
+
 
 function renderRowActions(props: Partial<RowActionsProps> & { kind: "workspace" | "conv"; id: string; label: string }) {
   return render(() => (
@@ -44,7 +27,7 @@ function renderRowActions(props: Partial<RowActionsProps> & { kind: "workspace" 
 
 afterEach(() => cleanup());
 
-// ─── idle state ──────────────────────────────────────────────────────────────
+
 
 describe("RowActions idle state", () => {
   it("workspace: renders label text", () => {
@@ -106,7 +89,7 @@ describe("RowActions idle state", () => {
   });
 });
 
-// ─── idle + isStreaming (conv only) ────────────────────────────────────────
+
 
 describe("RowActions idle + isStreaming", () => {
   it("conv: renders Loader2 spinner with aria-label='streaming' when isStreaming=true", () => {
@@ -128,7 +111,7 @@ describe("RowActions idle + isStreaming", () => {
   });
 });
 
-// ─── confirming-delete state ─────────────────────────────────────────────────
+
 
 describe("RowActions confirming-delete state", () => {
   it("workspace: click Trash2 → overlay appears with data-state='confirming'", () => {
@@ -146,9 +129,9 @@ describe("RowActions confirming-delete state", () => {
     const cancelBtn = container.querySelector("[aria-label='取消删除']");
     expect(confirmBtn).toBeTruthy();
     expect(cancelBtn).toBeTruthy();
-    // confirmBtn uses bg-destructive
+    
     expect((confirmBtn as HTMLElement).className).toContain("bg-destructive");
-    // cancelBtn uses border
+    
     expect((cancelBtn as HTMLElement).className).toContain("border");
   });
 
@@ -158,7 +141,7 @@ describe("RowActions confirming-delete state", () => {
     fireEvent.click(container.querySelector("[aria-label='Delete WS']") as HTMLElement);
     fireEvent.click(container.querySelector("[aria-label='确认删除']") as HTMLElement);
     expect(onDelete).toHaveBeenCalledWith("ws-del");
-    // back to idle — no overlay
+    
     expect(container.querySelector("[data-state='confirming']")).toBeNull();
   });
 
@@ -207,7 +190,7 @@ describe("RowActions confirming-delete state", () => {
   });
 });
 
-// ─── editing state ───────────────────────────────────────────────────────────
+
 
 describe("RowActions editing state", () => {
   it("workspace: click Pencil → input appears with aria-label='Rename input'", () => {
@@ -229,7 +212,7 @@ describe("RowActions editing state", () => {
     const { container } = renderRowActions({ kind: "workspace", id: "ws-1", label: "Old Name", onRename });
     fireEvent.click(container.querySelector("[aria-label='Rename Old Name']") as HTMLElement);
     const input = container.querySelector("[aria-label='Rename input']") as HTMLInputElement;
-    // Change value
+    
     fireEvent.input(input, { target: { value: "New Name" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onRename).toHaveBeenCalledWith("ws-1", "New Name");
@@ -248,15 +231,15 @@ describe("RowActions editing state", () => {
   });
 
   it("editing: label span is NOT rendered (only input shows)", () => {
-    // Per user 2026-07-25: "点击 rename 后，只应该出现 <input>".
-    // Pre-fix: <span>{label}</span> was rendered unconditionally (alongside
-    // the input in editing mode). Both were flex-1 in the same flex container,
-    // competing for space and showing the label text behind/around the input.
+    
+    
+    
+    
     const { container } = renderRowActions({ kind: "conv", id: "c-1", label: "Chat" });
     fireEvent.click(container.querySelector("[aria-label='Rename Chat']") as HTMLElement);
-    // Input is present
+    
     expect(container.querySelector("[aria-label='Rename input']")).toBeTruthy();
-    // Label span is gone (was a <span class="truncate flex-1 text-sm"> wrapping the label text)
+    
     const labelSpans = Array.from(container.querySelectorAll("span")).filter(
       (s) => s.textContent?.trim() === "Chat" && s.classList.contains("truncate"),
     );
@@ -279,7 +262,7 @@ describe("RowActions editing state", () => {
       (s) => s.textContent?.trim() === "Chat" && s.classList.contains("truncate"),
     );
     expect(labelSpans.length).toBe(1);
-    // No input in idle state
+    
     expect(container.querySelector("[aria-label='Rename input']")).toBeNull();
   });
 
@@ -373,7 +356,7 @@ describe("RowActions editing state", () => {
   it("input focuses and selects all on mount", async () => {
     const { container } = renderRowActions({ kind: "workspace", id: "ws-1", label: "Select Me" });
     fireEvent.click(container.querySelector("[aria-label='Rename Select Me']") as HTMLElement);
-    // Verify input appears and is ready for editing
+    
     const input = await waitFor(() => {
       const el = container.querySelector("[aria-label='Rename input']");
       if (!el) throw new Error("input not found");
@@ -381,22 +364,22 @@ describe("RowActions editing state", () => {
     });
     expect(input.value).toBe("Select Me");
     expect(input.maxLength).toBe(80);
-    // Note: jsdom does not fully support Selection API or activeElement tracking.
-    // The component calls el.focus() + el.setSelectionRange(0, value.length) on mount.
-    // Focus behavior is indirectly verified by other tests:
-    // - Enter with non-empty trim saves correctly
-    // - Enter with empty trim cancels correctly
-    // - Escape cancels correctly
-    // - blur cancels correctly
+    
+    
+    
+    
+    
+    
+    
   });
 });
 
-// ─── Icon color contrast (sidebar visibility) ──────────────────────────────────
-//
-// Bug: RowActions idle buttons inherit text color from parent row, which can
-// match the row's hover background — icons become invisible when row is hovered.
-// Fix mirrors ConvDeleteAction: explicit text-muted-foreground base + hover
-// variants that contrast with bg-sidebar-accent.
+
+
+
+
+
+
 
 describe("RowActions idle icon contrast", () => {
   it("Pencil button has text-muted-foreground base class", () => {
@@ -436,23 +419,23 @@ describe("RowActions idle icon contrast", () => {
   });
 });
 
-// ─── Vertical alignment (sidebar inner content centering) ──────────────────────
-//
-// Bug: CodemanSidebar wraps renderItem in <SidebarMenuButton asChild={...}/>
-// where @ark-ui/solid's AccordionTrigger className adds `items-start` to the
-// outer button, overriding SidebarMenuButton's own `items-center`. This
-// top-aligns RowActions' inner div against the button's content area.
-//
-// Per user 2026-07-25: "里面的元素存在问题,应该是垂直居中的才对".
-//
-// Fix: RowActions' outer div uses `self-center` (align-self: center) so it
-// stays vertically centered within the parent flex button regardless of
-// items-start / items-center on the parent.
+
+
+
+
+
+
+
+
+
+
+
+
 
 describe("RowActions vertical alignment", () => {
   it("idle: outer row div has self-center so it centers within parent flex", () => {
     const { container } = renderRowActions({ kind: "conv", id: "c-1", label: "Chat" });
-    // Find the top-level row container: it's a div that contains the label span
+    
     const labelSpan = container.querySelector("[aria-label='Rename Chat']")?.parentElement;
     expect(labelSpan).toBeTruthy();
     expect((labelSpan as HTMLElement).className).toContain("self-center");

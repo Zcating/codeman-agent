@@ -77,7 +77,7 @@ describe("CodemanInput", () => {
     expect(errorEl).toBeInTheDocument();
   });
 
-  // ─── IME 安全 (Bug Fix regression) ────────────────────────────────────
+  
   it("IME composition 期间 onInput 不触发 onValueChange", () => {
     const onChange = vi.fn();
     const { container } = render(() => (

@@ -4,10 +4,7 @@ export interface EnabledProvider {
   models: { id: string; label: string }[];
 }
 
-/**
- * Filters providers to those where `enabled === true` AND `llm` is defined.
- * Maps to a flat `{ id, label, models }` shape for the UI layer.
- */
+
 export function buildEnabledProviders(
   providers: Array<{
     id: string;
@@ -23,8 +20,8 @@ export function buildEnabledProviders(
       label: p.label,
       models: p.llm!.models.map((m) => ({
         id: m.id,
-        // Fallback to id when label is missing / empty / whitespace-only.
-        // Otherwise <Select.ItemText> renders an empty span in the dropdown.
+        
+        
         label: m.label?.trim() || m.id,
       })),
     }));

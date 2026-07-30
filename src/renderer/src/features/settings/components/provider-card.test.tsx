@@ -1,6 +1,6 @@
-//! ProviderCard V1.7+ tests 鈥?ADR-0015 appStore refactor.
-//! Tests for appStore integration, toggle, refresh, dropdown,
-//! delete removes provider from appStore, API Key input, and no Save buttons.
+
+
+
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, screen, waitFor } from "@solidjs/testing-library";
@@ -8,11 +8,11 @@ import userEvent from "@testing-library/user-event";
 import { Effect } from "effect";
 import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 
-// 鈹€鈹€鈹€ Mock appStore 鈥?ALL variables inside factory to avoid hoisting issues 鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
-// vi.mock is hoisted, so we must define everything inside the factory
+
+
 vi.mock("../../../shared/stores/app.store", () => {
-  // These are initialized inside the factory, so they're available when the mock runs
+  
   let providers: any[] = [];
   let lastSetCall: any = null;
 
@@ -37,7 +37,7 @@ vi.mock("../../../shared/stores/app.store", () => {
       clearAllHistory: vi.fn(),
     },
     _resetAppStoreForTest: vi.fn(),
-    // Expose internals for test assertions via module mocking
+    
     __setProviders: (p: any[]) => {
       providers = p;
     },
@@ -45,7 +45,7 @@ vi.mock("../../../shared/stores/app.store", () => {
   };
 });
 
-// 鈹€鈹€鈹€ Fixtures 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
 
 const mockProvider = {
   id: "minimax",
@@ -89,14 +89,14 @@ const _mockProviderDisabled = {
 };
 void _mockProviderDisabled;
 
-// 鈹€鈹€鈹€ Import provider-card AFTER mocking 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
 import { ProviderCard } from "@codeman-frontend/features/settings/components/provider-card";
 
-// We need to access the mock internals - import the module to get the exposed functions
+
 import * as appStoreMock from "@codeman-frontend/shared/stores/app.store";
 import { _resetSettingsSaverForTest } from "@codeman-frontend/features/settings/lib/settings-saver";
 
-// 鈹€鈹€鈹€ Helpers 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
 
 const renderCard = (provider = mockProvider) =>
   render(() => <ProviderCard provider={provider} onUpdate={vi.fn()} onDelete={vi.fn()} />);
@@ -104,7 +104,7 @@ const renderCard = (provider = mockProvider) =>
 const getLastSetCall = () => (appStoreMock as any).__getLastSetCall();
 const setProviders = (p: any[]) => (appStoreMock as any).__setProviders(p);
 
-// 鈹€鈹€鈹€ Tests 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
 
 describe("ProviderCard", () => {
   beforeEach(() => {
@@ -117,21 +117,21 @@ describe("ProviderCard", () => {
 
   afterEach(() => {
     cleanup();
-    // 2026-07 form pattern: settingsSaver.flushNow() is async; cancel the pending
-    // debounce to prevent the timer from firing after test teardown (when the
-    // Effect runtime is already disposed → "Cannot read properties of undefined
-    // (reading '_op')" unhandled rejection).
+    
+    
+    
+    
     _resetSettingsSaverForTest();
   });
 
-  // 鈹€鈹€ Test 1: renders 1 card with provider label 鈹€鈹€
+  
   it("renders 1 card with provider label and id", () => {
     renderCard();
     expect(screen.getByText("MiniMax")).toBeInTheDocument();
-    expect(screen.getByText("minimax")).toBeInTheDocument(); // code element
+    expect(screen.getByText("minimax")).toBeInTheDocument(); 
   });
 
-  // 鈹€鈹€ Test 2: toggling enabled checkbox calls appStore.set 鈹€鈹€
+  
   it("toggling enabled checkbox calls appStore.set and updates state", async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
@@ -143,7 +143,7 @@ describe("ProviderCard", () => {
 
     await user.click(checkbox);
 
-    // appStore.set was called with updated providers
+    
     const lastSet = getLastSetCall();
     expect(lastSet).toBeTruthy();
     const updatedProviders = lastSet.providers;
@@ -153,7 +153,7 @@ describe("ProviderCard", () => {
     );
   });
 
-  // ── Test 3 (V1.8+ ADR-0016 D1): Refresh models calls appStore.refreshProviderModels ──
+  
   it("Refresh models calls appStore.refreshProviderModels and shows success", async () => {
     const user = userEvent.setup();
     const mockModels = [
@@ -191,7 +191,7 @@ describe("ProviderCard", () => {
     });
   });
 
-  // 鈹€鈹€ Test 4: model dropdown calls appStore.set on change 鈹€鈹€
+  
   it("model dropdown calls appStore.set with new model", async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
@@ -217,17 +217,17 @@ describe("ProviderCard", () => {
     );
   });
 
-  // ── Test 5: Provider card renders LLM section ──
+  
   it("renders LLM section with model + base_url + api key", () => {
     renderCard();
 
     expect(screen.getByText("LLM")).toBeInTheDocument();
-    // V2: model select only (billing subform removed)
+    
     const selects = document.querySelectorAll("select");
     expect(selects.length).toBe(1);
   });
 
-  // ── Test 7 (V1.8+ ADR-0016 D4): delete button calls appStore.deleteProvider + onDelete ──
+  
   it("delete button calls appStore.deleteProvider and onDelete", async () => {
     const user = userEvent.setup();
     const onDelete = vi.fn();
@@ -242,21 +242,21 @@ describe("ProviderCard", () => {
     expect(onDelete).toHaveBeenCalledWith("minimax");
   });
 
-  // 鈹€鈹€ Test 8: API Key input onInput calls appStore.set 鈹€鈹€
+  
   it("API Key input onBlur commits to appStore with updated api_key (2026-07 form pattern)", async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(() => <ProviderCard provider={mockProvider} onUpdate={onUpdate} onDelete={vi.fn()} />);
 
-    // Find the LLM API Key password input (V2: only 1 — billing removed)
+    
     const apiKeyInputs = document.querySelectorAll('input[type="password"]');
     expect(apiKeyInputs.length).toBe(1);
 
     const llmApiKeyInput = apiKeyInputs[0] as HTMLInputElement;
     await user.clear(llmApiKeyInput);
     await user.type(llmApiKeyInput, "new-secret-key");
-    // 2026-07 fix: typing 不再立即写 store;commit 在 onBlur 触发 form.handleSubmit()
-    await user.tab(); // 触发 blur
+    
+    await user.tab(); 
 
     const lastSet = getLastSetCall();
     expect(lastSet).toBeTruthy();
@@ -267,22 +267,22 @@ describe("ProviderCard", () => {
     );
   });
 
-  // ── Test 9: No Save buttons in LLM subform section ──
+  
   it("no Save button appears in LLM subform section", () => {
     renderCard();
 
-    // There should be no button with text "Save" anywhere in the card
+    
     const saveButtons = screen.queryAllByRole("button", { name: /save/i });
     expect(saveButtons.length).toBe(0);
   });
 
-  // ── Test 10: Base URL input commits on blur (2026-07 form pattern) ──
+  
   it("Base URL input commits on blur and updates state (regression 2026-07: typing no longer writes store)", async () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(() => <ProviderCard provider={mockProvider} onUpdate={onUpdate} onDelete={vi.fn()} />);
 
-    // Find the Base URL input (text input in LLM section)
+    
     const textInputs = document.querySelectorAll('input[type="text"]');
     const baseUrlInput = textInputs[0] as HTMLInputElement;
     expect(baseUrlInput).toBeTruthy();
@@ -290,8 +290,8 @@ describe("ProviderCard", () => {
 
     await user.clear(baseUrlInput);
     await user.type(baseUrlInput, "https://api.example.com/v1");
-    // 2026-07 fix: typing 不再立即写 store;commit 在 onBlur 触发 form.handleSubmit()
-    await user.tab(); // 触发 blur
+    
+    await user.tab(); 
 
     const lastSet = getLastSetCall();
     expect(lastSet).toBeTruthy();
@@ -307,7 +307,7 @@ describe("ProviderCard", () => {
     );
   });
 
-  // ── Test 10b (regression 2026-07): typing in Base URL preserves focus + value ──
+  
   it("typing in Base URL input preserves focus (regression: <For> remount on each keystroke)", async () => {
     const user = userEvent.setup();
     render(() => <ProviderCard provider={mockProvider} onUpdate={vi.fn()} onDelete={vi.fn()} />);
@@ -316,21 +316,21 @@ describe("ProviderCard", () => {
     const baseUrlInput = textInputs[0] as HTMLInputElement;
     expect(baseUrlInput).toBeTruthy();
 
-    // Focus + clear first (mockProvider.baseUrl is non-empty)
+    
     baseUrlInput.focus();
     await user.clear(baseUrlInput);
     expect(document.activeElement).toBe(baseUrlInput);
 
-    // Type multiple characters — pre-fix, the input element was replaced on each
-    // keystroke (Solid <For> + array.map() reference-equal unmount), causing focus loss.
+    
+    
     await user.type(baseUrlInput, "abcdef");
 
-    // After typing 6 characters, input should still be focused AND have the typed value.
+    
     expect(document.activeElement).toBe(baseUrlInput);
     expect(baseUrlInput.value).toBe("abcdef");
   });
 
-  // ── Test 10c (regression 2026-07): Base URL pattern validation on blur ──
+  
   it("Base URL input shows validation error on blur when invalid (no http:// prefix)", async () => {
     const user = userEvent.setup();
     render(() => <ProviderCard provider={mockProvider} onUpdate={vi.fn()} onDelete={vi.fn()} />);
@@ -340,9 +340,9 @@ describe("ProviderCard", () => {
 
     await user.clear(baseUrlInput);
     await user.type(baseUrlInput, "not-a-url");
-    await user.tab(); // 触发 onBlur validator
+    await user.tab(); 
 
-    // Validation error should be displayed
+    
     await waitFor(() => {
       expect(
         screen.getByText(/Base URL must start with http/i),
@@ -350,7 +350,7 @@ describe("ProviderCard", () => {
     });
   });
 
-  // ── Test 11: delete confirm=false 时不调 deleteProvider ──
+  
   it("delete confirm=false 时不调 deleteProvider", async () => {
     const user = userEvent.setup();
     const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
@@ -369,7 +369,7 @@ describe("ProviderCard", () => {
     confirmSpy.mockRestore();
   });
 
-  // ── Test 14: delete 失败时显示 'Delete failed' ──
+  
   it("delete 失败时显示 Delete failed 错误信息", async () => {
     const user = userEvent.setup();
     vi.spyOn(window, "confirm").mockReturnValue(true);
@@ -387,7 +387,7 @@ describe("ProviderCard", () => {
     });
   });
 
-  // ── Test 15 (TDD RED): dev badge renders when base_url points at local mock server ──
+  
   it("llm.base_url 指向本地 mock server (http://127.0.0.1:...) → 显示 (dev) 徽标", () => {
     const devProvider = {
       id: "mock-test",

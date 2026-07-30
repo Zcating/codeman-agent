@@ -1,6 +1,6 @@
-//! ChatView 组件测试。
-//!
-//! Mocked: conversations store (V2 ADR-0019，不再 mock messages.store / agent.store）。
+
+
+
 
 import { describe, it, expect, vi, afterEach, beforeEach, beforeAll } from "vitest";
 import { render, cleanup, fireEvent, waitFor } from "@solidjs/testing-library";
@@ -10,7 +10,7 @@ import { ChatView } from "@codeman-frontend/features/chat/components/chat-view";
 import type { Message } from "@codeman-frontend/shared/lib/types";
 import type { CodemanGroupSelectProps } from "@codeman-frontend/shared/components/internal/codeman-group-select";
 
-// ─── Mock codeman-group-select: 轻量测试替身，渲染 trigger + role=option ──────
+
 vi.mock("../../../shared/components/internal/codeman-group-select", () => ({
   CodemanGroupSelect: (props: CodemanGroupSelectProps) => {
     const selectedLabel = () => {
@@ -53,8 +53,8 @@ vi.mock("../../../shared/components/internal/codeman-group-select", () => ({
   },
 }));
 
-// V2 ADR-0019: 不再 mock messages.store / agent.store，全部走 chat.store
-// 注意: vi.mock 会被 hoisting，所以 mock 数据必须内联在工厂函数内部
+
+
 vi.mock("../stores/chat.store", () => ({
   store: {
     activeId: null,
@@ -148,8 +148,8 @@ vi.mock("../stores/chat.store", () => ({
   setupConvState: vi.fn(),
 }));
 
-// V1.x provider selector: mock appStore (state + set) 和 settingsSaver (scheduleSave)。
-// appStore 内部 state 用 module-scoped variable, test 之间通过 __setAppStoreState 重置。
+
+
 vi.mock("../../../shared/stores/app.store", () => {
   let settings = {
     providers: [
@@ -212,7 +212,7 @@ vi.mock("../../settings/lib/settings-saver", () => ({
   },
 }));
 
-// ─── Mock codeman-toast (ADR-0029 D5) ──────────────────────────────────────────
+
 const mockCodemanToast = vi.hoisted(() => ({
   error: vi.fn(),
   success: vi.fn(),
@@ -231,9 +231,9 @@ vi.mock(import("@codeman-frontend/features/chat/lib/runtime"), async (importOrig
   };
 });
 
-// Module-level reference to the mock store so afterEach can reset shared state.
-// vi.mock hoists, so we can resolve the mock via dynamic import in beforeAll,
-// then use the cached reference across afterEach calls.
+
+
+
 let mockConversationsStore: { store: { byId: Record<string, { streamingMessageId: string | null; isAgentActive: boolean }> } } | undefined;
 
 describe("ChatView", () => {
@@ -243,10 +243,10 @@ describe("ChatView", () => {
 
   afterEach(() => {
     cleanup();
-    // Reset module-scoped mock store state to prevent pollution between tests.
-    // streamingMessageId + isAgentActive both control chat-view rendering and
-    // the form submit handler's early-return, so any leaked true state breaks
-    // unrelated tests.
+    
+    
+    
+    
     if (mockConversationsStore) {
       for (const convId of ["conv-1", "conv-err"]) {
         const cs = mockConversationsStore.store.byId[convId];
@@ -260,9 +260,9 @@ describe("ChatView", () => {
 
   it("从 store.byId[convId].messages 渲染消息列表", () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
-    // MessageBubble 外层包装有 class `mb-3 flex w-full`（Tailwind utilities）
-    // mock 数据含 3 条消息(user / assistant / tool),全 role 都走同一 wrapper,
-    // 所以 querySelectorAll("div.mb-3") 应得 3。
+    
+    
+    
     const bubbles = container.querySelectorAll("div.mb-3");
     expect(bubbles.length).toBe(3);
   });
@@ -279,17 +279,17 @@ describe("ChatView", () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
     const submitBtn = container.querySelector('button[type="submit"]');
     expect(submitBtn?.textContent).toContain("发送");
-    // V2.8:合并后,idle 时不存在任何 Stop/Cancel 形态按钮
+    
     expect(container.querySelector('button[aria-label="停止运行"]')).toBeNull();
     expect(container.querySelector('button[aria-label="取消运行"]')).toBeNull();
   });
 
   it("tool 角色的消息渲染工具结果", () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
-    // 验证工具结果details存在
+    
     const details = container.querySelectorAll("details");
     expect(details.length).toBeGreaterThan(0);
-    // 验证工具结果标签存在
+    
     const hasToolResult = Array.from(details).some((d) => d.textContent?.includes("工具结果"));
     expect(hasToolResult).toBe(true);
   });
@@ -301,16 +301,16 @@ describe("ChatView", () => {
     expect(hasToolCallId).toBe(true);
   });
 
-  // ─── V2.x provider 选择器测试 (CodemanGroupSelect) ─────────────────
+  
   it("渲染 provider 选择器并列出 enabled 的 provider", () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
     const trigger = container.querySelector('button[data-testid="provider-select-trigger"]') as HTMLButtonElement;
     expect(trigger).toBeTruthy();
-    // 点击 trigger 打开下拉菜单
+    
     trigger.click();
-    // Real @ark-ui/solid renders items as role="option"; use ARIA selector
+    
     const items = container.querySelectorAll('[role="option"]');
-    // 默认 mock providers 只 1 个 enabled (minimax), models 下有该选项
+    
     expect(items.length).toBeGreaterThan(0);
   });
 
@@ -318,24 +318,24 @@ describe("ChatView", () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
     const trigger = container.querySelector('button[data-testid="provider-select-trigger"]') as HTMLButtonElement;
     expect(trigger).toBeTruthy();
-    // Trigger 显示当前选中的值文本，验证存在即可
+    
     expect(trigger).toBeInTheDocument();
   });
 
-  // TODO: real @ark-ui/solid in jsdom does not propagate item clicks → onValueChange.
-  // Integration is verified by codeman-group-select.test.tsx (in isolation) and by e2e tests
-  // (C11 rewrites 10-home-agent.spec.ts and adds coverage for the full HomeAgentForm flow).
+  
+  
+  
   it.skip("切换 provider 触发 appStore.set + settingsSaver.scheduleSave", async () => {
-    // Skipped: deferred to V2.2 or e2e rewrite. See TODO above.
+    
   });
 
-  // ─── Bug: 选择非首项模型后 currentModelId() 弹回首项 ─────────────────────
-  // Bug 根因: currentModelId() 始终返回 provider.models[0].id（首项），
-  // handleChange() 只写 defaultLlmProviderId，不写 provider.llm.defaultModel。
-  // 结果：同 provider 下点击非首项模型，受控值立即弹回首项。
+  
+  
+  
+  
   it("Bug: 选择非首项模型 MiniMax-M2.7 后，llm.defaultModel 应为 MiniMax-M2.7（不弹回首项）", async () => {
     const { appStore } = await import("@codeman-frontend/shared/stores/app.store");
-    // 通过 appStore.set 设置多模型 fixture（shallow merge，替换整个 providers 数组）
+    
     appStore.set({
       providers: [
         {
@@ -360,18 +360,18 @@ describe("ChatView", () => {
 
     const { container } = render(() => <ChatView convId="conv-1" />);
 
-    // 点击 provider-select trigger 打开下拉
+    
     const trigger = container.querySelector('button[data-testid="provider-select-trigger"]') as HTMLButtonElement;
     expect(trigger).toBeTruthy();
     trigger.click();
 
-    // 点击非首项模型 MiniMax-M2.7（触发 CodemanGroupSelect onChange）
+    
     const m27Option = container.querySelector('[data-value="MiniMax-M2.7"]') as HTMLElement;
     expect(m27Option).toBeTruthy();
     m27Option.click();
 
-    // 断言 MiniMax provider 的 llm.defaultModel 已更新为 MiniMax-M2.7
-    // 红灯原因：handleChange() 只写 defaultLlmProviderId，未写 providers[].llm.defaultModel
+    
+    
     const minimaxProvider = appStore.state.value.providers?.find((p) => p.id === "minimax");
     expect(minimaxProvider?.llm?.defaultModel).toBe("MiniMax-M2.7");
   });
@@ -406,12 +406,12 @@ describe("ChatView", () => {
     expect(link?.textContent).toContain("settings");
   });
 
-  // ─── handleSend 测试 ─────────────────────────────────────────────────
+  
   it("handleSend with valid input 调 sendMessage", async () => {
     const user = (await import("@testing-library/user-event")).default;
     const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
     const appStoreMock = await import("@codeman-frontend/shared/stores/app.store");
-    // Reset sendMessage mock and appStore state
+    
     (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
     (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
       providers: [
@@ -444,7 +444,7 @@ describe("ChatView", () => {
     expect(textarea.value).toBe("hi");
     const submitBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
     await user.click(submitBtn);
-    // sendMessage mockResolvedValue(undefined), so await
+    
     await vi.waitFor(() => {
       expect((conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage).toHaveBeenCalledWith(
         "conv-1",
@@ -461,7 +461,7 @@ describe("ChatView", () => {
   it("handleSend empty input 不调 sendMessage", async () => {
     const user = (await import("@testing-library/user-event")).default;
     const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
-    // Reset sendMessage mock before test
+    
     (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
     const { container } = render(() => <ChatView convId="conv-1" />);
     const submitBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
@@ -473,7 +473,7 @@ describe("ChatView", () => {
     const user = (await import("@testing-library/user-event")).default;
     const appStoreMock = await import("@codeman-frontend/shared/stores/app.store");
     const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
-    // Reset sendMessage mock and appStore state
+    
     (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
     (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
       providers: [
@@ -506,19 +506,19 @@ describe("ChatView", () => {
     expect(textarea.value).toBe("hello world");
     const submitBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
     await user.click(submitBtn);
-    // After send, textarea should be cleared
+    
     await vi.waitFor(() => {
       expect(textarea.value).toBe("");
     });
   });
 
-  // ─── V2.8 Send/Stop 合并按钮测试 (覆盖 ADR-0029 D3/D6) ───────────────
+  
   it("idle 状态:Send 位置渲染 type=submit 的发送按钮", () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
     const sendBtn = container.querySelector('button[aria-label="发送消息"]') as HTMLButtonElement;
     expect(sendBtn).toBeTruthy();
     expect(sendBtn.getAttribute("type")).toBe("submit");
-    // idle 时不存在运行中的 Stop 按钮
+    
     expect(container.querySelector('button[aria-label="停止运行"]')).toBeNull();
   });
 
@@ -528,43 +528,43 @@ describe("ChatView", () => {
     mockStore.byId["conv-1"].streamingMessageId = "msg-streaming";
     mockStore.byId["conv-1"].isAgentActive = true;
     const { container } = render(() => <ChatView convId="conv-1" />);
-    // 同位置只有 Stop 按钮(不再有独立 Cancel sibling,不再有 submit 按钮)
+    
     const stopBtn = container.querySelector('button[aria-label="停止运行"]') as HTMLButtonElement;
     expect(stopBtn).toBeTruthy();
     expect(stopBtn.getAttribute("type")).toBe("button");
     expect(stopBtn.textContent).toContain("停止");
-    // running 时不再渲染 idle 的 Send 按钮
+    
     expect(container.querySelector('button[aria-label="发送消息"]')).toBeNull();
-    // 旧的独立 Cancel sibling 已移除
+    
     expect(container.querySelector('button[aria-label="取消运行"]')).toBeNull();
   });
 
   it("handleCancel 调 cancel(convId) — 点击 Stop 按钮触发取消", async () => {
     const user = (await import("@testing-library/user-event")).default;
     const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
-    // Reset cancel mock and set streaming state
+    
     (conversationsStoreMock as unknown as { cancel: ReturnType<typeof vi.fn> }).cancel.mockClear();
     const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null; isAgentActive: boolean }> } }).store;
     mockStore.byId["conv-1"].streamingMessageId = "msg-streaming";
     mockStore.byId["conv-1"].isAgentActive = true;
     const { container } = render(() => <ChatView convId="conv-1" />);
-    // 合并后,取消按钮 = Stop 按钮(同位置)
+    
     const stopBtn = container.querySelector('button[aria-label="停止运行"]') as HTMLButtonElement;
     expect(stopBtn).toBeTruthy();
     await user.click(stopBtn);
     expect((conversationsStoreMock as unknown as { cancel: ReturnType<typeof vi.fn> }).cancel).toHaveBeenCalledWith("conv-1");
   });
 
-  // ─── thinking indicator 测试 (W3.x 已移除 — WX-OPT-2026-07-16 页面优化) ──────
+  
   it("thinking indicator 已移除 — streaming + 空内容场景不再渲染", async () => {
     const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
     const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null; isAgentActive: boolean; messages: Message[] }> } }).store;
-    // Reset streaming state first, then set fresh
+    
     mockStore.byId["conv-1"].streamingMessageId = null;
     mockStore.byId["conv-1"].isAgentActive = false;
     mockStore.byId["conv-1"].streamingMessageId = "msg-streaming";
     mockStore.byId["conv-1"].isAgentActive = true;
-    // Set last message content to empty string (原 thinking indicator 触发条件)
+    
     mockStore.byId["conv-1"].messages[mockStore.byId["conv-1"].messages.length - 1].content = "";
     const { container } = render(() => <ChatView convId="conv-1" />);
     const indicator = container.querySelector('[data-testid="thinking-indicator"]');
@@ -573,7 +573,7 @@ describe("ChatView", () => {
 
   it("thinking indicator 已移除 — non-streaming 也不渲染", async () => {
     const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
-    // Ensure store state is clean
+    
     const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { streamingMessageId: string | null }> } }).store;
     mockStore.byId["conv-1"].streamingMessageId = null;
     const { container } = render(() => <ChatView convId="conv-1" />);
@@ -581,12 +581,12 @@ describe("ChatView", () => {
     expect(indicator).toBeNull();
   });
 
-  // ─── form submit 测试 ────────────────────────────────────────────────
+  
   it("form submit preventDefault + handleSend", async () => {
     const user = (await import("@testing-library/user-event")).default;
     const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
     const appStoreMock = await import("@codeman-frontend/shared/stores/app.store");
-    // Reset sendMessage mock and appStore state
+    
     (conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage.mockClear();
     (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
       providers: [
@@ -617,27 +617,27 @@ describe("ChatView", () => {
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
     await user.type(textarea, "submit test");
     const form = container.querySelector("form") as HTMLFormElement;
-    // user.submit doesn't exist, use fireEvent.submit
+    
     form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
     await vi.waitFor(() => {
       expect((conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage).toHaveBeenCalled();
     });
-    // Also verify textarea cleared
+    
     expect(textarea.value).toBe("");
   });
 
   it("renders empty state when no convId (guards against undefined convId)", () => {
     const { container } = render(() => <ChatView convId={undefined as unknown as string} />);
-    // Should not crash — renders empty/missing-indicator
+    
     expect(container.textContent).toBeTruthy();
   });
 
-  // ─── Bug B: lastError UX (ADR-0029 D5: inline banner 移除 → toast 替代) ─────
+  
 
   it("Bug B (ADR-0029 D5): inline error banner 已移除", () => {
     const { container } = render(() => <ChatView convId="conv-err" />);
     const banner = container.querySelector('[data-testid="chat-error-banner"]');
-    expect(banner).toBeNull(); // banner 取消, toast 接管
+    expect(banner).toBeNull(); 
   });
 
   it("Bug B (ADR-0029 D5): lastError = null / undefined 时不渲染 banner", () => {
@@ -656,7 +656,7 @@ describe("ChatView", () => {
     });
   });
 
-  // ─── Ctrl+Enter send shortcut ─────────────────────────────────────────────
+  
   it("Ctrl+Enter on textarea triggers sendMessage", async () => {
     const user = (await import("@testing-library/user-event")).default;
     const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
@@ -693,7 +693,7 @@ describe("ChatView", () => {
         expect.objectContaining({ apiKey: "test-key" }),
       );
     });
-    // Textarea should be cleared after send
+    
     expect(textarea.value).toBe("");
   });
 
@@ -764,16 +764,16 @@ describe("ChatView", () => {
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
     await user.type(textarea, "Just Enter");
     fireEvent.keyDown(textarea, { key: "Enter" });
-    // Plain Enter should not trigger send (textarea just adds newline)
+    
     expect((conversationsStoreMock as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage).not.toHaveBeenCalled();
   });
 });
 
-// ─── ThinkingPanel 已从 ChatView 移除 — thinking 由各 MessageBubble 的
-// ThinkingPanel 在文本上方渲染(streaming 时 open,done 后折叠)。
-// ThinkingPanel 组件本身的契约测试保留在 thinking-panel.test.tsx。
 
-// ─── IME 兼容性 (Regression test: 中文输入法 composition 期间不应写 signal) ──────
+
+
+
+
 describe("ChatView IME 兼容性", () => {
   afterEach(() => cleanup());
 
@@ -782,43 +782,43 @@ describe("ChatView IME 兼容性", () => {
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
     const submitBtn = container.querySelector('button[type="submit"]') as HTMLButtonElement;
 
-    // 空 input → submit 禁用
+    
     expect(submitBtn).toBeDisabled();
 
-    // 模拟用户用拼音 IME 输入 "ni" → "你":keydown→compositionstart→多个 input→选字→compositionend。
-    // 这中间若干 onInput 事件都不应改写 signal (避免
-    // value={input()} 响应绑定重复 set el.value 中断 IME composition,
-    // 表现为"每输入一个字母后自动 blur")。
+    
+    
+    
+    
     fireEvent(textarea, new Event("compositionstart", { bubbles: true }));
     fireEvent.input(textarea, { target: { value: "n" } });
     fireEvent.input(textarea, { target: { value: "ni" } });
     fireEvent.input(textarea, { target: { value: "你" } });
 
-    // Composition 期间 signal 应仍为 ""; 即便 DOM 被 fireEvent 写成 "你",
-    // Solid 的 value={input()} 响应绑定不应被中途触发,send 按钮保持 disabled。
+    
+    
     expect(submitBtn).toBeDisabled();
 
-    // Composition 结束 — signal 一次性写到最终 committed 值
+    
     fireEvent(textarea, new Event("compositionend", { bubbles: true }));
     fireEvent.input(textarea, { target: { value: "你" } });
 
-    // 现在 send 按钮应启用
+    
     expect(submitBtn).not.toBeDisabled();
   });
 });
 
-// ─── Bug fix regression: 输入框下方不应常驻 generic "Invalid value (Type)" 提示。──
-// 对称 chat-view.tsx / home.tsx(已在 fix/home-textarea-error-persistence 修复)。
-// 根因: form-level `onMount: effectSchema(ChatViewFormSchema)` 跑默认值
-// `{ draft: "" }`,触发 NonEmptyString 失败;ParseIssue 无 message annotation
-// → effect-schema-adapter fallback "Invalid value (Type)" → 渲染到 textarea 下方。
-// 修复:chat-view.tsx 错误展示也走 `field().state.meta.isTouched` 门控,避免
-// 在用户尚未触摸 field 时常驻 generic 错误(mount + 即将与 field 交互的瞬间)。
-//
-// 范围:本测试只断言 mount 时点无错误(对称 home.test.tsx:257-280 的 BUG: 测试)；
-// 一旦用户blur 后 isTouched=true,通用文案会再次出现 — 这是 TanStack Form
-// 预期行为,与 home 修复一致;要更换为友好文案走 schema message annotation
-// 路径另开修复(本修复范围之外)。
+
+
+
+
+
+
+
+
+
+
+
+
 describe("ChatView Bug regression: Invalid value (Type)", () => {
   afterEach(() => cleanup());
 
@@ -828,35 +828,35 @@ describe("ChatView Bug regression: Invalid value (Type)", () => {
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
     expect(textarea).toBeTruthy();
 
-    // 关键断言:mount 后(用户尚未触摸 field),不允许常驻 generic 错误。
+    
     const destructiveMessages = Array.from(
       container.querySelectorAll("p.text-destructive"),
     ).map((el) => el.textContent ?? "");
     expect(destructiveMessages).not.toContain("Invalid value (Type)");
   });
 
-  // 对称 home.test.tsx 的 "Bug regression: Invalid value (Type) on blur"。
-  // 根因：DraftFieldSchema = NonEmptyString = Schema.minLength(1) 无 message annotation。
-  // 用户 focus textarea 后 click 外部 → onBlur validator 跑空字符串 →
-  // effect-schema-adapter 的 fallback "Invalid value (Type)" 渲染到 textarea 下方。
-  // 修复：Schema.minLength(1) 加 { message: "..." } annotation，fallback 不再触发。
+  
+  
+  
+  
+  
   it("Bug: 输入框 blur 后不应出现 generic 'Invalid value (Type)' 提示", async () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
 
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
     expect(textarea).toBeTruthy();
 
-    // Sanity: mount 阶段 (未 touch) 不会有任何 destructive 提示
+    
     const mountMessages = Array.from(
       container.querySelectorAll("p.text-destructive"),
     ).map((el) => el.textContent ?? "");
     expect(mountMessages).not.toContain("Invalid value (Type)");
 
-    // 模拟用户 focus → blur 空 textarea (DraftFieldSchema 触发 onBlur validator)
+    
     textarea.focus();
     fireEvent.blur(textarea);
 
-    // 等待 Solid 同步 flush + TanStack Form 状态更新
+    
     await waitFor(() => {
       const messages = Array.from(
         container.querySelectorAll("p.text-destructive"),
@@ -866,13 +866,13 @@ describe("ChatView Bug regression: Invalid value (Type)", () => {
   });
 });
 
-// ─── Bug fix regression: 输入框 blur 后不应出现 '请输入消息内容' (submit-only 校验) ───
-// 根因：aabd902 给 NonEmptyString 加了 { message: () => "请输入消息内容" } annotation,
-// 把 generic 'Invalid value (Type)' 替换成友好提示。但 chat-view.tsx 的
-// <form.Field name="draft"> 仍用 validators={{ onBlur: effectSchema(DraftFieldSchema) }}
-// + error={field().state.meta.isTouched ? ...} —— 用户 focus 再 blur 空 textarea 时
-// onBlur validator 跑空字符串触发友好提示,isTouched=true 后错误渲染。
-// 期望：blur 不应触发校验,只有提交才校验数据。
+
+
+
+
+
+
+
 describe("ChatView Bug regression: '请输入消息内容' on blur (submit-only)", () => {
   let scrollSpy: ReturnType<typeof vi.spyOn>;
 
@@ -893,17 +893,17 @@ describe("ChatView Bug regression: '请输入消息内容' on blur (submit-only)
     const textarea = container.querySelector("textarea") as HTMLTextAreaElement;
     expect(textarea).toBeTruthy();
 
-    // Sanity: mount 阶段不会有任何 destructive 提示
+    
     const mountMessages = Array.from(
       container.querySelectorAll("p.text-destructive"),
     ).map((el) => el.textContent ?? "");
     expect(mountMessages).not.toContain("请输入消息内容");
 
-    // 模拟用户 focus → blur 空 textarea
+    
     textarea.focus();
     fireEvent.blur(textarea);
 
-    // 等待 Solid 同步 flush + TanStack Form 状态更新
+    
     await waitFor(() => {
       const messages = Array.from(
         container.querySelectorAll("p.text-destructive"),
@@ -913,18 +913,18 @@ describe("ChatView Bug regression: '请输入消息内容' on blur (submit-only)
   });
 });
 
-// ─── Bug fix regression: 首次进入对话不应动画滚动 ───────────────────────────────
-//
-// 根因：chat-view.tsx 的 auto-scroll createEffect 在 mount 时立即执行,
-// behavior 硬编码 "smooth",导致首次进入对话时浏览器播放滚动动画(用户感知为
-// "闪一下" + 滚动条移动)。期望：首次 = instant(直接定位,无动画),
-// 后续消息追加 = smooth(用户能感知新内容)。
+
+
+
+
+
+
 describe("ChatView Scroll: 首次进入对话不应动画滚动", () => {
   let scrollSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    // vitest.setup.ts 默认 stub scrollIntoView 为 no-op,不记录参数。
-    // 用 spyOn 替换为 mock,既能断言调用,又阻止真实 DOM 调用(jsdom 无 layout)。
+    
+    
     scrollSpy = vi
       .spyOn(Element.prototype, "scrollIntoView")
       .mockImplementation(() => {});
@@ -938,7 +938,7 @@ describe("ChatView Scroll: 首次进入对话不应动画滚动", () => {
   it("Bug: 首次进入对话 scrollIntoView 应使用 instant (无动画),后续 smooth", async () => {
     render(() => <ChatView convId="conv-1" />);
 
-    // 等待 Solid effect + queueMicrotask flush
+    
     await waitFor(() => {
       expect(scrollSpy).toHaveBeenCalled();
     });
@@ -946,18 +946,18 @@ describe("ChatView Scroll: 首次进入对话不应动画滚动", () => {
     const calls = scrollSpy.mock.calls;
     expect(calls.length).toBeGreaterThan(0);
 
-    // 关键断言：首次 scrollIntoView 必须不是 smooth(用户感知为"动画")
+    
     const firstCallArgs = calls[0][0] as ScrollIntoViewOptions | undefined;
     expect(firstCallArgs?.behavior).not.toBe("smooth");
   });
 });
 
-// ─── V2.8 (revert Bug B): ChatView messages wrapper owns its scroll ──────────
-// 2026-07-29: User feedback "下方 textarea 固定,不连带滚动" — re-adopted Variant A
-// from /prototype/chat-textarea-fixed (inner scroll). Messages wrapper owns
-// overflow-y-auto so it scrolls independently of the form (form is a sibling,
-// fixed at bottom by flex layout). The earlier "Bug B" removal of inner scroll
-// is reversed by deliberate design decision, not regression.
+
+
+
+
+
+
 describe("ChatView inner scroll (V2.8, Variant A from /prototype/chat-textarea-fixed)", () => {
   afterEach(() => cleanup());
 
@@ -984,7 +984,7 @@ describe("ChatView inner scroll (V2.8, Variant A from /prototype/chat-textarea-f
   });
 });
 
-// ─── ringInfo three-layer lookup (ADR-0036 V2.6) ──────────────────────────────────
+
 describe("ChatView ringInfo contextWindow three-layer lookup", () => {
   afterEach(() => cleanup());
 
@@ -992,8 +992,8 @@ describe("ChatView ringInfo contextWindow three-layer lookup", () => {
     const appStoreMock = await import("@codeman-frontend/shared/stores/app.store");
     const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
 
-    // Setup: MiniMax provider with model that has NO contextWindow (simulates API not returning it)
-    // but provider.llm.contextWindow = 200_000 (layer 2 fallback)
+    
+    
     (appStoreMock as unknown as { __setAppStoreState: (s: unknown) => void }).__setAppStoreState({
       providers: [
         {
@@ -1009,21 +1009,21 @@ describe("ChatView ringInfo contextWindow three-layer lookup", () => {
               {
                 id: "MiniMax-M2.7-highspeed",
                 label: "MiniMax-M2.7-highspeed",
-                // contextWindow intentionally absent — simulates API not returning it
+                
                 deprecated: false,
                 thinking: false,
               },
             ],
             modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
-            contextWindow: 200_000, // layer 2 fallback
+            contextWindow: 200_000, 
           },
         },
       ],
       defaultLlmProviderId: "minimax",
     });
 
-    // Add more message content so used tokens > 0.5% of 200_000 (needed for non-zero pct)
-    // 200_000 * 0.005 = 1000 chars minimum for 1% display
+    
+    
     const mockStore = (conversationsStoreMock as unknown as { store: { byId: Record<string, { messages: Message[] }> } }).store;
     mockStore.byId["conv-1"].messages = [
       {
@@ -1048,7 +1048,7 @@ describe("ChatView ringInfo contextWindow three-layer lookup", () => {
         toolCalls: null,
         toolResults: null,
         model: "gpt-4o",
-        inputTokens: null, // null so fallback to estimate is used
+        inputTokens: null, 
         outputTokens: null,
         createdAt: 1710000001,
       },
@@ -1056,11 +1056,11 @@ describe("ChatView ringInfo contextWindow three-layer lookup", () => {
 
     const { container } = render(() => <ChatView convId="conv-1" />);
 
-    // Ring should be present and show non-zero percentage
+    
     const ring = container.querySelector('[data-testid="context-ring"]');
     expect(ring).toBeTruthy();
-    // For pct >= 1: used >= 0.005 * 200_000 = 1000 tokens -> chars >= 4000
-    // With 4000 chars / 4 = 1000 tokens -> 1000/200000*100 = 0.5% -> rounds to 1%
+    
+    
     expect(ring!.getAttribute("data-context-pct")).not.toBe("0");
   });
 });

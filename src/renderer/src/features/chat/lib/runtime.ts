@@ -1,20 +1,20 @@
-// 工厂模式,无 Context.Tag / 无 Layer DI / 无 Ref<Map<ConvId, Agent>>:
-// - `createAgentRuntime()` 返回 `AgentRuntime` 接口,closure 持有 per-run 状态
-// - `run({ context, provider })`: context 是 store messages 浅拷贝(含最新 user msg)
-// - 每次 run 新建 pi-agent-core Agent + Stream.async fiber
-// - `cancel()`: 调 closure 内 `currentAgent.abort()` 触发 Agent 内部 signal
-//
-// 0.80.3 迁移要点 (vs 0.9.0):
-//   - `transport: AgentTransport` (旧,自己跑 agent loop) → `streamFn: anthropicStream`
-//   - `initialState.thinkingLevel` 必填,默认 "medium"(开 thinking,显示思考过程)
-//   - `model.reasoning: true` (跟 thinkingLevel 联动,Claude 等推理模型才能产出 thinking blocks)
-//   - `subscribe((evt) => ...)` → `subscribe((evt, signal) => ...)`
-//   - 旧 anthropic-transport.ts 的 agent loop 全部删除(由 Agent 内部处理)
-//
-// V3.1 Skills integration:
-//   - ProviderConfig.enabledSkills: SkillManifest[] — caller (chat.store) 提供
-//   - systemPrompt 自动追加 `<available_skills>...</available_skills>` 段
-//   - tools[] 数组添加 `_load_skill` meta-tool (LLM 主动调用拉全文)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 import { Effect, Exit, Stream } from "effect";
 import { match } from "ts-pattern";
@@ -42,9 +42,9 @@ import { toPiMessages } from "@codeman-frontend/features/chat/lib/runtime-to-pi-
 import { AppError } from "@codeman-frontend/shared/lib/errors";
 import type { TSchema } from "@sinclair/typebox";
 
-// ─── MCP tools builder ────────────────────────────────────────
 
-/** Convert MCP tool entries to pi-agent AgentTool definitions. */
+
+
 function buildMcpTools(entries: readonly McpToolEntry[]): AgentTool<TSchema, unknown>[] {
   return entries.map((entry) => ({
     label: entry.agentName,
@@ -88,7 +88,7 @@ function buildMcpTools(entries: readonly McpToolEntry[]): AgentTool<TSchema, unk
   }));
 }
 
-// ─── Runtime event types ──────────────────
+
 
 export type RuntimeEvent =
 | { type: "token"; content: string }
@@ -96,78 +96,62 @@ export type RuntimeEvent =
 | { type: "tool_call"; toolCall: { id: string; name: string; args: Record<string, unknown> } }
 | { type: "tool_result"; toolCallId: string; result: unknown; error?: string }
 | { type: "done"; message: Message }
-/**
- * V2.8: per-message 终止信号(对应 agent_end)。与 `done`(per-turn)区分:
- * - `done`: 每个 turn 触发一次,Bubble Boundary。chat.store 替换 stub 累积内容,**不**清 streamingMessageId。
- * - `message_stop`: 整个 message 真正结束时触发一次(agent_end)。chat.store 清 streamingMessageId → isRunning → Send 按钮恢复。
- * 多 turn 场景(turn-1 tool + turn-2 text)下,`done` 在中间 turn 触发不会让 UI 抖动(Stop→Send→Stop),只有 `message_stop` 才终止 running 状态。
- */
+
 | { type: "message_stop" }
 | { type: "error"; error: { message: string } };
 
-/** Structural subset of Effect's `Emit` we use (`single` + `end`). */
+
 interface RuntimeEmitter {
   readonly single: (event: RuntimeEvent) => unknown;
   readonly end: () => unknown;
 }
 
-// ─── Provider config (per-run, not closure) ─────────────────────
+
 
 export interface ProviderConfig {
-  /**
-   * Per-run API key for the LLM provider. Optional — omit when the caller
-   * hasn't configured auth yet; `Agent.getApiKey` falls through to `undefined`
-   * and the Anthropic SDK then resolves via env / no-auth path.
-   */
+  
   apiKey?: string;
   baseUrl: string;
   defaultModel: string;
   systemPrompt: string;
   tools: unknown[];
-  /**
-   * per-run workspace context — 当工具 schema 接受 `workspace_id`
-   * 但 LLM 没传时,`createFileTools()` 自动注入。空 = 不注入(保留 LLM 传的或让工具报错)。
-   */
+  
   workspaceId?: string;
-  /**
-   * V3.1: 已启用的 skill manifest 列表。Runtime 在每次 run() 入口自动
-   * 拼成 `<available_skills>...</available_skills>` 段追加到 system prompt。
-   * 空 / undefined = 不注入该段。
-   */
+  
   enabledSkills?: readonly SkillManifest[];
 }
 
-// ─── Run options ────────────────────────────────────────────────
+
 
 export interface RunOptions {
-  /** 浅拷贝,含最新用户输入 */
+  
   context: Message[];
   provider: ProviderConfig;
 }
 
-// ─── AgentRuntime interface ─────────────────────────────────────
+
 
 export interface AgentRuntime {
   run(opts: RunOptions): Stream.Stream<RuntimeEvent, never, never>;
   cancel(): void;
 }
 
-// ─── Bubble Boundary helpers ───────────────────────────────────────
-//
-// V3.1 cross-turn aggregation REMOVED. Runtime now emits one `done` event per
-// turn (at `turn_end`), not one aggregated `done` at `agent_end`. Each turn's
-// done.message owns ONLY that turn's thinking / tool_calls / tool_results —
-// no cross-turn move of any content type.
-//
-// Old contract (V3.1, removed): agent_end.messages[] aggregated across all
-// turns → 1 final done with cross-turn thinking + tool_calls.
-// New contract: turn_end.message (per turn) → 1 done per turn.
-// agent_end is now cleanup-only (emit.end() + unsubscribe).
 
-// ─── Per-event handlers (file-level, closure-free) ──────────────
-// Extracted from the inner subscribe callback to reduce nesting (5-6 levels
-// in the closure → 1-level dispatch). Each handler takes the dispatch input
-// + the emitter, plus any per-run values it needs (defaultModel, finalize).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function handleAssistantMessageEvent(
   evt: NonNullable<
@@ -177,15 +161,15 @@ function handleAssistantMessageEvent(
 ): void {
   match(evt)
     .with({ type: "text_delta" }, ({ delta }) => {
-      // pi-agent-core 0.80.3 message_update.text_delta.delta 是单 chunk（新片段）,
-      // 不是累积全文。anthropic-transport.ts line 491 emit 时也只 emit
-      // delta.text (新片段),snapshot.partial 才是累积态但这里没用。
-      // chat.store.ts token handler 用 `(m.content ?? "") + evt.content` APPEND
-      // 来累积 (G31 fix),所以这里不需要替消费方做"预累积"。
+      
+      
+      
+      
+      
       emit.single({ type: "token", content: delta });
     })
     .with({ type: "thinking_delta" }, ({ delta }) => {
-      // 同 text_delta:delta 是单 chunk,chat.store thinking handler APPEND 累积。
+      
       emit.single({ type: "thinking", content: delta });
     })
     .with({ type: "toolcall_end" }, ({ toolCall }) => {
@@ -194,14 +178,14 @@ function handleAssistantMessageEvent(
         toolCall: {
           id: toolCall.id,
           name: toolCall.name,
-          // pi-ai's ToolCall.arguments is Record<string, any>; assignable to
-          // Record<string, unknown> without an explicit cast.
+          
+          
           args: toolCall.arguments,
         },
       });
     })
     .otherwise(() => {
-      // text_start / thinking_start / toolcall_start / toolcall_delta / start: no-op
+      
     });
 }
 
@@ -211,13 +195,13 @@ function handleMessageUpdate(
 ): void {
   const { assistantMessageEvent, message } = evt;
   if (assistantMessageEvent) {
-    // NEW FORMAT (pi-agent-core 0.80.3): dispatch on assistantMessageEvent.type
+    
     handleAssistantMessageEvent(assistantMessageEvent, emit);
     return;
   }
 
-  // OLD FORMAT fallback (backward compat): infer from message.content blocks.
-  // contentOf returns [] for missing/non-array content — no cast needed.
+  
+  
   const msgContent = contentOf(message);
   if (msgContent.length > 0) {
     for (const block of msgContent) {
@@ -251,14 +235,7 @@ function handleToolExecutionEnd(
   });
 }
 
-/**
- * turn_end handler (Bubble Boundary): emits ONE `done` event for the
- * turn that just ended. The done.message owns ONLY this turn's content blocks:
- * text / thinking / toolCalls extracted from `evt.message`; toolResults from
- * `evt.toolResults` (NOT cross-turn aggregated).
- *
- * Replaces V3.1's handleAgentEnd which aggregated across all turns at agent_end.
- */
+
 function handleTurnEnd(
   evt: Extract<AgentEvent, { type: "turn_end" }>,
   emit: RuntimeEmitter,
@@ -286,9 +263,9 @@ function handleTurnEnd(
       }))
       : null;
 
-  // turn_end.toolResults is pi-ai's ToolResultMessage[]; we project to chat.store's
-  // ToolResult[] (toolCallId + result + error|null). content[] flattened for the
-  // single-text-result case (typical for file tools).
+  
+  
+  
   const toolResults =
     turnToolResults && turnToolResults.length > 0
       ? turnToolResults.map((tr) => ({
@@ -323,8 +300,7 @@ function handleTurnEnd(
   });
 }
 
-/** Flatten pi-ai ToolResultMessage.content (Content[]) to chat.store ToolResult.result.
- *  Text-only results stay as string; mixed results JSON-stringify. */
+
 function extractResultContent(content: unknown): unknown {
   if (!Array.isArray(content)) { return content; }
   const textBlocks = content.filter(
@@ -337,24 +313,13 @@ function extractResultContent(content: unknown): unknown {
   return JSON.stringify(content);
 }
 
-/** Extract plain text from pi-ai Content[] for error message. */
+
 function extractResultText(content: unknown): string {
   const extracted = extractResultContent(content);
   return typeof extracted === "string" ? extracted : JSON.stringify(extracted);
 }
 
-/**
- * agent_end handler: per-turn `done` events already fired
- * via handleTurnEnd. V2.8: emit `message_stop` BEFORE emit.end() so chat.store
- * can clear streamingMessageId (isRunning → Send 按钮恢复) only at the true
- * per-message boundary, not at every turn_end. This prevents the Send/Stop
- * button from flapping between turns in multi-turn agent runs (e.g. tool_use
- * → tool_result → final answer).
- *
- *   1. emit.single({ type: "message_stop" }) — terminate per-message running state
- *   2. emit.end() the runtime EventStream
- *   3. call finalize() (unsubscribe + clear currentAgent)
- */
+
 function handleAgentEnd(
   _evt: Extract<AgentEvent, { type: "agent_end" }>,
   emit: RuntimeEmitter,
@@ -366,16 +331,16 @@ function handleAgentEnd(
   finalize();
 }
 
-// ─── Factory (closure-based, no class, no Context.Tag) ──────────
+
 
 export function createAgentRuntime(): AgentRuntime {
-  // closure-shared,供 cancel() 触达 in-flight agent
+  
   let currentAgent: Agent | null = null;
 
   return {
     run({ context, provider }: RunOptions): Stream.Stream<RuntimeEvent, never, never> {
       return Stream.async<RuntimeEvent, never>((emit) => {
-        // ── Block A: defaultModel validation (P0-2) ──────────────────
+        
         const validation = validateProvider(provider);
         if (!validation.ok) {
           emit.single({ type: "error", error: { message: validation.reason } });
@@ -389,8 +354,8 @@ export function createAgentRuntime(): AgentRuntime {
           api: "anthropic-messages",
           provider: "anthropic",
           baseUrl: provider.baseUrl,
-          // 配合 initialState.thinkingLevel="medium",让 Claude 等推理模型产出 thinking blocks。
-          // 非推理模型 silently 忽略(per pi-ai 文档),所以默认全开对所有 provider 安全。
+          
+          
           reasoning: true,
           input: ["text"],
           cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -400,11 +365,11 @@ export function createAgentRuntime(): AgentRuntime {
 
         const fileTools = createFileTools(provider.workspaceId);
         const mcpTools = buildMcpTools(mcpAllTools$());
-        // 顺序: file tools 先, MCP tools 中, skills meta-tool 末 (便于 LLM 先看到主要工具)
+        
         const tools = [...fileTools, ...mcpTools, loadSkillTool];
 
-        // V3.1 D3: 拼接 enabled skills manifest 到 system prompt。
-        // 空数组 → formatSkillsManifestSection 返回 "" → 原 systemPrompt 不变。
+        
+        
         const skillsSection = formatSkillsManifestSection(provider.enabledSkills ?? []);
         const finalSystemPrompt = skillsSection
           ? `${provider.systemPrompt}\n\n${skillsSection}`
@@ -414,15 +379,15 @@ export function createAgentRuntime(): AgentRuntime {
           initialState: {
             systemPrompt: finalSystemPrompt,
             model,
-            // 默认 medium:显示完整思考过程。reasoning:true 的模型产出 thinking_delta
-            // → chat.store 累积到 stub.thinking → done 时合并到 final message.thinking
-            // → MessageBubble ThinkingPanel 在 bubble 顶部渲染(streaming 时 open)。
-            // 用户后续可在 settings 里加 provider-level thinkingLevel 配置来覆盖默认值。
+            
+            
+            
+            
             thinkingLevel: "medium",
             tools,
-            // D2 + bridge: our DB Message (snake_case, flat) → pi-ai Message
-            // (camelCase, content[] blocks). See runtime-to-pi-messages.ts for the
-            // mapping rules + edge cases (Usage synthesis, toolName lookup, etc.).
+            
+            
+            
             messages: toPiMessages(context, model),
           },
           streamFn: anthropicStream,
@@ -430,8 +395,7 @@ export function createAgentRuntime(): AgentRuntime {
         });
         currentAgent = agent;
 
-        /** Tear down subscription + clear `currentAgent` if still ours.
-         *  Shared by agent_end / prompt catch / Stream cleanup (3 sites). */
+        
         const unsubscribeAndClear = (): void => {
           sub();
           if (currentAgent === agent) {
@@ -445,14 +409,14 @@ export function createAgentRuntime(): AgentRuntime {
               .with({ type: "message_update" }, (e) => handleMessageUpdate(e, emit))
               .with({ type: "tool_execution_end" }, (e) => handleToolExecutionEnd(e, emit))
               .with({ type: "turn_end" }, (e) =>
-                // Bubble Boundary: per-turn done (1 turn = 1 bubble)
+                
                 handleTurnEnd(e, emit, provider.defaultModel))
               .with({ type: "agent_end" }, (e) =>
-                // cleanup-only (per-turn done already fired via turn_end)
+                
                 handleAgentEnd(e, emit, unsubscribeAndClear))
               .otherwise(() => {
-                // agent_start / turn_start / message_start / message_end /
-                // tool_execution_start / tool_execution_update: not mapped to RuntimeEvent
+                
+                
               });
           } catch (err) {
             emit.single({

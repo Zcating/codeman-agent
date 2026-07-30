@@ -8,12 +8,7 @@ export const MOCK_DEV_TEMPLATE_CONSTANTS = {
   modelsEndpoint: "",
 } as const;
 
-/**
- * Build a Provider record pre-filled for local-dev mock LLM usage.
- * All fields fully editable by the user after prefill (no locking).
- *
- * @param id - unique provider id (caller must ensure uniqueness; format suggestion: "mock-<timestamp>")
- */
+
 export function buildMockDevTemplate(id: string): Provider {
   return {
     id,

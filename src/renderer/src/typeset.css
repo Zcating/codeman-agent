@@ -1,21 +1,7 @@
-/*! typeset.css — shadcn/typeset 风格渲染 markdown HTML。
- *
- * 三个 CSS 自定义属性驱动节奏:
- *   --typeset-size     base font-size (默认 1em → 跟随容器)
- *   --typeset-leading  line-height (默认 1.75)
- *   --typeset-flow     块间距 (默认 1.25em)
- *
- * 颜色/字体从应用主题 token 继承。
- * 流式稳定: 仅用 margin-block-start, 无 forward-looking 选择器。
- *
- * 使用:
- *   <div class="typeset typeset-chat" innerHTML={renderMarkdown(src)} />
- *
- * 参考: https://ui.shadcn.com/typeset
- */
+
 
 @layer components {
-  /* ─── Base ──────────────────────────────────────────────────────── */
+  
 
   .typeset {
     --typeset-font-body: var(--font-sans, inherit);
@@ -32,7 +18,7 @@
     color: var(--color-foreground);
   }
 
-  /* ─── Headings ──────────────────────────────────────────────────── */
+  
 
   .typeset :where(h1, h2, h3, h4, h5, h6) {
     font-family: var(--typeset-font-heading);
@@ -49,7 +35,7 @@
   .typeset :where(h4) { font-size: calc(var(--typeset-size) * 1.1); }
   .typeset :where(h5, h6) { font-size: calc(var(--typeset-size) * 1); }
 
-  /* ─── Paragraphs & Lists ────────────────────────────────────────── */
+  
 
   .typeset :where(p, ul, ol, pre, blockquote, table, hr) {
     margin-block-start: var(--typeset-flow);
@@ -72,7 +58,7 @@
     margin-block-start: calc(var(--typeset-flow) * 0.25);
   }
 
-  /* ─── Inline Code & Pre ─────────────────────────────────────────── */
+  
 
   .typeset :where(code) {
     font-family: var(--typeset-font-mono);
@@ -97,7 +83,7 @@
     border-radius: 0;
   }
 
-  /* ─── Links ─────────────────────────────────────────────────────── */
+  
 
   .typeset :where(a) {
     color: var(--color-primary);
@@ -109,7 +95,7 @@
     opacity: 0.8;
   }
 
-  /* ─── Blockquote ────────────────────────────────────────────────── */
+  
 
   .typeset :where(blockquote) {
     border-inline-start: 3px solid var(--color-border);
@@ -117,14 +103,14 @@
     color: var(--color-muted-foreground);
   }
 
-  /* ─── Horizontal Rule ───────────────────────────────────────────── */
+  
 
   .typeset :where(hr) {
     border: none;
     border-top: 1px solid var(--color-border);
   }
 
-  /* ─── Tables ────────────────────────────────────────────────────── */
+  
 
   .typeset :where(table) {
     width: 100%;
@@ -143,7 +129,7 @@
     background: var(--color-muted);
   }
 
-  /* ─── Images ────────────────────────────────────────────────────── */
+  
 
   .typeset :where(img) {
     max-width: 100%;
@@ -151,14 +137,14 @@
     border-radius: 0.375rem;
   }
 
-  /* ─── Task List Checkboxes ──────────────────────────────────────── */
+  
 
   .typeset :where(input[type="checkbox"]) {
     margin-inline-end: 0.5em;
     transform: translateY(1px);
   }
 
-  /* ─── Inline Semantics ──────────────────────────────────────────── */
+  
 
   .typeset :where(strong) {
     font-weight: 600;
@@ -168,18 +154,16 @@
     text-decoration: line-through;
   }
 
-  /* ─── Opt-out ───────────────────────────────────────────────────── */
+  
 
   :where(.not-typeset, [data-not-typeset]),
   :where(.not-typeset, [data-not-typeset]) :where(.typeset) {
     all: revert;
   }
 
-  /* ═══════════════════════════════════════════════════════════════════
-     Presets
-     ═══════════════════════════════════════════════════════════════════ */
+  
 
-  /* ─── Chat — tighter rhythm for conversation bubbles ────────────── */
+  
 
   .typeset-chat {
     --typeset-font-body: "Geist", "Geist Fallback";

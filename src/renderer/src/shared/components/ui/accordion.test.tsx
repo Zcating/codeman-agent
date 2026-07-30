@@ -1,4 +1,4 @@
-//! accordion.test.tsx — Contract tests for Accordion primitive wrapping @ark-ui/solid.
+
 import { render, screen, cleanup } from "@solidjs/testing-library";
 import { describe, expect, it, beforeEach } from "vitest";
 import {
@@ -25,13 +25,13 @@ describe("Accordion — seam 10 (AccordionProvider)", () => {
       </Accordion>
     ));
 
-    // Both triggers should be visible
+    
     expect(screen.getByText("Trigger A")).toBeInTheDocument();
     expect(screen.getByText("Trigger B")).toBeInTheDocument();
 
-    // Content A should be visible (open)
+    
     expect(screen.getByText("Content A")).toBeInTheDocument();
-    // Content B might or might not be visible depending on default
+    
   });
 
   it("renders multiple items with defaultValue containing multiple values", () => {
@@ -68,8 +68,8 @@ describe("AccordionItem data-state — seam 11", () => {
       </Accordion>
     ));
 
-    // The accordion item should have a data-state attribute
-    // Looking for data-state on the item or its content
+    
+    
     const contentEl = container.querySelector("[data-state='open']");
     expect(contentEl).toBeTruthy();
   });
@@ -84,7 +84,7 @@ describe("AccordionItem data-state — seam 11", () => {
       </Accordion>
     ));
 
-    // No open state should be present when defaultValue is empty
+    
     const openEls = container.querySelectorAll("[data-state='open']");
     expect(openEls.length).toBe(0);
   });
@@ -114,7 +114,7 @@ describe("Accordion structural", () => {
         </AccordionItem>
       </Accordion>
     ));
-    // Content should be rendered
+    
     expect(screen.getByText("The content")).toBeInTheDocument();
   });
 

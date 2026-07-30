@@ -1,10 +1,10 @@
-// Skills meta-tool — `_load_skill` AgentTool (ADR-0031 D4)。
-//
-// 注入到 runtime tools[] 数组的特殊 meta-tool。前缀下划线暗示 meta 性质:
-// LLM 主动调用以拉取 Skill 全文 body。
-//
-// 与现有 tool result 路径同语义 — body 走 tool_result message 流 (不进 system prompt
-// 永久拼), 避免永久累积撑爆 context window。
+
+
+
+
+
+
+
 
 import { Effect, Exit, Schema } from "effect";
 import { toToolParameters } from "@codeman-frontend/shared/lib/tool-schema";

@@ -1,15 +1,15 @@
-//! routes/index.test.tsx — Chat route components tests.
-//!
-//! Post-PR-2: ChatLayout is a thin shell (mount data-loading + ChatSidebar).
-//! Chat-sidebar.test.tsx covers all chat-domain wiring. This file covers:
-//! - HomeRoute renders HomeAgentForm
-//! - ConversationRoute renders ChatView with back button (still tested)
-//! - ChatLayout: loads data on mount + renders ChatSidebar stub
+
+
+
+
+
+
+
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup } from "@solidjs/testing-library";
 
-// ─── Mock state (in vi.hoisted so factories can reference) ───────────────
+
 
 const F = vi.hoisted(() => {
   return {
@@ -21,7 +21,7 @@ const F = vi.hoisted(() => {
   };
 });
 
-// ─── Mock @tanstack/solid-router ──────────────────────────────────────────
+
 
 vi.mock("@tanstack/solid-router", () => ({
   Outlet: () => <div data-testid="outlet">Outlet</div>,
@@ -33,20 +33,20 @@ vi.mock("@tanstack/solid-router", () => ({
   useNavigate: () => F.mockUseNavigate,
 }));
 
-// ─── Mock chat.store (just for data loading) ──────────────────────────────
+
 
 vi.mock("../stores/chat.store", () => ({
   loadWorkspaces: F.mockLoadWorkspaces,
   loadConversations: F.mockLoadConversations,
 }));
 
-// ─── Mock ChatSidebar (chat-domain wrapper) at the new seam ───────────────
+
 
 vi.mock("../components/chat-sidebar", () => ({
   ChatSidebar: () => F.mockChatSidebar() as any,
 }));
 
-// ─── Mock HomeAgentForm ──────────────────────────────────────────────────
+
 
 vi.mock("../components/home", () => ({
   HomeAgentForm: () => (
@@ -54,7 +54,7 @@ vi.mock("../components/home", () => ({
   ),
 }));
 
-// ─── Mock ChatView ──────────────────────────────────────────────────────
+
 
 vi.mock("../components/chat-view", () => ({
   ChatView: (props: any) => (
@@ -64,13 +64,13 @@ vi.mock("../components/chat-view", () => ({
   ),
 }));
 
-// ─── Import route components from barrel ────────────────────────────────────
+
 
 import { HomeRoute } from "@codeman-frontend/features/chat/routes/home-route";
 import { ConversationRoute } from "@codeman-frontend/features/chat/routes/conversation-route";
 import { ChatLayout } from "@codeman-frontend/features/chat/routes/chat-layout";
 
-// ─── HomeRoute tests ─────────────────────────────────────────────────────
+
 
 describe("HomeRoute", () => {
   afterEach(() => {
@@ -83,7 +83,7 @@ describe("HomeRoute", () => {
   });
 });
 
-// ─── ConversationRoute tests ──────────────────────────────────────────────
+
 
 describe("ConversationRoute", () => {
   beforeEach(() => {
@@ -105,7 +105,7 @@ describe("ConversationRoute", () => {
   });
 });
 
-// ─── ChatLayout tests ────────────────────────────────────────────────────
+
 
 describe("ChatLayout", () => {
   beforeEach(() => {

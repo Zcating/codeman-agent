@@ -14,29 +14,23 @@
   --font-mono: "Geist Mono", "Geist Mono Fallback";
   --font-heading: "Geist", "Geist Fallback";
 
-  /* 11 阶 OKLCH primary 渐变，Lab Sky 锚点 sky-500 (#0ea5e9) 于 500 (hue 230) */
+  
   --color-primary-50: oklch(0.97 0.014 230);
   --color-primary-100: oklch(0.94 0.03 230);
   --color-primary-200: oklch(0.89 0.055 230);
   --color-primary-300: oklch(0.82 0.095 230);
   --color-primary-400: oklch(0.74 0.15 230);
-  --color-primary-500: oklch(0.685 0.169 230); /* ≈ #0ea5e9 sky-500 */
+  --color-primary-500: oklch(0.685 0.169 230); 
   --color-primary-600: oklch(0.61 0.18 230);
   --color-primary-700: oklch(0.53 0.17 230);
   --color-primary-800: oklch(0.45 0.15 230);
   --color-primary-900: oklch(0.37 0.13 230);
   --color-primary-950: oklch(0.27 0.1 230);
 
-  /* Singular 主色 — Tailwind v4 的 `bg-primary` / `text-primary` / `ring-primary`
-     查的是 `--color-primary` (无数字后缀),而 5 ui 原子 (Button/Input/Textarea/
-     Checkbox/Card) 的 cva variant 也只引用 singular 形式。补这一行把色阶 500
-     暴露为默认主色,这样 bg-primary 才会解析到 sky-500 蓝,不再透明。 */
+  
   --color-primary: var(--color-primary-500);
 
-  /* Shadcn-style semantic tokens (light mode defaults)
-     命名对齐 DESIGN.md: background = Cool Paper, foreground = Lab Graphite 等等。
-     5 ui 原子 (Button / Input / Textarea / Checkbox / Card) 的 cva variant
-     全部消费这些 token,所以必须先存在,否则 cva 编译会缺 utility。 */
+  
   --color-background: oklch(0.985 0.003 230);
   --color-foreground: oklch(0.18 0.008 230);
   --color-card: oklch(1 0 0);
@@ -60,7 +54,7 @@
   --color-input: oklch(0.92 0.005 230);
   --color-ring: oklch(0.685 0.169 230);
 
-  /* Sidebar (V2.1, shadcn-style) — used by ui/sidebar primitive + internal/codeman-sidebar */
+  
   --color-sidebar:                    oklch(0.985 0.003 230);
   --color-sidebar-foreground:         oklch(0.18 0.008 230);
   --color-sidebar-primary:            oklch(0.685 0.169 230);
@@ -69,15 +63,12 @@
   --color-sidebar-accent-foreground:   oklch(0.18 0.008 230);
   --color-sidebar-border:             oklch(0.92 0.005 230);
   --color-sidebar-ring:               oklch(0.685 0.169 230);
-  /* Layout width tokens */
+  
   --sidebar-width: 16rem;
   --sidebar-width-icon: 3rem;
   --sidebar-width-mobile: 18rem;
 
-  /* Accordion expand/collapse — 200ms ease-out。
-     高度由 @ark-ui/solid AccordionItemContent 在 data-state=open 时
-     setProperty("--height", scrollHeight + "px") 写入,keyframe 引用 var(--height)
-     做 0 → 自然高度的过渡。prefers-reduced-motion 由 @media 全局兜底。 */
+  
   --animate-accordion-down: accordion-down 200ms ease-out;
   --animate-accordion-up: accordion-up 200ms ease-out;
 }
@@ -104,7 +95,7 @@
   }
 }
 
-/* T2 shadcn-replica-rewrite: cn-font-heading utility per .repos/shadcn/card.tsx */
+
 @utility cn-font-heading {
   font-family: var(--font-heading, var(--font-sans));
 }
@@ -115,10 +106,7 @@
   #root {
     height: 100%;
   }
-  /* Per user 2026-07-26: SidebarMenu inner <span> labels were observed with
-     text cursor. Lock global default so any <span> in the app renders with
-     cursor: default regardless of ancestor inheritance, focus state, or
-     accidental overrides. */
+  
   span {
     cursor: default;
   }
@@ -126,7 +114,7 @@
     color-scheme: light dark;
   }
 
-  /* Dark mode token overrides — 跟 <html class="dark"> 触发,跟 @custom-variant dark 配合 */
+  
   .dark {
     --color-background: oklch(0.18 0.008 230);
     --color-foreground: oklch(0.95 0.005 230);
@@ -166,8 +154,7 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Reduced motion: 取消所有 transition 和 animation,尊重系统偏好。
-     Polish F-requirement: WCAG 2.1 AA a11y 默认。 */
+  
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

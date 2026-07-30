@@ -1,7 +1,7 @@
-//! codeman-textarea — 跨域应用绑定多行输入框,与 codeman-input.tsx 同源 / 同 IME-safe
-//! 行为 / 同 API 约定;唯一区别是内部用 ui/Textarea atom 替代 ui/Input atom。
-//!
-//! 完整设计文档见 codeman-input.tsx 头。
+
+
+
+
 
 import { type Component, type ComponentProps, Show, splitProps } from "solid-js";
 import { Textarea } from "@codeman-frontend/shared/components/ui/textarea";
@@ -20,7 +20,7 @@ export type CodemanTextareaProps = Omit<
   required?: boolean;
   class?: string;
   textareaClass?: string;
-  /** Forward 到 textarea DOM 节点 (用于外部 .focus() 调用)。*/
+  
   ref?: HTMLTextAreaElement | ((el: HTMLTextAreaElement) => void);
 };
 

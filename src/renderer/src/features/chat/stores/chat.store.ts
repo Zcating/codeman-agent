@@ -1,6 +1,6 @@
-// 唯一响应式源: Solid `createStore<{ activeId, byId: Record<ConvId, ConversationState> }>`。
-// ConversationState = DB fields + messages + streamingMessageId + runtime。
-// UI 读 store.byId[activeId()].messages,Solid proxy 按路径细粒度反应式。
+
+
+
 
 import { createSignal, type Accessor } from "solid-js";
 import { createStore, produce } from "solid-js/store";
@@ -29,10 +29,10 @@ import { deriveLabelFromPath } from "@codeman-frontend/shared/lib/derive-label-f
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
 import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
 
-// ─── ConversationState 类型 (inline 在 chat.store) ──────
+
 
 export interface ConversationState {
-  // DB-backed fields
+  
   id: string;
   title: string;
   systemPrompt: string | null;
@@ -40,25 +40,25 @@ export interface ConversationState {
   createdAt: number;
   updatedAt: number;
   archivedAt: number | null;
-  // Per-conv reactive state
+  
   messages: Message[];
-  // 当前 turn 的 streaming stub id。`done`(per-turn)时清;`token`/`thinking`
-  // 首个 event 时 lazy-init。**不**是 UI running 状态的唯一信号 — 见 isAgentActive。
+  
+  
   streamingMessageId: string | null;
-  // V2.8: agent 整体是否仍在工作 (per-message 状态)。
-  // 与 streamingMessageId 拆开:多 turn 场景下 turn-1 done 后 stub 已被替换
-  // (streamingMessageId 须清,否则 turn-2 token 会 append 到 turn-1 消息),
-  // 但 agent 还在工作 (isAgentActive=true) → UI isRunning() 仍为 true,
-  // Send/Stop 按钮不抖动。仅 message_stop / error / cancel 清。
+  
+  
+  
+  
+  
   isAgentActive: boolean;
-  // Bug B: 上次 runtime error 的人读消息，null 表示无错误。
-  // 任何 send 成功（type:'done'）后清空。
+  
+  
   lastError: string | null;
-  // Per-conv runtime (createAgentRuntime 工厂产物)
+  
   runtime: AgentRuntime;
 }
 
-// ─── 单一响应式源: Solid createStore ──────────────────────────
+
 
 const [store, setStore] = createStore<{
   byId: Record<string, ConversationState>;
@@ -70,12 +70,12 @@ const [store, setStore] = createStore<{
 
 export { store, setStore };
 
-// ─── Accessors (for UI components) ─────────────────────────────
+
 
 const [conversations, setConversationsSignal] = createSignal<ConversationState[]>([]);
 export const conversations$: Accessor<ConversationState[]> = conversations;
 
-// ─── Workspace state ──────────────────────────────────────────
+
 
 const [workspaces, setWorkspacesSignal] = createSignal<Workspace[]>([]);
 export const workspaces$: Accessor<Workspace[]> = workspaces;
@@ -87,7 +87,7 @@ export function setSelectedWorkspaceId(id: string | null): void {
   setSelectedWorkspaceIdSignal(id);
 }
 
-// ─── setupConvState: 初始化 ConvState ────────────────────────
+
 
 export function setupConvState(conv: Conversation, history: Message[]): ConversationState {
   const runtime = createAgentRuntime();
@@ -106,15 +106,15 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
     runtime,
   };
   setStore("byId", conv.id, cs);
-  // 同步 conversations$ accessor
+  
   setConversationsSignal(Object.values(store.byId));
   return cs;
 }
 
-// ─── DB 持久化辅助 (Effect.fn) ───────────────────────────────
-//
-// 注意:必须 const + module-top,不能 function 声明 — sendMessage 在 line 110
-// 引用这俩,const 没有 hoisting,TDZ 会炸。
+
+
+
+
 
 const persistUserMessage = Effect.fn(
   function* (msg: Message) {
@@ -144,7 +144,7 @@ const persistAssistantMessage = Effect.fn(
   Effect.provide(MessageApiLive),
 );
 
-// ─── sendMessage: append user msg + run + subscribe ───────────
+
 
 export const sendMessage = Effect.fn(
   function* (convId: string, content: string, provider: ProviderConfig) {
@@ -153,7 +153,7 @@ export const sendMessage = Effect.fn(
       return;
     }
 
-    // 1. Append user message to local + DB
+    
     const userMsg: Message = {
       id: crypto.randomUUID(),
       conversationId: convId,
@@ -170,26 +170,26 @@ export const sendMessage = Effect.fn(
     setStore("byId", convId, "messages", (msgs) => [...msgs, userMsg]);
     yield* persistUserMessage(userMsg);
 
-    // mark agent as active BEFORE first event arrives. isAgentActive is
-    // the per-message running signal (cleared by message_stop / error / cancel).
-    // streamingMessageId is the per-turn stub id (cleared by done / cancel).
+    
+    
+    
     setStore("byId", convId, "isAgentActive", true);
 
-    // 2. Build context (浅拷贝,含最新 user msg)
+    
     const context = [...store.byId[convId]!.messages];
 
-    // 3. Augment system prompt with real workspaceId so the LLM uses the
-    //    UUID (not a hallucinated label/path it saw in the user message) when
-    //    calling file tools. Without this, LLM picks e.g. "miniMax-workspace"
-    //    (the workspace label derived from the folder name) and the IPC
-    //    write_file/read_file/etc. fails with "Workspace not found: <label>".
-    //    同时把 workspaceId 通过 ProviderConfig 传给 runtime,作为兜底 —
-    //    即使 LLM 没传 workspaceId(系统 prompt 是 hint,不是 contract),
-    //    `createFileTools(workspaceId)` 包装层会在 schema 校验后注入到 args。
-    //
-    // 同时附 enabled skills manifest。Runtime 会拼成
-    //    `<available_skills>...</available_skills>` 段注入 system prompt,
-    //    LLM 读 manifest 后主动 `_load_skill` 拉全文。
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     const enabledNames = appStore.state.value.enabledSkills ?? [];
     const enabledSkills: readonly SkillManifest[] = skillsManifests$().filter(
       (m) => enabledNames.includes(m.name),
@@ -211,7 +211,7 @@ export const sendMessage = Effect.fn(
       }
       : { ...provider, enabledSkills };
 
-    // 4. Run runtime + subscribe
+    
     const stream = cs.runtime.run({ context, provider: augmentedProvider });
     yield* Stream.runForEach(stream, (evt) =>
       Effect.sync(() => handleEvent(convId, evt)),
@@ -224,12 +224,12 @@ export const sendMessage = Effect.fn(
   ),
 );
 
-// ─── handleEvent: RuntimeEvent → setStore ─────────────────────
+
 
 function handleEvent(convId: string, evt: RuntimeEvent): void {
   switch (evt.type) {
     case "token": {
-      // 找或创建 streaming stub
+      
       const cs = store.byId[convId];
       if (!cs) {
         return;
@@ -258,7 +258,7 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
           " existingAssistantCount=" +
           (store.byId[convId]?.messages.filter((m) => m.role === "assistant").length ?? 0),
         );
-        // Notify sidebar re: streaming state change (triggers conversations$ update)
+        
         setConversationsSignal(Object.values(store.byId));
       }
       setStore("byId", convId, "messages", (msgs) =>
@@ -269,8 +269,8 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       break;
     }
     case "thinking": {
-      // thinking 在 text 之前可能到达,也可能没有 streaming stub — 也需要 lazy-init
-      // (因为 mock-server 的 'think' entry 第一个事件就是 thinking_delta,先于 text)。
+      
+      
       const cs = store.byId[convId];
       if (!cs) {
         return;
@@ -337,7 +337,7 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
     case "done": {
       const stubId = store.byId[convId]?.streamingMessageId;
       if (stubId) {
-        // Normal path: replace the streaming stub with the final message.
+        
         setStore("byId", convId, "messages", (msgs) =>
           msgs.map((m) => (m.id === stubId ? { ...evt.message, id: stubId } : m)),
         );
@@ -346,16 +346,16 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
           " content.length=" + (evt.message.content ?? "").length,
         );
       } else {
-        // Resilient path: no stubId (e.g. duplicate done event or no token events fired).
-        // Instead of blindly appending (which creates a duplicate assistant message),
-        // find the LAST assistant message and replace it. Do NOT replace if the
-        // existing message already has content AND the new message is empty — this
-        // prevents a duplicate done (from Agent emitting two turn_end events)
-        // from erasing correct content with an empty message.
+        
+        
+        
+        
+        
+        
         const msgs = store.byId[convId]?.messages ?? [];
-        // Walk backwards to find the last assistant message. Using
-        // `length - 1 - findIndex` would yield 0 (not -1) when msgs is empty,
-        // which would then access msgs[0] and throw "undefined.content".
+        
+        
+        
         let lastAsstIdx = -1;
         for (let i = msgs.length - 1; i >= 0; i--) {
           if (msgs[i]?.role === "assistant") {
@@ -367,7 +367,7 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
           const lastAsst = msgs[lastAsstIdx];
           const newContent = (evt.message.content ?? "").trim();
           const existingContent = (lastAsst.content ?? "").trim();
-          // Skip empty duplicate if the existing message is already non-empty.
+          
           if (newContent.length === 0 && existingContent.length > 0) {
             logger.debug("[chat.store/diag] done skip empty duplicate: lastAsstIdx=" + lastAsstIdx);
           } else {
@@ -386,13 +386,13 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
           );
         }
       }
-      // `done` 保留 stub 替换 + 内容累积 + 持久化。
-      // **清** streamingMessageId(否则 turn-2 的 token 会 append 到 turn-1 的
-      // finalized 消息 — stubId 仍指向 turn-1,`msgs.map(m => m.id === stubId ...)`
-      // 会命中 turn-1)。
-      // **不**碰 isAgentActive — agent 整体还在工作(可能还有 turn-2、turn-3)。
-      // 真正的 per-message 终止由 `message_stop` (在 `agent_end` 时 emit) 接管,
-      // 它会清 isAgentActive → isRunning() → Send/Stop 按钮恢复 Send。
+      
+      
+      
+      
+      
+      
+      
       setStore("byId", convId, "streamingMessageId", null);
       setConversationsSignal(Object.values(store.byId));
       Effect.runPromise(persistAssistantMessage({ ...evt.message, conversationId: convId })).catch((err) =>
@@ -401,18 +401,18 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       break;
     }
     case "message_stop": {
-      // per-message 终止信号(对应 agent_end)。清 isAgentActive +
-      // streamingMessageId → isRunning() → Send/Stop 按钮恢复 Send。
+      
+      
       setStore("byId", convId, "streamingMessageId", null);
       setStore("byId", convId, "isAgentActive", false);
       setConversationsSignal(Object.values(store.byId));
       break;
     }
     case "error":
-      // 不论 cancel 还是真实 LLM 错误,都从 error path 进来。
-      // 必须清 streamingMessageId + isAgentActive,否则 UI 永远 stuck in "running" 状态
-      // (Cancel 按钮不消失,Send 按钮不恢复 — e2e spec 09 D2 失败的原因)。
-      // Bug B: 同步写 lastError，UI 渲染红色 banner 提示用户 (而非静默)。
+      
+      
+      
+      
       logger.error("[chat.store] runtime error:", evt.error);
       setStore("byId", convId, "streamingMessageId", null);
       setStore("byId", convId, "isAgentActive", false);
@@ -422,16 +422,16 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
   }
 }
 
-// ─── cancel: 调 runtime.cancel() 中断 in-flight stream ───────
+
 
 export function cancel(convId: string): void {
-      // Bug B fix (e2e spec 09 D2): synchronously clear streamingMessageId + isAgentActive
-      // so the UI (chat-view's isRunning() + sidebar's isStreaming badge) sees the conv as
-      // non-streaming IMMEDIATELY after cancel(), without waiting for the error event to
-      // propagate through the Effect fiber. Without this, the textarea stays disabled for
-      // ~1 render frame between cancel() and the error event handler, causing D2
-      // ("Cancel → Send 按钮恢复") to flake in CI environments with slower Effect fiber
-      // scheduling. Also clear isAgentActive (the per-message running signal).
+      
+      
+      
+      
+      
+      
+      
   const cs = store.byId[convId];
   if (!cs) { return; }
   cs.runtime.cancel();
@@ -440,7 +440,7 @@ export function cancel(convId: string): void {
   setConversationsSignal(Object.values(store.byId));
 }
 
-// ─── archiveConversation: cancel + 从 store 移除 + DB archive ──
+
 
 export const archiveConversation = Effect.fn(
   function* (convId: string) {
@@ -453,7 +453,7 @@ export const archiveConversation = Effect.fn(
   Effect.provide(ConversationApiLive),
 );
 
-// ─── deleteConversation: cancel + 从 store 移除 + DB delete ───
+
 
 export const deleteConversation = Effect.fn(
   function* (convId: string) {
@@ -466,7 +466,7 @@ export const deleteConversation = Effect.fn(
   Effect.provide(ConversationApiLive),
 );
 
-// ─── renameConversation: 更新 title + 刷新 conversations$ ───────
+
 
 export const renameConversation = Effect.fn(
   function* (convId: string, newTitle: string) {
@@ -478,7 +478,7 @@ export const renameConversation = Effect.fn(
   Effect.provide(ConversationApiLive),
 );
 
-// ─── loadConversations: DB → byId ─────────────────────────────
+
 
 export const loadConversations = Effect.fn(
   function* (includeArchived: boolean = false) {
@@ -494,16 +494,9 @@ export const loadConversations = Effect.fn(
   Effect.provide(MessageApiLive),
 );
 
-// ─── createConversation: DB 新建 + setupConvState ─────────────
 
-/**
- * 创建新 Conversation 并绑定 workspace。
- *
- * @param workspaceId - 用户选定的 workspace id（V2.1 per-Conv binding）。
- *                       V1.x 迁移的旧 conv 才有 workspaceId='' ('Needs workspace')。
- * @param title - 会话标题
- * @param systemPrompt - 可选，覆盖 settings.system_prompt.default
- */
+
+
 export const createConversation = Effect.fn(
   function* (workspaceId: string, title: string, systemPrompt?: string) {
     const svc = yield* ConversationApi;
@@ -514,18 +507,9 @@ export const createConversation = Effect.fn(
   Effect.provide(ConversationApiLive),
 );
 
-// ─── createAndSendConversation: Home send flow ─────────────────
 
-/**
- * Home send flow:
- * 1. createConversation(workspaceId, title) → DB persist
- * 2. sendMessage(convId, firstMessage, provider) → LLM streaming
- *
- * @param workspaceId - 用户选定的 workspace id
- * @param title - 会话标题（from firstMessage.slice(0, 30)）
- * @param firstMessage - 用户输入的第一条消息
- * @param provider - ProviderConfig (与 sendMessage 同样的构造)
- */
+
+
 export function createAndSendConversation(
   workspaceId: string,
   title: string,
@@ -538,7 +522,7 @@ export function createAndSendConversation(
   });
 }
 
-// ─── Workspace CRUD (D8-W) ──────────────────────────────────────────
+
 
 export const pickWorkspacePath = Effect.fn(
   function* () {
@@ -554,13 +538,13 @@ export const loadWorkspaces = Effect.fn(
     const result = yield* svc.list();
     setStore("workspaces", result);
     setWorkspacesSignal(Object.values(store.workspaces));
-    // Bug-fix (2026-07): app startup with 1 persisted workspace leaves
-    // selectedWorkspaceId$ at null, so home.tsx's initialWorkspaceId() falls back
-    // to "" and HomeAgentForm's textarea stays permanently disabled. Mirror
-    // addWorkspace's pattern: if exactly 1 workspace exists and no current
-    // selection, auto-select that one. 0 workspaces: stay null (HomeAgentForm
-    // disabled by design, prompting user to add). 2+ workspaces: stay null so
-    // user picks via picker.
+    
+    
+    
+    
+    
+    
+    
     if (selectedWorkspaceId() === null && result.length === 1) {
       setSelectedWorkspaceIdSignal(result[0].id);
     }
@@ -587,7 +571,7 @@ export const removeWorkspace = Effect.fn(
   function* (id: string) {
     const svc = yield* WorkspaceService;
     yield* svc.remove(id);
-    // CASCADE deletes conversations with this workspaceId in SQLite
+    
     setStore("workspaces", (ws) => ws.filter((w) => w.id !== id));
     setWorkspacesSignal(Object.values(store.workspaces));
     if (selectedWorkspaceId() === id) { setSelectedWorkspaceIdSignal(null); }

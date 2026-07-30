@@ -1,4 +1,4 @@
-// Skill injector tests — ADR-0031 Wave A2.
+
 
 import { describe, it, expect } from "vitest";
 import { formatSkillsManifestSection } from "@codeman-frontend/plugins/skills/lib/skill-injector";

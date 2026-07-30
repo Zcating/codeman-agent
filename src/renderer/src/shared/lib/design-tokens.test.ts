@@ -14,7 +14,7 @@ describe("design-tokens", () => {
   });
 
   it("constants are typed as their inferred primitive types", () => {
-    // TS 类型推断: SIDEBAR_TRANSITION_MS: number, SIDEBAR_KEYBOARD_SHORTCUT: string
+    
     expect(typeof SIDEBAR_TRANSITION_MS).toBe("number");
     expect(typeof SIDEBAR_KEYBOARD_SHORTCUT).toBe("string");
   });

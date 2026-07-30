@@ -1,23 +1,6 @@
-// Encapsulates delete (inline-confirm) + rename (inline-edit-in-place).
-//
-/*
- * State machine:
- * ───────────────────────────────────────────────────────────────────────────
- *  Mode               │ Entry condition          │ Exit to idle        │ Exit to other
- * ────────────────────┼──────────────────────────┼─────────────────────┼────────────────
- *  idle               │ initial                 │ —                   │ click trash → confirming-delete
- *                     │                          │                     │ click pencil → editing
- * ────────────────────┼──────────────────────────┼─────────────────────┼────────────────
- *  confirming-delete  │ click Trash2 button     │ click 取消 → idle   │ click 删除 → idle (calls onDelete)
- *                     │                          │                     │ (no other exit)
- * ────────────────────┼──────────────────────────┼─────────────────────┼────────────────
- *  editing            │ click Pencil button     │ Enter (trim≠"")    │ click 取消 → idle
- *                     │                          │   → idle (calls     │ Escape → idle
- *                     │                          │   onRename)         │ blur → idle
- *                     │                          │ Enter (trim==="")   │
- *                     │                          │   → idle (no call)  │
- * ───────────────────────────────────────────────────────────────────────────
- */
+
+
+
 
 import { createSignal, Show, type JSX } from "solid-js";
 import { Loader2, Pencil, Trash2 } from "lucide-solid";
@@ -67,10 +50,8 @@ export function RowActions(props: RowActionsProps): JSX.Element {
 
   return (
     <>
-      {/* idle + editing: label row */}
-      {/* self-center: the parent SidebarMenuButton carries items-start (from
-          @ark-ui/solid AccordionTrigger className override); align-self:center
-          re-centers this row vertically within the parent flex button. */}
+      {}
+      {}
       <div
         class="flex w-full self-center items-center gap-2 min-w-0"
         classList={{
@@ -83,18 +64,12 @@ export function RowActions(props: RowActionsProps): JSX.Element {
             aria-label="streaming"
           />
         </Show>
-        {/* Label span is only shown in idle state — in editing mode the
-            InlineRenameInput replaces it (the input's initial value is the
-            label). Per user 2026-07-25: "点击 rename 后，只应该出现 <input>".
-            Without this guard the label and the input both render in the
-            same flex row, both with flex-1, competing for the same width
-            and showing the old label text behind/around the input. */}
+        {}
         <Show when={!isEditing()}>
           <span class="truncate flex-1 text-sm">{props.label}</span>
         </Show>
 
-        {/* idle: hover-revealed action buttons — text-muted-foreground base + hover:bg-sidebar-accent
-            (mirrors ConvDeleteAction pattern; ensures icon stays visible against sidebar bg/accent) */}
+        {}
         <Show when={!isEditing()}>
           <button
             type="button"
@@ -114,7 +89,7 @@ export function RowActions(props: RowActionsProps): JSX.Element {
           </button>
         </Show>
 
-        {/* editing: inline input */}
+        {}
         <Show when={isEditing()}>
           <InlineRenameInput
             initialLabel={props.label}
@@ -127,7 +102,7 @@ export function RowActions(props: RowActionsProps): JSX.Element {
         </Show>
       </div>
 
-      {/* confirming-delete overlay */}
+      {}
       <Show when={isConfirming()}>
         <div
           data-state="confirming"
@@ -179,14 +154,14 @@ function InlineRenameInput(props: InlineRenameInputProps): JSX.Element {
   };
 
   const handleBlur = () => {
-    // blur cancels without saving
+    
     props.onCancel();
   };
 
   const handleInputRef = (el: HTMLInputElement) => {
     el.focus();
     el.setSelectionRange(0, el.value.length);
-    // Dispatch 'focus' event so jsdom picks up the selection
+    
     el.dispatchEvent(new Event("focus", { bubbles: true }));
   };
 

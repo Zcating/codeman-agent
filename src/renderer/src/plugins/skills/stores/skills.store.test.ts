@@ -1,4 +1,4 @@
-// Skills store tests — ADR-0031 Wave A2.
+
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { Effect, Layer } from "effect";
@@ -91,7 +91,7 @@ describe("skills store", () => {
 
 			yield* initializeSkillsManifests().pipe(Effect.provide(failingLayer));
 
-			// State should remain unchanged after failure
+			
 			expect(skillsManifests$()).toEqual(SAMPLE);
 		}),
 	);

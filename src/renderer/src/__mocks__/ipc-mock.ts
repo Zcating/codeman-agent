@@ -1,13 +1,13 @@
-//! V3 IPC mock — used by Effect service tests and jsdom test environment.
-//! Sets up `window.codeman` and exports `mockState` for test state control.
-//! (Replaces src/__mocks__/@tauri-apps/api/core.ts post-migration.)
-//!
-//! V1.5+ schema: Settings.providers[] (llm only — billing removed V2)
-//! V0 schema: Settings.llm_providers[] (legacy, migrated on read)
+
+
+
+
+
+
 
 import { vi } from "vitest";
 
-// ─── V1.5+ Types ───────────────────────────────────────────────
+
 
 export interface ModelMeta {
   id: string;
@@ -34,7 +34,7 @@ export interface Provider {
   llm: ProviderLlm;
 }
 
-// V1.5+ Settings shape
+
 export interface SettingsV15 {
   providers: Provider[];
   schemaVersion: "1.5";
@@ -50,7 +50,7 @@ export interface SettingsV15 {
   };
   systemPrompt: { default: string; userCanEdit: boolean };
   conversations: { autoArchiveAfterDays: number; maxHistory: number };
-  // V0 legacy field (cleared after migration, mirrors Rust behavior)
+  
   llmProviders: Array<{
     id: string;
     label: string;
@@ -60,7 +60,7 @@ export interface SettingsV15 {
     apiType: "anthropic-messages";
     apiKeyRef: string;
   }>;
-  // V2: workspaces (added in ADR-0013)
+  
   workspaces?: Array<{
     id: string;
     label: string;
@@ -69,7 +69,7 @@ export interface SettingsV15 {
   }>;
 }
 
-// V0 Settings shape (for migration testing)
+
 export interface SettingsV0 {
   schemaVersion?: string;
   llmProviders: Array<{
@@ -95,7 +95,7 @@ export interface SettingsV0 {
   conversations: { autoArchiveAfterDays: number; maxHistory: number };
 }
 
-// ─── Mock Factory ───────────────────────────────────────────────
+
 
 export const mockProvider = (
   overrides: Partial<Provider> & { id: string; label: string },
@@ -166,41 +166,41 @@ const defaultSettingsV15: SettingsV15 = {
   },
   systemPrompt: { default: "You are a helpful assistant.", userCanEdit: true },
   conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
-  // V0 legacy field (empty for V1.5 default)
+  
   llmProviders: [],
 };
 
-// ─── Mock State ────────────────────────────────────────────────
+
 
 export const mockState = {
   resolved: undefined as unknown,
   rejected: undefined as Error | undefined,
   calls: [] as string[],
-  // TDD 增强：跟踪每次 IPC 调用的 (command, args) 用于桥接函数参数断言。
-  // 增量为追加数组，每条 = `{ name, args }`；旧 `calls` 保留向后兼容。
+  
+  
   callArgs: [] as Array<{ name: string; args: Record<string, unknown> | undefined }>,
-  // Captures full invoke calls: { name, args }
+  
   invokeCalls: [] as { name: string; args?: Record<string, unknown> }[],
-  // V1.5+ settings store
+  
   settings: { ...defaultSettingsV15 } as SettingsV15,
-  // ADR-0015: store is retained for test backward compat only.
-  // New code should read api_key from settings.providers[i].api_key.
-  // Legacy tests reading from store still work; new tests should NOT use it.
+  
+  
+  
   store: {} as Record<string, Record<string, string>>,
-  // V0 migration flag
+  
   v0FixtureActive: false,
-  // Command-specific resolved override: when set, only applies to specific commands
-  // while the general resolved still applies to all commands.
-  // This allows tests to override return values for specific commands without
-  // affecting get_settings (which needs to return full settings for provider validation).
+  
+  
+  
+  
   resolvedByCommand: {} as Record<string, unknown>,
-  // QA table for file-tools feature
+  
   qaTable: [] as Array<{ question: string; answer: string; default?: boolean }>,
 };
 
-// ─── V0 → V1.5 Migration ───────────────────────────────────────
 
-// Default MiniMax provider for V0.5 fresh install
+
+
 const DEFAULT_MINIMAX_PROVIDER: Provider = {
   id: "minimax",
   label: "MiniMax",
@@ -225,7 +225,7 @@ const DEFAULT_MINIMAX_PROVIDER: Provider = {
 };
 
 function migrateV0toV15(v0: SettingsV0): SettingsV15 {
-  // V0.5 detection: empty llm_providers → fresh install, pre-fill MiniMax
+  
   if (v0.llmProviders.length === 0) {
     return {
       providers: [DEFAULT_MINIMAX_PROVIDER],
@@ -243,7 +243,7 @@ function migrateV0toV15(v0: SettingsV0): SettingsV15 {
 
   const providers: Provider[] = [];
 
-  // Migrate each LLM provider
+  
   for (const llm of v0.llmProviders) {
     providers.push({
       id: llm.id,
@@ -270,19 +270,19 @@ function migrateV0toV15(v0: SettingsV0): SettingsV15 {
     window: v0.window,
     systemPrompt: v0.systemPrompt,
     conversations: v0.conversations,
-    // V0 legacy field cleared after migration (mirrors Rust behavior)
+    
     llmProviders: [],
   };
 }
 
-// ─── IPC Command Handlers ───────────────────────────────────────
+
 
 type IPCCommand = string;
 type IPCArgs = Record<string, unknown> | undefined;
 
 const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
   getSettings(): unknown {
-    // If V0 fixture is active, migrate on read
+    
     if (mockState.v0FixtureActive) {
       const v0Settings = mockState.resolved as SettingsV0 | undefined;
       if (v0Settings && !v0Settings.schemaVersion) {
@@ -295,11 +295,11 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
   updateSettings(args?: IPCArgs): unknown {
     const newSettings = args?.newSettings as Partial<SettingsV15> | undefined;
     if (newSettings) {
-      // Merge with existing settings
+      
       mockState.settings = {
         ...mockState.settings,
         ...newSettings,
-        // Always preserve schemaVersion
+        
         schemaVersion: "1.5",
       };
     }
@@ -307,24 +307,24 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
   },
 
   clearAllHistory(): void {
-    // No-op in mock
+    
   },
 
   deleteProvider(): unknown {
-    // No-op in mock (backend may not implement this yet)
+    
     return undefined;
   },
 
   fetchModels(args?: IPCArgs): unknown {
-    // Returns current models from settings for the given provider
+    
     const providerId = args?.providerId as string;
     const provider = mockState.settings.providers.find((p) => p.id === providerId);
     return provider?.llm.models ?? [];
   },
 
-  // ─── V2 File IO (ADR-0013) ───────────────────────────────────
-  // Mock handlers for file_tools service; tests set mockState.resolved
-  // to control return value, or mockState.rejected to simulate errors.
+  
+  
+  
   readFile(): unknown {
     return mockState.resolved;
   },
@@ -345,9 +345,9 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
     return mockState.resolved;
   },
 
-  // ─── Conversation IPC (ADR-0013) ─────────────────────────────────
+  
   listConversations(_args?: IPCArgs): unknown {
-    // Return empty array by default; tests can override via mockState.resolved
+    
     return mockState.resolved ?? [];
   },
 
@@ -379,7 +379,7 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
     return mockState.resolved ?? undefined;
   },
 
-  // ─── Message IPC (ADR-0013) ─────────────────────────────────────
+  
   listMessages(_args?: IPCArgs): unknown {
     return mockState.resolved ?? [];
   },
@@ -392,17 +392,17 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
     return mockState.resolved ?? [];
   },
 
-  // ─── Workspace IPC ──────────────────────────────────────────────
+  
   pickWorkspacePath(): unknown {
     return mockState.resolved ?? null;
   },
 
-  // ─── QA Table IPC ───────────────────────────────────────────────
+  
   qaGetTable(_args?: IPCArgs): unknown {
     return mockState.qaTable ?? [];
   },
 
-  // ─── Skills plugin IPC (ADR-0031) ──────────────────────────────────
+  
   skillsScan(_args?: IPCArgs): unknown {
     return mockState.resolved ?? [];
   },
@@ -411,7 +411,7 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
     return mockState.resolved ?? "";
   },
 
-  // ─── MCP plugin IPC (ADR-0032) ─────────────────────────────────────
+  
   "mcp:list-servers"(_args?: IPCArgs): unknown {
     return mockState.resolved ?? [];
   },
@@ -441,7 +441,7 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
   },
 };
 
-// ─── Invoke Mock ────────────────────────────────────────────────
+
 
 export const invoke: (name: string, args?: IPCArgs) => Promise<unknown> = vi.fn().mockImplementation((name: string, args?: IPCArgs) => {
   mockState.calls.push(name);
@@ -452,15 +452,15 @@ export const invoke: (name: string, args?: IPCArgs) => Promise<unknown> = vi.fn(
     return Promise.reject(mockState.rejected);
   }
 
-  // Command-specific resolved override: takes precedence over general resolved.
-  // Allows tests to override specific commands without affecting get_settings.
+  
+  
   if (mockState.resolvedByCommand[name] !== undefined && !mockState.v0FixtureActive) {
     return Promise.resolve(mockState.resolvedByCommand[name]);
   }
 
-  // Backward compatibility: if mockState.resolved is set AND v0FixtureActive is false,
-  // return it directly. This preserves existing test behavior where tests set mockState.resolved.
-  // But if v0FixtureActive is true, we need to run the handler to apply migration.
+  
+  
+  
   if (mockState.resolved !== undefined && !mockState.v0FixtureActive) {
     return Promise.resolve(mockState.resolved);
   }
@@ -485,18 +485,18 @@ export const invoke: (name: string, args?: IPCArgs) => Promise<unknown> = vi.fn(
 export { invoke as TauriInvoke };
 export default { invoke } as { invoke: (name: string, args?: IPCArgs) => Promise<unknown> };
 
-// ─── V3: window.codeman Mock ───────────────────────────────────
-//
-// ipc.ts dispatches via `window.codeman.<method>` (set by src/preload).
-// This mock mirrors every command in `commandHandlers` as a method on
-// `window.codeman`, so V3 ipc.ts finds the mock at runtime in jsdom tests.
+
+
+
+
+
 
 function buildCodemanMock(): Record<string, unknown> {
-  // V3.2 IPC contract: every method on window.codeman takes a single
-  // args object (or no args). The mock just passes that object through
-  // to the V2 `invoke` recorder, so `mockState.callArgs` /
-  // `mockState.invokeCalls` / `commandHandlers` continue to work
-  // unchanged. No positional-args reconstruction needed.
+  
+  
+  
+  
+  
   const methodToCmd: Record<string, { cmd: string }> = {
     getSettings: { cmd: "getSettings" },
     updateSettings: { cmd: "updateSettings" },
@@ -537,19 +537,19 @@ function buildCodemanMock(): Record<string, unknown> {
   for (const [method, mapping] of Object.entries(methodToCmd)) {
     codeman[method] = (args?: unknown) => invoke(mapping.cmd, args as Record<string, unknown> | undefined);
   }
-  // Native shims (no IPC handler — return resolved Promise for tests).
+  
   codeman.notify = () => Promise.resolve();
   codeman.openExternal = () => Promise.resolve();
   codeman.setLoginItem = () => Promise.resolve();
   codeman.getLogPath = () => Promise.resolve("/tmp/codeman.log");
-  // Streaming — return unsubscribe fn.
+  
   codeman.onStreamChunk = () => () => {};
   return codeman;
 }
 
-// Install window.codeman on the global (jsdom). Skip if window absent
-// (e.g. running in pure Node). Use Object.defineProperty to make it
-// writable so tests can swap the codeman object via `window.codeman = ...`.
+
+
+
 if (typeof window !== "undefined") {
   Object.defineProperty(window, "codeman", {
     value: buildCodemanMock(),

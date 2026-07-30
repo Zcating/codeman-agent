@@ -1,12 +1,12 @@
-// 替代之前的 AnthropicTransport 类。pi-agent-core 0.80.3 重构后,
-// Agent 不再接受 AgentTransport (自己跑 agent loop),改为接受 streamFn
-// (只负责单次 LLM 调用,agent loop / 工具执行 / abort 都由 Agent 内部处理)。
-//
-// 重要 CORS 行为:
-//   ProviderTransport 走 pi-ai 的 anthropic provider → Anthropic SDK → 发
-//   `x-api-key` header,在 `api.minimaxi.com` CORS preflight whitelist 之外,
-//   webview fetch 报 TypeError。Authorization header 在 whitelist 里,
-//   所以这里走 `Authorization: Bearer` 路径。
+
+
+
+
+
+
+
+
+
 
 import {
     createAssistantMessageEventStream,
@@ -89,8 +89,8 @@ export function buildAnthropicRequestBody(
             if (typeof content === "string") {
                 anthropicMessages.push({ role: "user", content });
             } else {
-                // 把 TextContent[] 拼回纯文本(Anthropic API 也接受 array
-                // 形式,但 codeman-agent 的 user message 通常是纯文本)
+                
+                
                 const text = content
                     .filter((b): b is TextContent => b.type === "text")
                     .map((b) => b.text)
@@ -113,7 +113,7 @@ export function buildAnthropicRequestBody(
                         input: block.arguments as Record<string, unknown>,
                     });
                 }
-                // thinking blocks 不回传给 Anthropic(provider 自身不消费)
+                
             }
             if (blocks.length > 0) {
                 anthropicMessages.push({ role: "assistant", content: blocks });
@@ -131,14 +131,14 @@ export function buildAnthropicRequestBody(
                 is_error: trMsg.isError,
             };
 
-            // G33 fix: Anthropic API 协议要求 assistant(tool_use A, B, ...) 的
-            // 所有 tool_result 必须 batch 进紧跟的**同一个** user message。如果拆成
-            // 多个 user message,第二个 tool_result 的 tool_use 不在 immediate
-            // preceding assistant,API 400 "tool call result does not follow tool
-            // call (2013)"。
-            // 触发: 1 turn N 个并行 tool_use (e.g. read_file + search_files 并行)
-            // → handleTurnEnd 聚合到 assistant.toolResults → toPiMessages 拆 N 个
-            // ToolResultMessage → 这里必须 batch。
+            
+            
+            
+            
+            
+            
+            
+            
             const lastMsg = anthropicMessages[anthropicMessages.length - 1];
             if (
                 lastMsg &&
@@ -173,11 +173,7 @@ export function buildAnthropicRequestBody(
     };
 }
 
-/**
- * pi-agent-core 0.80.3 的 streamFn:把 pi-ai Context 转成 Anthropic SSE,
- * emit AssistantMessageEvent。Agent 内部处理 abort / agent loop /
- * 工具执行。
- */
+
 export const anthropicStream: StreamFn = (model, context, options) => {
     const stream = createAssistantMessageEventStream();
     void runAnthropicStream(model, context, options ?? {}, stream);
@@ -205,11 +201,11 @@ async function runAnthropicStream(
         context.tools,
     );
 
-    // dump the actual Anthropic-format messages array on every request.
-    // 帮助 debug "tool call result does not follow tool call (2013)" — 直接看到
-    // 发到 API 的 messages 序列。Api key 不在这条 log (Authorization 在 header,
-    // 不在 body 里),只是 messages JSON。失败时 dump 出来给 Anthropic support
-    // ticket 也能用。
+    
+    
+    
+    
+    
     logger.info("[anthropicStream]   body_messages", {
         msgCount: body.messages.length,
         messages: body.messages.map((m) => {
@@ -259,10 +255,10 @@ async function runAnthropicStream(
     try {
         response = await fetch(url, {
             method: "POST",
-            // 不发送 `anthropic-version` header — 不在 api.minimaxi.com 的 CORS
-            // preflight whitelist 里,会导致浏览器直接 block 请求。Anthropic SDK
-            // 默认带这个 header(2.x 版本要求),但 MiniMax 兼容端点不强校验,
-            // 省略反而能 work。`accept` 也不带(streaming SSE 一样能读)。
+            
+            
+            
+            
             headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${apiKey}`,
@@ -295,7 +291,7 @@ async function runAnthropicStream(
 
     try {
         const finalMessage = await parseSseStream(response.body, model, signal, stream);
-        // success — push done event to terminate stream
+        
         const reason: Extract<StopReason, "stop" | "length" | "toolUse"> =
             finalMessage.stopReason === "length"
                 ? "length"
@@ -396,14 +392,14 @@ export async function parseSseStream(
     const reader = body.getReader();
     const decoder = new TextDecoder("utf-8");
 
-    // Mutable partial state for the assistant message being built.
+    
     const content: Array<TextContent | ThinkingContent | ToolCall> = [];
     let stopReason: StopReason = "stop";
     let accUsage: Usage = emptyUsage();
 
     let buffer = "";
     let sseDataBuf = "";
-    let sseRawBody = ""; // accumulated across all reader.read() chunks — dump target
+    let sseRawBody = ""; 
     let currentBlockType: "text" | "thinking" | "tool_use" | null = null;
     let pendingToolCallJson = "";
     let pendingToolCallId = "";
@@ -426,8 +422,8 @@ export async function parseSseStream(
 
     try {
         while (true) {
-            // 显式检查 abort signal — 在 reader.read() 之前快速退出,避免无用的
-            // chunk 解析;Agent 的 abort() 会触发这里的 signal。
+            
+            
             if (signal?.aborted) {
                 logger.warn("[anthropicStream] parseSseStream aborted", {
                     currentBlockType,
@@ -441,7 +437,7 @@ export async function parseSseStream(
             }
             const chunk = decoder.decode(value, { stream: true });
             buffer += chunk;
-            sseRawBody += chunk; // capture raw wire bytes
+            sseRawBody += chunk; 
             logger.info("[anthropicStream]   sse_chunk_in", {
                 bytes: value.length,
                 textPreview: buffer.slice(-500),
@@ -517,9 +513,9 @@ export async function parseSseStream(
                             partial_json?: string;
                         };
                         if (delta.type === "text_delta" && delta.text) {
-                            // LENIENT: real Anthropic emits content_block_start before the first
-                            // delta, but mock-server + some test fixtures skip it. Auto-init the
-                            // block so we do not TypeError on undefined access.
+                            
+                            
+                            
                             if (!content[idx]) {
                                 content[idx] = { type: "text", text: "" };
                                 currentBlockType = "text";
@@ -534,7 +530,7 @@ export async function parseSseStream(
                                 partial: snapshot(),
                             });
                         } else if (delta.type === "thinking_delta" && delta.thinking) {
-                            // LENIENT (mirror text branch).
+                            
                             if (!content[idx]) {
                                 content[idx] = { type: "thinking", thinking: "" };
                                 currentBlockType = "thinking";
@@ -621,8 +617,8 @@ export async function parseSseStream(
                             };
                         }
                     }
-                    // message_start and message_stop 不需要额外处理
-                    // (initial partial 已在 start 事件发过,final end 由调用方 push done)
+                    
+                    
                 } else {
                     const parsed = parseSseLine(line);
                     if (parsed.event !== undefined || parsed.data !== undefined) {
@@ -647,11 +643,11 @@ export async function parseSseStream(
         rawTruncated: sseRawBody.length > 5000,
     });
 
-    // Aborted 优先于 stopReason — reader loop 退出时若 signal 已被 abort,
-    // 返回 aborted message 而非不完整的 stop
-    // BUG FIX: 如果已经有累积的 content（已经从 SSE 流完全读取），即使 signal
-    // 已 abort 也应该返回这些 content，而不是 makeAbortedMessage(content: [])。
-    // 只有在 content 为空时才返回 makeAbortedMessage（真正没有任何内容可返回）。
+    
+    
+    
+    
+    
     if (signal?.aborted && content.length === 0) {
         return makeAbortedMessage(model);
     }

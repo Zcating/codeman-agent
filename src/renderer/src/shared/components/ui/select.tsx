@@ -1,4 +1,4 @@
-//! Select — 9 atoms 1:1 .repos/shadcn. Solid 适配.
+
 
 import type { JSX } from "solid-js";
 import { createSignal, onCleanup, onMount, splitProps } from "solid-js";
@@ -104,9 +104,9 @@ export function SelectItem(props: SelectPrimitive.ItemProps) {
     <SelectPrimitive.Item
       data-slot="select-item"
       class={cn(
-        // hover:bg-accent mirrors focus:bg-accent (2026-07-26): both keyboard
-        // and mouse users see the same visual feedback on the active option.
-        // Previously only focus was styled, leaving mouse hover visually inert.
+        
+        
+        
         "relative flex w-full cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:hover:**:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2",
         local.class,
       )}
@@ -148,7 +148,7 @@ export function SelectScrollUpButton(props: JSX.HTMLAttributes<HTMLDivElement>) 
     if (!content) return;
     const update = () => setHidden(content.scrollTop <= 1);
     update();
-    // Recheck after layout settles (size may not be stable on first mount).
+    
     requestAnimationFrame(update);
     content.addEventListener("scroll", update, { passive: true });
     onCleanup(() => content.removeEventListener("scroll", update));

@@ -1,13 +1,13 @@
-// 设计要点:
-// - 内部用 `CodemanTextarea`(IME-safe),不绕过。
-// - `autoFocus={false}` / `restoreFocus={false}` / `closeOnInteractOutside={false}`
-//   三个 ark-ui prop 透传给内部 `<Popover>`,保留 textarea 焦点 + 自管关闭路径。
-// - `userDismissed` 信号:一旦显式关闭(选 / Esc / Ctrl+/ 之外的关闭),菜单
-//   持续关闭直至输入框中所有 `/` 被 backspace 清空。下一次 `/` 由 deriveTrigger
-//   自然触发,无需手动 reset。
-// - Ctrl/Cmd+/:忽略 IME,显式强制重开(即便 userDismissed=true)。
-// - Enter:菜单开着 → 选中并关闭 + userDismissed=true;菜单关着 →
-//   不 preventDefault,原生表单 submit 透传(由外层 `<form onSubmit>` 接管)。
+
+
+
+
+
+
+
+
+
+
 
 import {
   createSignal,
@@ -27,44 +27,38 @@ import { CodemanTextarea } from "@codeman-frontend/shared/components/internal/co
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
 export interface ComboTextareaProps {
-  /** Controlled textarea value (from form.Field / signal). */
+  
   value: string;
-  /** Called whenever the textarea value changes (IME-safe). */
+  
   onChange: (value: string) => void;
-  /** Skill candidates to show when menu is open. Filtering is the caller's job. */
+  
   skills: readonly SkillManifest[];
-  /** Textarea placeholder. */
+  
   placeholder?: string;
-  /** Number of visible rows. */
+  
   rows?: number;
-  /** Disable textarea (e.g. while sending). */
+  
   disabled?: boolean;
-  /** Error message rendered below textarea (per CodemanTextarea). */
+  
   error?: import("solid-js").JSX.Element;
-  /** Forward to the textarea DOM node (external .focus() / setSelectionRange). */
+  
   ref?: HTMLTextAreaElement | ((el: HTMLTextAreaElement) => void);
-  /** Accessible id for the textarea + label pairing. */
+  
   id?: string;
-  /** Optional class for the outer wrapper. */
+  
   class?: string;
-  /** Forward to the textarea DOM node (test selectors). */
+  
   "data-testid"?: string;
-  /**
-   * Caller-supplied keydown handler. ComboTextarea's own menu-handling logic
-   * runs FIRST (intercepting `/`, Ctrl+/, ArrowUp/Down/Enter/Esc when menu is
-   * open). This handler runs unconditionally afterwards — useful for chat-view's
-   * input history (ArrowUp/Down when menu closed) and Ctrl+Enter (form submit).
-   * ComboTextarea will not call this if it already preventDefault'd.
-   */
+  
   onKeyDown?: (e: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) => void;
 }
 
 interface TriggerState {
-  /** Position of the `/` in the textarea value */
+  
   slashPosition: number;
-  /** Everything after the `/` */
+  
   query: string;
-  /** Fresh rect of the textarea at time of last trigger set */
+  
   rect: DOMRect | null;
 }
 
@@ -151,25 +145,25 @@ function SlashMenuItem(props: SlashMenuItemProps): JSX.Element {
 }
 
 export function ComboTextarea(props: ComboTextareaProps): JSX.Element {
-  // State
+  
   const [triggerSignal, setTriggerSignal] = createSignal<TriggerState | null>(null);
   const [userDismissed, setUserDismissed] = createSignal(false);
   const [highlightedIndex, setHighlightedIndex] = createSignal(0);
 
-  // Refs
+  
   let textareaEl: HTMLTextAreaElement | null = null;
   let wrapperEl: HTMLDivElement | undefined;
   let anchorEl: HTMLDivElement | undefined;
 
-  // Auto-reset userDismissed when the user backspaces the `/` out of the input
-  // — they have to type `/` again to reopen the menu.
+  
+  
   createEffect(() => {
     if (userDismissed() && props.value.lastIndexOf("/") === -1) {
       setUserDismissed(false);
     }
   });
 
-  // deriveTrigger recalculates when value changes (user typed `/`)
+  
   const deriveTrigger = createMemo((): TriggerState | null => {
     const val = props.value;
     const pos = val.lastIndexOf("/");
@@ -182,8 +176,8 @@ export function ComboTextarea(props: ComboTextareaProps): JSX.Element {
     };
   });
 
-  // trigger = explicit Ctrl+/ signal if set, otherwise derived from value.
-  // Returns null when userDismissed is true (user explicitly closed the menu).
+  
+  
   const trigger = createMemo((): TriggerState | null => {
     if (userDismissed()) {return null;}
     const explicit = triggerSignal();
@@ -191,7 +185,7 @@ export function ComboTextarea(props: ComboTextareaProps): JSX.Element {
     return deriveTrigger();
   });
 
-  // Filtered candidates (memoised so highlight stays consistent)
+  
   const filteredSkills = createMemo(() => {
     const q = trigger()?.query ?? "";
     if (!q) {return [...props.skills];}
@@ -199,23 +193,23 @@ export function ComboTextarea(props: ComboTextareaProps): JSX.Element {
     return props.skills.filter((s) => s.name.toLowerCase().includes(lower));
   });
 
-  // Reset highlight on filter change
+  
   createEffect(() => {
     void filteredSkills();
     setHighlightedIndex(0);
   });
 
-  // Anchor rect — re-read on scroll/resize via Popover's positioning.getAnchorRect.
+  
   const getAnchorRect = () => textareaEl?.getBoundingClientRect() ?? null;
 
-  // Keyboard handler on textarea — let `/` through (browser inserts it, value
-  // change triggers deriveTrigger). Only intercept navigation keys when menu open.
-  // Caller's onKeyDown fires for keys we don't intercept.
+  
+  
+  
   const handleKeyDown = (e: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) => {
     let intercepted = false;
 
-    // Ctrl+/ or Cmd+/ — open menu without inserting `/`. Re-opens even after
-    // the user explicitly dismissed (userDismissed = true).
+    
+    
     if ((e.ctrlKey || e.metaKey) && e.key === "/") {
       e.preventDefault();
       intercepted = true;
@@ -258,12 +252,12 @@ export function ComboTextarea(props: ComboTextareaProps): JSX.Element {
       }
     }
 
-    // Caller's handler always runs (covers Ctrl+Enter submit, ArrowUp/Down
-    // input history when menu closed, IME composition, etc.).
+    
+    
     props.onKeyDown?.(e);
 
-    // Suppress unused-warning — `intercepted` is read for clarity but the
-    // caller's handler still fires (it's the caller's job to check e.defaultPrevented).
+    
+    
     void intercepted;
   };
 
@@ -276,9 +270,9 @@ export function ComboTextarea(props: ComboTextareaProps): JSX.Element {
       props.value.slice(t.slashPosition + 1 + t.query.length);
     props.onChange(newValue);
     setHighlightedIndex(0);
-    // Close after selection: the next `/` (if the user wants another skill)
-    // must be typed fresh — otherwise deriveTrigger would immediately re-open
-    // the menu with the just-selected skill's name as the query.
+    
+    
+    
     handleClose();
   };
 
@@ -308,8 +302,8 @@ export function ComboTextarea(props: ComboTextareaProps): JSX.Element {
             if (typeof props.ref === "function") {
               props.ref(el);
             } else if (props.ref !== undefined) {
-              // Caller passed a ref object — assignment is the caller's responsibility
-              // outside this component (we only forward via the function form).
+              
+              
             }
           }}
           onKeyDown={handleKeyDown}
@@ -339,11 +333,11 @@ export function ComboTextarea(props: ComboTextareaProps): JSX.Element {
             style={{
               width: `${wrapperEl?.getBoundingClientRect().width ?? 0}px`,
               height: `${POPOVER_HEIGHT}px`,
-              // Cap the popover to the viewport space the positioner actually
-              // has — ark-ui sets `--available-height` on the positioner and
-              // it cascades here. Without this cap, the 320px preferred height
-              // overflows and gets clipped when the textarea sits near the top
-              // of a short window (e.g. `--available-height: 273px`).
+              
+              
+              
+              
+              
               "max-height": `var(--available-height, ${POPOVER_HEIGHT}px)`,
             }}
           >

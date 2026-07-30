@@ -1,8 +1,8 @@
-// Rule: **UI 组件（`components/*.tsx`）禁止导入 `effect`**.
-// ChatSidebar is a UI component and previously called `Effect.runPromiseExit`
-// directly. This module is the seam: it imports `effect` (allowed — it's a
-// lib/, not a component) and exposes Promise-returning functions that the
-// UI can call without importing `effect`.
+
+
+
+
+
 
 import { Effect } from "effect";
 import {

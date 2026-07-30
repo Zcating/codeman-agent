@@ -1,4 +1,4 @@
-// MCP store tests — ADR-0032 Phase B mini-4.
+
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { Effect, Layer } from "effect";
@@ -84,7 +84,7 @@ describe("mcp store", () => {
 
     itEffect("initializeMcp 失败时 prior state 保持不变", () =>
       Effect.gen(function* () {
-        // Pre-populate signals with existing data
+        
         const existingServers: McpServerInfo[] = [
           {
             config: { name: "existing-server", command: "npx", args: [], enabled: true },
@@ -102,7 +102,7 @@ describe("mcp store", () => {
           },
         ];
 
-        // First, set up initial state with a success layer
+        
         const initialLayer = Layer.succeed(McpApi, {
           listServers: () => Effect.succeed(existingServers),
           getTools: () => Effect.succeed([]),
@@ -118,7 +118,7 @@ describe("mcp store", () => {
         expect(mcpServers$()).toEqual(existingServers);
         expect(mcpAllTools$()).toEqual(existingTools);
 
-        // Now simulate failure
+        
         const failingLayer = Layer.succeed(McpApi, {
           listServers: () => Effect.fail(new Unknown({ message: "MCP service unavailable" })),
           getTools: () => Effect.succeed([]),
@@ -134,7 +134,7 @@ describe("mcp store", () => {
 
         yield* initializeMcp().pipe(Effect.provide(failingLayer));
 
-        // State should remain unchanged
+        
         expect(mcpServers$()).toBe(priorServers);
         expect(mcpAllTools$()).toBe(priorTools);
       }),
@@ -143,13 +143,13 @@ describe("mcp store", () => {
     itEffect("initializeMcp 返回的 Effect<void, AppError> 兼容 registry descriptor", () =>
       Effect.gen(function* () {
         const program = initializeMcp();
-        // Effect should be a valid Effect instance
+        
         expect(program).toBeDefined();
         expect(typeof program).toBe("object");
-        // Should be runnable (has pipe method like all Effects)
+        
         expect(program).toHaveProperty("pipe");
 
-        // Verify it can be provided with a layer and runs
+        
         const mockLayer = Layer.succeed(McpApi, {
           listServers: () => Effect.succeed([]),
           getTools: () => Effect.succeed([]),
@@ -162,7 +162,7 @@ describe("mcp store", () => {
 
         const result = yield* program.pipe(Effect.provide(mockLayer), Effect.exit);
         expect(result._tag).toBe("Success");
-        // Compile-time proof: success value must be void (undefined)
+        
         if (result._tag === "Success") {
           expect(result.value).toBeUndefined();
         }

@@ -1,13 +1,13 @@
-//! parseModelsApiResponse — pure parser unit tests.
+
 
 import { describe, it, expect } from "vitest";
 import { parseModelsApiResponse } from "@codeman-frontend/shared/lib/parse-models-api-response";
 
 describe("parseModelsApiResponse", () => {
-  // Real MiniMax /v1/models response shape (verified 2026-07-15):
-  // only `id/object/created/owned_by`; no `name` field at all.
-  // Regression: before this helper, `m.name` was undefined → label rendered
-  // empty in the dropdown. Now falls back to `id`.
+  
+  
+  
+  
   it("parses MiniMax-style response (id only, no name) → label falls back to id", () => {
     const response = {
       object: "list",
@@ -43,7 +43,7 @@ describe("parseModelsApiResponse", () => {
     ]);
   });
 
-  // OpenAI / Anthropic-some-providers returns `name` as the human-readable label.
+  
   it("uses `name` as label when present", () => {
     const response = {
       object: "list",
@@ -68,19 +68,19 @@ describe("parseModelsApiResponse", () => {
     ]);
   });
 
-  // `context_window` is optional — preserve when present, omit when absent.
+  
   it("preserves context_window when provided as a finite number", () => {
     const response = {
       data: [
         { id: "m1", name: "M1", context_window: 128_000 },
-        { id: "m2", name: "M2" }, // no context_window
+        { id: "m2", name: "M2" }, 
       ],
     };
     const models = parseModelsApiResponse(response);
     expect(models[0].contextWindow).toBe(128_000);
     expect(models[1].contextWindow).toBeUndefined();
-    // Verify the second model does NOT have a `contextWindow` key at all
-    // (so it's truly optional in the persisted JSON, not null).
+    
+    
     expect("contextWindow" in models[1]).toBe(false);
   });
 
@@ -98,7 +98,7 @@ describe("parseModelsApiResponse", () => {
     }
   });
 
-  // Whitespace-only `name` is treated as missing — fallback to id.
+  
   it("treats whitespace-only name as missing → label falls back to id", () => {
     const response = {
       data: [
@@ -119,8 +119,8 @@ describe("parseModelsApiResponse", () => {
     expect(models[0].label).toBe("MiniMax M3");
   });
 
-  // Defensive: malformed responses must not throw, just return [] or skip
-  // bad items.
+  
+  
   it("returns [] for non-object response", () => {
     expect(parseModelsApiResponse(null)).toEqual([]);
     expect(parseModelsApiResponse(undefined)).toEqual([]);
@@ -156,8 +156,8 @@ describe("parseModelsApiResponse", () => {
     ]);
   });
 
-  // Default flags are pinned — fresh models are neither deprecated nor
-  // thinking-capable unless the API explicitly says otherwise.
+  
+  
   it("sets deprecated=false and thinking=false on all parsed models", () => {
     const response = {
       data: [

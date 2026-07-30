@@ -1,20 +1,20 @@
-//! parseModelsApiResponse — pure parser for `GET <modelsEndpoint>` responses.
-//!
-//! Multiple LLM providers expose an OpenAI-style `GET /v1/models` endpoint, but
-//! the per-item shape varies:
-//!
-//! - **OpenAI**: `{ id, object, created, owned_by, name? }`  (label: `name` or `id`)
-//! - **MiniMax / Anthropic-style**: `{ id, object, created, owned_by }` (NO `name`)
-//! - **DeepSeek**: `{ id, object, created, owned_by }` (NO `name`, NO `context_window`)
-//!
-//! The legacy parser assumed `name` and `context_window` were always present;
-//! MiniMax's real API returns neither, so `label` was silently `undefined` and
-//! the UI rendered empty `<Select.ItemText>` spans.
-//!
-//! This helper normalizes all known shapes into `ModelMeta[]` with a guaranteed
-//! non-empty `label` (falls back to `id` when `name` is missing/empty/whitespace).
-//!
-//! Defensive: returns `[]` for any non-object / non-array / item-missing-id.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 
@@ -58,9 +58,9 @@ export function parseModelsApiResponse(response: unknown): ModelMeta[] {
     if (id === undefined || id.length === 0) {
       continue;
     }
-    // label: prefer `name` (OpenAI / Anthropic-some-providers) when non-empty
-    // after trim; otherwise fall back to `id` so the UI always has something
-    // to display. Whitespace-only names are treated as missing.
+    
+    
+    
     const trimmedName = asString(item.name)?.trim();
     const label =
       trimmedName !== undefined && trimmedName.length > 0 ? trimmedName : id;

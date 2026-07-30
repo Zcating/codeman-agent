@@ -1,5 +1,5 @@
-//! NewChatButton — used as `header` slot in ChatSidebar.
-//! Click navigates to "/" (back to home for new conversation creation).
+
+
 
 import { render, cleanup, fireEvent } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";

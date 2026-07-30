@@ -1,9 +1,9 @@
-//! chat-sidebar-actions.test.ts
+
 import { describe, it, expect, vi } from "vitest";
 import { Effect } from "effect";
 import { chatSidebarActions } from "@codeman-frontend/features/chat/lib/chat-sidebar-actions";
 
-// Mock the chat.store module
+
 vi.mock("../stores/chat.store", () => ({
   renameConversation: vi.fn((_convId: string, _newTitle: string) =>
     Effect.succeed(undefined),

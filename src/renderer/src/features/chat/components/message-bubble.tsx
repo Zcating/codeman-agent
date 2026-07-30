@@ -1,7 +1,7 @@
-// 纯 UI。读取 Message prop。不导入 effect。
-//
-// assistant bubble 走 `w-full`，去卡片宽度限制和卡片背景，与右侧 user bubble 的 `bg-primary` 卡片
-// 形成"流式文档 + 消息气泡"对照。
+
+
+
+
 
 import { Show, For, createMemo } from "solid-js";
 import { XCircle, CheckCircle2 } from "lucide-solid";
@@ -11,7 +11,7 @@ import type { Message, ToolResult, FileMatch, ToolCall } from "@codeman-frontend
 import { store } from "@codeman-frontend/features/chat/stores/chat.store";
 import { renderMarkdown } from "@codeman-frontend/features/chat/lib/markdown";
 
-/** Escape user-provided text to prevent XSS. */
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")

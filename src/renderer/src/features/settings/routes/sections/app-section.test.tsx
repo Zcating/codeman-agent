@@ -1,4 +1,4 @@
-//! AppSection — `/settings/app` route component tests.
+
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
@@ -6,7 +6,7 @@ import { Effect } from "effect";
 import { AppSection } from "@codeman-frontend/features/settings/routes/sections/app-section";
 import { mockState, SettingsV15 } from "@codeman-frontend/__mocks__/ipc-mock";
 
-// Mock solid-js/store (jsdom lacks Solid reactive context)
+
 vi.mock("solid-js/store", () => {
   let store: { value: unknown } = { value: null };
   const setStore = vi.fn((...args: unknown[]) => {

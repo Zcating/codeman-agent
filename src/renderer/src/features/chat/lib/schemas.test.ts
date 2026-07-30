@@ -24,8 +24,8 @@ describe("chat schemas (ADR-0025 PR 4)", () => {
   });
 
   it("ConversationId and ToolCallId are distinct brands", () => {
-    // Type-level: a ConversationId is NOT assignable to ToolCallId.
-    // Runtime proxy: each Schema.make validates against its own brand.
+    
+    
     const conv = ConversationIdSchema.make("c1");
     const tc = ToolCallIdSchema.make("t1");
     expect(conv).not.toBe(tc);
@@ -37,7 +37,7 @@ describe("chat schemas (ADR-0025 PR 4)", () => {
   });
 });
 
-// ─── Form schemas (ADR-0029 PR 1, D2) ────────────────────────────────────────
+
 
 describe("chat form schemas (ADR-0029 PR 1)", () => {
   describe("field-level schemas (strict, no \"\" sentinel)", () => {

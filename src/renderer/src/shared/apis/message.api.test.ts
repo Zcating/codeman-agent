@@ -1,4 +1,4 @@
-// message Api IPC 测试，搬迁自 shared/lib/ipc.test.ts
+
 import { it, expect } from "@effect/vitest";
 import { describe } from "vitest";
 import { Effect } from "effect";

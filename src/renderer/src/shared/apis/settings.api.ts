@@ -1,4 +1,4 @@
-// SettingsApi - rendered SettingsApi Tag + Live Layer + Bridge Functions for settings domain IPC.
+
 import { Effect, Context, Layer } from "effect";
 import type { Settings, LLMProvider } from "../lib/types";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
@@ -46,7 +46,7 @@ export const SettingsApiLive = Layer.succeed(SettingsApi, {
     }),
 });
 
-// ─── Bridge functions (Promise-based, for Solid UI) ─────────────
+
 
 export async function getSettingsBridge(): Promise<Settings> {
   const program = Effect.gen(function* () {

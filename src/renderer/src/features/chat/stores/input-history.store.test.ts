@@ -1,4 +1,4 @@
-//! input-history.store Solid signal + cursor 单测
+
 
 import { describe, it, expect, beforeEach } from "vitest";
 import { createRoot } from "solid-js";
@@ -24,7 +24,7 @@ beforeEach(() => {
   _resetInputHistoryForTest();
 });
 
-// ─── 初始状态 ─────────────────────────────────────
+
 
 describe("初始状态", () => {
   it("无 localStorage 数据 → 空数组 + cursor -1", () => {
@@ -39,8 +39,8 @@ describe("初始状态", () => {
       INPUT_HISTORY_STORAGE_KEY,
       JSON.stringify(["pre", "seed"]),
     );
-    // 模块级 createSignal 在 import 时已经执行过一次——本测试由于 vitest 模块缓存，
-    // 重新 reset 后再手动 record 来覆盖。
+    
+    
     _resetInputHistoryForTest();
     createRoot(() => {
       recordInputEntry("alpha");
@@ -49,7 +49,7 @@ describe("初始状态", () => {
   });
 });
 
-// ─── recordInputEntry ────────────────────────────────
+
 
 describe("recordInputEntry", () => {
   it("追加新条目 + 重置 cursor", () => {
@@ -64,10 +64,10 @@ describe("recordInputEntry", () => {
   it("连续相同 → 仅重置 cursor,不写", () => {
     createRoot(() => {
       recordInputEntry("hello");
-      window.localStorage.clear(); // 清干净便于观察 store 是否再写
-      recordInputEntry("hello"); // 连续相同
+      window.localStorage.clear(); 
+      recordInputEntry("hello"); 
       const stored = window.localStorage.getItem(INPUT_HISTORY_STORAGE_KEY);
-      // store 即便 dedup 也仍按设计要 setCursor(-1)；持久化层不写 → localStorage 应为空
+      
       expect(stored).toBeNull();
     });
   });
@@ -75,7 +75,7 @@ describe("recordInputEntry", () => {
   it("trim 空字符串 → 仅重置 cursor,不写", () => {
     createRoot(() => {
       recordInputEntry("real");
-      recordInputEntry("   "); // trim 后空
+      recordInputEntry("   "); 
       window.localStorage.clear();
       recordInputEntry("   ");
       expect(inputHistory$()).toContain("real");
@@ -97,7 +97,7 @@ describe("recordInputEntry", () => {
         recordInputEntry(`e${i}`);
       }
       expect(inputHistory$()).toHaveLength(INPUT_HISTORY_MAX_ENTRIES);
-      // 最新的应该在栈顶
+      
       expect(inputHistory$()[0]).toBe(`e${INPUT_HISTORY_MAX_ENTRIES - 1}`);
     });
   });
@@ -113,7 +113,7 @@ describe("recordInputEntry", () => {
   });
 });
 
-// ─── navigateInputHistoryPrev ──────────────────────────
+
 
 describe("navigateInputHistoryPrev (↑)", () => {
   it("历史为空 → null", () => {
@@ -126,7 +126,7 @@ describe("navigateInputHistoryPrev (↑)", () => {
   it("-1 → 0 (进入 newest)", () => {
     createRoot(() => {
       recordInputEntry("a");
-      recordInputEntry("b"); // history = ["b", "a"]
+      recordInputEntry("b"); 
       const r = navigateInputHistoryPrev();
       expect(inputHistoryCursor$()).toBe(0);
       expect(r).toEqual({ value: "b" });
@@ -137,7 +137,7 @@ describe("navigateInputHistoryPrev (↑)", () => {
     createRoot(() => {
       recordInputEntry("a");
       recordInputEntry("b");
-      recordInputEntry("c"); // history = ["c", "b", "a"]
+      recordInputEntry("c"); 
       expect(navigateInputHistoryPrev()).toEqual({ value: "c" });
       expect(navigateInputHistoryPrev()).toEqual({ value: "b" });
       expect(navigateInputHistoryPrev()).toEqual({ value: "a" });
@@ -150,15 +150,15 @@ describe("navigateInputHistoryPrev (↑)", () => {
       recordInputEntry("a");
       recordInputEntry("b");
       navigateInputHistoryPrev();
-      navigateInputHistoryPrev(); // → 1
-      const r = navigateInputHistoryPrev(); // → null, 留 1
+      navigateInputHistoryPrev(); 
+      const r = navigateInputHistoryPrev(); 
       expect(r).toBeNull();
       expect(inputHistoryCursor$()).toBe(1);
     });
   });
 });
 
-// ─── navigateInputHistoryNext ──────────────────────────
+
 
 describe("navigateInputHistoryNext (↓)", () => {
   it("历史为空 → null", () => {
@@ -178,7 +178,7 @@ describe("navigateInputHistoryNext (↓)", () => {
   it("cursor = 0 → 退到 -1 (退出历史)", () => {
     createRoot(() => {
       recordInputEntry("a");
-      navigateInputHistoryPrev(); // → 0
+      navigateInputHistoryPrev(); 
       const r = navigateInputHistoryNext();
       expect(r).toEqual({ value: "" });
       expect(inputHistoryCursor$()).toBe(-1);
@@ -188,9 +188,9 @@ describe("navigateInputHistoryNext (↓)", () => {
   it("cursor = N-1 → cursor = N-2 (向新)", () => {
     createRoot(() => {
       recordInputEntry("a");
-      recordInputEntry("b"); // history = ["b", "a"]
-      navigateInputHistoryPrev(); // 0
-      navigateInputHistoryPrev(); // 1
+      recordInputEntry("b"); 
+      navigateInputHistoryPrev(); 
+      navigateInputHistoryPrev(); 
       expect(inputHistoryCursor$()).toBe(1);
       const r = navigateInputHistoryNext();
       expect(r).toEqual({ value: "b" });
@@ -199,7 +199,7 @@ describe("navigateInputHistoryNext (↓)", () => {
   });
 });
 
-// ─── handleArrowUp ────────────────────────────────
+
 
 describe("handleArrowUp (UI 集成辅助)", () => {
   it("input 非空 → 返回 false (让原生 caret 处理)", () => {
@@ -214,7 +214,7 @@ describe("handleArrowUp (UI 集成辅助)", () => {
         (v: string) => setInput(v),
       );
       expect(handled).toBe(false);
-      expect(inputVal).toBe("draft"); // 未动
+      expect(inputVal).toBe("draft"); 
     });
   });
 
@@ -250,7 +250,7 @@ describe("handleArrowUp (UI 集成辅助)", () => {
   it("已经导航态 → 继续向上翻", () => {
     createRoot(() => {
       recordInputEntry("a");
-      recordInputEntry("b"); // ["b", "a"]
+      recordInputEntry("b"); 
       let inputVal = "";
       const setInput = (v: string) => {
         inputVal = v;
@@ -258,7 +258,7 @@ describe("handleArrowUp (UI 集成辅助)", () => {
       handleArrowUp(() => inputVal, (v: string) => setInput(v));
       expect(inputVal).toBe("b");
       expect(inputHistoryCursor$()).toBe(0);
-      // 改 input 不影响 cursor（在 history mode）
+      
       const handled = handleArrowUp(() => inputVal, (v: string) => setInput(v));
       expect(handled).toBe(true);
       expect(inputVal).toBe("a");
@@ -267,7 +267,7 @@ describe("handleArrowUp (UI 集成辅助)", () => {
   });
 });
 
-// ─── handleArrowDown ───────────────────────────────
+
 
 describe("handleArrowDown (UI 集成辅助)", () => {
   it("cursor = -1 → 返回 false", () => {
@@ -289,12 +289,12 @@ describe("handleArrowDown (UI 集成辅助)", () => {
       const setInput = (v: string) => {
         inputVal = v;
       };
-      handleArrowUp(() => inputVal, (v: string) => setInput(v)); // → 0, "b"
-      handleArrowUp(() => inputVal, (v: string) => setInput(v)); // → 1, "a"
+      handleArrowUp(() => inputVal, (v: string) => setInput(v)); 
+      handleArrowUp(() => inputVal, (v: string) => setInput(v)); 
       expect(inputVal).toBe("a");
       const handled = handleArrowDown((v: string) => setInput(v));
       expect(handled).toBe(true);
-      expect(inputVal).toBe("b"); // 退一步
+      expect(inputVal).toBe("b"); 
       expect(inputHistoryCursor$()).toBe(0);
     });
   });
@@ -306,7 +306,7 @@ describe("handleArrowDown (UI 集成辅助)", () => {
       const setInput = (v: string) => {
         inputVal = v;
       };
-      handleArrowUp(() => inputVal, (v: string) => setInput(v)); // → 0
+      handleArrowUp(() => inputVal, (v: string) => setInput(v)); 
       expect(inputVal).toBe("a");
       const handled = handleArrowDown((v: string) => setInput(v));
       expect(handled).toBe(true);
@@ -316,15 +316,15 @@ describe("handleArrowDown (UI 集成辅助)", () => {
   });
 });
 
-// ─── recordInputEntry 重置 cursor ─────────────────────
+
 
 describe("recordInputEntry 重置 cursor（even on dedup/blank）", () => {
   it("发送后 cursor 应该 -1,无论是否真的写", () => {
     createRoot(() => {
       recordInputEntry("a");
-      navigateInputHistoryPrev(); // 进入历史
+      navigateInputHistoryPrev(); 
       expect(inputHistoryCursor$()).toBe(0);
-      recordInputEntry("a"); // 连续相同 → 仍要 reset
+      recordInputEntry("a"); 
       expect(inputHistoryCursor$()).toBe(-1);
     });
   });
@@ -333,22 +333,22 @@ describe("recordInputEntry 重置 cursor（even on dedup/blank）", () => {
     createRoot(() => {
       recordInputEntry("a");
       navigateInputHistoryPrev();
-      recordInputEntry("   "); // trim 空
+      recordInputEntry("   "); 
       expect(inputHistoryCursor$()).toBe(-1);
     });
   });
 });
 
-// ─── handleArrowUpField / handleArrowDownField (ADR-0029 PR 5) ──────────────
-//
-// form.Field-aware variants: caller passes a () => FieldAccessor (TanStack Form's
-// render prop shape) instead of writing closures for getInput/setInput.
+
+
+
+
 
 describe("handleArrowUpField (form.Field-aware ↑)", () => {
   it("input 空 + 历史非空 → 进入 newest + 通过 field.handleChange 写回", () => {
     createRoot(() => {
       recordInputEntry("foo");
-      recordInputEntry("bar"); // history = ["bar", "foo"]
+      recordInputEntry("bar"); 
       const fieldValue = { current: "" };
       const field = () => ({
         state: { value: fieldValue.current },
@@ -406,7 +406,7 @@ describe("handleArrowDownField (form.Field-aware ↓)", () => {
           fieldValue.current = v;
         },
       });
-      handleArrowUpField(field); // → cursor 0, field "a"
+      handleArrowUpField(field); 
       expect(fieldValue.current).toBe("a");
       const handled = handleArrowDownField(field);
       expect(handled).toBe(true);

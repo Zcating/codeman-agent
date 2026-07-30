@@ -1,4 +1,4 @@
-//! AdvancedSection — `/settings/advanced` route component tests.
+
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
@@ -6,7 +6,7 @@ import { AdvancedSection } from "@codeman-frontend/features/settings/routes/sect
 import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 
 vi.mock("@tanstack/solid-router", () => ({
-  // No router usage in this section, but include minimal stub for safety
+  
 }));
 
 beforeEach(() => {
@@ -37,14 +37,14 @@ describe("AdvancedSection — /settings/advanced", () => {
 
   it("clicking Cancel in confirm overlay returns to idle state", () => {
     render(() => <AdvancedSection />);
-    // Enter confirm state
+    
     fireEvent.click(screen.getByText(/Clear all history/i));
     expect(
       screen.getByText(/Delete all conversations\?/i),
     ).toBeInTheDocument();
-    // Click Cancel
+    
     fireEvent.click(screen.getAllByText(/Cancel/i)[0]!);
-    // Back to idle
+    
     expect(screen.getByText(/Clear all history/i)).toBeInTheDocument();
     expect(
       screen.queryByText(/Delete all conversations\?/i),

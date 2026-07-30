@@ -1,23 +1,23 @@
-//! buildModel 单元测试（V1.5+）。
-//!
-//! T14: 测试 buildModel 函数正确性。
-//!
-//! 测试场景：
-//! 1. buildModel returns valid Model for valid provider and model id (positive)
-//! 2. buildModel throws on unknown model id (negative)
-//! 3. buildModel throws on missing api_key (negative)
+
+
+
+
+
+
+
+
 
 import { describe, it, expect } from "vitest";
 import { buildModel, BuildModelError } from "@codeman-frontend/features/chat/lib/build-model";
 import type { Provider } from "@codeman-frontend/shared/lib/types";
 
-// ─── Test Fixtures ─────────────────────────────────────────────
+
 
 const mockProvider: Provider = {
   id: "minimax",
   label: "MiniMax",
   enabled: true,
-  apiKey: "test-api-key", // ADR-0015: top-level api_key
+  apiKey: "test-api-key", 
   llm: {
     defaultModel: "MiniMax-M2.5-highspeed",
     baseUrl: "https://api.minimaxi.com/anthropic",
@@ -42,13 +42,13 @@ const mockProvider: Provider = {
   },
 };
 
-// ─── Tests ─────────────────────────────────────────────────────
+
 
 describe("buildModel", () => {
   it("returns valid Model for valid provider and model id", () => {
     const model = buildModel(mockProvider, "MiniMax-M2.5-highspeed");
 
-    // 验证 Model 对象结构
+    
     expect(model).toBeDefined();
     expect(model.id).toBe("MiniMax-M2.5-highspeed");
     expect(model.name).toBe("MiniMax-M2.5-highspeed");
@@ -68,7 +68,7 @@ describe("buildModel", () => {
   });
 
   it("uses ModelMeta context_window from provider models", () => {
-    // 不同模型有不同 context_window
+    
     const model1 = buildModel(mockProvider, "MiniMax-M2.5-highspeed");
     expect(model1.contextWindow).toBe(200000);
 
@@ -77,7 +77,7 @@ describe("buildModel", () => {
   });
 
   it("uses ModelMeta thinking flag from provider models", () => {
-    // 查找具有 thinking: true 的模型来测试
+    
     const thinkingProvider: Provider = {
       ...mockProvider,
       llm: {
@@ -147,7 +147,7 @@ describe("buildModel", () => {
           {
             id: "no-context-window",
             label: "No Context Window",
-            // context_window 未定义
+            
             deprecated: false,
             thinking: false,
           },
@@ -156,7 +156,7 @@ describe("buildModel", () => {
     };
 
     const model = buildModel(providerNoContextWindow, "no-context-window");
-    // 默认值 128000
+    
     expect(model.contextWindow).toBe(128000);
   });
 });

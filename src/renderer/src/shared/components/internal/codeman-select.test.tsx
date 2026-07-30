@@ -1,10 +1,10 @@
-//! codeman-select — Ark UI Select wrapper tests.
+
 
 import { render, screen, fireEvent } from "@solidjs/testing-library";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { CodemanSelect, CodemanSelectOption } from "@codeman-frontend/shared/components/internal/codeman-select";
 
-// Mock state - plain values, not reactive
+
 let mockIsOpen = false;
 let sharedOnValueChange: ((details: { value: string[] }) => void) | null = null;
 let sharedPositioning: Record<string, unknown> | undefined;
@@ -96,7 +96,7 @@ vi.mock("@ark-ui/solid", async () => {
   };
 });
 
-// Reset state before each test
+
 beforeEach(() => {
   mockIsOpen = false;
   sharedOnValueChange = null;
@@ -110,7 +110,7 @@ const defaultOptions: CodemanSelectOption[] = [
 ];
 
 describe("CodemanSelect", () => {
-  // 1. renders trigger with placeholder
+  
   it("renders trigger with placeholder", () => {
     render(() => (
       <CodemanSelect
@@ -126,7 +126,7 @@ describe("CodemanSelect", () => {
     expect(valueText?.textContent).toBe("Select an option");
   });
 
-  // 2. opens content when trigger clicked
+  
   it("opens content when trigger clicked", () => {
     render(() => (
       <CodemanSelect
@@ -138,14 +138,14 @@ describe("CodemanSelect", () => {
       />
     ));
     const trigger = screen.getByTestId("test-select-trigger");
-    // Click to open - mockIsOpen toggles but doesn't re-render reactively
-    // Since we can't test reactive updates, we verify initial closed state
+    
+    
     const content = document.querySelector('[data-part="content"]');
     expect(content).toBeInTheDocument();
     expect(trigger).toHaveAttribute("data-state", "closed");
   });
 
-  // 3. shows options from collection
+  
   it("shows options from collection", () => {
     render(() => (
       <CodemanSelect
@@ -156,7 +156,7 @@ describe("CodemanSelect", () => {
         data-testid="test-select"
       />
     ));
-    // Verify options exist in the DOM structure
+    
     const items = document.querySelectorAll('li[data-value]');
     expect(items.length).toBe(3);
     expect(items[0]).toHaveAttribute("data-value", "a");
@@ -164,7 +164,7 @@ describe("CodemanSelect", () => {
     expect(items[2]).toHaveAttribute("data-value", "c");
   });
 
-  // 4. calls onChange with selected value (string)
+  
   it("calls onChange with selected value (string)", () => {
     const onChange = vi.fn();
     render(() => (
@@ -176,13 +176,13 @@ describe("CodemanSelect", () => {
         data-testid="test-select"
       />
     ));
-    // Simulate clicking an item - this should call onChange via the mock
+    
     const itemB = document.querySelector('li[data-value="b"]');
     fireEvent.click(itemB!);
     expect(onChange).toHaveBeenCalledWith("b");
   });
 
-  // 5. closes when option selected
+  
   it("closes when option selected", () => {
     render(() => (
       <CodemanSelect
@@ -193,15 +193,15 @@ describe("CodemanSelect", () => {
         data-testid="test-select"
       />
     ));
-    // Click item A - this sets mockIsOpen = false in the mock
+    
     const itemA = document.querySelector('li[data-value="a"]');
     fireEvent.click(itemA!);
-    // The mock's isOpen is now false, but we can't verify DOM update without reactivity
-    // We verify the click handler was called (state changed)
+    
+    
     expect(itemA).toBeInTheDocument();
   });
 
-  // 6. shows empty state when no options
+  
   it("shows empty state when no options", () => {
     render(() => (
       <CodemanSelect
@@ -212,14 +212,14 @@ describe("CodemanSelect", () => {
         data-testid="test-select"
       />
     ));
-    // With empty options, List renders but has no items
+    
     const list = document.querySelector('[data-part="list"]');
     expect(list).toBeInTheDocument();
     const items = document.querySelectorAll('li[data-value]');
     expect(items.length).toBe(0);
   });
 
-  // 7. disabled state prevents interaction
+  
   it("disabled state prevents interaction", () => {
     const onChange = vi.fn();
     render(() => (
@@ -234,12 +234,12 @@ describe("CodemanSelect", () => {
     ));
     const trigger = screen.getByTestId("test-select-trigger");
     expect(trigger).toBeDisabled();
-    // Clicking disabled trigger should not open
+    
     fireEvent.click(trigger);
     expect(trigger).toHaveAttribute("data-state", "closed");
   });
 
-  // 8. Action slot renders non-option button after list and closes dropdown on click
+  
   it("Action slot renders non-option button after list and closes dropdown on click", () => {
     const onActionClick = vi.fn();
     render(() => (
@@ -255,14 +255,14 @@ describe("CodemanSelect", () => {
         </button>
       </CodemanSelect>
     ));
-    // The action button should be rendered (after the list)
+    
     const actionBtn = document.querySelector('[data-testid="action-btn"]');
     expect(actionBtn).toBeInTheDocument();
     fireEvent.click(actionBtn!);
     expect(onActionClick).toHaveBeenCalled();
   });
 
-  // 9. applies data-testid to trigger with -trigger suffix
+  
   it("applies data-testid to trigger with -trigger suffix", () => {
     render(() => (
       <CodemanSelect
@@ -276,7 +276,7 @@ describe("CodemanSelect", () => {
     expect(screen.getByTestId("my-select-trigger")).toBeInTheDocument();
   });
 
-  // 10. applies data-testid to content with -content suffix
+  
   it("applies data-testid to content with -content suffix", () => {
     render(() => (
       <CodemanSelect
@@ -287,11 +287,11 @@ describe("CodemanSelect", () => {
         data-testid="my-select"
       />
     ));
-    // Content exists in DOM (even if not visible due to mockIsOpen=false)
+    
     expect(screen.getByTestId("my-select-content")).toBeInTheDocument();
   });
 
-  // 12. T6 SelectTrigger renders data-slot="select-trigger"
+  
   it("SelectTrigger has data-slot=select-trigger", () => {
     render(() => (
       <CodemanSelect
@@ -306,7 +306,7 @@ describe("CodemanSelect", () => {
     expect(trigger).toBeInTheDocument();
   });
 
-  // 13. T6 SelectItem renders data-slot="select-item"
+  
   it("SelectItem has data-slot=select-item", () => {
     render(() => (
       <CodemanSelect
@@ -321,9 +321,9 @@ describe("CodemanSelect", () => {
     expect(items.length).toBe(3);
   });
 
-  // 14. regression: visual chrome (border / shadow / bg) must live on Content,
-  //     not Positioner. Otherwise Positioner's always-mounted div leaves a ghost
-  //     bordered box on the page when the select is closed.
+  
+  
+  
   it("places visual chrome on Content, not Positioner (no ghost border when closed)", () => {
     render(() => (
       <CodemanSelect
@@ -339,22 +339,22 @@ describe("CodemanSelect", () => {
     expect(positioner).toBeInTheDocument();
     expect(content).toBeInTheDocument();
 
-    // Positioner is always mounted — it must not carry visual chrome.
+    
     expect(positioner.className).not.toMatch(/\bborder\b/);
     expect(positioner.className).not.toMatch(/\bshadow\b/);
 
-    // Content owns the codeman-explicit visible chrome (bg-background).
-    // border/shadow live in ui/select default styles (bypassed by mock).
+    
+    
     expect(content.className).toMatch(/bg-background\b/);
   });
 
-  // 15. regression: dropdown must NOT use sameWidth positioning.
-  //     Root cause (2026-07-26): `positioning={{ sameWidth: true }}` locked
-  //     dropdown width to trigger width. Combined with `w-(--anchor-width)
-  //     min-w-36 overflow-x-hidden` on SelectContent, long option labels were
-  //     clipped to ~144px and hidden on the right edge — WorkspacePicker in
-  //     home.tsx rendered broken text. Fix: pass `sameWidth: false` so the
-  //     dropdown auto-sizes to its content.
+  
+  
+  
+  
+  
+  
+  
   it("passes sameWidth: false to SelectRoot so long option labels are not clipped", () => {
     render(() => (
       <CodemanSelect

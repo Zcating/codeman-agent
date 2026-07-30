@@ -1,11 +1,11 @@
-//! scrollarea.tsx -- shadcn-style ScrollArea primitive wrapping @ark-ui/solid.
-//!
-//! Compound components: ScrollArea, ScrollAreaViewport, ScrollBar, ScrollThumb.
-//!
-//! Notes on the API:
-//! - ScrollArea wraps a Viewport that hosts the actual scrollable content.
-//! - ScrollBar renders a styled scrollbar overlay. It must be a child of ScrollArea.
-//! - ScrollThumb is the draggable inner element. Sized automatically by @ark-ui.
+
+
+
+
+
+
+
+
 
 import type { JSX } from "solid-js";
 import { splitProps } from "solid-js";

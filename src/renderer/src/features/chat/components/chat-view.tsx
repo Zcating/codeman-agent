@@ -33,7 +33,7 @@ import {
 import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
-// ─── ProviderSelect (model picker bound to form.Field "modelId") ─────────────
+
 
 function ProviderSelect(props: {
   value: string;
@@ -81,7 +81,7 @@ function ProviderSelect(props: {
   );
 }
 
-// ─── ChatView ─────────────────────────────────────────────────────────────────
+
 
 export function ChatView(props: { convId?: string }): JSX.Element {
   const convId = (): string | undefined => props.convId;
@@ -91,16 +91,16 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     startThemeSync();
   });
 
-  // ─── Derived state ────────────────────────────────────────────────────────
+  
   const isRunning = (): boolean => {
     const id = convId();
     if (!id) { return false; }
-    // 读 isAgentActive 而非 streamingMessageId。streamingMessageId 是
-    // per-turn stub id(`done` 时清,turn 切换时让下一个 token 创建新 stub),
-    // 多 turn 场景下中间 done 会让 streamingMessageId 在 turn 间反复 null 切换
-    // → isRunning 抖动 → Send/Stop 按钮闪。isAgentActive 是 per-message 信号
-    // (sendMessage 起始 = true,message_stop/error/cancel = false),只在真正
-    // 整条 message 结束时才转 false,Send/Stop 切换只在边界发生一次。
+    
+    
+    
+    
+    
+    
     return store.byId[id]?.isAgentActive === true;
   };
 
@@ -110,16 +110,16 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     return store.byId[id]?.messages ?? [];
   };
 
-  // ─── ContextRing 派生 state (V2.6) ────────────────────────────────
-  //   读取当前 provider/model + 当前 conv messages 算 context window 使用率。
-  //   `total` 来自 ModelMeta.contextWindow;`used` 优先用最新一条 assistant
-  //   msg 的 `inputTokens` (LLM 真实回报),退路走粗估(字符 /4)。
+  
+  
+  
+  
   const ringInfo = createMemo(() => {
     const providers = appStore.state.value.providers ?? [];
     const pid = appStore.state.value.defaultLlmProviderId;
     const provider = providers.find((p) => p.id === pid);
-    // 双可选链:settings 数据漂移(老 provider 没 llm / llm 没 models)时不要 throw,
-    // 让 total 走 0 分支,环仍渲染 0% · 0 / 0 tokens 给用户可观察信号。
+    
+    
     const model = provider?.llm?.models.find(
       (m) => m.id === provider?.llm?.defaultModel,
     );
@@ -128,12 +128,12 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     const msgs = currentMessages();
     let used = 0;
     if (total > 0 && msgs.length > 0) {
-      // 1. 优先用最新 assistant message 的 inputTokens (API 真实值)
+      
       const lastAssistant = [...msgs].reverse().find((m) => m.role === "assistant");
       if (lastAssistant && lastAssistant.inputTokens != null) {
         used = lastAssistant.inputTokens;
       } else {
-        // 2. Fallback:用 system prompt + 所有消息内容长度粗估
+        
         const systemPrompt = appStore.state.value.systemPrompt?.default ?? "";
         used = computeUsedTokensEst(msgs) + Math.ceil(systemPrompt.length / 4);
       }
@@ -143,9 +143,9 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     return { percentage, used, total };
   });
 
-  // Auto-scroll to bottom on messages change.
-  // 首次进入对话(mount 后第一次 effect 执行)用 instant 直接定位,后续消息追加
-  // 用 smooth 让用户感知到新内容到达。
+  
+  
+  
   let hasScrolledInitially = false;
   createEffect(() => {
     currentMessages();
@@ -155,7 +155,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     hasScrolledInitially = true;
   });
 
-  // Tracks prev error to avoid duplicate toasts when lastError stays non-null across renders.
+  
   const currentLastError = (): string | null => {
     const id = convId();
     if (!id) { return null; }
@@ -166,7 +166,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     if (err) { codemanToast.error(err); }
   });
 
-  // ─── Form ─────────────────────────────────────────────────────────────────
+  
   const form = createForm(() => ({
     defaultValues: {
       draft: "",
@@ -181,7 +181,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
       const id = convId();
       if (!text || !id || isRunning()) { return; }
 
-      // Build ProviderConfig from appStore (read at submit-time)
+      
       const providerId = appStore.state.value.defaultLlmProviderId;
       const providerConfig = appStore.state.value.providers?.find((p) => p.id === providerId);
       const provider: ProviderConfig = {
@@ -192,11 +192,11 @@ export function ChatView(props: { convId?: string }): JSX.Element {
         tools: [],
       };
 
-      // Clear draft + record history entry
+      
       form.reset({ draft: "", modelId: value.modelId });
       recordInputEntry(text);
 
-      // Send (long-running streaming — do not await)
+      
       void Effect.runPromiseExit(sendMessage(id, text, provider)).then((exit) => {
         if (Exit.isFailure(exit)) {
           codemanToast.error(formatAppError(exit.cause));
@@ -205,15 +205,15 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     },
   }));
 
-  // ─── Cancel handler (form-external sibling) ───────────────────────────────
+  
   const handleCancel = () => {
     const id = convId();
     if (!id) { return; }
     cancel(id);
   };
 
-  // ─── skills for ComboTextarea ──────────────────────────────────
-  /** Enabled skills = manifests ∩ appStore.enabledSkills */
+  
+  
   const enabledSkills = createMemo((): readonly SkillManifest[] => {
     const all = skillsManifests$();
     const enabledNames = new Set(appStore.state.value.enabledSkills ?? []);
@@ -234,7 +234,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
           void form.handleSubmit();
         }}
       >
-        {/* draft field (textarea) — submit-only validation (per UX request) */}
+        {}
         <form.Field name="draft">
           {(field) => (
             <>
@@ -248,11 +248,11 @@ export function ChatView(props: { convId?: string }): JSX.Element {
                 value={field().state.value}
                 onChange={(v) => field().handleChange(v)}
                 onKeyDown={(e) => {
-                  // ComboTextarea handles `/`, Ctrl+/, ArrowUp/Down/Enter/Esc
-                  // when menu is open. This handler runs unconditionally for
-                  // keys that don't go through the menu:
-                  // - Ctrl/Cmd+Enter: submit form
-                  // - ArrowUp/Down when menu closed: input history
+                  
+                  
+                  
+                  
+                  
                   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
                     if (e.defaultPrevented) {return;}
                     e.preventDefault();
@@ -276,9 +276,9 @@ export function ChatView(props: { convId?: string }): JSX.Element {
                 disabled={isRunning() || form.state.isSubmitting}
                 skills={enabledSkills()}
                 error={
-                  // submit-only: 错误只在用户提交后才显示。isTouched 在 blur 后变 true,
-                  // 不再用作显示门控(避免 blur 触发校验后立即渲染错误)。
-                  // form.state.isSubmitted 在首次 handleSubmit() 后变 true (TanStack Form)。
+                  
+                  
+                  
                   form.state.isSubmitted
                     ? firstErrorMessage(field().state.meta.errors)
                     : undefined
@@ -288,7 +288,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
           )}
         </form.Field>
 
-        {/* row: provider label + ProviderSelect + (spacer) + Send */}
+        {}
         <div class="flex items-center gap-2">
           <label for="provider-select" class="text-xs text-muted-foreground whitespace-nowrap">
             Provider
@@ -302,7 +302,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
                 value={field().state.value}
                 onChange={(modelId) => {
                   field().handleChange(modelId);
-                  // Sync to appStore so global default updates (ProviderCard / settings)
+                  
                   const providers = appStore.state.value.providers ?? [];
                   const provider = buildEnabledProviders(providers).find((p) =>
                     p.models.some((m) => m.id === modelId),
@@ -326,23 +326,19 @@ export function ChatView(props: { convId?: string }): JSX.Element {
 
           <div class="flex-1" />
 
-          {/* Cluster: [ContextRing] <16px gap> [Send button]
-              — 几何常量和组件本身都在 `./context-ring.tsx`。
-              — ring 数据来自 `ringInfo` memo(下方 ChatView 派生 state)。 */}
+          {}
           <div
             class="flex items-center gap-4"
             data-testid="ring-send-cluster"
           >
-            {/* 始终渲染 ContextRing — 之前用 <Show when={total > 0}> gate 会让
-                model lookup 失败 / settings 数据漂移时环消失,违背"左侧常驻"的设计。
-                total=0 时环自然显示 "0% · 0 / 0 tokens",作为可观察信号。 */}
+            {}
             <ContextRing
               percentage={ringInfo().percentage}
               usedTokens={ringInfo().used}
               totalTokens={ringInfo().total}
             />
 
-            {/* Send/Stop 同位置切换 — running 时变 Stop(type=button, destructive) */}
+            {}
             <form.Subscribe
               selector={(state) => ({
                 canSubmit: state.canSubmit,
@@ -382,7 +378,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
   );
 }
 
-// ─── Helpers (module-level) ────────────────────────────────────────────────────
+
 
 function initialModelId(): string {
   const providers = appStore.state.value.providers ?? [];

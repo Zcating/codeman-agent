@@ -1,4 +1,4 @@
-//! chat.store Solid createStore 测试 (Task 4)
+
 import { describe, it, expect, vi } from "vitest";
 import { createRoot } from "solid-js";
 import { Effect, Exit, Stream } from "effect";
@@ -28,7 +28,7 @@ import {
 import type { Conversation, Message, Workspace } from "@codeman-frontend/shared/lib/types";
 import type { RuntimeEvent, ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
 
-// ─── Mock tauri services ─────────────────────────────────────────────
+
 
 vi.mock("@codeman-frontend/shared/apis", async () => {
   const { Layer, Effect: E } = await import("effect");
@@ -99,7 +99,7 @@ vi.mock("@codeman-frontend/shared/apis", async () => {
       delete: () => E.void,
       rename: () => E.void,
     }),
-    // V3.1 ADR-0031 + ADR-0016: appStore reads these — provide minimal stubs
+    
     ProviderApiLive: Layer.succeed(ProviderApi, {
       list: () => E.succeed([]),
       get: () => E.fail({ kind: "IPC", message: "not used" } as never),
@@ -156,14 +156,14 @@ vi.mock("@codeman-frontend/shared/apis", async () => {
   };
 });
 
-// ─── Mock workspace-service ──────────────────────────────────────────
+
 
 vi.mock("../../../shared/lib/workspace-service", async () => {
   const { Layer, Effect: E } = await import("effect");
   const { WorkspaceService } = await vi.importActual<
     typeof import("../../../shared/lib/workspace-service")
   >("../../../shared/lib/workspace-service");
-  // Default mock behavior
+  
   return {
     WorkspaceService,
     WorkspaceServiceLive: Layer.succeed(WorkspaceService, {
@@ -181,7 +181,7 @@ vi.mock("../../../shared/lib/workspace-service", async () => {
   };
 });
 
-// ─── Mock runtime (prevent real API calls) ─────────────────────────
+
 
 vi.mock("../lib/runtime", () => ({
   createAgentRuntime: () => ({
@@ -190,7 +190,7 @@ vi.mock("../lib/runtime", () => ({
   }),
 }));
 
-// ─── Helpers ────────────────────────────────────────────────────────
+
 
 const mockConv: Conversation = {
   id: "c1",
@@ -226,7 +226,7 @@ const defaultProvider: ProviderConfig = {
   tools: [],
 };
 
-// ─── Existing tests ────────────────────────────────────────────────
+
 
 describe("chat.store — ConversationState 类型", () => {
   it("setupConvState() 插入 byId, 包含空 messages 状态和 runtime", () =>
@@ -267,7 +267,7 @@ describe("sendMessage — 跨会话隔离", () => {
       expect(csA).not.toBe(csB);
       expect(csA?.messages).not.toBe(csB?.messages);
 
-      // 写 A 不影响 B
+      
       setStore("byId", "cA", "messages", [
         {
           id: "x",
@@ -314,7 +314,7 @@ describe("cancel / archive / delete — 取消/归档/删除", () => {
   });
 });
 
-// ─── New tests: sendMessage ─────────────────────────────────────────
+
 
 describe("sendMessage — G1: 添加 user msg 到 byId[convId].messages", () => {
   it("sendMessage() 添加 user message 到 store.byId[convId].messages", async () => {
@@ -339,7 +339,7 @@ describe("sendMessage — G3: 从 store.byId[convId].messages 构建 context", (
         .spyOn(store.byId["c1"]!.runtime, "run")
         .mockReturnValue(Stream.fromIterable([]));
       await Effect.runPromise(sendMessage("c1", "second msg", defaultProvider));
-      // Context passed to runtime.run should contain both messages
+      
       const callArg = runSpy.mock.calls[0][0];
       expect(callArg.context.length).toBeGreaterThanOrEqual(1);
       dispose();
@@ -357,8 +357,8 @@ describe("sendMessage — G4: 调用 runtime.run({ context, provider })", () => 
       await Effect.runPromise(sendMessage("c1", "hello", defaultProvider));
       expect(runSpy).toHaveBeenCalledTimes(1);
       const opts = runSpy.mock.calls[0][0] as { context: Message[]; provider: ProviderConfig };
-      // mockConv.workspace_id === "" → workspace augmentation skipped
-      // V3.1 ADR-0031: 但 enabledSkills 仍被注入 (新对象, identity 不再 preserve)
+      
+      
       expect(opts.provider).not.toBe(defaultProvider);
       expect(opts.provider.systemPrompt).toBe(defaultProvider.systemPrompt);
       expect(opts.provider.enabledSkills).toBeDefined();
@@ -367,9 +367,9 @@ describe("sendMessage — G4: 调用 runtime.run({ context, provider })", () => 
     });
   });
 
-  // Regression: LLM-hallucinated workspace_id → IPC "Workspace not found: <label>".
-  // Fix: chat.store.sendMessage injects the real workspace_id (UUID) into the
-  // system prompt so the LLM uses it for ALL file tools.
+  
+  
+  
   it("sendMessage() 当 conv.workspace_id 非空时 → 在 provider.systemPrompt 注入真实 workspace_id", async () => {
     await createRoot(async (dispose) => {
       const convWithWs: Conversation = {
@@ -384,8 +384,8 @@ describe("sendMessage — G4: 调用 runtime.run({ context, provider })", () => 
       await Effect.runPromise(sendMessage("c-ws-fix", "write to miniMax-workspace", defaultProvider));
       expect(runSpy).toHaveBeenCalledTimes(1);
       const opts = runSpy.mock.calls[0][0] as { provider: ProviderConfig };
-      // Augmented provider must include the real workspaceId so LLM does NOT
-      // hallucinate "miniMax-workspace" from the user's message text.
+      
+      
       expect(opts.provider.systemPrompt).toContain('workspaceId="real-uuid-7c8e9f10"');
       expect(opts.provider.systemPrompt).toContain("read_file, write_file, edit_file, search_files, delete_file");
       expect(opts.provider.systemPrompt).toContain("Do NOT infer the id from user messages");
@@ -395,16 +395,16 @@ describe("sendMessage — G4: 调用 runtime.run({ context, provider })", () => 
 
   it("sendMessage() 当 conv.workspace_id 为空时 → 不修改 systemPrompt 但注入 enabledSkills", async () => {
     await createRoot(async (dispose) => {
-      setupConvState(mockConv, []); // mockConv.workspace_id === ""
+      setupConvState(mockConv, []); 
       const runSpy = vi
         .spyOn(store.byId["c1"]!.runtime, "run")
         .mockReturnValue(Stream.fromIterable([]));
       await Effect.runPromise(sendMessage("c1", "hello", defaultProvider));
       const opts = runSpy.mock.calls[0][0] as { provider: ProviderConfig };
-      // V3.1 ADR-0031: 即使 workspaceId 为空, enabledSkills 字段也被注入(即使为空数组)
-      expect(opts.provider).not.toBe(defaultProvider); // 对象身份已被扩 (新对象)
-      expect(opts.provider.systemPrompt).toBe(defaultProvider.systemPrompt); // systemPrompt 未追加 workspace context
-      expect(opts.provider.enabledSkills).toEqual([]); // 空 enabled skills
+      
+      expect(opts.provider).not.toBe(defaultProvider); 
+      expect(opts.provider.systemPrompt).toBe(defaultProvider.systemPrompt); 
+      expect(opts.provider.enabledSkills).toEqual([]); 
       dispose();
     });
   });
@@ -435,9 +435,9 @@ describe("sendMessage — G5: 处理 token event → 在首个 event 时创建 s
       ];
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
       await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
-      // After done, streamingMessageId should be null
+      
       expect(store.byId["c1"]?.streamingMessageId).toBeNull();
-      // And there should be an assistant message
+      
       const msgs = store.byId["c1"]?.messages ?? [];
       const assistantMsg = msgs.find((m) => m.role === "assistant");
       expect(assistantMsg).toBeDefined();
@@ -481,28 +481,28 @@ describe("sendMessage — G6: 处理后续 token events → 更新 stub.content"
   });
 });
 
-// ─── G31: Bug fix — token deltas accumulate, not replace ───────────
-//
-// 背景: mock-server deltaSize=1 (config-service.ts) 触发 per-char text_delta 事件。
-// pi-agent-core 的 message_update.text_delta.delta 携带的也是单 chunk (新片段)
-// 而非累积全文(anthropic-transport.ts line 491 只 emit delta.text,不 emit
-// accumulated snapshot)。
-//
-// Bug: chat.store 的 token handler 用 `{ ...m, content: evt.content }` (REPLACE),
-// 导致每来一个 token 就把 stub.content 替换成那一个字符。User 看到
-// "R" → "e" → "a" → "d" ... 逐字弹出,而不是 "Reading the file now" 累积出现。
-//
-// 修复: 改成 `(m.content ?? "") + evt.content` (APPEND)。
-//
-// 此测试在 done 之前 capture stub.content 验证多 token 累积,
-// 用真 mock-server deltaSize=1 风格的 per-char delta 模拟 streaming 真实形态。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 describe("sendMessage — G31: token events 累积 (per-char delta 场景)", () => {
   it("G31a: 多 token 累积 (mock-server deltaSize=1 风格) → stub.content 是 concat 而非 replace", async () => {
     await createRoot(async (dispose) => {
       setupConvState(mockConv, []);
-      // 模拟 mock-server deltaSize=1 发出的 per-char text_delta 流。
-      // 真实形态: anthropic-transport.ts 把 SSE text_delta 转发为
-      // { type: "text_delta", delta: <新字符> },runtime 再 emit { type: "token", content: <新字符> }。
+      
+      
+      
       const fullText = "Reading the file now....";
       const perCharEvents: RuntimeEvent[] = Array.from(fullText, (ch) => ({
         type: "token",
@@ -533,8 +533,8 @@ describe("sendMessage — G31: token events 累积 (per-char delta 场景)", () 
       const msgs = store.byId["c1"]?.messages ?? [];
       const finalAssistant = msgs.find((m) => m.role === "assistant");
       expect(finalAssistant).toBeDefined();
-      // 关键断言: done 替换前,stub.content 必须是 累积结果 ("Reading the file now...."),
-      // 不是最后一个 token 字符 (".")
+      
+      
       expect(finalAssistant?.content).toBe(fullText);
       dispose();
     });
@@ -544,8 +544,8 @@ describe("sendMessage — G31: token events 累积 (per-char delta 场景)", () 
     await createRoot(async (dispose) => {
       setupConvState(mockConv, []);
       const fullText = "Reading the file now.";
-      // 前 8 个字符先到 (代表 streaming 中段);后续 18 个字符 + done 后到。
-      // 这里不用 done,直接验证 stub.content 在中段已累积。
+      
+      
       const partialEvents: RuntimeEvent[] = Array.from(fullText.slice(0, 8), (ch) => ({
         type: "token",
         content: ch,
@@ -555,14 +555,14 @@ describe("sendMessage — G31: token events 累积 (per-char delta 场景)", () 
       );
       await Effect.runPromise(sendMessage("c1", "tool", defaultProvider));
 
-      // stream 已 drain 完(没 done),stub 应保留前 8 字符累积值
+      
       const msgs = store.byId["c1"]?.messages ?? [];
       const stub = msgs.find((m) => m.role === "assistant");
       expect(stub).toBeDefined();
-      // 关键断言: 不应是最后 1 字符 ("R" 被覆盖后变 "e",或最终变成 "g")
-      // 而应是前 8 字符累积 "Reading "
+      
+      
       expect(stub?.content).toBe("Reading ");
-      // 不能是单字符
+      
       expect(stub?.content?.length).toBeGreaterThan(1);
       dispose();
     });
@@ -585,7 +585,7 @@ describe("sendMessage — G31: token events 累积 (per-char delta 场景)", () 
       const msgs = store.byId["c1"]?.messages ?? [];
       const stub = msgs.find((m) => m.role === "assistant");
       expect(stub).toBeDefined();
-      // 关键断言: 多 thinking chunk 必须累积为完整 reasoning 字符串
+      
       expect(stub?.thinking).toBe(fullThinking);
       dispose();
     });
@@ -620,7 +620,7 @@ describe("sendMessage — G7: 处理 tool_call event → 添加到 stub.tool_cal
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
       await Effect.runPromise(sendMessage("c1", "weather?", defaultProvider));
       const msgs = store.byId["c1"]?.messages ?? [];
-      // Find the assistant message - it should have toolCalls from the done event
+      
       const assistantMsg = msgs.find((m) => m.role === "assistant");
       expect(assistantMsg?.toolCalls).toBeDefined();
       expect(assistantMsg?.toolCalls?.length).toBeGreaterThan(0);
@@ -696,22 +696,22 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
     });
   });
 
-  // ─── Thinking 字段在 done event 中被保留（不是被 null 覆盖）────────────────
-  //
-  // 用户场景: stream 期间 runtime emit 多个 thinking event 累积到 stub.thinking,
-  // done event 应该把 stub 替换成 evt.message(包含 evt.message.thinking)。
-  // 这个路径若 done.message.thinking = null,UI 上 MessageBubble.ThinkingPanel 就不渲染。
-  // runtime.test.ts 已经验证了 "done.message.thinking 由 runtime 正确聚合(非空 thinking 块 → 字符串)",
-  // 这里验证 store 层把 evt.message.thinking 直接传给最终 message(不做 null 覆盖)。
+  
+  
+  
+  
+  
+  
+  
 
   it("G26: thinking stream 累积 → done event 带非空 thinking → 最终 message.thinking = 该字符串", async () => {
     await createRoot(async (dispose) => {
       setupConvState(mockConv, []);
       const thinkingAccumulated = "Reasoning step 1. Reasoning step 2.";
       const events: RuntimeEvent[] = [
-        // 模拟 runtime 累积: 单次 thinking event 代表 streaming 终态
-        // (real stream 是多 chunk APPEND,G31c 验证多 chunk 累积场景)。
-        // 这里用单 chunk 简化,因为 done event 提供的 full thinking 决定 final state。
+        
+        
+        
         { type: "thinking", content: thinkingAccumulated },
         { type: "token", content: "Final answer text." },
         {
@@ -737,8 +737,8 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
       const msgs = store.byId["c1"]?.messages ?? [];
       const finalMsg = msgs.find((m) => m.role === "assistant");
       expect(finalMsg).toBeDefined();
-      // 关键断言: final message.thinking 必须是 done event 中的非空字符串,
-      // 不能是 null(否则 UI MessageBubble.ThinkingPanel 不渲染)。
+      
+      
       expect(finalMsg?.thinking).toBe(thinkingAccumulated);
       expect(finalMsg?.content).toBe("Final answer text.");
       dispose();
@@ -748,7 +748,7 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
   it("G27: stream 期间 stub.thinking 被覆写累积,后续 token 不会清掉 thinking", async () => {
     await createRoot(async (dispose) => {
       setupConvState(mockConv, []);
-      // Mock `think` entry 场景: thinking 先到,text 后到(stub.lazy-init by thinking)
+      
       const events: RuntimeEvent[] = [
         { type: "thinking", content: "Streaming thought chunk 1." },
         { type: "thinking", content: "Streaming thought chunk 1. Streaming thought chunk 2." },
@@ -783,14 +783,14 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
     });
   });
 
-  // ─── Multi-turn: tool entry 场景 — 第二个 assistant stub 接 done 时 toolCalls 应保留 ───
-  //
-  // 用户场景: 输入 "tool" → mock-server turn 0: thinking + text + toolUse(read_file) + done
-  // → tool 执行(read_file) → mock-server 短路: turn 1: thinking + text + end_turn
-  // → runtime 跨 turn 聚合 toolCalls(见 runtime.test.ts "multi-turn agent_end")→ done event
-  //   带 toolCalls = [read_file] 到达 store,store 必须把这条 toolCalls 写到 final assistant msg
-  // → UI bubble 2 (short-circuit "(mock) Script complete.") 必须渲染 inline-tool-calls
-  //   (read_file card),不渲染 = bug。
+  
+  
+  
+  
+  
+  
+  
+  
   it("G28: multi-turn (turn-1 tool_use + turn-2 short-circuit) → final assistant msg.toolCalls preserved", async () => {
     await createRoot(async (dispose) => {
       setupConvState(mockConv, []);
@@ -799,17 +799,17 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
         name: "read_file",
         args: { path: "README.md" },
       };
-      // 模拟 runtime 已聚合: done event 带 toolCalls = [read_file] (来自 turn-1)
+      
       const events: RuntimeEvent[] = [
-        // turn 1: thinking + text + tool_use
+        
         { type: "thinking", content: "calling read_file" },
         { type: "token", content: "Reading the file now." },
         { type: "tool_call", toolCall: readFileToolCall },
         { type: "tool_result", toolCallId: "tc-read-1", result: "# Tauri + Solid" },
-        // turn 2 (short-circuit): thinking + text only
-        { type: "thinking", content: "calling read_file" }, // stub2 lazy-init
+        
+        { type: "thinking", content: "calling read_file" }, 
         { type: "token", content: "(mock) Script complete." },
-        // done (aggregated toolCalls from turn-1)
+        
         {
           type: "done",
           message: {
@@ -818,7 +818,7 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
             role: "assistant",
             content: "(mock) Script complete.",
             thinking: "calling read_file",
-            toolCalls: [readFileToolCall], // ← 来自 turn-1 聚合
+            toolCalls: [readFileToolCall], 
             toolResults: [
               {
                 toolCallId: "tc-read-1",
@@ -841,8 +841,8 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
         (m) => m.role === "assistant" && m.content === "(mock) Script complete.",
       );
       expect(finalAssistant).toBeDefined();
-      // 关键断言: short-circuit bubble 的 toolCalls 必须保留 read_file
-      // (runtime 已聚合,store 不能 drop)
+      
+      
       expect(finalAssistant?.toolCalls).not.toBeNull();
       expect(finalAssistant?.toolCalls?.length).toBe(1);
       expect(finalAssistant?.toolCalls?.[0]?.name).toBe("read_file");
@@ -852,11 +852,11 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
   });
 });
 
-// ─── G29: Bubble Boundary — 1 user input → N assistant bubbles (per agent turn) ───
-//
-// ADR-0028: 每个 agent turn = 1 assistant message = 1 bubble。Runtime 在每个 turn_end
-// emit 1 个 done (per-turn); 不再在 agent_end 跨 turn 聚合。Chat.store 接收 N 个 done
-// → 产生 N 个 assistant 消息 (1 per turn) + 1 user message。
+
+
+
+
+
 describe("sendMessage — G29: Bubble Boundary — 1 user input → N assistant bubbles (per agent turn)", () => {
   it("G29a: 2 turn run (turn-1 tool_use + turn-2 text) → 1 user + 2 assistant bubbles, turn-1 owns toolCalls/toolResults", async () => {
     await createRoot(async (dispose) => {
@@ -867,10 +867,10 @@ describe("sendMessage — G29: Bubble Boundary — 1 user input → N assistant 
         args: { path: "README.md" },
       };
 
-      // Per-turn done: turn-1 emit done with toolCalls+toolResults, turn-2 emit done with text only.
-      // (Replaces V3.1 aggregation: 1 final done with cross-turn aggregated content.)
+      
+      
       const events: RuntimeEvent[] = [
-        // ── Turn 1: thinking + text + tool_use + tool_result ──
+        
         { type: "thinking", content: "Calling read_file." },
         { type: "token", content: "Reading the file now." },
         { type: "tool_call", toolCall: readFileToolCall },
@@ -901,7 +901,7 @@ describe("sendMessage — G29: Bubble Boundary — 1 user input → N assistant 
             createdAt: Date.now(),
           },
         },
-        // ── Turn 2 (short-circuit): thinking + text only, no tool calls ──
+        
         { type: "thinking", content: "Done." },
         { type: "token", content: "(mock) Script complete." },
         {
@@ -912,7 +912,7 @@ describe("sendMessage — G29: Bubble Boundary — 1 user input → N assistant 
             role: "assistant",
             content: "(mock) Script complete.",
             thinking: "Done.",
-            toolCalls: null, // turn-2 didn't call any tool
+            toolCalls: null, 
             toolResults: null,
             model: "mock-default",
             inputTokens: null,
@@ -926,14 +926,14 @@ describe("sendMessage — G29: Bubble Boundary — 1 user input → N assistant 
 
       const msgs = store.byId["c1"]?.messages ?? [];
 
-      // S2 contract: 1 user bubble + 2 assistant bubbles = 3 messages total
+      
       expect(msgs.length).toBe(3);
 
-      // msg[0] = user input
+      
       expect(msgs[0]?.role).toBe("user");
       expect(msgs[0]?.content).toBe("tool");
 
-      // msg[1] = turn-1 assistant: owns toolCalls + toolResults
+      
       const turn1 = msgs[1];
       expect(turn1?.role).toBe("assistant");
       expect(turn1?.content).toBe("Reading the file now.");
@@ -943,8 +943,8 @@ describe("sendMessage — G29: Bubble Boundary — 1 user input → N assistant 
       expect(turn1?.toolResults?.length).toBe(1);
       expect(turn1?.toolResults?.[0]?.result).toBe("# Tauri + Solid");
 
-      // msg[2] = turn-2 assistant: text + thinking only, NO tool calls (cross-turn
-      // aggregation REVERTED — turn-1's read_file is NOT in turn-2's bubble)
+      
+      
       const turn2 = msgs[2];
       expect(turn2?.role).toBe("assistant");
       expect(turn2?.content).toBe("(mock) Script complete.");
@@ -952,7 +952,7 @@ describe("sendMessage — G29: Bubble Boundary — 1 user input → N assistant 
       expect(turn2?.toolCalls).toBeNull();
       expect(turn2?.toolResults).toBeNull();
 
-      // streamingMessageId cleared after final done
+      
       expect(store.byId["c1"]?.streamingMessageId).toBeNull();
       dispose();
     });
@@ -963,7 +963,7 @@ describe("sendMessage — G29: Bubble Boundary — 1 user input → N assistant 
       setupConvState(mockConv, []);
 
       const events: RuntimeEvent[] = [
-        // turn 1: read_file
+        
         { type: "thinking", content: "Reading." },
         { type: "tool_call", toolCall: { id: "tc-1", name: "read_file", args: {} } },
         { type: "tool_result", toolCallId: "tc-1", result: "data" },
@@ -983,7 +983,7 @@ describe("sendMessage — G29: Bubble Boundary — 1 user input → N assistant 
             createdAt: Date.now(),
           },
         },
-        // turn 2: search_files
+        
         { type: "thinking", content: "Searching." },
         { type: "tool_call", toolCall: { id: "tc-2", name: "search_files", args: {} } },
         { type: "tool_result", toolCallId: "tc-2", result: ["match"] },
@@ -1003,7 +1003,7 @@ describe("sendMessage — G29: Bubble Boundary — 1 user input → N assistant 
             createdAt: Date.now(),
           },
         },
-        // turn 3: final summary
+        
         { type: "thinking", content: "Summarizing." },
         { type: "token", content: "Summary complete." },
         {
@@ -1028,7 +1028,7 @@ describe("sendMessage — G29: Bubble Boundary — 1 user input → N assistant 
 
       const msgs = store.byId["c1"]?.messages ?? [];
 
-      expect(msgs.length).toBe(4); // 1 user + 3 assistant
+      expect(msgs.length).toBe(4); 
       expect(msgs[0]?.role).toBe("user");
       expect(msgs[1]?.role).toBe("assistant");
       expect(msgs[1]?.toolCalls?.[0]?.name).toBe("read_file");
@@ -1042,17 +1042,17 @@ describe("sendMessage — G29: Bubble Boundary — 1 user input → N assistant 
   });
 });
 
-// ─── V2.8: message_stop 终止信号 — isRunning 只在 message_stop 清除 ───────
-//
-// Bug: runtime 在每个 turn_end emit `done`(per-turn, ADR-0028),done 当前清
-// streamingMessageId。多 turn 场景(turn-1 = 工具调用,turn-2 = 文本)中间
-// done 触发会让 UI isRunning 在 turn 间抖动(Stop → Send → Stop → Send)。
-//
-// Fix: 新增 `message_stop` RuntimeEvent 变体,在 `agent_end` 时 emit。
-// - `done`(per-turn): 保留替换 stub + 累积内容,但不清 streamingMessageId
-// - `message_stop`(per-message): 清 streamingMessageId → isRunning → Send 按钮恢复
-// - `error`: 仍立即清(用户/网络错误,不能再 keep Stop)
-// - `cancel()`: 仍同步清(用户主动取消)
+
+
+
+
+
+
+
+
+
+
+
 describe("sendMessage — V2.8: isRunning 只在 message_stop 时停止,中间 done 不抖动", () => {
   it("V2.8-A: 多 turn 场景 (turn-1 done → turn-2 token → turn-2 done) 中,中间 done 不清 streamingMessageId", async () => {
     await createRoot(async (dispose) => {
@@ -1063,7 +1063,7 @@ describe("sendMessage — V2.8: isRunning 只在 message_stop 时停止,中间 d
         args: { path: "README.md" },
       };
       const events: RuntimeEvent[] = [
-        // Turn 1: thinking + text + tool_use + done(per-turn)
+        
         { type: "thinking", content: "Let me read the file." },
         { type: "token", content: "Reading file." },
         { type: "tool_call", toolCall: readFileToolCall },
@@ -1088,10 +1088,10 @@ describe("sendMessage — V2.8: isRunning 只在 message_stop 时停止,中间 d
             createdAt: Date.now(),
           },
         },
-        // ── 关键断言点:turn-1 done 后,UI 仍应是 running 状态
-        // (后续 turn-2 token 还没来,但用户视角是"agent 还在工作")
-        // 此前实现会在此处清掉 streamingMessageId → UI 闪 Send。
-        // ── Turn 2: token + done(per-turn)
+        
+        
+        
+        
         { type: "token", content: "Final answer after tool." },
         {
           type: "done",
@@ -1113,18 +1113,18 @@ describe("sendMessage — V2.8: isRunning 只在 message_stop 时停止,中间 d
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
       await Effect.runPromise(sendMessage("c1", "read me", defaultProvider));
 
-      // V2.8 关键断言:多 turn 跑完后(中间 done 已 emit,无 message_stop 注入)
-      // 由于本次测试序列未包含 message_stop,isAgentActive(per-message running
-      // 信号)仍为 true — UI isRunning() 仍 true,Send/Stop 按钮不抖动。
-      // 旧实现:此处 streamingMessageId 已被 turn-1 done 清,turn-2 token 会
-      // append 到 turn-1 消息,V2.8 拆分 isAgentActive 后每个 turn 各自有 stub。
+      
+      
+      
+      
+      
       expect(store.byId["c1"]?.isAgentActive).toBe(true);
-      // 消息内容应正确累积:1 user + 2 assistant(每 turn 独立 stub)
+      
       const msgs = store.byId["c1"]?.messages ?? [];
       expect(msgs.length).toBe(3);
       expect(msgs[1]?.content).toBe("Reading file.");
       expect(msgs[2]?.content).toBe("Final answer after tool.");
-      // turn-1 与 turn-2 消息 id 不同(各自独立 stub)
+      
       expect(msgs[1]?.id).not.toBe(msgs[2]?.id);
       dispose();
     });
@@ -1151,12 +1151,12 @@ describe("sendMessage — V2.8: isRunning 只在 message_stop 时停止,中间 d
             createdAt: Date.now(),
           },
         },
-        // V2.8 新增:message_stop = per-message 终止信号(对应 agent_end)
+        
         { type: "message_stop" },
       ];
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
       await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
-      // message_stop 应清 streamingMessageId
+      
       expect(store.byId["c1"]?.streamingMessageId).toBeNull();
       dispose();
     });
@@ -1181,7 +1181,7 @@ describe("sendMessage — G10: 处理 error event → console.error", () => {
 describe("sendMessage — G11: 如果 convId 不在 byId 中则提前返回 (no-op)", () => {
   it("sendMessage() 当 convId 不在 byId 中时提前返回不报错", async () => {
     await createRoot(async (dispose) => {
-      // c999 does not exist in store - sendMessage should return early without throwing
+      
       await expect(Effect.runPromise(sendMessage("c999", "hello", defaultProvider))).resolves.toBeUndefined();
       dispose();
     });
@@ -1193,7 +1193,7 @@ describe("sendMessage — G12: 当 runtime stream 失败时 → console.error", 
     await createRoot(async (dispose) => {
       setupConvState(mockConv, []);
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => { });
-      // Create a stream that fails - use 'any' cast since run is mocked anyway
+      
       const failStream = Stream.fail(new Error("Stream failed")) as any;
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(failStream);
       await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
@@ -1204,7 +1204,7 @@ describe("sendMessage — G12: 当 runtime stream 失败时 → console.error", 
   });
 });
 
-// ─── Bug B: handleEvent "error" should set lastError so chat-view can render banner ──
+
 
 describe("sendMessage — Bug B: RuntimeEvent 'error' sets store.byId[convId].lastError", () => {
   it("G25: 收到 {type:'error', error:{message:'X'}} 时 lastError = 'X'，且 streamingMessageId 清空", async () => {
@@ -1212,7 +1212,7 @@ describe("sendMessage — Bug B: RuntimeEvent 'error' sets store.byId[convId].la
       setupConvState(mockConv, []);
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => { });
 
-      // Runtime emits a single error event then ends — via Stream.make
+      
       const errorStream = Stream.make({
         type: "error" as const,
         error: { message: "AnthropicTransport: 缺 apiKey" },
@@ -1221,14 +1221,14 @@ describe("sendMessage — Bug B: RuntimeEvent 'error' sets store.byId[convId].la
 
       await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
 
-      // 1. lastError 设进去了（typed narrow，绕开编译期无该字段）
+      
       const cs = store.byId["c1"] as ConversationState & { lastError?: string | null };
       expect(cs?.lastError).toBe("AnthropicTransport: 缺 apiKey");
 
-      // 2. 仍然 console.error (向后兼容 dev 调试可见性)
+      
       expect(errorSpy).toHaveBeenCalled();
 
-      // 3. streamingMessageId 清空（避免"正在思考"卡住）
+      
       expect(cs?.streamingMessageId).toBeNull();
 
       errorSpy.mockRestore();
@@ -1237,7 +1237,7 @@ describe("sendMessage — Bug B: RuntimeEvent 'error' sets store.byId[convId].la
   });
 });
 
-// ─── New tests: archiveConversation ────────────────────────────────
+
 
 describe("archiveConversation — G13: 从 byId 移除 + 调用 runtime.cancel()", () => {
   it("archiveConversation() 从 byId 移除 conv + 调用 runtime.cancel()", async () => {
@@ -1253,7 +1253,7 @@ describe("archiveConversation — G13: 从 byId 移除 + 调用 runtime.cancel()
   });
 });
 
-// ─── New tests: deleteConversation ────────────────────────────────
+
 
 describe("deleteConversation — G15: 从 byId 移除 + 调用 runtime.cancel()", () => {
   it("deleteConversation() 从 byId 移除 conv + 调用 runtime.cancel()", async () => {
@@ -1269,22 +1269,22 @@ describe("deleteConversation — G15: 从 byId 移除 + 调用 runtime.cancel()"
   });
 });
 
-// ─── New tests: renameConversation ────────────────────────────────
+
 
 describe("renameConversation — G14: 更新 byId[convId].title + 刷新 conversations$", () => {
   it("renameConversation() 更新 conv title + 刷新 conversations$", async () => {
     await createRoot(async (dispose) => {
       setupConvState(mockConv, []);
-      // Verify initial title
+      
       expect(store.byId["c1"]?.title).toBe("测试");
-      // Verify initial conversations$ has the conv
+      
       expect(conversations$().some((c) => c.id === "c1")).toBe(true);
 
       await Effect.runPromise(renameConversation("c1", "new-title"));
 
-      // Check store.byId[convId].title updated
+      
       expect(store.byId["c1"]?.title).toBe("new-title");
-      // Check conversations$ reflects the new title
+      
       const updatedConv = conversations$().find((c) => c.id === "c1");
       expect(updatedConv?.title).toBe("new-title");
       dispose();
@@ -1292,14 +1292,14 @@ describe("renameConversation — G14: 更新 byId[convId].title + 刷新 convers
   });
 });
 
-// ─── New tests: loadConversations ────────────────────────────────
+
 
 describe("loadConversations — G16: 遍历 convs + 填充 byId", () => {
   it("loadConversations() 用 service 中的 conversations 填充 byId", async () => {
     await createRoot(async (dispose) => {
       await loadConversations(false);
-      // With the mock returning empty list, byId should be empty
-      // The function should not throw
+      
+      
       expect(typeof store.byId).toBe("object");
       dispose();
     });
@@ -1309,14 +1309,14 @@ describe("loadConversations — G16: 遍历 convs + 填充 byId", () => {
 describe("loadConversations — G17: 当 MessageApi.list 失败时跳过 per-conv", () => {
   it("loadConversations() 当 conv 的 MessageApi.list 失败时继续执行", async () => {
     await createRoot(async (dispose) => {
-      // With the mock returning empty list, loadConversations should not throw
+      
       await expect(Effect.runPromise(loadConversations(false))).resolves.toBeUndefined();
       dispose();
     });
   });
 });
 
-// ─── New tests: createConversation ────────────────────────────────
+
 
 describe("createConversation — G18: 调用 ConversationApi.create + setupConvState + 返回 convId", () => {
   it("createConversation() 创建 conv + 设置 state + 返回 convId", async () => {
@@ -1335,14 +1335,14 @@ describe("createConversation — G22: workspaceId 作为第一参数传入 IPC",
       await Effect.runPromise(createConversation("ws-test", "title with workspace"));
       const created = store.byId["new-id"];
       expect(created).toBeDefined();
-      // The mock echoes _workspaceId as workspace_id
+      
       expect((created as ConversationState | undefined)?.id).toBe("new-id");
       dispose();
     });
   });
 });
 
-// ─── New tests: persistUserMessage / persistAssistantMessage ─────
+
 
 describe("persistUserMessage — G20: 调用 MessageApi.append 并传入正确参数 (snake→camel 桥接)", () => {
   it("persistUserMessage() 通过 sendMessage 工作 - 验证 snake→camel 桥接", async () => {
@@ -1368,7 +1368,7 @@ describe("persistUserMessage — G20: 调用 MessageApi.append 并传入正确�
       ];
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
       await Effect.runPromise(sendMessage("c1", "hello", defaultProvider));
-      // If we get here without error, the snake→camel bridge worked
+      
       expect(store.byId["c1"]?.messages.some((m) => m.role === "user")).toBe(true);
       dispose();
     });
@@ -1402,26 +1402,26 @@ describe("persistAssistantMessage — G21: 当存在时将 toolCalls/toolResults
       ];
       vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
       await Effect.runPromise(sendMessage("c1", "hi", defaultProvider));
-      // The mock append returns parsed tool_calls/tool_results, so if we get here it worked
+      
       expect(store.byId["c1"]?.messages.some((m) => m.role === "assistant")).toBe(true);
       dispose();
     });
   });
 });
 
-// ─── New tests: createAndSendConversation ───────────────────────────
+
 
 describe("createAndSendConversation — T4.2: create + sendMessage chained", () => {
   it("createAndSendConversation: calls createConversation + sendMessage with new conv id", async () => {
     await createRoot(async (dispose) => {
-      // createAndSendConversation uses createAgentRuntime() which is now mocked to return
-      // a runtime that yields an empty stream, so sendMessage will:
-      // 1. Append user message to store (synchronously)
-      // 2. Run the stream (empty, so no token/done events)
-      // This lets us verify the full flow without real API calls.
+      
+      
+      
+      
+      
       await Effect.runPromise(createAndSendConversation("ws-1", "Test Title", "First message content", defaultProvider));
 
-      // Verify store state after the full flow
+      
       expect(store.byId["new-id"]).toBeDefined();
       const msgs = store.byId["new-id"]?.messages ?? [];
       const userMsg = msgs.find((m) => m.role === "user");
@@ -1432,17 +1432,17 @@ describe("createAndSendConversation — T4.2: create + sendMessage chained", () 
   });
 });
 
-// ─── New tests: uncovered lines 304-310 + 362-363 ───────────────────────
+
 
 describe("loadConversations — G23: setupConvState called with conversation + history", () => {
   it("loadConversations: calls setupConvState for each conversation returned by list", async () => {
     await createRoot(async (dispose) => {
-      // The mock's ConversationApi.list returns 1 conv (c1).
-      // The mock's MessageApi.list returns [] (empty history).
-      // This exercises the success path of the for-loop in loadConversations.
+      
+      
+      
       await Effect.runPromise(loadConversations(false));
-      // Verify setupConvState was called (by the real implementation)
-      // and the conv was added to the store
+      
+      
       expect(store.byId["c1"]).toBeDefined();
       dispose();
     });
@@ -1466,10 +1466,10 @@ describe("createAndSendConversation — G24: setupConvState copies workspace_id"
   });
 });
 
-// ─── Workspace CRUD tests (T4) ───────────────────────────────────────
+
 
 describe("chat.store — workspace CRUD", () => {
-  // Test synchronous store state
+  
   it("workspaces$: returns current workspaces array", () => {
     createRoot((dispose) => {
       const ws = workspaces$();
@@ -1503,7 +1503,7 @@ describe("chat.store — workspace CRUD", () => {
     });
   });
 
-  // pickWorkspacePath: uses module-level mock which returns "/picked/path"
+  
   it("pickWorkspacePath: returns Effect wrapping WorkspaceService.pickPath", async () => {
     const result = await Effect.runPromiseExit(pickWorkspacePath());
     Exit.match(result, {
@@ -1512,7 +1512,7 @@ describe("chat.store — workspace CRUD", () => {
     });
   });
 
-  // loadWorkspaces: uses module-level mock (list returns 2 workspaces)
+  
   it("loadWorkspaces: writes workspaces to store via WorkspaceService.list", async () => {
     await createRoot(async (dispose) => {
       await Effect.runPromiseExit(loadWorkspaces());
@@ -1523,7 +1523,7 @@ describe("chat.store — workspace CRUD", () => {
     });
   });
 
-  // addWorkspace: uses module-level mock (pickPath="/picked/path", add returns new-ws-id)
+  
   it("addWorkspace: IPC succeeds → adds workspace to store + sets selectedWorkspaceId", async () => {
     await createRoot(async (dispose) => {
       const result = await Effect.runPromiseExit(addWorkspace());
@@ -1540,10 +1540,10 @@ describe("chat.store — workspace CRUD", () => {
     });
   });
 
-  // removeWorkspace: module-level mock has remove that succeeds
+  
   it("removeWorkspace: IPC succeeds → filters workspace from store", async () => {
     await createRoot(async (dispose) => {
-      // Pre-populate
+      
       await Effect.runPromiseExit(loadWorkspaces());
       expect(workspaces$().some((w) => w.id === "ws-1")).toBe(true);
 
@@ -1554,10 +1554,10 @@ describe("chat.store — workspace CRUD", () => {
     });
   });
 
-  // renameWorkspace: module-level mock has rename that succeeds
+  
   it("renameWorkspace: IPC succeeds → patches workspace label in store", async () => {
     await createRoot(async (dispose) => {
-      // Pre-populate
+      
       await Effect.runPromiseExit(loadWorkspaces());
       expect(workspaces$().find((w) => w.id === "ws-1")?.label).toBe("Workspace 1");
 
@@ -1569,17 +1569,17 @@ describe("chat.store — workspace CRUD", () => {
   });
 });
 
-// ─── Per-conv runtime isolation tests (Bug B: streaming state leak) ─────────────
-//
-// These tests verify the fix for e2e spec 09 failures:
-//   D1+D3: A streaming 不 leak 到 B view; 切回 A 内容完整
-//   D5:    sidebar streaming 指示 (⏳) 出现在 streaming conv 上,完成后消失
-//   D2:    Cancel 中断 in-flight; Send 按钮恢复; 新 send 正常工作
-//   D1+D3+D5: 2 个 conv 同时 streaming,sidebar 各自显示 ⏳
-//
-// Root cause: cancel() did not synchronously clear streamingMessageId.
-// This caused the UI to remain in "running" state (textarea disabled) after cancel,
-// because the error event that clears streamingMessageId might not have been processed yet.
+
+
+
+
+
+
+
+
+
+
+
 
 describe("per-conv runtime isolation — streamingMessageId per conv independence", () => {
   it("cancel() synchronously clears streamingMessageId (fixes D2: Cancel restores Send button)", async () => {
@@ -1587,18 +1587,18 @@ describe("per-conv runtime isolation — streamingMessageId per conv independenc
       const convA = { ...mockConv, id: "cA" };
       setupConvState(convA, []);
 
-      // Simulate streaming: set streamingMessageId manually (as if token events started)
+      
       const stubId = "streaming-stub-123";
       setStore("byId", "cA", "streamingMessageId", stubId);
 
-      // Verify streamingMessageId is set
+      
       expect(store.byId["cA"]?.streamingMessageId).toBe(stubId);
 
-      // Cancel should synchronously clear streamingMessageId
+      
       cancel("cA");
 
-      // Critical assertion: streamingMessageId must be null IMMEDIATELY after cancel()
-      // (not waiting for error event to propagate)
+      
+      
       expect(store.byId["cA"]?.streamingMessageId).toBeNull();
 
       dispose();
@@ -1612,12 +1612,12 @@ describe("per-conv runtime isolation — streamingMessageId per conv independenc
       setupConvState(convA, []);
       setupConvState(convB, []);
 
-      // ConvA is streaming
+      
       setStore("byId", "cA", "streamingMessageId", "stub-A-123");
-      // ConvB is NOT streaming (streamingMessageId = null)
+      
 
-      // Switching "active" to convB should NOT affect convA's streamingMessageId
-      // (activeId is a UI concept; store.byId is the source of truth)
+      
+      
       expect(store.byId["cA"]?.streamingMessageId).toBe("stub-A-123");
       expect(store.byId["cB"]?.streamingMessageId).toBeNull();
 
@@ -1632,7 +1632,7 @@ describe("per-conv runtime isolation — streamingMessageId per conv independenc
       setupConvState(convA, []);
       setupConvState(convB, []);
 
-      // Add a partial streaming message to convA (simulating in-flight tokens)
+      
       const stubA: Message = {
         id: "stub-A",
         conversationId: "cA",
@@ -1649,7 +1649,7 @@ describe("per-conv runtime isolation — streamingMessageId per conv independenc
       setStore("byId", "cA", "streamingMessageId", "stub-A");
       setStore("byId", "cA", "messages", [stubA]);
 
-      // ConvB's messages should be empty (not contain convA's streaming text)
+      
       const convBMessages = store.byId["cB"]?.messages ?? [];
       expect(convBMessages.some((m) => m.content.includes("conv A"))).toBe(false);
 
@@ -1662,27 +1662,27 @@ describe("per-conv runtime isolation — streamingMessageId per conv independenc
       const convA = { ...mockConv, id: "cA" };
       setupConvState(convA, []);
 
-      // Start a stream
+      
       setStore("byId", "cA", "streamingMessageId", "old-stream");
 
-      // Cancel it
+      
       cancel("cA");
 
-      // streamingMessageId cleared (this is the key fix: UI sees non-streaming immediately)
+      
       expect(store.byId["cA"]?.streamingMessageId).toBeNull();
 
-      // Verify sendMessage can be called after cancel (user can type in textarea)
-      // Note: sendMessage appends user message synchronously even if stream is mock-empty
+      
+      
       const events: RuntimeEvent[] = [
         { type: "done", message: { id: "final", conversationId: "cA", role: "assistant", content: "ok", thinking: null, toolCalls: null, toolResults: null, model: null, inputTokens: null, outputTokens: null, createdAt: Date.now() } },
       ];
       vi.spyOn(store.byId["cA"]!.runtime, "run").mockReturnValue(Stream.fromIterable(events));
       await Effect.runPromise(sendMessage("cA", "second message", defaultProvider));
 
-      // After the mock stream completes (synchronously), streamingMessageId is null
-      // The important invariant: cancel() + sendMessage() does not throw or get stuck
+      
+      
       expect(store.byId["cA"]?.streamingMessageId).toBeNull();
-      // User message was appended (sendMessage works after cancel)
+      
       const msgs = store.byId["cA"]?.messages ?? [];
       expect(msgs.some((m) => m.role === "user" && m.content === "second message")).toBe(true);
 
@@ -1694,19 +1694,19 @@ describe("per-conv runtime isolation — streamingMessageId per conv independenc
     await createRoot(async (dispose) => {
       setupConvState(mockConv, []);
 
-      // Before streaming: streamingMessageId is null
+      
       expect(store.byId["c1"]?.streamingMessageId).toBeNull();
 
-      // Simulate streaming start (first token event)
+      
       setStore("byId", "c1", "streamingMessageId", "new-stream-stub");
 
-      // While streaming: streamingMessageId is non-null
+      
       expect(store.byId["c1"]?.streamingMessageId).not.toBeNull();
 
-      // Simulate done event (as handleEvent does)
+      
       setStore("byId", "c1", "streamingMessageId", null);
 
-      // After done: streamingMessageId is null
+      
       expect(store.byId["c1"]?.streamingMessageId).toBeNull();
 
       dispose();
@@ -1720,20 +1720,20 @@ describe("per-conv runtime isolation — streamingMessageId per conv independenc
       setupConvState(convA, []);
       setupConvState(convB, []);
 
-      // Both streaming simultaneously
+      
       setStore("byId", "cA", "streamingMessageId", "stream-A");
       setStore("byId", "cB", "streamingMessageId", "stream-B");
 
-      // Each conv has its own streamingMessageId
+      
       expect(store.byId["cA"]?.streamingMessageId).toBe("stream-A");
       expect(store.byId["cB"]?.streamingMessageId).toBe("stream-B");
 
-      // Cancel convA should only clear convA's streamingMessageId
+      
       cancel("cA");
       expect(store.byId["cA"]?.streamingMessageId).toBeNull();
-      expect(store.byId["cB"]?.streamingMessageId).toBe("stream-B"); // Unaffected
+      expect(store.byId["cB"]?.streamingMessageId).toBe("stream-B"); 
 
-      // Cancel convB should only clear convB's streamingMessageId
+      
       cancel("cB");
       expect(store.byId["cA"]?.streamingMessageId).toBeNull();
       expect(store.byId["cB"]?.streamingMessageId).toBeNull();

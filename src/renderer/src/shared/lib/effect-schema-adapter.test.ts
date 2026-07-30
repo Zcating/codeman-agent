@@ -1,4 +1,4 @@
-// Smoke test for effect-schema-adapter
+
 import { describe, expect, it } from "vitest";
 import { Schema } from "effect";
 import { effectSchema, firstErrorMessage } from "@codeman-frontend/shared/lib/effect-schema-adapter";
@@ -27,9 +27,9 @@ describe("effectSchema adapter (Standard Schema V1)", () => {
     const r = v["~standard"].validate(42);
     expect("issues" in r).toBe(true);
     if ("issues" in r && r.issues) {
-      // Effect's Type issue for Schema.String has no default message annotation.
-      // Adapter falls back to "Invalid value (Type)"; users wanting a custom message
-      // should pass `{ message: "..." }` to their schema (see test above).
+      
+      
+      
       expect(r.issues[0]?.message).toBe("Invalid value (Type)");
     }
   });
@@ -46,7 +46,7 @@ describe("effectSchema adapter (Standard Schema V1)", () => {
     const r = v["~standard"].validate({ name: "", age: "x" });
     expect("issues" in r).toBe(true);
     if ("issues" in r && r.issues) {
-      // 两个 field 各一个 issue
+      
       expect(r.issues.length).toBe(2);
       const paths = r.issues.map((i) => i.path?.join("."));
       expect(paths).toContain("name");

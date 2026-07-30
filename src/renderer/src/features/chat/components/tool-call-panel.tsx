@@ -1,16 +1,16 @@
-// 默认折叠:tool call 默认收起,summary 行就足够扫读多轮调用的上下文。
-// 由 MessageBubble 在 inline-tool-calls 容器内逐条渲染,data-tool-call-id 锚定。
+
+
 
 import { Wrench } from "lucide-solid";
 import { ToolCallCard } from "@codeman-frontend/features/chat/components/tool-call-card";
 import type { ToolCall, ToolResult } from "@codeman-frontend/shared/lib/types";
 
 export interface ToolCallPanelProps {
-	/** tool call 元数据(name / args / id) */
+	
 	toolCall: ToolCall;
-	/** 工具执行结果(可选;无 = running) */
+	
 	result?: ToolResult;
-	/** 当前 assistant message id,作为 data-message-id 锚点 */
+	
 	messageId: string;
 }
 

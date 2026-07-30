@@ -85,9 +85,9 @@ describe("Popover prop forwarding", () => {
   });
 });
 
-// Regression: 之前 `<PopoverAnchor>` 渲染 `<div class="inline-block">`,空 inline-block
-// 在父容器里占一个 line-box,导致 `<ComboTextarea>` 在 slash 菜单开/关时 form 高度
-// 跳动 24px(shadcn 设计是 class-free passthrough,我们误加 inline-block)。
+
+
+
 describe("PopoverAnchor — layout neutrality", () => {
   beforeEach(() => {
     mockAnchor.mockClear();

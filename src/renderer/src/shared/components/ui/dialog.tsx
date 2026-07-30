@@ -1,5 +1,5 @@
-//! dialog.tsx — shadcn/ui-style Dialog primitive wrapping @ark-ui/solid Dialog.
-//! Follows the compound component pattern like codeman-select.tsx.
+
+
 
 import type { Component, JSX } from "solid-js";
 import { splitProps } from "solid-js";
@@ -129,7 +129,7 @@ export const DialogCloseComponent: Component<DialogCloseProps> = (props) => {
   );
 };
 
-// Re-export Dialog compound components with shadcn/ui-style names
+
 export const Dialog = DialogRootBase;
 export const DialogTrigger = DialogTriggerComponent;
 export const DialogContent = DialogContentComponent;

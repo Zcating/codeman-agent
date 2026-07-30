@@ -181,7 +181,7 @@ describe("contentOf", () => {
     });
 
     it("returns empty array when content is a string (not array)", () => {
-        // UserMessage.content can be string OR array — guard must only return array branch
+        
         expect(contentOf({ content: "hello" })).toEqual([]);
     });
 

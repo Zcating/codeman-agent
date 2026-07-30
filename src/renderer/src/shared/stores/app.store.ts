@@ -1,26 +1,26 @@
-//! 全局 app-store.
-//!
-//! Settings 的全局 reactive 桥接层。UI 通过 `appStore.state.value` 读，
-//! 通过 `appStore.set(patch)` / `appStore.forceFlush()` / `appStore.refresh()`
-//! 及 service-only-in-store 新方法 (D4) 写。
-//!
-//! 架构约束：
-//! - **store 函数返回类型二选一**：`void` 或 `Effect<A, E, never>`。绝不返回 Promise。
-//! - **本模块不接 debounce 逻辑**。`set()` 是同步 state mutation；debounce 由 Settings
-//!   feature 层（`src/features/settings/lib/settings-saver.ts`）用 es-toolkit 实现。
-//! - **D4 硬规则**：所有 service 操作（IPC / ProviderApi / SettingsApi /
-//!   WorkspaceService）必须包成 store method，组件层只调 `Effect.runPromiseExit(store.method())`。
-//!
-//! 设计要点：
-//! - `value: Settings` 永不为 null — `defaultSettings` 站位
-//! - `set(patch)` 同步 in-memory update（不触发 IPC）
-//! - `forceFlush()` 跳过 debounce 立即 IPC（footer Save 调用）
-//! - `refresh()` 从后端重新加载
-//! - `refreshProviderModels(id)` 拉 models + 写 state + D2 不变量
-//! - `pickWorkspacePath()` 弹 OS folder picker
-//! - `deleteProvider(id)` 从 providers[] 移除
-//! - `clearAllHistory()` 清 SQLite conversation 表
-//! - 启动时由 `src/index.tsx` 在 mount RouterProvider 之前 `await Effect.runPromiseExit(appStore.refresh())`
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 import { createStore } from "solid-js/store";
 import { Effect } from "effect";
@@ -28,9 +28,9 @@ import type { Settings, Provider, ModelMeta, Workspace } from "@codeman-frontend
 import { logger } from "@codeman-frontend/shared/lib/logger";
 import { Unknown, type AppError } from "@codeman-frontend/shared/lib/errors";
 import { decodeAppError } from "@codeman-frontend/shared/lib/decode-app-error";
-// V3: route IPC through the V3 canonical (window.codeman dispatch) instead of
-// the V2 @tauri-apps/api/core which reads window.__TAURI_INTERNALS__ (missing
-// in V3 Electron).
+
+
+
 import {
   invoke as ipcInvoke,
   ProviderApi,
@@ -40,7 +40,7 @@ import {
 } from "@codeman-frontend/shared/apis";
 import { WorkspaceService, WorkspaceServiceLive } from "@codeman-frontend/shared/lib/workspace-service";
 import { lookupContextWindow } from "@codeman-frontend/features/chat/lib/context-window-fallback";
-// ─── Default Settings ─────────────────────────────────────────────────
+
 const DEFAULT_MINIMAX_PROVIDER: Provider = {
   id: "minimax",
   label: "MiniMax",
@@ -107,14 +107,14 @@ function toAppError(e: unknown): AppError {
   return new Unknown({ message: e instanceof Error ? e.message : String(e) });
 }
 
-// V3: ipcInvoke returns Effect.Effect<T, AppError> (not Promise) — use
-// Effect.gen with yield* instead of tryPromise + await.
-// V3 e2e: deep-clone settings.value via JSON round-trip — Solid createStore
-// returns a Proxy (and nested values are also Proxies); ipcRenderer.invoke
-// uses the structured clone algorithm which cannot serialize Proxies
-// ("An object could not be cloned"). Shallow spread `{ ...settings.value }`
-// is NOT enough because nested arrays/objects remain Proxies. JSON
-// round-trip produces a fully plain object tree that structured-clones.
+
+
+
+
+
+
+
+
 const flushImpl = Effect.fn(function* () {
   yield* ipcInvoke("updateSettings", {
     newSettings: JSON.parse(JSON.stringify(settings.value)),
@@ -190,104 +190,66 @@ const clearAllHistoryImpl = Effect.fn(
 );
 
 export const appStore = {
-  /** Reactive read of current Settings (always defined, never null). */
+  
   state: settings,
 
-  /**
-   * Merge patch into reactive state SYNCHRONOUSLY (no debounce, no IPC).
-   * - Multiple set() calls within a short time coalesce visually but each mutates state immediately.
-   * - To trigger IPC, call `settingsSaver.scheduleSave()` (from src/features/settings/lib/settings-saver).
-   * - Returns void immediately.
-   */
+  
   set(patch: Partial<Settings>): void {
     applyPatch(patch);
   },
 
-  /**
-   * Force immediate flush (skip debounce). Called by footer Save button.
-   * Returns Effect — caller bridges via `Effect.runPromiseExit(appStore.forceFlush())`.
-   */
+  
   forceFlush(): Effect.Effect<void, AppError> {
     return flushImpl();
   },
 
-  /**
-   * Reload Settings from backend. Called on app startup and on demand.
-   * Returns Effect — caller bridges via `Effect.runPromiseExit(appStore.refresh())`.
-   */
+  
   refresh(): Effect.Effect<Settings, AppError> {
     return refreshImpl();
   },
 
-  /**
-   * V1.8+ D1: 拉指定 provider 的 models 列表，写入 store。
-   * 包含 D2 Default Model Invariant 强制执行。
-   * 组件用 `Effect.runPromiseExit(appStore.refreshProviderModels(id))` + Exit.match 处理。
-   * 注意: settingsSaver.scheduleSave() 仍由组件调用 (shared → feature 单向依赖)。
-   */
+  
   refreshProviderModels(id: string): Effect.Effect<ModelMeta[], AppError> {
     return refreshProviderModelsImpl(id);
   },
 
-  /**
-   * V1.8+ D4: 弹 OS folder picker，返回选中路径或 null。
-   * 组件用 `Effect.runPromiseExit(appStore.pickWorkspacePath())` + Exit.match。
-   */
+  
   pickWorkspacePath(): Effect.Effect<string | null, AppError> {
     return pickWorkspacePathImpl();
   },
 
-  /**
-   * @deprecated D8-W: Workspaces are now managed by WorkspaceService (Rust backend).
-   * This method is a stub - actual workspace creation goes through WorkspaceService.add().
-   * This method is kept for backward compatibility and will be removed in a future wave.
-   */
+  
   addWorkspace(_rootPath: string): Workspace | null {
     logger.warn("appStore.addWorkspace is deprecated - use WorkspaceService instead");
     return null;
   },
 
-  /**
-   * V1.8+ D4: 从 providers[] 移除 + 后端 delete IPC。
-   * 组件用 `Effect.runPromiseExit(appStore.deleteProvider(id))` + Exit.match。
-   */
+  
   deleteProvider(id: string): Effect.Effect<void, AppError> {
     return deleteProviderImpl(id);
   },
 
-  /**
-   * V1.8+ D4 + D5: 清 SQLite conversation 表。
-   * 组件用 `Effect.runPromiseExit(appStore.clearAllHistory())` + Exit.match。
-   */
+  
   clearAllHistory(): Effect.Effect<void, AppError> {
     return clearAllHistoryImpl();
   },
 
-  /**
-   * @deprecated D8-W: last_used_workspace_id is removed from Settings.
-   * Workspace selection is now transient (in-memory only) in the chat domain.
-   */
+  
   setLastUsedWorkspaceId(_id: string | null): void {
   },
 
-  /**
-   * @deprecated D8-W: last_used_workspace_id is removed from Settings.
-   * Always returns null - workspace selection is now transient.
-   */
+  
   getLastUsedWorkspaceId(): string | null {
     return null;
   },
 
-  /**
-   * @deprecated D8-W: Workspaces are now managed by Rust backend.
-   * This method always returns null - workspace selection is now done via WorkspaceService.list().
-   */
+  
   selectedWorkspaceId(): string | null {
     return null;
   },
 };
 
-/** Test-only: reset store state to defaultSettings (called from app.store.test.ts). */
+
 export function _resetAppStoreForTest(): void {
   setSettings("value", defaultSettings);
 }

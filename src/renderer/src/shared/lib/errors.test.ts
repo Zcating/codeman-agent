@@ -29,10 +29,10 @@ describe("errors — Schema.TaggedError variants (ADR-0025 PR1)", () => {
     expect(new Network({ message: "a", cause: "timeout" }).cause).toBe("timeout");
     expect(new Network({ message: "a" }).cause).toBeUndefined();
     expect(new InvalidConfig({ message: "a" }).field).toBeUndefined();
-    // NOTE: `message` collides with Error.prototype.message (Schema.TaggedError extends
-    // Error). When the optional `message` field is omitted, `.message` falls through to
-    // Error's default `""` (empty string), NOT undefined. formatAppError must treat
-    // empty-string as "no message" (uses `||`, not `??`).
+    
+    
+    
+    
     expect(new SandboxViolation({ path: "/p", workspaceLabel: "w" }).message).toBe("");
     expect(new SandboxViolation({ message: "m", path: "/p", workspaceLabel: "w" }).message).toBe("m");
   });

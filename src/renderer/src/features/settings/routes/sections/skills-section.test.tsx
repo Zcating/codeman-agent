@@ -1,11 +1,11 @@
-// SkillsSection — `/settings/skills` route component tests.
-//
-// Verifies:
-// - No refresh button (data-testid="skills-refresh") is rendered
-// - No "Refresh" label is rendered
-// - Skills list renders with toggles when skills exist
-// - Empty state renders when no skills exist
-// - Empty state copy mentions startup scanning, not refresh
+
+
+
+
+
+
+
+
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { render, screen, cleanup } from "@solidjs/testing-library";
@@ -16,8 +16,8 @@ import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
 import { appStore, _resetAppStoreForTest } from "@codeman-frontend/shared/stores/app.store";
 
-// Mock solid-js/store — SkillsSection imports appStore, appStore uses createStore.
-// jsdom lacks Solid reactive context, this mock provides minimal proxy.
+
+
 vi.mock("solid-js/store", () => {
   let store: { value: unknown } = { value: null };
   const setStore = vi.fn((...args: unknown[]) => {
@@ -44,8 +44,8 @@ vi.mock("solid-js/store", () => {
   return { createStore: () => [storeProxy, setStore] };
 });
 
-// Mock skills store — intercepts setManifests to keep manifests in memory
-// so the signal reflects what we set via mockState.
+
+
 let _manifests: SkillManifest[] = [];
 vi.mock("@codeman-frontend/plugins/skills/stores/skills.store", () => {
   return {
@@ -67,8 +67,8 @@ describe("SkillsSection — /settings/skills", () => {
   beforeEach(async () => {
     _resetAppStoreForTest();
     _manifests = [];
-    // Set up mockState.settings as SettingsV15 (without extra enabledSkills).
-    // The test populates skills via _manifests mock, not appStore settings.
+    
+    
     mockState.settings = {
       providers: [],
       schemaVersion: "1.5",
@@ -143,9 +143,9 @@ describe("SkillsSection — /settings/skills", () => {
     _manifests = [];
     render(() => <SkillsSection />);
     await new Promise((resolve) => setTimeout(resolve, 10));
-    // Should NOT contain refresh instruction
+    
     expect(screen.queryByText(/Click Refresh/i)).not.toBeInTheDocument();
-    // Should mention startup scanning
+    
     expect(screen.getByText(/startup/i)).toBeInTheDocument();
   });
 

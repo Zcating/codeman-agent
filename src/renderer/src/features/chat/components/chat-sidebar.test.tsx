@@ -1,17 +1,17 @@
-//! ChatSidebar — chat-domain wrapper tests (PR 2).
-//!
-//! Strategy: mock CodemanSidebar to capture the props ChatSidebar passes.
-//! Verify ChatSidebar's CONTRACT (what it passes to CodemanSidebar) rather
-//! than the rendered DOM. Chat-sidebar.test.tsx verifies chat-specific
-//! wiring; codeman-sidebar.test.tsx verifies the universal sidebar's
-//! rendering; row-actions.test.tsx verifies the leaf component (delete +
-//! rename + inline-confirm + inline edit-in-place).
+
+
+
+
+
+
+
+
 
 import { render } from "@solidjs/testing-library";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Effect } from "effect";
 
-// ─── Captured props from ChatSidebar → CodemanSidebar ─────────────────────
+
 
 interface CapturedProps {
   options: any[];
@@ -53,7 +53,7 @@ const F = vi.hoisted(() => {
     mockRemoveWorkspace: vi.fn(() => Effect.succeed(undefined)),
     mockDialogConfirm: vi.fn(),
     capturedProps: null as CapturedProps | null,
-    // For RowActions mock (T8)
+    
     capturedRowActionsProps: null as any,
     mockChatSidebarActions: {
       deleteConversation: vi.fn().mockResolvedValue(undefined),
@@ -61,7 +61,7 @@ const F = vi.hoisted(() => {
       renameWorkspace: vi.fn().mockResolvedValue(true),
       removeWorkspace: vi.fn().mockResolvedValue(true),
     },
-    // Default plugin metadata for tests
+    
     getPluginMetadata: () =>
       new Map([
         [
@@ -84,8 +84,8 @@ const F = vi.hoisted(() => {
   };
 });
 
-// ─── Plugin metadata mock (hoisted to top level for vi.mock to work) ────────────
-// Uses an object with a getter so tests can reassign F.getPluginMetadata dynamically.
+
+
 const mockPluginMetadata = {
   get: () => F.getPluginMetadata(),
 };
@@ -94,7 +94,7 @@ vi.mock("@codeman-frontend/plugins", () => ({
   getPluginMetadata: () => mockPluginMetadata.get(),
 }));
 
-// ─── Module mocks ──────────────────────────────────────────────────────────
+
 
 vi.mock("@tanstack/solid-router", async () => {
   const actual = await vi.importActual<typeof import("@tanstack/solid-router")>(
@@ -152,11 +152,11 @@ vi.mock("../../../shared/components/internal/codeman-sidebar", () => ({
   },
 }));
 
-// ─── Imports under test ───────────────────────────────────────────────────
+
 
 import { ChatSidebar } from "@codeman-frontend/features/chat/components/chat-sidebar";
 
-// ─── Setup ─────────────────────────────────────────────────────────────────
+
 
 beforeEach(() => {
   F.capturedProps = null;
@@ -170,7 +170,7 @@ beforeEach(() => {
   F.mockDialogConfirm.mockReset();
 });
 
-// ─── Tests ─────────────────────────────────────────────────────────────────
+
 
 describe("ChatSidebar (PR 2)", () => {
   it("builds CodemanSidebarGroupOption[] with plugin group and project group", () => {
@@ -179,12 +179,12 @@ describe("ChatSidebar (PR 2)", () => {
     const opts = F.capturedProps!.options;
     expect(opts.length).toBe(2);
 
-    // Plugin group (top)
+    
     expect(opts[0]).toMatchObject({
       label: "插件",
       value: "plugins",
     });
-    // Plugin children: Skills and MCP
+    
     expect(opts[0].children.length).toBe(2);
     expect(opts[0].children[0]).toMatchObject({
       label: "Skills",
@@ -195,19 +195,19 @@ describe("ChatSidebar (PR 2)", () => {
       value: "mcp",
     });
 
-    // Project group (second) — always visible (no defaultExpanded; sidebar-reshim Q28 reversal)
+    
     expect(opts[1]).toMatchObject({
       label: "项目",
       value: "workspace",
     });
-    // Two MenuGroups as children, each carrying per-group Accordion defaultExpanded
+    
     expect(opts[1].children.length).toBe(2);
     expect(opts[1].children[0]).toMatchObject({
       label: "Frontend",
       value: "ws-1",
       defaultExpanded: true,
     });
-    // Convs as Menu children of each MenuGroup
+    
     expect(opts[1].children[0].children).toEqual([
       { label: "Chat 1", value: "c-1" },
       { label: "Chat 2", value: "c-2" },
@@ -246,20 +246,20 @@ describe("ChatSidebar (PR 2)", () => {
   });
 
   it("onMenuGroupSelect is NOT wired (MenuGroup click must NOT navigate — ADR-0023 D7-CS)", () => {
-    // Per ADR-0023 D7-CS: MenuGroups are NEVER active, only
-    // menus are. Clicking a MenuGroup label should ONLY toggle its accordion —
-    // it must NOT navigate to /conversation/{wsId} (a non-existent conv route).
-    // Universal CodemanSidebar still calls props.onMenuGroupSelect?.() — but
-    // chat intentionally does not pass one (no-op when undefined).
+    
+    
+    
+    
+    
     render(() => <ChatSidebar />);
     expect(F.capturedProps?.onMenuGroupSelect).toBeUndefined();
   });
 
   it("clicking MenuGroup label does NOT navigate (regression: avoid /conversation/{wsId} 404)", async () => {
-    // User-reported 2026-07-25: clicking the outer accordion trigger button
-    // used to navigate to /conversation/{wsId}. Workspace id ≠ conv id → 404.
-    // After fix: chat passes no onMenuGroupSelect → CodemanSidebar's
-    // handleSelect is a no-op → no navigation. Accordion toggle still fires.
+    
+    
+    
+    
     render(() => <ChatSidebar />);
     F.mockNavigate.mockClear();
     expect(F.capturedProps?.onMenuGroupSelect).toBeUndefined();
@@ -267,10 +267,10 @@ describe("ChatSidebar (PR 2)", () => {
   });
 
   it("clicking inner Delete button in renderMenuGroup does NOT navigate (RowActions stopPropagation)", async () => {
-    // Defensive: inner Rename/Delete buttons in RowActions call
-    // e.stopPropagation() so the outer CodemanSidebar trigger's onClick should
-    // NOT fire. After fix, onMenuGroupSelect is absent — but we still assert
-    // no navigate to lock the defensive contract.
+    
+    
+    
+    
     render(() => <ChatSidebar />);
     F.mockNavigate.mockClear();
     const renderMenuGroup = F.capturedProps!.renderMenuGroup;
@@ -323,12 +323,12 @@ describe("ChatSidebar (PR 2)", () => {
   it("conversations are sorted by updatedAt descending", () => {
     render(() => <ChatSidebar />);
     const menus = F.capturedProps!.options[1].children[0].children;
-    // c-1 has updatedAt=200, c-2 has updatedAt=100
+    
     expect(menus[0].label).toBe("Chat 1");
     expect(menus[1].label).toBe("Chat 2");
   });
 
-  // ─── Seam 20: workspace hover rename + delete ─────────────────────────────
+  
   describe("Seam 20: MenuGroup hover rename+delete via renderMenuGroup", () => {
     it("renderMenuGroup returns JSX containing rename and delete buttons", () => {
       render(() => <ChatSidebar />);
@@ -385,13 +385,13 @@ describe("ChatSidebar (PR 2)", () => {
     });
   });
 
-  // ─── Seam P1: Plugin group derived from registry metadata ─────────────────────
+  
   describe("Seam P1: Plugin group from registry metadata", () => {
     it("plugin group children are sorted by sidebar.order (not hardcoded order)", () => {
       render(() => <ChatSidebar />);
       const opts = F.capturedProps!.options;
       const pluginChildren = opts[0].children;
-      // skills has order=3, mcp has order=4 → skills should come first
+      
       expect(pluginChildren[0].value).toBe("skills");
       expect(pluginChildren[1].value).toBe("mcp");
     });
@@ -400,15 +400,15 @@ describe("ChatSidebar (PR 2)", () => {
       render(() => <ChatSidebar />);
       const opts = F.capturedProps!.options;
       const pluginChildren = opts[0].children;
-      // Verify the children have the correct values that map to route.path
+      
       expect(pluginChildren.find((c: any) => c.value === "skills")).toBeTruthy();
       expect(pluginChildren.find((c: any) => c.value === "mcp")).toBeTruthy();
     });
 
     it("navigates using route.path from metadata (not hardcoded /plugins/skills path)", () => {
       render(() => <ChatSidebar />);
-      // The onMenuSelect handler should navigate using registry metadata
-      // Skills value "skills" should navigate to "/plugins/skills" from metadata
+      
+      
       F.capturedProps!.onMenuSelect!("skills");
       expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/plugins/skills" });
     });
@@ -425,20 +425,20 @@ describe("ChatSidebar (PR 2)", () => {
       const pluginChildren = opts[0].children;
       const skillsChild = pluginChildren.find((c: any) => c.value === "skills");
       const mcpChild = pluginChildren.find((c: any) => c.value === "mcp");
-      // Icons should be JSX elements (WandSparkles for skills, Cable for mcp)
+      
       expect(skillsChild?.icon).toBeTruthy();
       expect(mcpChild?.icon).toBeTruthy();
     });
 
     it("FAILS if metadata order is ignored: changing order in registry should reorder sidebar", () => {
-      // Build metadata with REVERSED order to prove sorting is applied
+      
       const reversedMetadata = new Map([
         [
           "mcp",
           {
             id: "mcp",
             route: { path: "/plugins/mcp", label: "MCP" },
-            sidebar: { icon: "Cable", order: 1, visible: true }, // mcp comes first
+            sidebar: { icon: "Cable", order: 1, visible: true }, 
           },
         ],
         [
@@ -446,20 +446,20 @@ describe("ChatSidebar (PR 2)", () => {
           {
             id: "skills",
             route: { path: "/plugins/skills", label: "Skills" },
-            sidebar: { icon: "WandSparkles", order: 2, visible: true }, // skills comes second
+            sidebar: { icon: "WandSparkles", order: 2, visible: true }, 
           },
         ],
       ]);
 
-      // This test FAILS with hardcoded implementation because mcp is hardcoded first
-      // With registry-based implementation, mcp should appear first
+      
+      
       const originalGetPluginMetadata = F.getPluginMetadata;
       F.getPluginMetadata = () => reversedMetadata;
 
       render(() => <ChatSidebar />);
       const opts = F.capturedProps!.options;
       const pluginChildren = opts[0].children;
-      // With registry-based implementation sorted by order, mcp (order=1) should come first
+      
       expect(pluginChildren[0].value).toBe("mcp");
       expect(pluginChildren[1].value).toBe("skills");
 
@@ -492,16 +492,16 @@ describe("ChatSidebar (PR 2)", () => {
       render(() => <ChatSidebar />);
       const opts = F.capturedProps!.options;
       const pluginChildren = opts[0].children;
-      // hidden-plugin should NOT appear
+      
       expect(pluginChildren.find((c: any) => c.value === "hidden-plugin")).toBeUndefined();
-      expect(pluginChildren.length).toBe(1); // only skills
+      expect(pluginChildren.length).toBe(1); 
 
       F.getPluginMetadata = originalGetPluginMetadata;
     });
 
     it("FAILS if unknown icon identifier: throws with plugin/id context instead of silent WandSparkles fallback", () => {
-      // Registry has exactly two valid icon IDs: WandSparkles and Cable.
-      // Unknown identifiers must fail loudly to catch bad metadata early.
+      
+      
       const metadataWithUnknownIcon = new Map([
         [
           "bad-plugin",
@@ -522,7 +522,7 @@ describe("ChatSidebar (PR 2)", () => {
     });
   });
 
-  // ─── Seam T8: RowActions integration ────────────────────────────────────────
+  
   describe("Seam T8: RowActions integration", () => {
     beforeEach(() => {
       F.capturedRowActionsProps = null;
@@ -532,9 +532,9 @@ describe("ChatSidebar (PR 2)", () => {
       F.mockChatSidebarActions.removeWorkspace.mockClear();
     });
 
-    // Mock RowActions to:
-    // 1. Render the actual RowActions component (so OLD DOM tests still work)
-    // 2. Capture the props (so NEW prop-verification tests work)
+    
+    
+    
     vi.mock("./row-actions", async () => {
       const actual = await vi.importActual<typeof import("./row-actions")>(
         "./row-actions",
@@ -543,7 +543,7 @@ describe("ChatSidebar (PR 2)", () => {
         ...actual,
         RowActions: (props: any) => {
           F.capturedRowActionsProps = props;
-          // Render actual RowActions so DOM queries still work
+          
           return <actual.RowActions {...props} />;
         },
       };

@@ -1,12 +1,6 @@
 import type { SkillManifest } from "@codeman-frontend/plugins/skills/lib/skill-loader-schema";
 
-/**
- * 格式化 enabled skills 为 system prompt 注入段。
- * 空数组 → 空字符串 (让 runtime 跳过此段拼接)。
- *
- * description / name 中的 XML 特殊字符 (`<` / `>` / `&` / `"` / `'`)
- * 自动转义, 防止 description 含未转义 markup 破坏输出 XML 结构。
- */
+
 export function formatSkillsManifestSection(
 	manifests: readonly SkillManifest[],
 ): string {
@@ -30,7 +24,7 @@ export function formatSkillsManifestSection(
 	return lines.join("\n");
 }
 
-/** 转义 XML 特殊字符 (防御 skill name/description 含 markup 破坏 prompt 完整性)。 */
+
 function escapeXml(s: string): string {
 	return s
 		.replace(/&/g, "&amp;")

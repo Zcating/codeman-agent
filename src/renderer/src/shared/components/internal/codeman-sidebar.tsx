@@ -1,5 +1,5 @@
-//! CodemanSidebar — universal render-driven sidebar.
-//! Layer 2 prop-driven composition over `ui/sidebar` + `ui/accordion` primitives.
+
+
 
 import { For, Show, type JSX } from "solid-js";
 import {
@@ -26,77 +26,64 @@ import {
   SidebarInset,
 } from "@codeman-frontend/shared/components/ui/sidebar";
 
-/** Top-level group. `children` is heterogeneous — MenuGroups (accordion-controlled) and Menus (flat) can coexist. */
+
 export interface CodemanSidebarGroupOption {
   label: string;
   value: string;
   children: (CodemanSidebarMenuGroupOption | CodemanSidebarMenuOption)[];
 }
 
-/** Middle layer. Presence of `children` (vs Menu's flat leaf) drives the Accordion wrapper at render time. */
+
 export interface CodemanSidebarMenuGroupOption {
   label: string;
   value: string;
   icon?: JSX.Element;
   disabled?: boolean;
-  /** Initial open state for the per-group Accordion. Default: false. */
+  
   defaultExpanded?: boolean;
   children: CodemanSidebarMenuOption[];
 }
 
-/** Leaf layer. No `children` field — discriminated from MenuGroup by absence. */
+
 export interface CodemanSidebarMenuOption {
   label: string;
   value: string;
   icon?: JSX.Element;
   disabled?: boolean;
-  /**
-   * When true, forces this item to render inside SidebarMenuSub
-   * (nested submenu path), bypassing the top-level SidebarMenuItem path.
-   * Used for plugin/Skills/MCP children that must align with project children.
-   */
+  
   forceSubMenu?: boolean;
 }
 
 export interface CodemanSidebarProps {
   options: CodemanSidebarGroupOption[];
-  /**
-   * Render function for MenuGroup item internal visual.
-   * Called once per MenuGroup with a CodemanSidebarMenuGroupOption.
-   */
+  
   renderMenuGroup: (item: CodemanSidebarMenuGroupOption) => JSX.Element;
-  /**
-   * Render function for Menu leaf internal visual.
-   * Called once per Menu with a CodemanSidebarMenuOption. Falls back to `{menu.label}` when omitted.
-   */
+  
   renderMenu?: (menu: CodemanSidebarMenuOption) => JSX.Element;
-  /**
-   * Optional override for the group header content.
-   * Called once per group with a CodemanSidebarGroupOption.
-   */
+  
   renderGroupHeader?: (group: CodemanSidebarGroupOption) => JSX.Element;
 
-  /** Current active value for highlighting */
+  
   currentValue?: string;
-  /** Custom active predicate: (value, currentValue) => boolean */
+  
   isActive?: (value: string | undefined, currentValue: string | undefined) => boolean;
-  /** Click handler for MenuGroup items */
+  
   onMenuGroupSelect?: (value: string) => void;
-  /** Click handler for Menu items */
+  
   onMenuSelect?: (value: string) => void;
-  /** Called when an empty group is clicked (no children) */
+  
   onEmptyGroupClick?: (groupValue: string) => void;
 
-  /** Top slot — inside sidebar shell, above menu */
+  
   header?: JSX.Element;
-  /** Bottom slot — inside sidebar shell, below menu */
+  
   footer?: JSX.Element;
-  /** Main content slot — rendered in SidebarInset (right column) */
+  
   children?: JSX.Element;
 
-  /** Shown when `options.length === 0` */
+  
   emptyMessage?: string;
-  /** Tailwind utility class merged into the root sidebar */
+  
   class?: string;
 }
 
@@ -137,7 +124,7 @@ interface CodemanSidebarGroupViewProps {
   isMenuActive: (menu: CodemanSidebarMenuOption) => boolean;
 }
 
-/** Empty-state placeholder when `options.length === 0`. */
+
 function CodemanSidebarEmptyState(
   props: CodemanSidebarEmptyStateProps,
 ): JSX.Element {
@@ -153,7 +140,7 @@ function CodemanSidebarEmptyState(
   );
 }
 
-/** Action button shown when a group has no children AND `onEmptyGroupClick` is provided. */
+
 function CodemanSidebarEmptyGroupButton(
   props: CodemanSidebarEmptyGroupButtonProps,
 ): JSX.Element {
@@ -172,11 +159,7 @@ function CodemanSidebarEmptyGroupButton(
   );
 }
 
-/**
- * One MenuGroup row. Wraps its children in a per-group Accordion (each MenuGroup
- * expands independently). The MenuGroup's trigger is always `isActive={false}`;
- * only Menu leaves can be active.
- */
+
 function CodemanSidebarMenuGroup(
   props: CodemanSidebarMenuGroupProps,
 ): JSX.Element {
@@ -199,8 +182,8 @@ function CodemanSidebarMenuGroup(
           <AccordionTrigger
             class={cn(
               "peer/menu-button group/menu-button group/row w-full items-center gap-2 overflow-hidden rounded-md outline-hidden transition-[width,height,padding]",
-              // `hover:no-underline` + `font-normal` override the shadcn
-              // trigger's `hover:underline` + `font-medium` defaults.
+              
+              
               "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:no-underline",
               "font-normal",
               "focus-visible:ring-2",
@@ -233,7 +216,7 @@ function CodemanSidebarMenuGroup(
   );
 }
 
-/** One Menu leaf row inside SidebarMenuSub. */
+
 function CodemanSidebarMenuView(
   props: CodemanSidebarMenuViewProps,
 ): JSX.Element {
@@ -254,10 +237,7 @@ function CodemanSidebarMenuView(
   );
 }
 
-/**
- * One group: header + heterogeneous children (MenuGroups or Menus).
- * Discriminator: presence of `children` on the child decides Accordion wrapping.
- */
+
 function CodemanSidebarGroupView(
   props: CodemanSidebarGroupViewProps,
 ): JSX.Element {
@@ -347,7 +327,7 @@ function CodemanSidebarGroupView(
   );
 }
 
-/** Bound active predicate for Menu leaves (closes over currentValue + isActiveFn). */
+
 function makeIsMenuActive(
   currentValue: string | undefined,
   isActiveFn: CodemanSidebarProps["isActive"] | undefined,

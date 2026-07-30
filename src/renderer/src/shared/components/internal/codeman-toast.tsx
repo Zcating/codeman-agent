@@ -1,5 +1,5 @@
-//! codeman-toast.tsx — Imperative codemanToast.error / .success API.
-//! Module-level singleton toaster shared between ToasterMount and codemanToast.
+
+
 
 import { type JSX } from "solid-js";
 import { Portal } from "solid-js/web";
@@ -11,12 +11,12 @@ import {
 import { AlertCircle, CheckCircle2 } from "lucide-solid";
 import { cn } from "@codeman-frontend/shared/lib/cn";
 
-// ─── Singleton toaster ───────────────────────────────────────────────────────
-//
-// Module-level singleton: createToaster() at module load, shared between
-// ToasterMount (consumer of DOM render) and codemanToast (writer of toast
-// entries). Mirrors the codeman-dialog pattern of a module-level imperative
-// API backed by a Portal-mounted React-style tree.
+
+
+
+
+
+
 
 const toaster = createToaster({
   placement: "bottom-end",
@@ -37,10 +37,10 @@ export const codemanToast = {
   },
 };
 
-// ─── ToasterMount ────────────────────────────────────────────────────────────
-//
-// Render once at the app root (mount in src/index.tsx). Subsequent codemanToast
-// calls render into this Toaster.
+
+
+
+
 
 export function ToasterMount(): JSX.Element {
   return (

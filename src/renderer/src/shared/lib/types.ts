@@ -1,7 +1,7 @@
-//! TS-side data structures. Field names use camelCase in TS; the IPC layer
-//! (`src/main/ipc.ts`) translates to/from snake_case at the SQLite/Rust
-//! boundary so DB column names stay snake_case. New fields added here MUST
-//! use camelCase.
+
+
+
+
 
 export interface ModelMeta {
   id: string;
@@ -14,7 +14,7 @@ export interface ModelMeta {
 export interface ProviderLlm {
   defaultModel: string;
   baseUrl: string;
-  /** V1 only supports anthropic-messages protocol */
+  
   apiType: "anthropic-messages";
   contextWindow?: number;
   models: ModelMeta[];
@@ -30,9 +30,9 @@ export interface Provider {
 }
 
 export interface Settings {
-  /** V1.5: unified providers array. Optional for V1 backward-compat. */
+  
   providers?: Provider[];
-  /** V1.5: schema version marker. Optional for V1 backward-compat. */
+  
   schemaVersion?: "1.5";
   defaultLlmProviderId?: string;
   userLanguage: "zh" | "en" | "auto";
@@ -41,21 +41,19 @@ export interface Settings {
   window: WindowSettings;
   systemPrompt: SystemPromptSettings;
   conversations: ConversationSettings;
-  /** V3.1: 已启用的 skill 名字列表。空 = 不在 system prompt 注入 skills。 */
+  
   enabledSkills?: string[];
-  /** @deprecated Use providers instead. Kept for V1 consumer backward-compatibility. */
+  
   llmProviders: LLMProvider[];
 }
 
-// ============================================================================
-// Legacy V1 Types (deprecated - for backward compatibility)
-// ============================================================================
-// These types mirror the V1 flat structure. V1.5 uses nested Provider type.
-// Will be removed after all consumers are migrated to V1.5 Provider schema.
 
-/**
- * @deprecated Use Provider.llm instead. Will be removed after T6-T11 migrations.
- */
+
+
+
+
+
+
 export interface LLMProvider {
   id: string;
   label: string;
@@ -77,18 +75,18 @@ export interface SystemPromptSettings {
   userCanEdit: boolean;
 }
 export interface ConversationSettings {
-  autoArchiveAfterDays: number; // default 30
-  maxHistory: number; // default 1000
+  autoArchiveAfterDays: number; 
+  maxHistory: number; 
 }
 
 export interface Workspace {
   id: string;
   label: string;
-  rootPath: string; // PathBuf in Rust, string in TS
+  rootPath: string; 
   createdAt: number;
 }
 
-/** Mirror of Rust `FileMatch` struct from T9 */
+
 export interface FileMatch {
   path: string;
   lineNumber: number | null;
@@ -100,7 +98,7 @@ export interface Conversation {
   id: string;
   title: string;
   systemPrompt: string | null;
-  /** V2.1: per-Conv workspace binding. '' 表示 'Needs workspace' (V1.x 旧 conv 灰标). */
+  
   workspaceId: string;
   createdAt: number;
   updatedAt: number;
@@ -110,9 +108,9 @@ export interface Message {
   id: string;
   conversationId: string;
   role: Role;
-  /** 助手正文（Markdown 渲染）。thinking 不在此处。 */
+  
   content: string;
-  /** 助手思考过程（来自 Anthropic thinking_delta）。仅 assistant role；user/tool/system 一律 null。 */
+  
   thinking: string | null;
   toolCalls: ToolCall[] | null;
   toolResults: ToolResult[] | null;
@@ -132,46 +130,42 @@ export interface ToolResult {
   error: string | null;
 }
 
-// ============================================================================
-// V2 Local Dev Mock LLM Pipeline
-// ============================================================================
 
-/**
- * Q→A Entry — pre-formatted Anthropic SSE response keyed by user-message substring.
- * Used by the local-dev mock LLM provider pipeline. `default?: true` entries are
- * first-wins fallbacks when no `question` substring matches.
- */
+
+
+
+
 export interface QaEntry {
   question: string;
   answer: string;
   default?: boolean;
 }
 
-// ============================================================================
-// V3.1 Skills Plugin
-// ============================================================================
 
-/** Skill 来源标识 — preinstalled (ship-with-app) 或 user (用户添加)。 */
+
+
+
+
 export type SkillSource = "preinstalled" | "user";
 
-/** SKILL.md 顶部 YAML frontmatter block 的形状。 */
+
 export interface SkillFrontmatter {
   name: string;
   description: string;
 }
 
-/** 单个 skill 的运行时元数据 (从 ~/.agents/skills/<name>/SKILL.md 解析)。 */
+
 export interface SkillManifest {
   name: string;
   description: string;
   source: SkillSource;
-  /** 绝对路径指向 SKILL.md 文件, 供 IPC handler 读全文用 */
+  
   path: string;
 }
 
-// ============================================================================
-// V3.1 MCP Client
-// ============================================================================
+
+
+
 
 export type McpServerStatus =
   | { kind: "disabled" }
@@ -209,7 +203,7 @@ export interface McpServerInfo {
 export interface McpToolEntry {
   serverName: string;
   agentName: string;
-  /** Original tool name (before slugification), e.g. "create_issue". */
+  
   toolName: string;
   description: string;
   inputSchema: unknown;

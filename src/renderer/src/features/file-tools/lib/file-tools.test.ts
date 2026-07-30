@@ -1,7 +1,7 @@
-//! File Tools — AgentTool 测试（T11-T15）。
-//!
-//! 测试 5 个工具的 happy path 和 error path。
-//! 使用 mockState（src/__mocks__/@tauri-apps/api/core.ts）mock IPC invoke。
+
+
+
+
 
 import { describe, it, expect, beforeEach } from "vitest";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
@@ -91,7 +91,7 @@ describe("writeFileTool", () => {
   });
 
   it("happy path returns void with success message", async () => {
-    mockState.resolved = undefined; // write_file returns ()
+    mockState.resolved = undefined; 
 
     const result = await writeFileTool.execute("c1", {
       workspaceId: "ws1",
@@ -343,16 +343,16 @@ describe("deleteFileTool", () => {
   });
 });
 
-// Task 4 (Phase-3 review Hard #1 + J3): single workspaceId field constant.
-// Proves the constant is exported and round-trips for both present and absent
-// values (i.e., is genuinely optional).
-//
-// Note: `Schema.optional(...)` returns a PropertySignature, which is only
-// decodable inside a `Schema.Struct({...})`. So each test wraps the field in
-// a one-key Struct to mirror how the 5 tool schemas consume it.
-//
-// ADR-0013.1: workspaceId is the camelCase single source of truth; the previous
-// `workspace_id` snake_case wrap is removed.
+
+
+
+
+
+
+
+
+
+
 import { Schema } from "effect";
 import { workspaceIdField } from "@codeman-frontend/features/file-tools/lib/file-tools";
 
@@ -381,9 +381,9 @@ describe("workspaceIdField — single source of truth (Phase-3 review + ADR-0013
   });
 });
 
-// Task 8 (Phase-3 review J2): `fileTools` and `createFileTools` return type must
-// be `AgentTool<TSchema, unknown>[]` (NOT `AgentTool<any, any>[]`).
-// This is a compile-time check using a type alias that fails loudly if reverted.
+
+
+
 describe("fileTools / createFileTools array type (ADR-0025 review J2)", () => {
   it("returns AgentTool<TSchema, unknown>[] — never 'any'", () => {
     type IsAny<T> = 0 extends 1 & T ? true : false;
