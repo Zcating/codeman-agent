@@ -23,7 +23,7 @@ md.use(markdownItTaskLists);
 
 export function renderMarkdown(src: string): string {
   const raw = md.render(src);
-  // TODO(spec-2): 考虑显式声明 USE_PROFILES: { html: true } 以锁定 DOMPurify 行为。
+  // TODO: 考虑显式声明 USE_PROFILES: { html: true } 以锁定 DOMPurify 行为。
   // 当前依赖默认配置。
   return DOMPurify.sanitize(raw);
 }
