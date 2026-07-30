@@ -1,6 +1,6 @@
-# ADR 0010 — 前端 5+1 子目录白名单 + 跨域类型/lib 收口 + mockState 单一源
+# ADR 0010 — 前端 5+1 → 6+1 子目录白名单 + 跨域类型/lib 收口 + mockState 单一源
 
-- Status: Accepted
+- Status: Accepted (amended by ADR-0038, 2026-07-30)
 - Date: 2026-06-15
 - Scope: codeman-agent V1 前端 src/ 结构第二轮收口（ADR-0008 之后的延伸）
 
@@ -44,6 +44,7 @@ src/
 | `routes/`     | 路由组件                                                             | `index.tsx`                                    |
 | `hooks/`      | Solid composable（`use-` 前缀，参数或返回值含 Accessor）             | `use-debounce.ts`, `use-conversations.ts`      |
 | `lib/`        | 纯函数 / Effect-TS service / Effect runtime / 类型 / schema / 格式化 | `runtime.ts`, `llm-providers.ts`, `billing.ts` |
+| `tools/`      | LLM-facing AgentTool 定义（扁平，无子目录）                          | `file-ops.ts`, `webfetch.ts`, `schemas.ts`    |
 
 **`shared/` 允许的子目录**：
 
@@ -55,14 +56,16 @@ src/
 | `hooks/`               | 跨域 Solid composable                                                             | 空，V1 预留                                    |
 | `lib/`                 | 纯函数 / 跨域类型 / 跨域 util                                                     | `cn.ts` + `tauri.ts` + `units.ts` + `types.ts` |
 
-### Feature 根级只允许两个文件
+### Feature / tools 根级规则
 
 每个 `features/<feature>/` 根级**只允许**：
 
 - `index.ts` — public API barrel
 - `AGENTS.md` — feature 规则
 
-所有其它文件（runtime、service、tool schema、bridge、类型）必须落在 5 个子目录之一。`chat/runtime.ts` 当前在 feature 根级，迁到 `chat/lib/runtime.ts`。
+所有其它文件（runtime、service、tool schema、bridge、类型）必须落在 6 个子目录之一。`chat/runtime.ts` 当前在 feature 根级，迁到 `chat/lib/runtime.ts`。
+
+**ADR-0038 扩展**:新增 `src/renderer/src/tools/` 作为 6+1 白名单的第 6 条允许路径。`tools/<name>/` 根级规则与 feature 一致（仅 `index.ts` + `AGENTS.md`），agent tool 定义走扁平文件（`<name>.ts` + `schemas.ts` + `index.ts` barrel），无嵌套子目录。
 
 ### 现有 → 新映射
 
@@ -165,11 +168,20 @@ billing 是"无 UI 工具 schema"——只有 `lib/`，没有 components/routes/
 
 AGENTS.md 是该 feature 域的"leading source of truth"——开发者进入 feature 第一眼看的就是 `AGENTS.md`。把它放在 feature 根级（`features/<feature>/AGENTS.md`）而非 `features/<feature>/lib/AGENTS.md`，是因为：① feature 根是 IDE 折叠 / 跳读时的入口视觉点；② "AGENTS.md 是根级文件"是项目既有约定，挪到 `lib/` 反而违反"AGENTS.md 是阅读锚点"的隐含语义；③ Q2 已确认 feature 根级只允许 `index.ts` + `AGENTS.md` 两个文件，没有"AGENTS.md 必须进子目录"的约束。
 
+### 5+1 → 6+1 演进（ADR-0038，2026-07-30）
+
+新增 `tools/` 作为第 6 个允许子目录（实质是 `src/renderer/src/tools/<name>/` 顶层目录，与 `features/` 同级）。
+
+动机：内置 AgentTool（file-ops、webfetch）与 `features/` 的业务域（chat、settings、billing）不同——它们是 LLM-facing 工具定义，不承载 UI 或业务状态。`features/<feature>/tools/` 曾在 ADR-0010 被合并到 `lib/`，但 `tools/` 作为 renderer 顶层目录（`src/renderer/src/tools/`）是新增位置，不与现有 feature 目录冲突。
+
+详见 ADR-0038。
+
 ## Consequences
 
 **正面**：
 
-- 5+1 白名单让新人 5 分钟理解 src/ 整体结构
+- 5+1 → 6+1 白名单（ADR-0038 扩展）新增 `tools/`，覆盖内置 AgentTool 定义
+- 6+1 白名单让新人 5 分钟理解 src/ 整体结构
 - 命名统一：store→stores、state→stores、subsystems/tools→lib、ui→components/ui
 - mockState 单一源消除了 test-setup 与 settings.test.tsx 配置互相看不见的隐藏 bug
 - `llm_providers` 改为 `llm-providers`，跟 kebab-case 约定对齐
@@ -219,3 +231,4 @@ AGENTS.md 是该 feature 域的"leading source of truth"——开发者进入 fe
 - `src/features/settings/AGENTS.md`
 - `src/features/billing/AGENTS.md`
 - vitest 文档：`__mocks__/` 自动应用规则
+- **Amended by ADR-0038** (2026-07-30) — 5+1 → 6+1 白名单扩展 + `tools/` 顶层目录
