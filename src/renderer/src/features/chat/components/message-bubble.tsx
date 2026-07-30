@@ -107,6 +107,8 @@ export function MessageBubble(props: { message: Message }) {
           </Show>
 
           {/* 3. 正文 Markdown */}
+          {/* FIXME: prose* 类依赖未装的 @tailwindcss/typography 插件,目前无样式生效。
+              见 .omo/plans/chatbubble-markdown-it.md "已知未修问题"。 */}
           <Show when={hasContent()}>
             <div
               class="prose prose-sm dark:prose-invert max-w-none"

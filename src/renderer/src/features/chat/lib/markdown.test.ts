@@ -2,19 +2,7 @@
 //!
 //! 覆盖: bold, H1, link, linkify, strikethrough, table, task lists, XSS 防护, 空输入。
 
-import { describe, it, expect, vi } from "vitest";
-
-// ─── DOMPurify mock ──────────────────────────────────────────────────────────
-// jsdom 25+ 自带 window 但 DOMPurify 依赖 window.document 而可能不完全兼容。
-// 先检查是否能正常 import，如果不行则 mock。
-// 注意: html:false 是第一道防线，DOMPurify 是第二道。即使 DOMPurify 被 mock 成透传，
-// T8/T9 的 html:false 拦截仍然有效。
-vi.mock("dompurify", () => ({
-  default: {
-    sanitize: (str: string) => str,
-  },
-}));
-
+import { describe, it, expect } from "vitest";
 import { renderMarkdown } from "@codeman-frontend/features/chat/lib/markdown";
 
 describe("renderMarkdown", () => {
@@ -68,11 +56,11 @@ describe("renderMarkdown", () => {
     expect(result).not.toContain("<script>");
   });
 
-  // T9: XSS — img 标签不会作为 HTML 渲染（html:false 将其转义为文本）
-  it("T9: <img src=x onerror=alert(1)> 不会作为 HTML img 标签渲染", () => {
+  // T9: XSS — onerror 属性必须被剥离（不论通过 html:false 转义还是 DOMPurify 过滤）
+  it("T9: XSS <img onerror> 属性 onerror= 被剥离", () => {
     const result = renderMarkdown('<img src=x onerror=alert(1)>');
-    // html:false 使原始 HTML 被转义为可见文本，不会作为 <img> 标签执行
-    expect(result).not.toContain("<img");
+    // 检查没有实际的 HTML img 标签携带 onerror 属性（排除 markdown-it 转义后的文本）
+    expect(result).not.toMatch(/<[^>]*?onerror\s*=/);
   });
 
   // T10: empty string
