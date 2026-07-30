@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { FilePathSchema, type FilePath } from "@codeman-frontend/features/file-tools/lib/schemas";
+import { FilePathSchema, type FilePath } from "@codeman-frontend/tools/file-ops";
 
 describe("FilePathSchema (ADR-0025 PR 4)", () => {
   it("accepts absolute paths without traversal", () => {

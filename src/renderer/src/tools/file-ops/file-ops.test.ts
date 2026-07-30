@@ -14,7 +14,7 @@ import {
   deleteFileTool,
   fileTools,
   createFileTools,
-} from "@codeman-frontend/features/file-tools/lib/file-tools";
+} from "@codeman-frontend/tools/file-ops";
 import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 import {
   NotFound,
@@ -354,7 +354,7 @@ describe("deleteFileTool", () => {
 // ADR-0013.1: workspaceId is the camelCase single source of truth; the previous
 // `workspace_id` snake_case wrap is removed.
 import { Schema } from "effect";
-import { workspaceIdField } from "@codeman-frontend/features/file-tools/lib/file-tools";
+import { workspaceIdField } from "@codeman-frontend/tools/file-ops";
 
 const wrap = Schema.Struct({ workspaceId: workspaceIdField });
 
