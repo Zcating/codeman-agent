@@ -307,6 +307,25 @@ describe("ComboTextarea — selection", () => {
     expect(popoverContent!.style.width).toBe("640px");
   });
 
+  it("caps popover height to available vertical space (no clipping when <320px)", () => {
+    // ark-ui's Popover positioner exposes `--available-height` as a CSS
+    // variable (see bug HTML: --available-height: 273px). ComboTextarea
+    // hardcodes height: 320px, so when --available-height is smaller (e.g.
+    // textarea sits near top of viewport, or window is short), the popover
+    // overflows and gets clipped. The fix caps max-height to the available
+    // space, leaving the 320px preferred height intact.
+    const { queryByTestId } = render(() => <TestWrapper initialValue="/" />);
+    expect(queryByTestId("slash-menu")).toBeInTheDocument();
+
+    const popoverContent = document.querySelector(
+      '[data-slot="popover-content"]',
+    ) as HTMLElement | null;
+    expect(popoverContent).not.toBeNull();
+    expect(popoverContent!.style.maxHeight).toBe(
+      "var(--available-height, 320px)",
+    );
+  });
+
   it("popover width is not stolen by an empty PopoverAnchor (0px wide)", () => {
     // Production scenario: <PopoverAnchor> is an empty inline-block div with
     // 0 width. ComboTextarea used to share wrapperEl between the textarea

@@ -353,6 +353,12 @@ export function ComboTextarea(props: ComboTextareaProps): JSX.Element {
             style={{
               width: `${wrapperEl?.getBoundingClientRect().width ?? 0}px`,
               height: `${POPOVER_HEIGHT}px`,
+              // Cap the popover to the viewport space the positioner actually
+              // has — ark-ui sets `--available-height` on the positioner and
+              // it cascades here. Without this cap, the 320px preferred height
+              // overflows and gets clipped when the textarea sits near the top
+              // of a short window (e.g. `--available-height: 273px`).
+              "max-height": `var(--available-height, ${POPOVER_HEIGHT}px)`,
             }}
           >
             <div
