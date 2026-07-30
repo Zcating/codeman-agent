@@ -122,6 +122,13 @@ export interface CodemanApi {
   readonly mcpRestart: (args: { serverName: string }) => Promise<void>;
   readonly mcpCallTool: (args: { serverName: string; toolName: string; args: unknown }) => Promise<unknown>;
   readonly mcpOpenConfigDir: () => Promise<void>;
+
+  // Webfetch (SSRF-guarded HTTP fetch)
+  readonly webfetch: (args: { url: string; timeout?: number }) => Promise<{
+    status: number;
+    contentType: string;
+    body: ArrayBuffer;
+  }>;
 }
 
 // ─── Combined exposed shape ──────────────────────────────────────
@@ -195,6 +202,9 @@ const codeman: CodemanApiExposed = {
   mcpRestart: (args) => ipcRenderer.invoke("mcp:restart", args),
   mcpCallTool: (args) => ipcRenderer.invoke("mcp:call-tool", args),
   mcpOpenConfigDir: () => ipcRenderer.invoke("mcp:open-config-dir"),
+
+  // Webfetch
+  webfetch: (args) => ipcRenderer.invoke("webfetch:fetch", args),
 
   // Streaming: preload exposes a callback registration API; main calls
   // webContents.send('stream-chunk', evt). Renderer wraps onStreamChunk

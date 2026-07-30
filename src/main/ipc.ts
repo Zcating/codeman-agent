@@ -20,6 +20,7 @@ import {
   readFileInWorkspace,
   writeFileInWorkspace,
 } from "./file-sandbox";
+import { fetchSafe } from "./features/webfetch/index.js";
 
 // ─── Settings store (JSON file under app.getPath("userData")) ─────────
 
@@ -517,6 +518,16 @@ export function registerIpcHandlers(_deps: {
       abortControllers.delete(args.requestId);
     }
     return null;
+  });
+
+  // Webfetch (SSRF-guarded HTTP fetch)
+  ipcMain.handle("webfetch:fetch", async (_e, args: { url: string; timeout?: number }) => {
+    const result = await fetchSafe(args.url, { timeoutSeconds: args.timeout });
+    return {
+      status: result.status,
+      contentType: result.contentType,
+      body: result.body,
+    };
   });
 }
 

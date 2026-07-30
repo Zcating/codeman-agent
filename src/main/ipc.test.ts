@@ -98,6 +98,8 @@ const EXPECTED_CHANNELS = [
   "mcp:restart",
   "mcp:call-tool",
   "mcp:open-config-dir",
+  // Webfetch
+  "webfetch:fetch",
 ];
 
 describe("T3 — src/main/ipc.ts", () => {
@@ -106,7 +108,7 @@ describe("T3 — src/main/ipc.ts", () => {
     fakeWin.webContents.send.mockClear();
   });
 
-  it("registers all 34 expected ipcMain.handle channels (qa:get_table removed — handled by mock-server)", async () => {
+  it("registers all 35 expected ipcMain.handle channels (qa:get_table removed — handled by mock-server)", async () => {
     const { registerIpcHandlers } = await import("./ipc");
     const { McpManager } = await import("./mcp-manager");
     const { registerMcpIpcHandlers } = await import("./mcp-ipc");
