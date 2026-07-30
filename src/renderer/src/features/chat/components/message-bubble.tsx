@@ -15,12 +15,12 @@
 //! module doc)。
 
 import { Show, For, createMemo } from "solid-js";
-import { marked } from "marked";
 import { XCircle, CheckCircle2 } from "lucide-solid";
 import { ToolCallPanel } from "@codeman-frontend/features/chat/components/tool-call-panel";
 import { ThinkingPanel } from "@codeman-frontend/features/chat/components/thinking-panel";
 import type { Message, ToolResult, FileMatch, ToolCall } from "@codeman-frontend/shared/lib/types";
 import { store } from "@codeman-frontend/features/chat/stores/chat.store";
+import { renderMarkdown } from "@codeman-frontend/features/chat/lib/markdown";
 
 /** 转义用户提供的文本以防止 XSS。 */
 function escapeHtml(s: string): string {
@@ -30,11 +30,6 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-/** 渲染 Markdown 为经清理的 HTML。用于 assistant 内容（可信）。 */
-function renderMarkdown(s: string): string {
-  return marked.parse(s, { async: false }) as string;
 }
 
 /** 把 message 内的 tool_calls 与 tool_results 配对,产出 render-ready 列表。
@@ -111,10 +106,10 @@ export function MessageBubble(props: { message: Message }) {
             </div>
           </Show>
 
-          {/* 3. 正文 Markdown */}
+          {/* 3. 正文 Markdown — typeset 样式系统,见 src/renderer/src/typeset.css */}
           <Show when={hasContent()}>
             <div
-              class="prose prose-sm dark:prose-invert max-w-none"
+              class="typeset typeset-chat"
               data-testid="agent-text-content"
               innerHTML={renderMarkdown(props.message.content)}
             />
