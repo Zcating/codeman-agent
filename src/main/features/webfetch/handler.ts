@@ -10,7 +10,7 @@ export interface FetchResult {
 const TIMEOUT_CONFIG = { min: 5, max: 120, default: 30 } as const;
 const MAX_BYTES = 5 * 1024 * 1024;
 
-const NON_TEXT_TYPES = /^image\/(?!svg\+xml)/;
+const NON_TEXT_TYPES = /^(image\/(?!svg\+xml)|audio\/|video\/|application\/(octet-stream|pdf|zip|x-(gzip|bzip2|7z-compressed|tar|rar)))/i;
 
 export async function fetchSafe(
   url: string,

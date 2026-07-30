@@ -44,13 +44,13 @@ describe("fetchSafe", () => {
   });
 
   it("rejects when content-length > 5MB", async () => {
-    nock("https://example.com").get("/big").reply(200, "x", { "content-length": "10000000" });
+    nock("https://example.com").get("/big").reply(200, "x", { "content-type": "text/plain", "content-length": "10000000" });
     await expect(fetchSafe("https://example.com/big")).rejects.toThrow(/too large/);
   });
 
   it("rejects when actual body > 5MB", async () => {
     const big = Buffer.alloc(6 * 1024 * 1024, "x");
-    nock("https://example.com").get("/").reply(200, big);
+    nock("https://example.com").get("/").reply(200, big, { "content-type": "text/plain" });
     await expect(fetchSafe("https://example.com/")).rejects.toThrow(/too large/);
   });
 
@@ -69,5 +69,20 @@ describe("fetchSafe", () => {
   it("rejects timeout when server is slow", { timeout: 10000 }, async () => {
     nock("https://slow.example.com").get("/").delay(10000).reply(200, "slow");
     await expect(fetchSafe("https://slow.example.com/", { timeoutSeconds: 5 })).rejects.toThrow(/timed out/i);
+  });
+
+  it("rejects application/pdf content-type", async () => {
+    nock("https://example.com").get("/file.pdf").reply(200, "%PDF-1.4", { "content-type": "application/pdf" });
+    await expect(fetchSafe("https://example.com/file.pdf")).rejects.toThrow(/Unsupported content type/);
+  });
+
+  it("rejects application/octet-stream content-type", async () => {
+    nock("https://example.com").get("/file").reply(200, "binary", { "content-type": "application/octet-stream" });
+    await expect(fetchSafe("https://example.com/file")).rejects.toThrow(/Unsupported content type/);
+  });
+
+  it("rejects audio/mpeg content-type", async () => {
+    nock("https://example.com").get("/song.mp3").reply(200, "id3", { "content-type": "audio/mpeg" });
+    await expect(fetchSafe("https://example.com/song.mp3")).rejects.toThrow(/Unsupported content type/);
   });
 });

@@ -6,7 +6,7 @@
 
 import dns from "node:dns/promises";
 import net from "node:net";
-import { InvalidConfig, SandboxViolation } from "../../../renderer/src/shared/lib/errors";
+import { InvalidConfig, Network, SandboxViolation } from "../../../renderer/src/shared/lib/errors";
 
 const ALLOWED_SCHEMES = new Set(["http:", "https:"]);
 
@@ -85,11 +85,11 @@ export async function assertSafeUrl(url: string): Promise<void> {
   try {
     parsed = new URL(url);
   } catch {
-    throw new Error("Invalid URL");
+    throw new InvalidConfig({field: "url", message: "Invalid URL"});
   }
 
   if (!ALLOWED_SCHEMES.has(parsed.protocol)) {
-    throw new Error(`URL scheme must be http or https, got ${parsed.protocol}`);
+    throw new InvalidConfig({field: "url", message: `URL scheme must be http or https, got ${parsed.protocol}`});
   }
 
   const hostname = parsed.hostname;
@@ -97,7 +97,7 @@ export async function assertSafeUrl(url: string): Promise<void> {
   try {
     addresses = await dns.lookup(hostname, { all: true });
   } catch (e) {
-    throw new Error(`DNS lookup failed: ${(e as Error).message}`);
+    throw new Network({message: `DNS lookup failed: ${(e as Error).message}`});
   }
 
   for (const { address } of addresses) {
