@@ -531,6 +531,7 @@ function buildCodemanMock(): Record<string, unknown> {
     mcpRestart: { cmd: "mcp:restart" },
     mcpCallTool: { cmd: "mcp:call-tool" },
     mcpOpenConfigDir: { cmd: "mcp:open-config-dir" },
+    webfetch: { cmd: "webfetch:fetch" },
   };
 
   const codeman: Record<string, unknown> = {};

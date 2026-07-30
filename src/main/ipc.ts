@@ -11,6 +11,7 @@ import {
   readFileInWorkspace,
   writeFileInWorkspace,
 } from "./file-sandbox";
+import { fetchSafe } from "./features/webfetch/index.js";
 
 // ─── Settings store (JSON file under app.getPath("userData")) ─────────
 
@@ -446,9 +447,15 @@ export function registerIpcHandlers(_deps: {
       try {
         return await fn(...args);
       } catch (e) {
-        if (e && typeof e === "object" && "kind" in e) {
-          const ae = e as { kind: string; message?: string };
-          throw new Error(JSON.stringify({ kind: ae.kind, message: ae.message ?? String(e) }));
+        if (e && typeof e === "object") {
+          if ("kind" in e) {
+            const ae = e as { kind: string; message?: string };
+            throw new Error(JSON.stringify({ kind: ae.kind, message: ae.message ?? String(e) }));
+          }
+          if ("_tag" in e) {
+            const ae = e as { _tag: string; message?: string };
+            throw new Error(JSON.stringify({ kind: ae._tag, message: ae.message ?? String(e) }));
+          }
         }
         throw e;
       }
@@ -529,6 +536,16 @@ export function registerIpcHandlers(_deps: {
     }
     return null;
   });
+
+  // Webfetch (SSRF-guarded HTTP fetch)
+  ipcMain.handle("webfetch:fetch", sandboxHandler(async (_e, args: { url: string; timeout?: number }) => {
+    const result = await fetchSafe(args.url, { timeoutSeconds: args.timeout });
+    return {
+      status: result.status,
+      contentType: result.contentType,
+      body: result.body,
+    };
+  }));
 }
 
 /**

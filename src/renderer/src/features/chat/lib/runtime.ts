@@ -24,7 +24,8 @@ import { logger } from "@codeman-frontend/shared/lib/logger";
 import { anthropicStream } from "@codeman-frontend/features/chat/lib/anthropic-transport";
 import { Agent, type AgentEvent, type AgentTool } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai";
-import { createFileTools } from "@codeman-frontend/features/file-tools/lib/file-tools";
+import { createFileTools } from "@codeman-frontend/tools/file-ops";
+import { webfetchTool } from "@codeman-frontend/tools/webfetch";
 import { formatSkillsManifestSection } from "@codeman-frontend/plugins/skills/lib/skill-injector";
 import { loadSkillTool } from "@codeman-frontend/plugins/skills/lib/skill-meta-tool";
 import { mcpAllTools$ } from "@codeman-frontend/plugins/mcp/stores/store";
@@ -400,8 +401,8 @@ export function createAgentRuntime(): AgentRuntime {
 
         const fileTools = createFileTools(provider.workspaceId);
         const mcpTools = buildMcpTools(mcpAllTools$());
-        // 顺序: file tools 先, MCP tools 中, skills meta-tool 末 (便于 LLM 先看到主要工具)
-        const tools = [...fileTools, ...mcpTools, loadSkillTool];
+        // 顺序: file tools 先, webfetch 内置, MCP tools 中, skills meta-tool 末 (便于 LLM 先看到主要工具)
+        const tools = [...fileTools, webfetchTool, ...mcpTools, loadSkillTool];
 
         // V3.1 D3: 拼接 enabled skills manifest 到 system prompt。
         // 空数组 → formatSkillsManifestSection 返回 "" → 原 systemPrompt 不变。

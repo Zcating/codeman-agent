@@ -5,5 +5,9 @@ export {
   searchFilesTool,
   deleteFileTool,
   fileTools,
-} from "@codeman-frontend/features/file-tools/lib/file-tools";
+  createFileTools,
+  workspaceIdField,
+} from "./file-ops.js";
+export { FilePathSchema } from "./schemas.js";
+export type { FilePath } from "./schemas.js";
 export type { FileMatch } from "@codeman-frontend/shared/lib/types";

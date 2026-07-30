@@ -52,6 +52,11 @@ vi.mock("./mcp-config", () => ({
   MCP_CONFIG_PATH: "/tmp/.agents/mcp_servers.json",
 }));
 
+// Mock webfetch so we can test sandboxHandler AppError serialization
+vi.mock("./features/webfetch/index", () => ({
+  fetchSafe: vi.fn(),
+}));
+
 const EXPECTED_CHANNELS = [
   // Settings
   "getSettings",
@@ -98,6 +103,8 @@ const EXPECTED_CHANNELS = [
   "mcp:restart",
   "mcp:call-tool",
   "mcp:open-config-dir",
+  // Webfetch
+  "webfetch:fetch",
 ];
 
 describe("T3 — src/main/ipc.ts", () => {
@@ -106,7 +113,7 @@ describe("T3 — src/main/ipc.ts", () => {
     fakeWin.webContents.send.mockClear();
   });
 
-  it("registers all 34 expected ipcMain.handle channels (qa:get_table removed — handled by mock-server)", async () => {
+  it("registers all 36 expected ipcMain.handle channels (qa:get_table removed — handled by mock-server)", async () => {
     const { registerIpcHandlers } = await import("./ipc");
     const { McpManager } = await import("./mcp-manager");
     const { registerMcpIpcHandlers } = await import("./mcp-ipc");
@@ -148,6 +155,23 @@ describe("T3 — src/main/ipc.ts", () => {
     const channels = fakeIpcMain.handle.mock.calls.map((c) => c[0]);
     expect(channels).toContain("deleteProvider");
     expect(channels).toContain("abortRequest");
+  });
+
+  it("webfetch AppError serializes as {kind: Network} via sandboxHandler", async () => {
+    const { Network } = await import("../renderer/src/shared/lib/errors");
+    const { fetchSafe } = await import("./features/webfetch/index");
+    vi.mocked(fetchSafe).mockRejectedValue(new Network({ message: "test net err" }));
+    const { registerIpcHandlers } = await import("./ipc");
+    registerIpcHandlers({ getMainWindow: () => fakeWin as any });
+    const entry = fakeIpcMain.handle.mock.calls.find(
+      (c: unknown[]) => c[0] === "webfetch:fetch",
+    );
+    expect(entry).toBeDefined();
+    const handler = entry![1] as (e: unknown, args: unknown) => Promise<unknown>;
+    let thrown: unknown;
+    try { await handler(undefined, { url: "https://x.com", timeout: 30 }); } catch (e) { thrown = e; }
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toContain('"kind":"Network"');
   });
 
   it("renameConversation handler runs correct SQL UPDATE", async () => {

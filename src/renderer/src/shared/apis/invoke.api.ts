@@ -123,6 +123,13 @@ export interface CodemanApi {
   readonly mcpRestart: (args: { serverName: string }) => Promise<void>;
   readonly mcpCallTool: (args: { serverName: string; toolName: string; args: unknown }) => Promise<unknown>;
   readonly mcpOpenConfigDir: () => Promise<void>;
+
+  // Webfetch (SSRF-guarded HTTP fetch)
+  readonly webfetch: (args: { url: string; timeout?: number }) => Promise<{
+    status: number;
+    contentType: string;
+    body: ArrayBuffer;
+  }>;
 }
 
 declare global {

@@ -1,6 +1,6 @@
 ﻿# codeman-agent — 项目语境
 
-独立 Windows 桌面 AI 智能体，基于 Electron (Node main + Chromium renderer) + Solid.js + TypeScript + Effect-TS，运行时采用 pi-mono (`@mariozechner/pi-ai` + `@mariozechner/pi-agent`)。主窗口是 LLM 对话 (`/`)，设置走 `/settings` 路由（TanStack Router），内置 2 个计费工具（`get_balance`、`get_plan_quota`，覆盖 DeepSeek 与 MiniMax）和 5 个文件工具（`read_file` / `write_file` / `edit_file` / `search_files` / `delete_file`）。本文档固定词汇表，确保 plan、code 与 commit message 保持一致。V3 起壳由 Tauri 2 迁至 Electron（ADR-0024），UI / 逻辑层 / Agent runtime / 持久化 schema 全保留。
+独立 Windows 桌面 AI 智能体，基于 Electron (Node main + Chromium renderer) + Solid.js + TypeScript + Effect-TS，运行时采用 pi-mono (`@mariozechner/pi-ai` + `@mariozechner/pi-agent`)。主窗口是 LLM 对话 (`/`)，设置走 `/settings` 路由（TanStack Router），内置 2 个计费工具（`get_balance`、`get_plan_quota`，覆盖 DeepSeek 与 MiniMax）、5 个文件工具（`read_file` / `write_file` / `edit_file` / `search_files` / `delete_file`）和 1 个网页抓取工具（`webfetch`）。本文档固定词汇表，确保 plan、code 与 commit message 保持一致。V3 起壳由 Tauri 2 迁至 Electron（ADR-0024），UI / 逻辑层 / Agent runtime / 持久化 schema 全保留。
 
 ## 词汇表
 
@@ -9,7 +9,7 @@
 - **Agent (代理)** — 产品本体。LLM 驱动的助手，运行在独立 Windows 桌面窗口中。_避免_：widget、app、client。
 - **Conversation (会话)** — 用户拥有的持久聊天线程。线性消息序列；不支持分支。每 Conversation 至多 1 个 active 流，多 Conversation 可并行 streaming。每个 Conversation 创建时绑定 1 个 workspace (`workspace_id: string`，详见 `Workspace-Bound Conversation`)；旧 conv (V1.x 迁移) `workspace_id = ""` 视为 "needs workspace"，UI 灰标。active 流定义：`run()` 已调用且 `done` / `error` / `cancel` 之一尚未触发。active 流的取消走 `AgentRuntime.cancel(conversationId)`。
 - **Message (消息)** — 会话中的单轮消息。角色为 `user`、`assistant`、`tool` 或 `system` 之一。可能内联携带 tool call 与 tool result（JSON 形式）。Assistant message 对应 **1 个 agent turn**（runtime 在每个 `turn_end` emit 1 个 `done` 事件），详见 `Bubble Boundary`。
-- **Tool (工具)** — Agent 可调用的类型化函数。内置 2 个计费工具 + 5 个文件工具；注册表可扩展。
+- **Tool (工具)** — Agent 可调用的类型化函数。内置 2 个计费工具 + 5 个文件工具 + 1 个网页抓取工具（`webfetch`）；注册表可扩展。
 - **Tool Call (工具调用)** — LLM 请求调用工具的指令。携带工具名与 JSON 参数。
 - **Tool Result (工具结果)** — 工具调用的返回值。可能携带类型化错误。
 - **Bubble Boundary (气泡边界)** — Conversation.messages[] 数组中的每个 Message 渲染为 1 个 bubble。**Agent-turn boundary**：1 个 agent loop turn = 1 个 assistant message = 1 个 bubble，由 runtime 在 `turn_end` 触发 `done` 事件保证。跨 turn **不聚合**——turn-1 的 thinking block 只在 turn-1 的 bubble 顶部，不搬到 turn-2 bubble。Tool result inline 在所属 turn 的 assistant message 的 `toolResults[]` 字段（`ToolCallPanel` 渲染在 bubble 内），不独立走 `role:tool` bubble。1 user input 因此可能产生 **N 个 assistant bubble**（N = 该 input 触发的 agent turn 数）。per [ADR-0028](./adr/0028-bubble-boundary-per-agent-turn.md)。_避免_: V3.1 logical-unit boundary（旧 contract，跨 turn 聚合 thinking/tool_calls 到最终 bubble），content-type boundary（tool_result 独立 role=tool bubble），agent-loop bubble（语义含糊）。
@@ -35,7 +35,8 @@
 - **Add Workspace (添加 Workspace)** — 用户在 Home 的 workspace picker dropdown 中通过 "+ Add new workspace…" Action slot 触发；调 `chatStore.pickWorkspacePath()` 弹 OS 原生 folder picker；picker 关闭后若返回非 null 路径，调用 `chatStore.addWorkspace(rootPath)` → `WorkspaceService.add`（SQLite 持久化）+ 自动派生 label（`deriveLabelFromPath`）+ dedup（同 root_path 重复时静默忽略并自动选已有）+ 关闭 dropdown + focus textarea。Home **不**再跳 /settings。_避免_: Navigate-to-Settings（V2.1 polish 早期设计，已废止）。
 - **Workspace Label Derivation (workspace label 派生)** — 通过 OS folder picker 添加 workspace 时（`Add Workspace` 流程），`label` 从 `root_path` 自动派生：调用 `deriveLabelFromPath(rootPath)` (位于 `src/shared/lib/derive-label-from-path.ts`) 取路径最后非空段作为 label；空结果（`C:\`、`/`）fallback `"Untitled workspace"`。后续用户可通过 sidebar hover → Rename 按钮修改 label。_避免_: 强制用户在 picker 关闭后输入 label（增加 UI 阻塞；违反"calm/professional"原则）。
 - **File Tool (文件工具)** — pi-agent 工具族，内置 5 个: `read_file` (读全文) / `write_file` (覆盖写) / `edit_file` (替换文本，支持 `replaceAll`) / `search_files` (glob + content 搜索) / `delete_file` (移至回收站)。所有工具通过 IPC 调 Electron Main process 的 `node:fs`，沙箱由 workspace 边界约束。_避免_: fs tool、file operation (过载)。
-- **Sandbox Violation (越界错误)** — Electron Main process 在 `fs.realpath(path)` 后检测到 `path` 不在任何 workspace 目录下时返回的错误。Agent 收到后必须重新规划 (改路径 / 让用户加 workspace) 而非重试原路径。V3 起语义不变；实现从 Rust `std::fs::canonicalize` 改为 Node `fs.realpath.native` (per ADR-0024)。
+- **Webfetch (网页抓取工具)** — 内置 AgentTool（`webfetch`），对 LLM 暴露 HTTP/HTTPS 网页抓取能力。走 IPC（`webfetch:fetch`）到 Electron Main process，main 端实施 SSRF 防护（URL scheme 校验 + DNS 预解析 + IP 黑名单 + 大小限制 + 超时）。HTML 使用 turndown 转 Markdown。参数：`{ url, format, timeout? }`。renderer 端定义见 `src/renderer/src/tools/webfetch/`，main 端见 `src/main/features/webfetch/`。per ADR-0038。_避免_: fetch tool、http tool（非单字名）、url tool。
+- **Sandbox Violation (越界错误)** — Electron Main process 在 `fs.realpath(path)` 后检测到 `path` 不在任何 workspace 目录下时返回的错误。Agent 收到后必须重新规划 (改路径 / 让用户加 workspace) 而非重试原路径。V3 起语义不变；实现从 Rust `std::fs::canonicalize` 改为 Node `fs.realpath.native` (per ADR-0024)。**网络 SSRF 同样视为 sandbox 越界** (webfetch 等网络工具调 main 端 SSRF 黑名单拒绝私有 IP 时, throw `SandboxViolation` with `workspaceLabel: "webfetch"`, per ADR-0038 D1)。
 
 ### Plugins
 
@@ -55,6 +56,8 @@
 - **IPC** — Electron 跨进程命令桥接。Main 端 handler 注册在 `src/main/ipc.ts` 的 `ipcMain.handle(...)`；preload 通过 `contextBridge.exposeInMainWorld('codeman', api)` 暴露类型化 API；renderer 端包装在 `src/renderer/shared/lib/ipc.ts`（Service Tag + Live Layer）。Renderer 直接 import `window.codeman` 不出现；所有调用走 Service Tag。V3 起替代 V2 的 Tauri `invoke_handler` 桥接 (per ADR-0024)。
 - **Input History (输入历史)** — V2.4+ 引入的 chat 输入最近提交记录栈（最多 100 条, 新的在前）。跨 Home / ChatView 两个输入框共享。↑ / ↓ 键在空 input（或历史导航态）上做历史导航（与 bash readline 同语义）。**存储偏离项目惯例**：`localStorage["codeman.input-history.v1"]` 而不是 SQLite——100 条 × 几 KB 的轻量、best-effort 语义、不引新 SQL migration。QuotaExceededError 静默吞。存储 / dedup / cap / trim 逻辑在 `src/features/chat/lib/input-history.ts`；Solid 反应式 + 导航 cursor 在 `src/features/chat/stores/input-history.store.ts`。_避免_: shell history、recent messages、消息历史（与 Conversation 持久化混淆）、history（与浏览器 `window.history` 撞名）。
 - **Input History Cursor (输入历史光标)** — `inputHistoryCursor$(): -1 | number`。`-1` = 用户当前输入态（input 是真正草稿或空）；`0..N-1` = 历史导航态（input 显示 `history[cursor]`，用户可编辑但 cursor 保持在历史）。语义对应 bash readline 的 `history_pos`。提交消息（`recordInputEntry`）或回退到最新条目之后再按 ↓（`navigateInputHistoryNext`）时重置回 -1。_避免_: history index、navigation index、position。
+
+- **`tools/` 目录 (6+1 白名单)** — `src/renderer/src/tools/<name>/` 顶层目录（与 `features/` 同级），存放 LLM-facing AgentTool 定义。每个 `<name>/` 根级仅允许 `index.ts`（barrel）+ `AGENTS.md`。ADR-0010 原 5+1 白名单（5 个 feature 子目录 + 1 个 shared），ADR-0038 扩展为 6+1（新增 `tools/`）。当前成员：`file-ops/`（5 个文件工具，从 `features/file-tools` 迁入）、`webfetch/`（网页抓取工具）。_避免_：放到 `features/<feature>/tools/`（已在 ADR-0010 被合并到 `lib/`）；`tools/` 下嵌套子目录（扁平约束）。
 
 ### Schema 与错误模型 (ADR-0025)
 
@@ -171,14 +174,15 @@
 Agent
   ├── runtime          (createAgentRuntime() 工厂, per-conv 实例化 per ADR-0019)
   ├── bridge           (Effect → Solid createStore 翻译器, conversations.store.ts)
-  └── tools[]          (类型化函数；计费 + 文件工具)
+  └── tools[]          (类型化函数；计费 + 文件 + 网页抓取)
         ├── get_balance(provider_id)             → Snapshot
         ├── get_plan_quota(provider_id)          → Snapshot
         ├── read_file(workspaceId, path)        → string
         ├── write_file(workspaceId, path, text) → void
         ├── edit_file(workspaceId, path, old, new, replaceAll) → void
         ├── search_files(workspaceId, glob, pattern?) → FileMatch[]
-        └── delete_file(workspaceId, path)      → void
+        ├── delete_file(workspaceId, path)      → void
+        └── webfetch(url, format?, timeout?)    → string
 
 Conversation          (src/shared/lib/types.ts, DB-backed)
   ├── id, title, system_prompt?, created_at, updated_at, archived_at?
