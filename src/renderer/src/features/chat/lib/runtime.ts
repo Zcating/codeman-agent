@@ -407,7 +407,7 @@ export function createAgentRuntime(): AgentRuntime {
 
         const fileTools = createFileTools(provider.workspaceId);
         const mcpTools = buildMcpTools(mcpAllTools$());
-        // 顺序: file tools 先, MCP tools 中, skills meta-tool 末 (便于 LLM 先看到主要工具)
+        // 顺序: file tools 先, webfetch 内置, MCP tools 中, skills meta-tool 末 (便于 LLM 先看到主要工具)
         const tools = [...fileTools, webfetchTool, ...mcpTools, loadSkillTool];
 
         // V3.1 ADR-0031 D3: 拼接 enabled skills manifest 到 system prompt。

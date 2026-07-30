@@ -40,4 +40,18 @@ describe("htmlToText", () => {
   it("strips HTML tags from plain text", () => {
     expect(htmlToText("<p>plain</p>")).toBe("plain");
   });
+
+  it("htmlToText strips svg with event handlers", () => {
+    expect(htmlToText('<svg onload="alert(1)"><circle/></svg>')).not.toMatch(/onload/);
+  });
+
+  it("htmlToText strips iframe content", () => {
+    expect(htmlToText('<iframe src="x">inner</iframe>')).toBe("");
+  });
+
+  it("htmlToMarkdown removes iframe", () => {
+    const out = htmlToMarkdown('<iframe src="evil"></iframe><p>hi</p>');
+    expect(out).not.toMatch(/iframe/);
+    expect(out).toMatch(/hi/);
+  });
 });

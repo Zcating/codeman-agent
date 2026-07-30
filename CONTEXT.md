@@ -36,7 +36,7 @@
 - **Workspace Label Derivation (workspace label 派生)** — 通过 OS folder picker 添加 workspace 时（`Add Workspace` 流程），`label` 从 `root_path` 自动派生：调用 `deriveLabelFromPath(rootPath)` (位于 `src/shared/lib/derive-label-from-path.ts`) 取路径最后非空段作为 label；空结果（`C:\`、`/`）fallback `"Untitled workspace"`。后续用户可通过 sidebar hover → Rename 按钮修改 label。_避免_: 强制用户在 picker 关闭后输入 label（增加 UI 阻塞；违反"calm/professional"原则）。
 - **File Tool (文件工具)** — pi-agent 工具族，内置 5 个: `read_file` (读全文) / `write_file` (覆盖写) / `edit_file` (替换文本，支持 `replaceAll`) / `search_files` (glob + content 搜索) / `delete_file` (移至回收站)。所有工具通过 IPC 调 Electron Main process 的 `node:fs`，沙箱由 workspace 边界约束。_避免_: fs tool、file operation (过载)。
 - **Webfetch (网页抓取工具)** — 内置 AgentTool（`webfetch`），对 LLM 暴露 HTTP/HTTPS 网页抓取能力。走 IPC（`webfetch:fetch`）到 Electron Main process，main 端实施 SSRF 防护（URL scheme 校验 + DNS 预解析 + IP 黑名单 + 限流）。HTML 使用 turndown 转 Markdown。参数：`{ url, format, timeout? }`。renderer 端定义见 `src/renderer/src/tools/webfetch/`，main 端见 `src/main/features/webfetch/`。per ADR-0038。_避免_: fetch tool、http tool（非单字名）、url tool。
-- **Sandbox Violation (越界错误)** — Electron Main process 在 `fs.realpath(path)` 后检测到 `path` 不在任何 workspace 目录下时返回的错误。Agent 收到后必须重新规划 (改路径 / 让用户加 workspace) 而非重试原路径。V3 起语义不变；实现从 Rust `std::fs::canonicalize` 改为 Node `fs.realpath.native` (per ADR-0024)。
+- **Sandbox Violation (越界错误)** — Electron Main process 在 `fs.realpath(path)` 后检测到 `path` 不在任何 workspace 目录下时返回的错误。Agent 收到后必须重新规划 (改路径 / 让用户加 workspace) 而非重试原路径。V3 起语义不变；实现从 Rust `std::fs::canonicalize` 改为 Node `fs.realpath.native` (per ADR-0024)。**网络 SSRF 同样视为 sandbox 越界** (webfetch 等网络工具调 main 端 SSRF 黑名单拒绝私有 IP 时, throw `SandboxViolation` with `workspaceLabel: "webfetch"`, per ADR-0038 D1)。
 
 ### Plugins
 

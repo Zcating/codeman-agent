@@ -22,7 +22,7 @@ describe("isBlockedIp", () => {
   it("allows 8.8.8.8", () => expect(isBlockedIp("8.8.8.8")).toBe(false));
   it("allows 1.1.1.1", () => expect(isBlockedIp("1.1.1.1")).toBe(false));
   it("allows 2606:4700:4700::1111 (Cloudflare DNS)", () => expect(isBlockedIp("2606:4700:4700::1111")).toBe(false));
-  it("rejects garbage (not an IP)", () => expect(isBlockedIp("not-an-ip")).toBe(true));
+  it("rejects garbage (not an IP)", () => expect(() => isBlockedIp("not-an-ip")).toThrow(/Invalid IP/));
 });
 
 describe("assertSafeUrl", () => {
@@ -46,7 +46,7 @@ describe("assertSafeUrl", () => {
   it("rejects http://localhost/ (DNS to 127.0.0.1)", async () => {
     mockLookup.mockResolvedValue([{ address: "127.0.0.1", family: 4 }]);
     await expect(assertSafeUrl("http://localhost")).rejects.toMatchObject({
-      kind: "SandboxViolation",
+      _tag: "SandboxViolation",
     });
   });
 

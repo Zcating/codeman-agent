@@ -140,6 +140,12 @@ const BLOCKED_V6 = [
 
 DNS 预解析: `dns.lookup(url.hostname)` 获取 IP 后逐 CIDR 比对。解析失败或匹配黑名单均拒绝请求。
 
+**已知限制 — DNS rebinding 窗口 (V1):** `dns.lookup` 执行 DNS 查询,而 `fetch`
+在 V1 实现中是异步连接——之间存在 5-10ms 窗口。理论上攻击者可利用 DNS rebinding
+使首次解析返回公网 IP (通过检查),重绑定后第二次连接指向私有 IP。真实攻击要求
+攻击者同时控制 DNS server 与 timing,利用难度极高。V2 评估方向: `dns.lookup` +
+同 tick 内 `fetch`,或 socket-level IP 绑定拦截。
+
 ### D6 — LLM-facing name: `webfetch`
 
 单字 `webfetch`（非 `webfetch_url` 或 `web_fetch`）。
@@ -177,7 +183,7 @@ file-tools 后续考虑从 `features/file-tools` 迁到 `tools/file-ops`，使 `
 
 ### 代价
 
-- 增加 IPC 通道 `webfetch:fetch`（36 → 36 channels，无新增 net channel 增量）
+- 增加 IPC 通道 `webfetch:fetch`（35 → 36 channels，无新增 net channel 增量）
 - package.json 新增 `turndown` + `@types/turndown` 依赖（约 50KB gzipped）
 - file-ops import 路径变更需同步改 runtime.ts 及测试文件（共 5 处 import path 更新）
 - ADR-0010 需要 amendment

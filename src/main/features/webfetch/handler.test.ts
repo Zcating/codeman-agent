@@ -59,6 +59,13 @@ describe("fetchSafe", () => {
     await expect(fetchSafe("https://x.com", { timeoutSeconds: 200 })).rejects.toThrow(/Timeout/);
   });
 
+  it("rejects HTTP 301 redirect (SSRF guard)", async () => {
+    nock("https://example.com").get("/").reply(301, "", { Location: "http://192.168.1.1/admin" });
+    await expect(fetchSafe("https://example.com/")).rejects.toMatchObject({
+      _tag: "Network",
+    });
+  });
+
   it("rejects timeout when server is slow", { timeout: 10000 }, async () => {
     nock("https://slow.example.com").get("/").delay(10000).reply(200, "slow");
     await expect(fetchSafe("https://slow.example.com/", { timeoutSeconds: 5 })).rejects.toThrow(/timed out/i);

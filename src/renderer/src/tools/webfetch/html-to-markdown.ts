@@ -7,13 +7,14 @@ const turndown = new TurndownService({
   emDelimiter: "*",
 });
 
-turndown.remove(["script", "style", "meta", "link"]);
+const REMOVED_TAGS = ["script", "style", "meta", "link", "noscript", "iframe", "object", "embed", "svg"];
+turndown.remove((node) => REMOVED_TAGS.includes(node.tagName.toLowerCase()));
 
 export function htmlToMarkdown(html: string): string {
   return turndown.turndown(html);
 }
 
-const TAG_RE = /<\/?(script|style|noscript|iframe|object|embed)\b[^>]*>[\s\S]*?<\/\1>/gi;
+const TAG_RE = /<\/?(script|style|noscript|iframe|object|embed|svg|math|audio|video|picture|form|button)\b[^>]*>[\s\S]*?<\/\1>/gi;
 const TAG_STRIP_RE = /<[^>]*>/g;
 const ENTITY_MAP: Record<string, string> = {
   "&amp;": "&",

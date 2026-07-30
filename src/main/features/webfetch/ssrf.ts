@@ -1,5 +1,12 @@
+// DNS rebinding 限制 (V1):
+// - 从 dns.lookup 到 fetch 完成连接存在 5-10ms 窗口,攻击者可利用 DNS
+//   重绑定使第一次解析返回公网 IP 通过检查,第二次连接时指向内网 IP。
+// - 真实攻击需要攻击者同时控制 DNS server 与 timing,实际利用难度高。
+// - V2 评估方向: dns.lookup + 立即 fetch in same tick,或 socket-level 拦截。
+
 import dns from "node:dns/promises";
 import net from "node:net";
+import { InvalidConfig, SandboxViolation } from "../../../renderer/src/shared/lib/errors";
 
 const ALLOWED_SCHEMES = new Set(["http:", "https:"]);
 
@@ -44,9 +51,9 @@ function expandV6(ip: string): string[] {
   const trailing = parts.slice(emptyIndex + 1).filter(Boolean);
   const missing = 8 - leading.length - trailing.length;
   const expanded: string[] = [];
-  for (const p of leading) expanded.push(p.padStart(4, "0"));
-  for (let i = 0; i < missing; i++) expanded.push("0000");
-  for (const p of trailing) expanded.push(p.padStart(4, "0"));
+  for (const p of leading) { expanded.push(p.padStart(4, "0")); }
+  for (let i = 0; i < missing; i++) { expanded.push("0000"); }
+  for (const p of trailing) { expanded.push(p.padStart(4, "0")); }
   return expanded;
 }
 
@@ -70,7 +77,7 @@ export function isBlockedIp(ip: string): boolean {
     });
   }
 
-  return true;
+  throw new InvalidConfig({ field: "ip", message: `Invalid IP from dns.lookup: ${ip}` });
 }
 
 export async function assertSafeUrl(url: string): Promise<void> {
@@ -95,12 +102,11 @@ export async function assertSafeUrl(url: string): Promise<void> {
 
   for (const { address } of addresses) {
     if (isBlockedIp(address)) {
-      throw {
-        kind: "SandboxViolation",
+      throw new SandboxViolation({
         path: url,
-        workspaceRoot: "webfetch",
+        workspaceLabel: "webfetch",
         message: `IP ${address} is blocked (SSRF guard)`,
-      };
+      });
     }
   }
 }
