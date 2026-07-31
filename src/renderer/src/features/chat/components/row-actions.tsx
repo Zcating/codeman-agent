@@ -6,7 +6,7 @@ export interface RowActionsProps {
   kind: "workspace" | "conv";
   id: string;
   label: string;
-  isStreaming?: boolean;
+  isAgentActive?: boolean;
   onDelete: (id: string) => void | Promise<void>;
   onRename: (id: string, newLabel: string) => void | Promise<void>;
 }
@@ -55,7 +55,7 @@ export function RowActions(props: RowActionsProps): JSX.Element {
           "invisible": isConfirming(),
         }}
       >
-        <Show when={props.kind === "conv" && props.isStreaming}>
+        <Show when={props.kind === "conv" && props.isAgentActive}>
           <Loader2
             class="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground"
             aria-label="streaming"
@@ -155,9 +155,15 @@ function InlineRenameInput(props: InlineRenameInputProps): JSX.Element {
   };
 
   const handleInputRef = (el: HTMLInputElement) => {
-    el.focus();
-    el.setSelectionRange(0, el.value.length);
-    el.dispatchEvent(new Event("focus", { bubbles: true }));
+    // Defer focus + select to a microtask so the click event that entered
+    // editing mode finishes propagating first. Calling focus() synchronously
+    // races against the click handler's default focus restoration, which in
+    // real browsers leaves the input unfocused and forces a second click.
+    queueMicrotask(() => {
+      el.focus();
+      el.setSelectionRange(0, el.value.length);
+      el.dispatchEvent(new Event("focus", { bubbles: true }));
+    });
   };
 
   return (

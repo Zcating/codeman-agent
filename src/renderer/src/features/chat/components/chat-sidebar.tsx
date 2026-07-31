@@ -164,7 +164,7 @@ export function ChatSidebar(): JSX.Element {
       kind="conv"
       id={menu.value}
       label={menu.label}
-      isStreaming={store.byId[menu.value]?.streamingMessageId != null}
+      isAgentActive={store.byId[menu.value]?.isAgentActive === true}
       onDelete={(id) => { void handleConvDelete(id); }}
       onRename={(id, newTitle) => { void handleConvRename(id, newTitle); }}
     />
