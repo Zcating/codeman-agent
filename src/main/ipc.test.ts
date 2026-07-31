@@ -23,8 +23,11 @@ vi.mock("electron", () => ({
 }));
 
 vi.mock("./db/mod", () => ({
-  initDatabase: () => ({ prepare: () => ({ all: () => [], get: () => undefined, run: () => undefined }), exec: () => undefined, pragma: () => undefined }),
-  getDatabase: () => ({ prepare: () => ({ all: () => [], get: () => undefined, run: () => undefined }), exec: () => undefined, pragma: () => undefined }),
+  getOrInitDatabase: () => ({
+    prepare: () => ({ all: () => [], get: () => undefined, run: () => undefined }),
+    exec: () => undefined,
+    pragma: () => undefined,
+  }),
 }));
 
 vi.mock("./mcp-host", () => ({
@@ -48,7 +51,6 @@ vi.mock("./mcp-config", () => ({
   MCP_CONFIG_PATH: "/tmp/.agents/mcp_servers.json",
 }));
 
-// Mock webfetch so we can test sandboxHandler AppError serialization
 vi.mock("./features/webfetch/index", () => ({
   fetchSafe: vi.fn(),
 }));
@@ -56,6 +58,7 @@ vi.mock("./features/webfetch/index", () => ({
 const EXPECTED_CHANNELS = [
   "getSettings",
   "updateSettings",
+  "deleteProvider",
   "clearAllHistory",
   "listConversations",
   "getConversation",
@@ -80,8 +83,8 @@ const EXPECTED_CHANNELS = [
   "notify",
   "openExternal",
   "getLogPath",
-  "deleteProvider",
   "abortRequest",
+  "webfetch:fetch",
   "mcp:list-servers",
   "mcp:get-tools",
   "mcp:get-all-tools",
@@ -89,20 +92,18 @@ const EXPECTED_CHANNELS = [
   "mcp:restart",
   "mcp:call-tool",
   "mcp:open-config-dir",
-  // Webfetch
-  "webfetch:fetch",
 ];
 
-describe("T3 — src/main/ipc.ts", () => {
+describe("ipc.ts barrel", () => {
   beforeEach(() => {
     fakeIpcMain.handle.mockClear();
     fakeWin.webContents.send.mockClear();
   });
 
-  it("registers all 36 expected ipcMain.handle channels (qa:get_table removed — handled by mock-server)", async () => {
-    const { registerIpcHandlers } = await import("./ipc");
-    const { McpManager } = await import("./mcp-manager");
-    const { registerMcpIpcHandlers } = await import("./mcp-ipc");
+  it("registers all 36 expected ipcMain.handle channels", async () => {
+    const { registerIpcHandlers } = await import("./ipc.js");
+    const { McpManager } = await import("./mcp-manager.js");
+    const { registerMcpIpcHandlers } = await import("./mcp-ipc.js");
     registerIpcHandlers({ getMainWindow: () => fakeWin as any });
     registerMcpIpcHandlers(new McpManager());
     const channels = fakeIpcMain.handle.mock.calls.map((c) => c[0]);
@@ -110,8 +111,8 @@ describe("T3 — src/main/ipc.ts", () => {
     expect(channels.length).toBe(EXPECTED_CHANNELS.length);
   });
 
-  it("emitStreamChunk forwards raw event via webContents.send to first window", async () => {
-    const { emitStreamChunk } = await import("./ipc");
+  it("emitStreamChunk forwards event to first window", async () => {
+    const { emitStreamChunk } = await import("./ipc.js");
     emitStreamChunk({ kind: "token", content: "hi" });
     expect(fakeWin.webContents.send).toHaveBeenCalledWith("stream-chunk", {
       kind: "token",
@@ -129,159 +130,9 @@ describe("T3 — src/main/ipc.ts", () => {
       destroyed as any,
       fakeWin as any,
     ]);
-    const { emitStreamChunk } = await import("./ipc");
-    emitStreamChunk({ kind: "token", content: "x" });
+    const { emitStreamChunk } = await import("./ipc.js");
+    emitStreamChunk({ kind: "x" });
     expect(destroyed.webContents.send).not.toHaveBeenCalled();
     expect(fakeWin.webContents.send).toHaveBeenCalled();
-  });
-
-  it("deleteProvider + abortRequest handlers are registered", async () => {
-    const { registerIpcHandlers } = await import("./ipc");
-    registerIpcHandlers({ getMainWindow: () => fakeWin as any });
-    const channels = fakeIpcMain.handle.mock.calls.map((c) => c[0]);
-    expect(channels).toContain("deleteProvider");
-    expect(channels).toContain("abortRequest");
-  });
-
-  it("webfetch AppError serializes as {kind: Network} via sandboxHandler", async () => {
-    const { Network } = await import("../renderer/src/shared/lib/errors");
-    const { fetchSafe } = await import("./features/webfetch/index");
-    vi.mocked(fetchSafe).mockRejectedValue(new Network({ message: "test net err" }));
-    const { registerIpcHandlers } = await import("./ipc");
-    registerIpcHandlers({ getMainWindow: () => fakeWin as any });
-    const entry = fakeIpcMain.handle.mock.calls.find(
-      (c: unknown[]) => c[0] === "webfetch:fetch",
-    );
-    expect(entry).toBeDefined();
-    const handler = entry![1] as (e: unknown, args: unknown) => Promise<unknown>;
-    let thrown: unknown;
-    try { await handler(undefined, { url: "https://x.com", timeout: 30 }); } catch (e) { thrown = e; }
-    expect(thrown).toBeInstanceOf(Error);
-    expect((thrown as Error).message).toContain('"kind":"Network"');
-  });
-
-  it("renameConversation handler runs correct SQL UPDATE", async () => {
-    const { registerIpcHandlers } = await import("./ipc");
-    registerIpcHandlers({ getMainWindow: () => fakeWin as any });
-    const renameHandler = fakeIpcMain.handle.mock.calls.find(
-      (c: unknown[]) => c[0] === "renameConversation",
-    );
-    expect(renameHandler).toBeDefined();
-    const handler = renameHandler?.[1] as (e: unknown, args: { id: string; title: string }) => void;
-    expect(typeof handler).toBe("function");
-  });
-});
-
-describe("applyEdit helper", () => {
-  it("returns notFound when content has no occurrences", async () => {
-    const { applyEdit } = await import("./ipc");
-    const result = applyEdit("no match here", "needle", "hay", false, "/fake/path.txt");
-    expect(result.kind).toBe("notFound");
-    if (result.kind === "notFound") {
-      expect(result.message).toContain("/fake/path.txt");
-      expect(result.message).toContain("needle");
-    }
-  });
-
-  it("returns ambiguous when content has 2+ occurrences and replaceAll=false", async () => {
-    const { applyEdit } = await import("./ipc");
-    const result = applyEdit("needle and needle again", "needle", "hay", false, "/fake/path.txt");
-    expect(result.kind).toBe("ambiguous");
-    if (result.kind === "ambiguous") {
-      expect(result.message).toContain("/fake/path.txt");
-      expect(result.message).toContain("needle");
-      expect(result.message).toContain("2");
-    }
-  });
-
-  it("returns ok when content has exactly 1 occurrence", async () => {
-    const { applyEdit } = await import("./ipc");
-    const result = applyEdit("found my needle here", "needle", "hay", false, "/fake/path.txt");
-    expect(result.kind).toBe("ok");
-    if (result.kind === "ok") {
-      expect(result.newContent).toBe("found my hay here");
-    }
-  });
-
-  it("returns ok when content has 2+ occurrences and replaceAll=true", async () => {
-    const { applyEdit } = await import("./ipc");
-    const result = applyEdit("needle and needle again", "needle", "hay", true, "/fake/path.txt");
-    expect(result.kind).toBe("ok");
-    if (result.kind === "ok") {
-      expect(result.newContent).toBe("hay and hay again");
-    }
-  });
-
-  it("truncates oldText longer than 200 chars and includes ... in message", async () => {
-    const { applyEdit } = await import("./ipc");
-    const longPattern = "a".repeat(250);
-    const result = applyEdit("no match", longPattern, "hay", false, "/fake/path.txt");
-    expect(result.kind).toBe("notFound");
-    if (result.kind === "notFound") {
-      expect(result.message).toContain("...");
-      expect(result.message).toContain("a".repeat(200));
-      expect(result.message).not.toContain("a".repeat(201));
-    }
-  });
-
-
-  it("matches LF-only oldText against CRLF content and preserves CRLF on rewrite", async () => {
-    const { applyEdit } = await import("./ipc");
-    const content = "line1\r\nline2\r\nline3";
-    const result = applyEdit(content, "line1\nline2", "REPLACED", false, "/fake/path.txt");
-    expect(result.kind).toBe("ok");
-    if (result.kind === "ok") {
-      expect(result.newContent).toBe("REPLACED\r\nline3");
-    }
-  });
-
-  it("matches CRLF oldText against CRLF content (no regression on existing happy path)", async () => {
-    const { applyEdit } = await import("./ipc");
-    const content = "line1\r\nline2\r\nline3";
-    const result = applyEdit(content, "line1\r\nline2", "REPLACED", false, "/fake/path.txt");
-    expect(result.kind).toBe("ok");
-    if (result.kind === "ok") {
-      expect(result.newContent).toBe("REPLACED\r\nline3");
-    }
-  });
-
-  it("preserves LF when content is LF and oldText is LF (no EOL drift on happy path)", async () => {
-    const { applyEdit } = await import("./ipc");
-    const content = "line1\nline2\nline3";
-    const result = applyEdit(content, "line1\nline2", "REPLACED", false, "/fake/path.txt");
-    expect(result.kind).toBe("ok");
-    if (result.kind === "ok") {
-      expect(result.newContent).toBe("REPLACED\nline3");
-    }
-  });
-
-  it("replaceAll=true replaces all CRLF occurrences when LLM emits LF", async () => {
-    const { applyEdit } = await import("./ipc");
-    const content = "foo\r\nbar\r\nfoo\r\nbar";
-    const result = applyEdit(content, "foo\nbar", "FOOBAR", true, "/fake/path.txt");
-    expect(result.kind).toBe("ok");
-    if (result.kind === "ok") {
-      expect(result.newContent).toBe("FOOBAR\r\nFOOBAR");
-    }
-  });
-
-  it("notFound on CRLF content when oldText does not exist (real miss, not EOL mismatch)", async () => {
-    const { applyEdit } = await import("./ipc");
-    const content = "line1\r\nline2\r\nline3";
-    const result = applyEdit(content, "nonexistent", "REPLACED", false, "/fake/path.txt");
-    expect(result.kind).toBe("notFound");
-    if (result.kind === "notFound") {
-      expect(result.message).toContain("nonexistent");
-    }
-  });
-
-  it("ambiguous on CRLF content when oldText matches multiple times", async () => {
-    const { applyEdit } = await import("./ipc");
-    const content = "needle\r\nneedle\r\nneedle";
-    const result = applyEdit(content, "needle", "REPLACED", false, "/fake/path.txt");
-    expect(result.kind).toBe("ambiguous");
-    if (result.kind === "ambiguous") {
-      expect(result.message).toContain("3");
-    }
   });
 });
