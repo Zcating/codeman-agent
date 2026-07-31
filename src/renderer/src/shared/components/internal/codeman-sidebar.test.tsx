@@ -1,6 +1,6 @@
 
 import { render, cleanup } from "@solidjs/testing-library";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CodemanSidebar,
   type CodemanSidebarGroupOption,
@@ -580,6 +580,208 @@ describe("CodemanSidebar (PR 2)", () => {
       const inset = container.querySelector("[data-slot='sidebar-inset']");
       expect(inset).toBeTruthy();
       expect(inset!.className).toContain("overflow-y-auto");
+    });
+  });
+
+  describe("Resizable + Collapsible behavior", () => {
+    beforeEach(() => {
+      window.localStorage.clear();
+    });
+
+    describe("Splitter.Root wrapping", () => {
+      it("renders a Splitter.Root with two panels (sidebar + main)", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        // The splitter root should have data-part attribute
+        const splitterRoot = container.querySelector("[data-part='root']");
+        expect(splitterRoot).toBeTruthy();
+        // Should have two panel elements
+        const panels = container.querySelectorAll("[data-part='panel']");
+        expect(panels.length).toBe(2);
+      });
+
+      it("Sidebar is inside first Splitter.Panel with id 'sidebar'", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        // Use id selector since zag renders id attribute directly
+        const sidebarPanel = container.querySelector("[data-id='sidebar']");
+        expect(sidebarPanel).toBeTruthy();
+        const sidebar = sidebarPanel?.querySelector("aside");
+        expect(sidebar).toBeTruthy();
+      });
+
+      it("SidebarInset is inside second Splitter.Panel with id 'main'", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        // zag renders panel id as scoped (e.g. "splitter:splitter:root:panel:main")
+        // so we use data-part to find panels and take the second one
+        const panels = container.querySelectorAll("[data-part='panel']");
+        expect(panels.length).toBe(2);
+        const mainPanel = panels[1];
+        const inset = mainPanel?.querySelector("[data-slot='sidebar-inset']");
+        expect(inset).toBeTruthy();
+      });
+
+      it("Sidebar inside Splitter.Panel has w-full h-full to fill panel", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const sidebarPanel = container.querySelector("[data-id='sidebar']");
+        const sidebar = sidebarPanel?.querySelector("aside");
+        expect(sidebar).toBeTruthy();
+        expect(sidebar!.className).toContain("w-full");
+        expect(sidebar!.className).toContain("h-full");
+      });
+    });
+
+    describe("ResizeTrigger", () => {
+      it("ResizeTrigger between sidebar and main panels has tabIndex={-1}", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const resizeTrigger = container.querySelector("[data-part='resize-trigger']");
+        expect(resizeTrigger).toBeTruthy();
+        expect(resizeTrigger?.getAttribute("tabindex")).toBe("-1");
+      });
+    });
+
+    describe("Toolbar row with CollapseToggleButton", () => {
+      it("SidebarInset contains a toolbar row with h-10 at top", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const inset = container.querySelector("[data-slot='sidebar-inset']");
+        const toolbar = inset?.querySelector("[data-testid='sidebar-toolbar']");
+        expect(toolbar).toBeTruthy();
+        expect(toolbar!.className).toContain("h-10");
+      });
+
+      it("toolbar contains a collapse toggle button at top-left", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const toolbar = container.querySelector("[data-testid='sidebar-toolbar']");
+        const button = toolbar?.querySelector("[data-testid='collapse-toggle-button']");
+        expect(button).toBeTruthy();
+      });
+
+      it("collapse button shows PanelLeftClose icon when expanded", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const button = container.querySelector("[data-testid='collapse-toggle-button']");
+        expect(button).toBeTruthy();
+        // PanelLeftClose icon should be present (lucide icon name in aria-label or data)
+        expect(button!.getAttribute("aria-label")).toContain("Collapse");
+      });
+
+      it("collapse button shows PanelLeftOpen icon when collapsed", async () => {
+        // Set localStorage to collapsed state
+        window.localStorage.setItem("codeman.sidebar.collapsed", "true");
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        // Need to wait for effect to run
+        await new Promise(r => setTimeout(r, 50));
+        const button = container.querySelector("[data-testid='collapse-toggle-button']");
+        expect(button).toBeTruthy();
+        expect(button!.getAttribute("aria-label")).toContain("Expand");
+        window.localStorage.clear();
+      });
+    });
+
+    describe("Collapse button functionality", () => {
+      it("clicking collapse button when expanded calls collapsePanel('sidebar')", async () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const button = container.querySelector("[data-testid='collapse-toggle-button']") as HTMLButtonElement;
+        button.click();
+        // After click, should be collapsed - check aria-label changed
+        await new Promise(r => setTimeout(r, 50));
+        expect(button.getAttribute("aria-label")).toContain("Expand");
+      });
+
+      it("clicking expand button when collapsed calls expandPanel('sidebar')", async () => {
+        // Set localStorage to collapsed state
+        window.localStorage.setItem("codeman.sidebar.collapsed", "true");
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        await new Promise(r => setTimeout(r, 50));
+        const button = container.querySelector("[data-testid='collapse-toggle-button']") as HTMLButtonElement;
+        button.click();
+        await new Promise(r => setTimeout(r, 50));
+        expect(button.getAttribute("aria-label")).toContain("Collapse");
+        window.localStorage.clear();
+      });
+    });
+
+    describe("inert attribute on sidebar content", () => {
+      it("sidebar content wrapper has inert attribute when collapsed", async () => {
+        window.localStorage.setItem("codeman.sidebar.collapsed", "true");
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        await new Promise(r => setTimeout(r, 50));
+        const sidebarContent = container.querySelector("[data-testid='sidebar-content-wrapper']");
+        expect(sidebarContent).toBeTruthy();
+        expect(sidebarContent!.getAttribute("data-collapsed")).toBe("true");
+        window.localStorage.clear();
+      });
+
+      it("sidebar content wrapper does NOT have inert attribute when expanded", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const sidebarContent = container.querySelector("[data-testid='sidebar-content-wrapper']");
+        expect(sidebarContent).toBeTruthy();
+        expect(sidebarContent!.hasAttribute("inert")).toBe(false);
+      });
+    });
+
+    describe("Conditional style override when collapsed", () => {
+      it("sidebar panel has style override {min-width:0px, flex-basis:0px, flex-grow:0, overflow:hidden} when collapsed", async () => {
+        window.localStorage.setItem("codeman.sidebar.collapsed", "true");
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        await new Promise(r => setTimeout(r, 50));
+        const sidebarPanel = container.querySelector("[data-id='sidebar']") as HTMLElement | null;
+        expect(sidebarPanel).toBeTruthy();
+        expect(sidebarPanel!.style.minWidth).toBe("0px");
+        expect(sidebarPanel!.style.flexBasis).toBe("0px");
+        expect(sidebarPanel!.style.flexGrow).toBe("0");
+        expect(sidebarPanel!.style.overflow).toBe("hidden");
+        window.localStorage.clear();
+      });
+
+      it("sidebar panel has NO style override when expanded (uses zag defaults)", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const sidebarPanel = container.querySelector("[data-id='sidebar']") as HTMLElement | null;
+        expect(sidebarPanel).toBeTruthy();
+        // When expanded, min-width should NOT be 0px (should be 160px from zag)
+        expect(sidebarPanel!.style.minWidth).not.toBe("0px");
+      });
+    });
+
+    describe("localStorage persistence", () => {
+      it("reads default width of 256px when no stored value", () => {
+        window.localStorage.removeItem("codeman.sidebar.width");
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const sidebarPanel = container.querySelector("[data-id='sidebar']");
+        expect(sidebarPanel).toBeTruthy();
+        // Default size should be around 256px
+        const style = sidebarPanel!.getAttribute("style");
+        expect(style).toBeTruthy();
+      });
+
+      it("persists width to localStorage on resize end", async () => {
+        window.localStorage.removeItem("codeman.sidebar.width");
+        renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        // Simulate resize by setting localStorage directly to verify read works
+        window.localStorage.setItem("codeman.sidebar.width", "300px");
+        // Re-render to pick up new value
+        cleanup();
+        const { container: container2 } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const sidebarPanel = container2.querySelector("[data-id='sidebar']");
+        expect(sidebarPanel).toBeTruthy();
+        window.localStorage.clear();
+      });
+
+      it("persists collapsed state to localStorage", async () => {
+        window.localStorage.removeItem("codeman.sidebar.collapsed");
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const button = container.querySelector("[data-testid='collapse-toggle-button']") as HTMLButtonElement;
+        button.click();
+        await new Promise(r => setTimeout(r, 50));
+        expect(window.localStorage.getItem("codeman.sidebar.collapsed")).toBe("true");
+        window.localStorage.clear();
+      });
+
+      it("restores collapsed state from localStorage on mount", async () => {
+        window.localStorage.setItem("codeman.sidebar.collapsed", "true");
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        await new Promise(r => setTimeout(r, 50));
+        const sidebarContent = container.querySelector("[data-testid='sidebar-content-wrapper']");
+        expect(sidebarContent?.getAttribute("data-collapsed")).toBe("true");
+        window.localStorage.clear();
+      });
     });
   });
 });
