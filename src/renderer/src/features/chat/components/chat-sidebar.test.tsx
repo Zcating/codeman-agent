@@ -32,10 +32,10 @@ const F = vi.hoisted(() => {
       { id: "c-3", title: "Chat 3", workspaceId: "ws-2", updatedAt: 50, createdAt: 3, systemPrompt: null, archivedAt: null },
     ],
     mockStoreById: {
-      "c-1": { workspaceId: "ws-1", streamingMessageId: null },
-      "c-2": { workspaceId: "ws-1", streamingMessageId: "msg-x" },
-      "c-3": { workspaceId: "ws-2", streamingMessageId: null },
-    } as Record<string, { workspaceId: string; streamingMessageId: string | null }>,
+      "c-1": { workspaceId: "ws-1", isAgentActive: false },
+      "c-2": { workspaceId: "ws-1", isAgentActive: true },
+      "c-3": { workspaceId: "ws-2", isAgentActive: false },
+    } as Record<string, { workspaceId: string; isAgentActive: boolean }>,
     mockNavigate: vi.fn(),
     mockParamsAccessor: vi.fn(() => ({ convId: undefined as string | undefined })),
     mockSetSelectedWorkspaceId: vi.fn(),
@@ -521,12 +521,12 @@ describe("ChatSidebar (PR 2)", () => {
       expect(F.capturedRowActionsProps.label).toBe("Chat 1");
     });
 
-    it("renderMenu passes isStreaming from store.byId", () => {
+    it("renderMenu passes isAgentActive from store.byId", () => {
       F.mockParamsAccessor.mockImplementation(() => ({ convId: "c-2" }));
       render(() => <ChatSidebar />);
       const renderMenu = F.capturedProps!.renderMenu!;
       render(() => renderMenu({ label: "Chat 2", value: "c-2" }));
-      expect(F.capturedRowActionsProps.isStreaming).toBe(true);
+      expect(F.capturedRowActionsProps.isAgentActive).toBe(true);
     });
 
     it("RowActions delete on conv row calls chatSidebarActions.deleteConversation with convId", async () => {

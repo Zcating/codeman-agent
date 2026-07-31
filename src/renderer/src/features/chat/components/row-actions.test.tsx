@@ -10,7 +10,7 @@ function renderRowActions(props: Partial<RowActionsProps> & { kind: "workspace" 
       kind={props.kind}
       id={props.id}
       label={props.label}
-      isStreaming={props.isStreaming}
+      isAgentActive={props.isAgentActive}
       onDelete={props.onDelete ?? vi.fn()}
       onRename={props.onRename ?? vi.fn()}
     />
@@ -81,21 +81,21 @@ describe("RowActions idle state", () => {
 });
 
 
-describe("RowActions idle + isStreaming", () => {
-  it("conv: renders Loader2 spinner with aria-label='streaming' when isStreaming=true", () => {
-    const { container } = renderRowActions({ kind: "conv", id: "c-1", label: "Chat 1", isStreaming: true });
+describe("RowActions idle + isAgentActive", () => {
+  it("conv: renders Loader2 spinner with aria-label='streaming' when isAgentActive=true", () => {
+    const { container } = renderRowActions({ kind: "conv", id: "c-1", label: "Chat 1", isAgentActive: true });
     const spinner = container.querySelector("[aria-label='streaming']");
     expect(spinner).toBeTruthy();
   });
 
-  it("conv: does NOT render spinner when isStreaming=false (default)", () => {
+  it("conv: does NOT render spinner when isAgentActive=false (default)", () => {
     const { container } = renderRowActions({ kind: "conv", id: "c-1", label: "Chat 1" });
     const spinner = container.querySelector("[aria-label='streaming']");
     expect(spinner).toBeNull();
   });
 
-  it("workspace: isStreaming prop is ignored (no spinner)", () => {
-    const { container } = renderRowActions({ kind: "workspace", id: "ws-1", label: "WS", isStreaming: true });
+  it("workspace: isAgentActive prop is ignored (no spinner)", () => {
+    const { container } = renderRowActions({ kind: "workspace", id: "ws-1", label: "WS", isAgentActive: true });
     const spinner = container.querySelector("[aria-label='streaming']");
     expect(spinner).toBeNull();
   });
@@ -340,6 +340,33 @@ describe("RowActions editing state", () => {
     });
     expect(input.value).toBe("Select Me");
     expect(input.maxLength).toBe(80);
+
+    // Regression guard: clicking rename must put the input into active focus
+    // and pre-select the entire label so the user can start typing (or
+    // pressing Delete/Backspace) immediately, without a second click.
+    // In jsdom the ref callback defers focus via queueMicrotask to avoid a
+    // race with the click event's default focus restoration; waitFor polls
+    // across the microtask boundary.
+    await waitFor(() => {
+      expect(document.activeElement).toBe(input);
+    });
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe(input.value.length);
+  });
+
+  it("conv: click Pencil focuses the rename input and pre-selects the label", async () => {
+    const { container } = renderRowActions({ kind: "conv", id: "c-1", label: "My Chat" });
+    fireEvent.click(container.querySelector("[aria-label='Rename My Chat']") as HTMLElement);
+    const input = await waitFor(() => {
+      const el = container.querySelector("[aria-label='Rename input']");
+      if (!el) throw new Error("input not found");
+      return el as HTMLInputElement;
+    });
+    await waitFor(() => {
+      expect(document.activeElement).toBe(input);
+    });
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe("My Chat".length);
   });
 });
 
