@@ -210,10 +210,26 @@
     ]
   },
   {
+    "question": "compaction-auto",
+    "turns": [
+      {
+        "text": "Compaction auto-trigger test response — context window threshold reached, auto compaction will begin."
+      }
+    ]
+  },
+  {
+    "question": "compaction-manual",
+    "turns": [
+      {
+        "text": "Compaction manual-trigger test response — user clicked compact-now, compaction in progress."
+      }
+    ]
+  },
+  {
     "question": "*",
     "turns": [
       {
-        "text": "(mock) I don't know how to answer that. Try asking: hello, read, list, ping, think, tool, three-blocks, 11::msgs, 11::pure"
+        "text": "(mock) I don't know how to answer that. Try asking: hello, read, list, ping, think, tool, three-blocks, 11::msgs, 11::pure, compaction-auto, compaction-manual"
       }
     ],
     "default": true
