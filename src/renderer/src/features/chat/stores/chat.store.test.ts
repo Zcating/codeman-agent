@@ -24,7 +24,7 @@ import {
   loadWorkspaces,
   type ConversationState,
 } from "@codeman-frontend/features/chat/stores/chat.store";
-import type { Conversation, Message, Workspace } from "@codeman-frontend/shared/lib/types";
+import type { Conversation, Message, Workspace, CompactionEntry } from "@codeman-frontend/shared/lib/types";
 import type { RuntimeEvent, ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
 
 
@@ -36,6 +36,7 @@ vi.mock("@codeman-frontend/shared/apis", async () => {
     ProviderApi,
     SettingsApi,
     SkillsApi,
+    CompactionApi,
   } = await vi.importActual<typeof import("@codeman-frontend/shared/apis")>(
     "@codeman-frontend/shared/apis",
   );
@@ -45,6 +46,7 @@ vi.mock("@codeman-frontend/shared/apis", async () => {
     ProviderApi,
     SettingsApi,
     SkillsApi,
+    CompactionApi,
     MessageApiLive: Layer.succeed(MessageApi, {
       list: () => E.succeed([] as Message[]),
       append: (args: {
@@ -149,6 +151,20 @@ vi.mock("@codeman-frontend/shared/apis", async () => {
     SkillsApiLive: Layer.succeed(SkillsApi, {
       scan: () => E.succeed([]),
       load: () => E.succeed(""),
+    }),
+    CompactionApiLive: Layer.succeed(CompactionApi, {
+      list: () => E.succeed([] as CompactionEntry[]),
+      append: () =>
+        E.succeed({
+          id: "new-entry",
+          conversationId: "c1",
+          summary: "test summary",
+          model: "test-model",
+          tokensBefore: 1000,
+          kind: "manual" as const,
+          createdAt: Date.now(),
+          firstKeptMessageId: "msg-1",
+        } as CompactionEntry),
     }),
   };
 });
