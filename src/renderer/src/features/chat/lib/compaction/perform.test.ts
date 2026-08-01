@@ -20,6 +20,8 @@ describe("performCompaction", () => {
         messages: ["msg1", "msg2", "msg3"],
         previousSummary: "old summary",
         kind: "auto" as const,
+        firstKeptMessageId: "msg-last",
+        rawMessages: [],
       };
 
       yield* performCompaction(deps, ctx);
@@ -39,7 +41,7 @@ describe("performCompaction", () => {
           summary: "summarized content (sanitized)",
           tokensBefore: 5000,
           kind: "auto",
-          firstKeptMessageId: "",
+          firstKeptMessageId: "msg-last",
         }),
       );
     }).pipe(Effect.provide(EmptyTestLayer)),
@@ -65,6 +67,8 @@ describe("performCompaction", () => {
         messages: ["msg1"],
         previousSummary: null,
         kind: "auto" as const,
+        firstKeptMessageId: "msg-1",
+        rawMessages: [],
       };
 
       yield* performCompaction(deps, ctx);
@@ -95,6 +99,8 @@ describe("performCompaction", () => {
         messages: ["msg1"],
         previousSummary: null,
         kind: "auto" as const,
+        firstKeptMessageId: "msg-1",
+        rawMessages: [],
       };
 
       const result = yield* Effect.exit(performCompaction(deps, ctx));
@@ -126,6 +132,8 @@ describe("performCompaction", () => {
         messages: ["msg1"],
         previousSummary: null,
         kind: "manual" as const,
+        firstKeptMessageId: "msg-1",
+        rawMessages: [],
       };
 
       const result = yield* Effect.exit(performCompaction(deps, ctx));
@@ -162,6 +170,8 @@ describe("performCompaction", () => {
         previousSummary: null,
         signal: controller.signal,
         kind: "auto" as const,
+        firstKeptMessageId: "msg-1",
+        rawMessages: [],
       };
 
       const result = yield* Effect.exit(performCompaction(deps, ctx));

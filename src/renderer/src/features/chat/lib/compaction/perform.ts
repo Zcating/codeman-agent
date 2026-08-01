@@ -33,7 +33,7 @@ export function performCompaction(
           model: ctx.model,
           tokensBefore,
           kind: ctx.kind,
-          firstKeptMessageId: "", // filled by caller / appendEntry impl
+          firstKeptMessageId: ctx.firstKeptMessageId,
         }),
       catch: () => new CompactionFailed({ reason: "persist" }),
     });
