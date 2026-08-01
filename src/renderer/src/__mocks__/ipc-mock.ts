@@ -390,6 +390,23 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
   "mcp:open-config-dir"(_args?: IPCArgs): unknown {
     return undefined;
   },
+
+  "compactionList"(_args?: IPCArgs): unknown {
+    return mockState.resolved ?? [];
+  },
+
+  "compactionAppend"(_args?: IPCArgs): unknown {
+    return mockState.resolved ?? {
+      id: "new-compaction-entry",
+      conversationId: (_args?.conversationId as string) ?? "",
+      summary: (_args?.summary as string) ?? "",
+      model: (_args?.model as string) ?? "",
+      tokensBefore: (_args?.tokensBefore as number) ?? 0,
+      kind: (_args?.kind as string) ?? "manual",
+      createdAt: Date.now(),
+      firstKeptMessageId: (_args?.firstKeptMessageId as string) ?? "",
+    };
+  },
 };
 
 
