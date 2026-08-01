@@ -113,6 +113,7 @@ export type TransformContext = (msgs: Message[], state: {
 
 export interface CreateAgentRuntimeOptions {
   transformContext?: TransformContext;
+  getState?: () => { conversationId: string; compactionEntries: CompactionEntry[] };
 }
 
 export interface AgentRuntime {
@@ -282,10 +283,9 @@ function handleAgentEnd(
 
 
 export function createAgentRuntime(options: CreateAgentRuntimeOptions = {}): AgentRuntime {
-  const { transformContext } = options;
+  const { transformContext, getState } = options;
   let currentAgent: Agent | null = null;
-  // Shared state for transformContext access during run
-  let currentState: { conversationId: string; compactionEntries: CompactionEntry[] } | null = null;
+  const defaultGetState = () => ({ conversationId: "", compactionEntries: [] as CompactionEntry[] });
 
   return {
     run({ context, provider }: RunOptions): Stream.Stream<RuntimeEvent, never, never> {
@@ -327,7 +327,7 @@ export function createAgentRuntime(options: CreateAgentRuntimeOptions = {}): Age
             tools,
             messages: toPiMessages(
               transformContext
-                ? transformContext(context, currentState ?? { conversationId: "", compactionEntries: [] })
+                ? transformContext(context, (getState ?? defaultGetState)())
                 : context,
               model,
             ),
