@@ -12,6 +12,11 @@ import {
   type RuntimeEvent,
   type ProviderConfig,
 } from "@codeman-frontend/features/chat/lib/runtime";
+import { toPiMessages } from "@codeman-frontend/features/chat/lib/runtime-to-pi-messages";
+import { generateSummary } from "@earendil-works/pi-agent-core";
+import { createModels, type ApiKeyAuth } from "@earendil-works/pi-ai";
+import { buildModel } from "@codeman-frontend/features/chat/lib/build-model";
+import { anthropicStream } from "@codeman-frontend/features/chat/lib/anthropic-transport";
 import {
   ConversationApi,
   ConversationApiLive,
@@ -105,7 +110,12 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
   // Sort entries by createdAt ASC
   compactionEntries = [...compactionEntries].sort((a, b) => a.createdAt - b.createdAt);
 
-  const runtime = createAgentRuntime();
+  const runtime = createAgentRuntime({
+    getState: () => ({
+      conversationId: conv.id,
+      compactionEntries: store.byId[conv.id]?.compactionEntries ?? [],
+    }),
+  });
   const cs: ConversationState = {
     id: conv.id,
     title: conv.title,
@@ -151,10 +161,64 @@ const doCompaction = Effect.fn(
     setStore("byId", convId, "compactionStatus", { _tag: "compacting", kind });
 
     const deps: PerformCompactionDeps = {
-      summarize: async ({ messagesToSummarize }) => {
-        // TODO: T3.5 — wire real pi/generateSummary here
-        // For now, return a placeholder that will be replaced by T3.5
-        return `[Compacted summary of ${messagesToSummarize.length} messages]`;
+      summarize: async ({ previousSummary: _previousSummary }) => {
+        // Build model from the default provider
+        const settings = appStore.state.value;
+        const providerId = settings.defaultLlmProviderId ?? "";
+        const appProvider = settings.providers?.find((p) => p.id === providerId);
+        if (!appProvider) {
+          throw new CompactionFailed({ reason: "no_provider" });
+        }
+        let model;
+        try {
+          model = buildModel(appProvider, appProvider.llm.defaultModel);
+        } catch (e) {
+          throw new CompactionFailed({ reason: "no_api_key" });
+        }
+
+        // Build a pi-ai Provider adapter wrapping the app's provider
+        const apiKeyAuth: ApiKeyAuth = {
+          name: "app-provider",
+          resolve: async () => ({ auth: { apiKey: appProvider.apiKey } }),
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const piProvider: any = {
+          id: appProvider.id,
+          name: appProvider.label,
+          baseUrl: appProvider.llm.baseUrl,
+          auth: { apiKey: apiKeyAuth },
+          getModels: () => [model],
+          streamSimple: (model: any, context: any, options: any) => {
+            const effectiveOptions = {
+              ...options,
+              apiKey: options?.apiKey ?? appProvider.apiKey,
+            };
+            return anthropicStream(model, context, effectiveOptions);
+          },
+        };
+
+        // Build a Models collection with the current provider
+        const models = createModels();
+        models.setProvider(piProvider);
+
+        // Convert Message[] to AgentMessage[] using toPiMessages
+        const piMessages = toPiMessages(allMessages, model);
+
+        const result = await generateSummary(
+          piMessages,
+          models,
+          model,
+          COMPACTION_RESERVE_TOKENS,
+          undefined,
+          undefined,
+          _previousSummary ?? undefined,
+          undefined,
+        );
+
+        if (!result.ok) {
+          throw new CompactionFailed({ reason: "summarize" });
+        }
+        return result.value;
       },
       estimateTokens,
       sanitize: (text) => text,
@@ -178,6 +242,9 @@ const doCompaction = Effect.fn(
     };
 
     const allMessages = store.byId[convId]!.messages;
+    if (allMessages.length === 0) {
+      throw new CompactionFailed({ reason: "empty_context" });
+    }
     const messageStrings = allMessages.map(
       (m) => `${m.role}: ${m.content}`,
     );
@@ -187,6 +254,8 @@ const doCompaction = Effect.fn(
     )[0];
     const previousSummary = lastEntry?.summary ?? null;
 
+    const firstKeptMessageId = allMessages[allMessages.length - 1]!.id;
+
     try {
       const entry = yield* performCompaction(deps, {
         conversationId: convId,
@@ -194,6 +263,8 @@ const doCompaction = Effect.fn(
         messages: messageStrings,
         previousSummary,
         kind,
+        firstKeptMessageId,
+        rawMessages: allMessages,
       });
 
       // Append entry to state
