@@ -104,6 +104,34 @@ describe("ResizableHandle", () => {
     const el = container.querySelector("[data-slot='resizable-handle']");
     expect(el?.className).toContain("relative");
     expect(el?.className).toContain("w-px");
+    expect(el?.className).toContain("bg-border");
+  });
+
+  it("does not apply focus ring (no blue outline on focus)", () => {
+    const { container } = render(() => (
+      <ResizablePanelGroup panels={[{ id: "a" }, { id: "b" }]}>
+        <ResizablePanel id="a">Panel 1</ResizablePanel>
+        <ResizableHandle id="a:b" />
+        <ResizablePanel id="b">Panel 2</ResizablePanel>
+      </ResizablePanelGroup>
+    ));
+    const el = container.querySelector("[data-slot='resizable-handle']");
+    // Blue ring would come from `focus-visible:ring-ring` (--color-ring at hue 230)
+    expect(el?.className).not.toMatch(/focus-visible:ring-ring/);
+    expect(el?.className).not.toMatch(/focus-visible:ring-2/);
+    expect(el?.className).not.toMatch(/focus-visible:ring-offset/);
+  });
+
+  it("does not apply muted-foreground hover (neutral hover only)", () => {
+    const { container } = render(() => (
+      <ResizablePanelGroup panels={[{ id: "a" }, { id: "b" }]}>
+        <ResizablePanel id="a">Panel 1</ResizablePanel>
+        <ResizableHandle id="a:b" />
+        <ResizablePanel id="b">Panel 2</ResizablePanel>
+      </ResizablePanelGroup>
+    ));
+    const el = container.querySelector("[data-slot='resizable-handle']");
+    expect(el?.className).not.toMatch(/hover:bg-muted-foreground/);
   });
 
   it("withHandle=true renders a visible grip indicator", () => {

@@ -9,9 +9,11 @@ import {
 } from "@ark-ui/solid/splitter";
 import { cn } from "@codeman-frontend/shared/lib/cn";
 
-// Default classes from shadcn resizable handle
+// Default classes for ResizableHandle — kept neutral: no blue ring on focus,
+// no orange-leaning hover, no colored borders on the wider hit area.
+// Track inherits theme via bg-border (neutral gray-blue at hue 230, low chroma).
 const resizableHandleDefaultClasses =
-  "relative flex w-px items-center justify-center bg-border after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 after:border-border after:border-x data-[orientation=vertical]:flex-col data-[orientation=vertical]:h-px data-[orientation=vertical]:w-full data-[orientation=vertical]:after:left-0 data-[orientation=vertical]:after:h-1 data-[orientation=vertical]:after:w-full data-[orientation=vertical]:after:-translate-y-1/2 data-[orientation=vertical]:after:translate-x-0 hover:bg-muted-foreground/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-disabled:pointer-events-none aria-disabled:opacity-50";
+  "relative flex w-px items-center justify-center bg-border after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 data-[orientation=vertical]:flex-col data-[orientation=vertical]:h-px data-[orientation=vertical]:w-full data-[orientation=vertical]:after:left-0 data-[orientation=vertical]:after:h-1 data-[orientation=vertical]:after:w-full data-[orientation=vertical]:after:-translate-y-1/2 data-[orientation=vertical]:after:translate-x-0 hover:bg-foreground/10 aria-disabled:pointer-events-none aria-disabled:opacity-50";
 
 export const ResizablePanelGroup: Component<
   ComponentProps<typeof SplitterRoot>

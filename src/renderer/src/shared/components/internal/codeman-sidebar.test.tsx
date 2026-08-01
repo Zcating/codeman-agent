@@ -627,6 +627,16 @@ describe("CodemanSidebar (PR 2)", () => {
         expect(sidebar!.className).toContain("w-full");
         expect(sidebar!.className).toContain("h-full");
       });
+
+      it("sidebar-content-wrapper has w-full so its bg-sidebar can track panel width", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const wrapper = container.querySelector("[data-testid='sidebar-content-wrapper']");
+        expect(wrapper).toBeTruthy();
+        // Without w-full, the wrapper is a flex item with content-sized width;
+        // the inner aside's w-full would resolve to content size, not panel size,
+        // so dragging the handle wider would not extend the bg-sidebar.
+        expect(wrapper!.className).toContain("w-full");
+      });
     });
 
     describe("ResizeHandle", () => {

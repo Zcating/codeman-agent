@@ -508,7 +508,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
           data-testid="sidebar-content-wrapper"
           data-collapsed={collapsed() ? "true" : undefined}
           inert={collapsed() ? true : undefined}
-          class="flex h-full"
+          class="flex h-full w-full"
         >
           <Sidebar class={cn("w-full h-full", props.class)}>
             <Show when={props.header}>
