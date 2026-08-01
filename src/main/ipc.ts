@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { getOrInitDatabase } from "./db/mod.js";
 import { registerConversationsIpc } from "./features/conversations/ipc.js";
+import { registerCompactionIpc } from "./features/compaction/ipc.js";
 import { registerFileOpsIpc } from "./features/file-ops/ipc.js";
 import { registerSettingsIpc } from "./features/settings/ipc.js";
 import { SettingsState } from "./features/settings/state.js";
@@ -22,6 +23,7 @@ export function registerIpcHandlers(_deps: {
 
   registerSettingsIpc({ settings: settingsState });
   registerConversationsIpc({ db });
+  registerCompactionIpc({ db });
   registerWorkspacesIpc({ db });
   registerFileOpsIpc({ db });
   registerSystemIpc();
