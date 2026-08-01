@@ -10,6 +10,7 @@ import type {
   McpServerInfo,
   McpTool,
   McpToolEntry,
+  CompactionEntry,
 } from "@codeman-frontend/shared/lib/types";
 
 export interface StreamSubscription {
@@ -94,6 +95,17 @@ export interface CodemanApi {
     contentType: string;
     body: ArrayBuffer;
   }>;
+
+  // Compaction
+  readonly compactionList: (args: { conversationId?: string }) => Promise<CompactionEntry[]>;
+  readonly compactionAppend: (args: {
+    conversationId?: string;
+    summary: string;
+    model: string;
+    tokensBefore: number;
+    kind: "auto" | "manual";
+    firstKeptMessageId: string;
+  }) => Promise<CompactionEntry>;
 }
 
 export type CodemanApiExposed = CodemanApi &
@@ -150,6 +162,9 @@ const codeman: CodemanApiExposed = {
   mcpOpenConfigDir: () => ipcRenderer.invoke("mcp:open-config-dir"),
 
   webfetch: (args) => ipcRenderer.invoke("webfetch:fetch", args),
+
+  compactionList: (args) => ipcRenderer.invoke("compaction:list", args),
+  compactionAppend: (args) => ipcRenderer.invoke("compaction:append", args),
 
   onStreamChunk: (handler) => {
     const listener = (_e: unknown, evt: unknown) => handler(evt);

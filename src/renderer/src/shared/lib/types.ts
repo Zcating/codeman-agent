@@ -174,3 +174,14 @@ export interface McpToolEntry {
   description: string;
   inputSchema: unknown;
 }
+
+export interface CompactionEntry {
+  id: string;
+  conversationId: string;
+  summary: string;
+  model: string;
+  tokensBefore: number;
+  kind: "auto" | "manual";
+  createdAt: number;
+  firstKeptMessageId: string;
+}
