@@ -64,6 +64,11 @@ export function getDatabase(): DB {
   return _db;
 }
 
+export function getOrInitDatabase(): DB {
+  if (_db) {return _db;}
+  return initDatabase();
+}
+
 export function closeDatabase(): void {
   if (_db) {
     _db.close();
