@@ -264,7 +264,6 @@ const doCompaction = Effect.fn(
         previousSummary,
         kind,
         firstKeptMessageId,
-        rawMessages: allMessages,
       });
 
       // Append entry to state

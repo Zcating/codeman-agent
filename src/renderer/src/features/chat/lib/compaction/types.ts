@@ -28,6 +28,4 @@ export interface PerformCompactionCtx {
   readonly signal?: AbortSignal;
   readonly kind: "auto" | "manual";
   readonly firstKeptMessageId: string;
-  /** Original Message[] for pi generateSummary (derived from messages, preserves toolCalls/thinking) */
-  readonly rawMessages: import("@codeman-frontend/shared/lib/types").Message[];
 }
