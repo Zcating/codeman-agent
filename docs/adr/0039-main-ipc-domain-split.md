@@ -362,3 +362,55 @@ Reference: ADR-0039 supersedes nothing; aligns with ADR-0010 renderer-side split
 - `src/main/index.ts` — `app.whenReady()` boot sequence 调用 `registerIpcHandlers({ getMainWindow })`
 - Effect-TS / Solid 既有约定不变
 - AGENTS.md — "atomic commit" / "精准修改" / "简单优先"
+
+## Addendum (2026-08-01)
+
+> 实施后的对抗式 review(`/code-review` + 对抗式补充)发现以下 5 类共 10 个 finding。本节显式记录 spec 矛盾、pre-existing 死功能、judgement call 豁免,以保留审计轨迹。
+
+### Add-1: D3 表 vs Rollout 矛盾(spec 内部)
+
+ADR-0039 line 87-93 的 D3 表说 `registerSystemIpc = 6 channels`(deps `getMainWindow`),而 line 314-319 的 Rollout 把 `webfetch:fetch` 同时列在 `registerSystemIpc` 6 handlers 与 `registerWebfetchIpc` 1 handler 中,`abortRequest` 在 Rollout 算 system 的 6 个之一,但 D3 表又要求 abortControllers → webfetch/cancel-map.ts(`D5` CancelMap locality 决策)。
+
+**实现选择**:`abortRequest` 归 `registerWebfetchIpc`(操作 cancelMap,locality 优先于 D3 字面归置)。最终 `registerSystemIpc = 4`(setLoginItem, notify, openExternal, getLogPath),`registerWebfetchIpc = 2`(abortRequest, webfetch:fetch)。Channel 总数 4+10+5+5+2+4=30 本地 + 6 MCP = 36,拆分前后一致。D3 表的 system/webfetch 行视为 typo,以本次实现归置为准。
+
+### Add-2: sandbox-handler 协议(spec outline 错)
+
+ADR-0039 line 254-261 的 Implementation Outline 描述 sandboxHandler 走 `if (err instanceof AppError) return { __error: serializeAppError(err) }; throw err`,但实际 renderer 契约是 `ipcRenderer.invoke` reject 时 `Error.message` 含 JSON `{kind, message}`,由 `src/renderer/src/shared/apis/invoke.api.ts:133-147 mapIpcError` 解析。
+
+原始 `src/main/ipc.ts:415` sandboxHandler 走 throw JSON 路径。Refactor 保留旧行为以保 renderer 契约不变 — outline 是 spec 作者设想,实际契约以 renderer `mapIpcError` 为权威。返回类型 `Promise<TResult>`(非 `Promise<TResult | SerializedAppError>`),`SerializedAppError` 类型保留 export 但仅作占位,加注释说明。
+
+### Add-3: `getMainWindow` 为死参数(pre-existing)
+
+`registerIpcHandlers(_deps: { getMainWindow: () => BrowserWindow | null })` 在 barrel 接收但不传给任何 register 函数 — 原始 `src/main/ipc.ts:244` 同样 `_deps` 未使用。ADR-0039 D10 "不变"要求保留外部签名以保 `src/main/index.ts` 零改动。**死参数属 pre-existing,refactor 未引入。**
+
+### Add-4: webfetch abort 是 pre-existing 死功能
+
+`features/webfetch/cancel-map.ts` `CancelMap.register()` 生产代码零调用(grep 证实仅测试调用);`webfetch:fetch` handler 调 `fetchSafe(args.url, { timeoutSeconds })`,fetchSafe 内部用 `AbortSignal.timeout` 创建 signal,从未接受外部 AbortController 或注册到 cancelMap;`abortRequest` 因此永远 abort 失败。原始 `src/main/ipc.ts:19 abortControllers` map 同样从未被写入。
+
+**这是 pre-existing dead feature,refactor 原样搬入 CancelMap。修复需后续 task:** `fetchSafe` 接受 `signal` 参数,`webfetch:fetch` 中 `cancelMap.register(requestId, ctrl)` + ctrl 在 fetchSafe 完成后 unregister。本次 refactor 仅抽象了壳,功能未接通。
+
+### Add-5: Judgement call 豁免
+
+#### Add-5.1 `getOrInitDatabase` 是 middle-man/冗余抽象
+
+`db/mod.ts:67-70 getOrInitDatabase()` = `if (_db) return _db; return initDatabase()`,而 `initDatabase(): DB` 自身已幂等(`if (_db) return _db`)。两者功能等价。
+
+**豁免理由**: ADR-0039 D5 明确要求 `getOrInitDatabase` 作为独立入口,删除会偏离 spec。保留并接受这一层包装作为 D2 deps locality 的边界情况,后续如有清理 task 可二选一收敛。
+
+#### Add-5.2 `file-ops` 用 module import 而非 deps 接收 sandbox
+
+`features/file-ops/ipc.ts:9-10` 直接 `import` file-sandbox.js 的纯函数,未通过 deps 注入。ADR-0039 D3 表要求 `registerFileOpsIpc deps = sandbox, db, getMainWindow`。
+
+**豁免理由**: file-sandbox.js 是纯函数模块(无状态、无 IO 副作用),模块级 import 与 deps 注入等价。D2 "最小 deps" 精神优先于 D3 字面。
+
+#### Add-5.3 `RawWorkspace` 在 file-ops 与 workspaces mappers 重复
+
+`features/file-ops/ipc.ts:12-17 RawWorkspace` 与 `features/workspaces/mappers.ts:1-6 RawWorkspace` 同形但未 import 复用。
+
+**豁免理由**: minor 改善,留为后续 task(file-ops import workspaces/mappers.ts 的 `RawWorkspace`)。
+
+#### Add-5.4 `getWorkspaceById` 在 file-ops 与 workspaces 域 SQL 重复
+
+`features/file-ops/ipc.ts:19-25 getWorkspaceById(db, id)` 与 `features/workspaces/ipc.ts` 内联 workspaces 表查询重复。
+
+**豁免理由**: minor 改善,留为后续 task(抽共享 workspace data access)。
