@@ -47,7 +47,7 @@ export function CompactionMarker(props: { entry: CompactionEntry }): JSX.Element
     >
       <summary
         class="flex cursor-pointer list-none items-center gap-1.5 font-medium text-foreground"
-        data-testid={`compaction-kind-${entry().kind}`}
+        data-testid="compaction-summary-trigger"
         aria-expanded={isOpen()}
         onClick={() => setIsOpen((v) => !v)}
       >
@@ -55,7 +55,12 @@ export function CompactionMarker(props: { entry: CompactionEntry }): JSX.Element
           {entry().kind === "auto"
             ? <Zap class="size-3 text-warning" aria-hidden="true" />
             : <Hand class="size-3 text-warning" aria-hidden="true" />}
-          <span class="sr-only">{entry().kind === "auto" ? "自动" : "手动"}压缩</span>
+          <span
+            class="sr-only"
+            data-testid={`compaction-kind-${entry().kind}`}
+          >
+            {entry().kind === "auto" ? "自动" : "手动"}压缩
+          </span>
         </span>
         <span class="flex-1 truncate" data-testid="compaction-preview">{previewText()}</span>
       </summary>

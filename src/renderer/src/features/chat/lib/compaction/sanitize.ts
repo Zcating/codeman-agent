@@ -1,5 +1,10 @@
 const REDACTED = "***REDACTED***";
 
+// Threshold note: The 20+ character minimum for sk- and Bearer tokens is chosen to
+// align with pi's shouldCompact token estimation granularity (~4 chars/token), which
+// ensures sensitive tokens are reliably detected and redacted before compaction decisions.
+// apiKey/key/secret field values are redacted regardless of length (no threshold).
+
 // Matches sk- followed by 20+ alphanumeric characters
 const SK_PATTERN = /\bsk-[a-zA-Z0-9]{20,}/g;
 
