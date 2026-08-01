@@ -37,7 +37,7 @@ describe("registerSettingsIpc", () => {
     expect(result).toEqual({ providers: [] });
   });
 
-  it("updateSettings handler unwraps newSettings and calls settings.update()", () => {
+  it("updateSettings handler unwraps newSettings and calls settings.update()", async () => {
     const update = vi.fn().mockReturnValue({ theme: "dark" });
     registerSettingsIpc({
       settings: {
@@ -49,12 +49,12 @@ describe("registerSettingsIpc", () => {
     const handler = fakeIpcMain.handle.mock.calls.find(
       (c) => c[0] === "updateSettings",
     )![1] as (e: unknown, args: unknown) => unknown;
-    const result = handler(undefined, { newSettings: { theme: "dark" } });
+    const result = await handler(undefined, { newSettings: { theme: "dark" } });
     expect(update).toHaveBeenCalledWith({ theme: "dark" });
     expect(result).toEqual({ theme: "dark" });
   });
 
-  it("deleteProvider handler delegates to settings.deleteProvider(id)", () => {
+  it("deleteProvider handler delegates to settings.deleteProvider(id)", async () => {
     const deleteProvider = vi.fn().mockReturnValue([{ id: "p2" }]);
     registerSettingsIpc({
       settings: {
@@ -66,7 +66,7 @@ describe("registerSettingsIpc", () => {
     const handler = fakeIpcMain.handle.mock.calls.find(
       (c) => c[0] === "deleteProvider",
     )![1] as (e: unknown, args: { id: string }) => unknown;
-    const result = handler(undefined, { id: "p1" });
+    const result = await handler(undefined, { id: "p1" });
     expect(deleteProvider).toHaveBeenCalledWith("p1");
     expect(result).toEqual([{ id: "p2" }]);
   });

@@ -1,8 +1,9 @@
+// SerializedAppError 曾用于 IPC return 协议,实际实现走 throw 路径;保留仅为向后兼容。
 export type SerializedAppError = { kind: string; message: string };
 
 export function sandboxHandler<TArgs extends unknown[], TResult>(
   fn: (...args: TArgs) => Promise<TResult>,
-): (_event: unknown, ...args: TArgs) => Promise<TResult | SerializedAppError> {
+): (_event: unknown, ...args: TArgs) => Promise<TResult> {
   return async (_event, ...args) => {
     try {
       return await fn(...args);
