@@ -23,7 +23,8 @@ import {
   SidebarMenuSubButton,
   SidebarInset,
 } from "@codeman-frontend/shared/components/ui/sidebar";
-import { Splitter, useSplitterContext } from "@ark-ui/solid/splitter";
+import { useSplitterContext } from "@ark-ui/solid/splitter";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@codeman-frontend/shared/components/ui/resizable";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-solid";
 
 // ─── Persistence keys ────────────────────────────────────────────────────────────
@@ -487,7 +488,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
   };
 
   return (
-    <Splitter.Root
+    <ResizablePanelGroup
       defaultSize={[width()]}
       onResizeEnd={handleResizeEnd}
       onCollapse={handleCollapse}
@@ -499,7 +500,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
     >
       <SplitterStartupRestore setCollapsed={setCollapsed} />
 
-      <Splitter.Panel
+      <ResizablePanel
         id="sidebar"
         style={sidebarPanelStyle()}
       >
@@ -541,13 +542,13 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
             </Show>
           </Sidebar>
         </div>
-      </Splitter.Panel>
+      </ResizablePanel>
 
-      <Splitter.ResizeTrigger id="sidebar:main" tabIndex={-1}>
+      <ResizableHandle id="sidebar:main" tabIndex={-1} withHandle>
         <div class="w-1 h-full bg-transparent hover:bg-sidebar-border/50 cursor-col-resize transition-colors" />
-      </Splitter.ResizeTrigger>
+      </ResizableHandle>
 
-      <Splitter.Panel id="main">
+      <ResizablePanel id="main">
         <SidebarInset class="min-h-0 overflow-y-auto flex flex-col">
           {/* Toolbar row at top of SidebarInset */}
           <div
@@ -567,7 +568,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
             </div>
           </Show>
         </SidebarInset>
-      </Splitter.Panel>
-    </Splitter.Root>
+      </ResizablePanel>
+    </ResizablePanelGroup>
   );
 }

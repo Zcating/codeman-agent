@@ -589,17 +589,17 @@ describe("CodemanSidebar (PR 2)", () => {
     });
 
     describe("Splitter.Root wrapping", () => {
-      it("renders a Splitter.Root with two panels (sidebar + main)", () => {
+      it("renders a ResizablePanelGroup with two panels (sidebar + main)", () => {
         const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
-        // The splitter root should have data-part attribute
-        const splitterRoot = container.querySelector("[data-part='root']");
+        // The resizable panel group should have data-slot attribute
+        const splitterRoot = container.querySelector("[data-slot='resizable-panel-group']");
         expect(splitterRoot).toBeTruthy();
         // Should have two panel elements
-        const panels = container.querySelectorAll("[data-part='panel']");
+        const panels = container.querySelectorAll("[data-slot='resizable-panel']");
         expect(panels.length).toBe(2);
       });
 
-      it("Sidebar is inside first Splitter.Panel with id 'sidebar'", () => {
+      it("Sidebar is inside first ResizablePanel with id 'sidebar'", () => {
         const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
         // Use id selector since zag renders id attribute directly
         const sidebarPanel = container.querySelector("[data-id='sidebar']");
@@ -608,18 +608,18 @@ describe("CodemanSidebar (PR 2)", () => {
         expect(sidebar).toBeTruthy();
       });
 
-      it("SidebarInset is inside second Splitter.Panel with id 'main'", () => {
+      it("SidebarInset is inside second ResizablePanel with id 'main'", () => {
         const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
         // zag renders panel id as scoped (e.g. "splitter:splitter:root:panel:main")
-        // so we use data-part to find panels and take the second one
-        const panels = container.querySelectorAll("[data-part='panel']");
+        // so we use data-slot to find panels and take the second one
+        const panels = container.querySelectorAll("[data-slot='resizable-panel']");
         expect(panels.length).toBe(2);
         const mainPanel = panels[1];
         const inset = mainPanel?.querySelector("[data-slot='sidebar-inset']");
         expect(inset).toBeTruthy();
       });
 
-      it("Sidebar inside Splitter.Panel has w-full h-full to fill panel", () => {
+      it("Sidebar inside ResizablePanel has w-full h-full to fill panel", () => {
         const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
         const sidebarPanel = container.querySelector("[data-id='sidebar']");
         const sidebar = sidebarPanel?.querySelector("aside");
@@ -629,12 +629,12 @@ describe("CodemanSidebar (PR 2)", () => {
       });
     });
 
-    describe("ResizeTrigger", () => {
-      it("ResizeTrigger between sidebar and main panels has tabIndex={-1}", () => {
+    describe("ResizeHandle", () => {
+      it("ResizeHandle between sidebar and main panels has tabIndex={-1}", () => {
         const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
-        const resizeTrigger = container.querySelector("[data-part='resize-trigger']");
-        expect(resizeTrigger).toBeTruthy();
-        expect(resizeTrigger?.getAttribute("tabindex")).toBe("-1");
+        const resizeHandle = container.querySelector("[data-slot='resizable-handle']");
+        expect(resizeHandle).toBeTruthy();
+        expect(resizeHandle?.getAttribute("tabindex")).toBe("-1");
       });
     });
 
