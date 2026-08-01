@@ -214,6 +214,12 @@
     "turns": [
       {
         "text": "Compaction auto-trigger test response — context window threshold reached, auto compaction will begin."
+      },
+      {
+        "text": "Auto compaction in progress, monitoring context usage."
+      },
+      {
+        "text": "Auto compaction round complete."
       }
     ]
   },
@@ -222,6 +228,12 @@
     "turns": [
       {
         "text": "Compaction manual-trigger test response — user clicked compact-now, compaction in progress."
+      },
+      {
+        "text": "Manual compaction in progress, reorganizing context."
+      },
+      {
+        "text": "Manual compaction round finished."
       }
     ]
   },
