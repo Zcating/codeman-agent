@@ -15,9 +15,9 @@ export class SubAgentsApi extends Context.Tag("SubAgentsApi")<
 >() {}
 
 export const SubAgentsApiLive = Layer.succeed(SubAgentsApi, {
-  list: () => invoke<readonly SubAgentConfig[]>("subAgents:list"),
-  add: (config) => invoke<SubAgentConfig>("subAgents:add", config),
-  update: (id, patch) => invoke<SubAgentConfig>("subAgents:update", { id, patch }),
-  delete: (id) => invoke<void>("subAgents:delete", { id }),
-  setEnabled: (id, enabled) => invoke<SubAgentConfig>("subAgents:setEnabled", { id, enabled }),
+  list: () => invoke<readonly SubAgentConfig[]>("subAgentsList"),
+  add: (config) => invoke<SubAgentConfig>("subAgentsAdd", config),
+  update: (id, patch) => invoke<SubAgentConfig>("subAgentsUpdate", { id, patch }),
+  delete: (id) => invoke<void>("subAgentsDelete", { id }),
+  setEnabled: (id, enabled) => invoke<SubAgentConfig>("subAgentsSetEnabled", { id, enabled }),
 });

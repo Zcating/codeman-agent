@@ -26,6 +26,8 @@ import { extractToolErrorText } from "@codeman-frontend/features/chat/lib/runtim
 import { toPiMessages } from "@codeman-frontend/features/chat/lib/runtime-to-pi-messages";
 import { AppError } from "@codeman-frontend/shared/lib/errors";
 import type { TSchema } from "@sinclair/typebox";
+import { subAgentsStore } from "@codeman-frontend/plugins/multi-agents/stores/sub-agents.store";
+import { buildDelegateTaskTool } from "@codeman-frontend/plugins/multi-agents/lib/delegate-task-tool";
 
 
 function buildMcpTools(entries: readonly McpToolEntry[]): AgentTool<TSchema, unknown>[] {
@@ -310,7 +312,19 @@ export function createAgentRuntime(options: CreateAgentRuntimeOptions = {}): Age
 
         const fileTools = createFileTools(provider.workspaceId);
         const mcpTools = buildMcpTools(mcpAllTools$());
-        const tools = [...fileTools, webfetchTool, ...mcpTools, loadSkillTool];
+        const baseTools = [...fileTools, webfetchTool, ...mcpTools, loadSkillTool];
+
+        // Build tool registry Map for delegate_task tool
+        const toolRegistry = new Map<string, AgentTool>(
+          baseTools.map((t) => [t.name, t]),
+        );
+
+        // Conditionally add delegate_task tool if there are enabled sub-agents
+        const enabledSubAgents = Object.values(subAgentsStore.state.byId).filter((s) => s.enabled);
+        const delegateTaskTool = enabledSubAgents.length > 0
+          ? buildDelegateTaskTool(enabledSubAgents, provider, toolRegistry, () => {})
+          : null;
+        const tools = delegateTaskTool ? [...baseTools, delegateTaskTool] : baseTools;
 
         const skillsSection = formatSkillsManifestSection(provider.enabledSkills ?? []);
         const finalSystemPrompt = skillsSection

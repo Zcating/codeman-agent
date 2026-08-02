@@ -1,8 +1,6 @@
 import { Schema } from "effect";
 
-export type SubAgentId = string & Schema.Brand<"SubAgentId">;
-
-export const SubAgentIdSchema = Schema.String.pipe(Schema.brand("SubAgentId"));
+export type SubAgentId = string;
 
 export type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh";
 
@@ -29,7 +27,7 @@ export interface SubAgentConfig {
 }
 
 export const SubAgentConfigSchema: Schema.Schema<SubAgentConfig> = Schema.Struct({
-  id: Schema.String.pipe(Schema.brand("SubAgentId")),
+  id: Schema.String,
   name: Schema.String,
   description: Schema.String,
   systemPrompt: Schema.String,

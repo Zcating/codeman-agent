@@ -49,6 +49,7 @@ const SAMPLE_PROVIDER: ProviderConfig = {
 };
 
 const makeMockTool = (name: string): AgentTool => ({
+  label: name,
   name,
   description: `Tool: ${name}`,
   parameters: { type: "object", properties: {} } as AgentTool["parameters"],

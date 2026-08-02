@@ -1,5 +1,5 @@
 import { createStore } from "solid-js/store";
-import { Effect, Exit } from "effect";
+import { Effect } from "effect";
 import { SubAgentsApi, SubAgentsApiLive } from "@codeman-frontend/shared/apis";
 import type { SubAgentConfig, SubAgentId } from "../lib/sub-agent.types";
 

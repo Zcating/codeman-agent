@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, expect, beforeEach } from "vitest";
 import { Effect, Layer } from "effect";
 import { it as itEffect } from "@effect/vitest";
 import { subAgentsStore } from "./sub-agents.store";
