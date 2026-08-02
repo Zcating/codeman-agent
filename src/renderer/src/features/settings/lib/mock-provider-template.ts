@@ -12,7 +12,6 @@ export function buildMockDevTemplate(id: string): Provider {
   return {
     id,
     label: MOCK_DEV_TEMPLATE_CONSTANTS.label,
-    enabled: true,
     apiKey: "",
     llm: {
       defaultModel: MOCK_DEV_TEMPLATE_CONSTANTS.defaultModel,
