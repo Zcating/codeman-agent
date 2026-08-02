@@ -4,6 +4,13 @@ import { loadQaTable } from "./features/mock-server/qa-loader";
 import { writeHeadWithCors } from "./features/mock-server/cors";
 import { lookupQaAnswer } from "./features/mock-server/qa-lookup";
 import { buildSseEvents, buildSseTurnEvents, writeSseStream } from "./features/mock-server/sse";
+import {
+  readJsonBody,
+  extractLastUserText,
+  extractFirstUserText,
+  countAssistantMessages,
+  countCurrentRunAssistants,
+} from "./features/mock-server/request-parser";
 import { readMockServerConfig } from "./config-service";
 
 
@@ -15,124 +22,6 @@ const logger = {
     console.log(msg);
   },
 };
-
-interface AnthropicMessagesBody {
-  model?: string;
-  messages?: Array<{ role: string; content: unknown }>;
-}
-
-function readJsonBody(req: IncomingMessage): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    req.on("data", (chunk: Buffer) => chunks.push(chunk));
-    req.on("end", () => {
-      const raw = Buffer.concat(chunks).toString("utf-8");
-      if (!raw) {
-        resolve({});
-        return;
-      }
-      try {
-        resolve(JSON.parse(raw) as unknown);
-      } catch (e) {
-        reject(e instanceof Error ? e : new Error(String(e)));
-      }
-    });
-    req.on("error", reject);
-  });
-}
-
-function extractLastUserText(body: unknown): string {
-  if (!body || typeof body !== "object") {
-    return "";
-  }
-  const b = body as AnthropicMessagesBody;
-  const msgs = b.messages;
-  if (!Array.isArray(msgs)) {
-    return "";
-  }
-  for (let i = msgs.length - 1; i >= 0; i--) {
-    const m = msgs[i];
-    if (m && m.role === "user") {
-      const c = m.content;
-      if (typeof c === "string") {
-        return c;
-      }
-      return typeof c === "object" ? JSON.stringify(c) : String(c ?? "");
-    }
-  }
-  return "";
-}
-
-function extractFirstUserText(body: unknown): string {
-  if (!body || typeof body !== "object") {
-    return "";
-  }
-  const b = body as AnthropicMessagesBody;
-  const msgs = b.messages;
-  if (!Array.isArray(msgs)) {
-    return "";
-  }
-  for (let i = 0; i < msgs.length; i++) {
-    const m = msgs[i];
-    if (m && m.role === "user") {
-      const c = m.content;
-      if (typeof c === "string") {
-        return c;
-      }
-      return typeof c === "object" ? JSON.stringify(c) : String(c ?? "");
-    }
-  }
-  return "";
-}
-
-function countAssistantMessages(body: unknown): number {
-  if (!body || typeof body !== "object") {return 0;}
-  const b = body as AnthropicMessagesBody;
-  const msgs = b.messages;
-  if (!Array.isArray(msgs)) {return 0;}
-  let n = 0;
-  for (const m of msgs) {
-    if (m && m.role === "assistant") {n++;}
-  }
-  return n;
-}
-
-function countCurrentRunAssistants(body: unknown): number {
-  if (!body || typeof body !== "object") {return 0;}
-  const b = body as AnthropicMessagesBody;
-  const msgs = b.messages;
-  if (!Array.isArray(msgs)) {return 0;}
-
-  let lastPlainUserIdx = -1;
-  for (let i = msgs.length - 1; i >= 0; i--) {
-    const m = msgs[i];
-    if (!m || m.role !== "user") {continue;}
-    const c = m.content;
-    if (
-      Array.isArray(c) &&
-      c.some(
-        (block: unknown) =>
-          !!block &&
-          typeof block === "object" &&
-          (block as { type?: unknown }).type === "tool_result",
-      )
-    ) {
-      continue;
-    }
-    lastPlainUserIdx = i;
-    break;
-  }
-
-  if (lastPlainUserIdx < 0) {return 0;}
-
-  let n = 0;
-  for (let i = lastPlainUserIdx + 1; i < msgs.length; i++) {
-    const m = msgs[i];
-    if (m && m.role === "assistant") {n++;}
-  }
-  return n;
-}
-
 
 const SHORT_CIRCUIT_TEXT = "(mock) Script complete.";
 
