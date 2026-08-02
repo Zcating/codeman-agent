@@ -1,13 +1,13 @@
 
-import { app, ipcMain } from "electron";
+import { app } from "electron";
 import { access, copyFile, mkdir, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { Effect } from "effect";
 import {
 	loadSkillContent,
 	scanSkillsDir,
-} from "./features/skills/lib/skill-loader";
-import type { SkillManifest } from "../renderer/src/shared/lib/types";
+} from "./lib/skill-loader";
+import type { SkillManifest } from "../../../renderer/src/shared/lib/types";
 
 
 export function getSkillsDir(): string {
@@ -61,18 +61,4 @@ export async function ensurePreinstalledSkills(): Promise<void> {
 		await mkdir(targetDir, { recursive: true });
 		await copyFile(sourceFile, targetFile);
 	}
-}
-
-
-export function registerSkillHandlers(): void {
-	ipcMain.handle("skillsScan", async () => {
-		return await listSkills();
-	});
-	ipcMain.handle("skillsLoad", async (_event, args: { name: string }) => {
-		const name = args?.name;
-		if (typeof name !== "string" || name.length === 0) {
-			throw new Error("skillsLoad: name required");
-		}
-		return await readSkillFile(name);
-	});
 }

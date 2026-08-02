@@ -94,6 +94,8 @@ const EXPECTED_CHANNELS = [
   "mcp:open-config-dir",
   "compaction:list",
   "compaction:append",
+  "skillsScan",
+  "skillsLoad",
 ];
 
 describe("ipc.ts barrel", () => {
@@ -102,12 +104,14 @@ describe("ipc.ts barrel", () => {
     fakeWin.webContents.send.mockClear();
   });
 
-  it("registers all 38 expected ipcMain.handle channels", async () => {
+  it("registers all 40 expected ipcMain.handle channels", async () => {
     const { registerIpcHandlers } = await import("./ipc.js");
     const { McpManager } = await import("./features/mcp/mcp-manager.js");
     const { registerMcpIpcHandlers } = await import("./features/mcp/mcp-ipc.js");
+    const { registerSkillsIpc } = await import("./features/skills/ipc.js");
     registerIpcHandlers({ getMainWindow: () => fakeWin as any });
     registerMcpIpcHandlers(new McpManager());
+    registerSkillsIpc();
     const channels = fakeIpcMain.handle.mock.calls.map((c) => c[0]);
     expect(channels).toEqual(expect.arrayContaining(EXPECTED_CHANNELS));
     expect(channels.length).toBe(EXPECTED_CHANNELS.length);
