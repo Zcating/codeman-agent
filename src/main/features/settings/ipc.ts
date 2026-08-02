@@ -1,5 +1,5 @@
 import { ipcMain } from "electron";
-import type { Settings } from "../../settings-schema";
+import type { Settings } from "./settings-schema";
 import type { SettingsState } from "./state.js";
 import { sandboxHandler } from "../../lib/sandbox-handler.js";
 
