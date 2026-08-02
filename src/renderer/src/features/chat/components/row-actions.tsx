@@ -50,7 +50,7 @@ export function RowActions(props: RowActionsProps): JSX.Element {
       {}
       {}
       <div
-        class="flex w-full self-center items-center gap-2 min-w-0"
+        class="flex flex-1 self-center items-center gap-2 min-w-0"
         classList={{
           "invisible": isConfirming(),
         }}
