@@ -1,2 +1,1 @@
-export { scanSkillsDir, loadSkillContent, parseFrontmatter } from "@codeman-frontend/plugins/skills/lib/skill-loader";
-export type { SkillManifest, SkillFrontmatter, SkillSource } from "@codeman-frontend/plugins/skills/lib/skill-loader-schema";
+export type { SkillManifest, SkillFrontmatter, SkillSource } from "@codeman-frontend/shared/lib/types";
