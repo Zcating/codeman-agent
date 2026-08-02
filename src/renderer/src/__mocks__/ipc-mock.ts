@@ -407,6 +407,10 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
       firstKeptMessageId: (_args?.firstKeptMessageId as string) ?? "",
     };
   },
+
+  runCommand(_args?: IPCArgs): unknown {
+    return mockState.resolved;
+  },
 };
 
 
@@ -484,6 +488,7 @@ function buildCodemanMock(): Record<string, unknown> {
     mcpCallTool: { cmd: "mcp:call-tool" },
     mcpOpenConfigDir: { cmd: "mcp:open-config-dir" },
     webfetch: { cmd: "webfetch:fetch" },
+    runCommand: { cmd: "runCommand" },
   };
 
   const codeman: Record<string, unknown> = {};

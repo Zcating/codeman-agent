@@ -96,6 +96,9 @@ export interface CodemanApi {
     body: ArrayBuffer;
   }>;
 
+  // Run command
+  readonly runCommand: (args: { command: string; cwd?: string; timeoutMs?: number }) => Promise<unknown>;
+
   // Compaction
   readonly compactionList: (args: { conversationId?: string }) => Promise<CompactionEntry[]>;
   readonly compactionAppend: (args: {
@@ -162,6 +165,8 @@ const codeman: CodemanApiExposed = {
   mcpOpenConfigDir: () => ipcRenderer.invoke("mcp:open-config-dir"),
 
   webfetch: (args) => ipcRenderer.invoke("webfetch:fetch", args),
+
+  runCommand: (args) => ipcRenderer.invoke("runCommand", args),
 
   compactionList: (args) => ipcRenderer.invoke("compaction:list", args),
   compactionAppend: (args) => ipcRenderer.invoke("compaction:append", args),

@@ -10,6 +10,7 @@ import { Agent, type AgentEvent, type AgentTool } from "@earendil-works/pi-agent
 import type { Model } from "@earendil-works/pi-ai";
 import { createFileTools } from "@codeman-frontend/tools/file-ops";
 import { webfetchTool } from "@codeman-frontend/tools/webfetch";
+import { runCommandTool } from "@codeman-frontend/tools/run-command";
 import { formatSkillsManifestSection } from "@codeman-frontend/plugins/skills/lib/skill-injector";
 import { loadSkillTool } from "@codeman-frontend/plugins/skills/lib/skill-meta-tool";
 import { mcpAllTools$ } from "@codeman-frontend/plugins/mcp/stores/store";
@@ -312,7 +313,7 @@ export function createAgentRuntime(options: CreateAgentRuntimeOptions = {}): Age
 
         const fileTools = createFileTools(provider.workspaceId);
         const mcpTools = buildMcpTools(mcpAllTools$());
-        const tools = [...fileTools, webfetchTool, ...mcpTools, loadSkillTool];
+        const tools = [...fileTools, webfetchTool, runCommandTool, ...mcpTools, loadSkillTool];
 
         const skillsSection = formatSkillsManifestSection(provider.enabledSkills ?? []);
         const finalSystemPrompt = skillsSection
