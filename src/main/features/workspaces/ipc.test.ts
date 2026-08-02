@@ -1,30 +1,48 @@
+/**
+ * workspaces/ipc.test.ts
+ *
+ * ADR-0046 D3 测试策略：
+ * - vi.mock("./data") 后测 handler wiring
+ * - 频道注册齐全、args 转发、返回值透传
+ */
+
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Database as DB } from "better-sqlite3";
 
-const fakeIpcMain = vi.hoisted(() => ({ handle: vi.fn() }));
-const fakeDialog = vi.hoisted(() => ({ showOpenDialog: vi.fn() }));
-const mockRandomUUID = vi.hoisted(() => vi.fn(() => "mock-uuid"));
-
-vi.mock("electron", () => ({
-  ipcMain: fakeIpcMain,
-  dialog: fakeDialog,
+// vi.hoisted mocks are evaluated at module evaluation time, before vi.mock hoisting
+const {
+  mockIpcMain,
+  mockDialog,
+  mockRandomUUID,
+  mockListWorkspaces,
+  mockAddWorkspace,
+  mockRenameWorkspace,
+  mockDeleteWorkspace,
+} = vi.hoisted(() => ({
+  mockIpcMain: { handle: vi.fn() },
+  mockDialog: { showOpenDialog: vi.fn() },
+  mockRandomUUID: vi.fn(() => "mock-uuid"),
+  mockListWorkspaces: vi.fn(() => Promise.resolve([])),
+  mockAddWorkspace: vi.fn(() => Promise.resolve({})),
+  mockRenameWorkspace: vi.fn<() => Promise<void>>(() => Promise.resolve()),
+  mockDeleteWorkspace: vi.fn<() => Promise<void>>(() => Promise.resolve()),
 }));
 
+vi.mock("electron", () => ({
+  ipcMain: mockIpcMain,
+  dialog: mockDialog,
+}));
 vi.mock("node:crypto", () => ({
   randomUUID: mockRandomUUID,
 }));
-
-class FakeStatement {
-  all = vi.fn<() => unknown[]>().mockReturnValue([]);
-  get = vi.fn<() => undefined>().mockReturnValue(undefined);
-  run = vi.fn();
-}
-class FakeDatabase {
-  statement = new FakeStatement();
-  prepare = vi.fn((_sql: string) => this.statement);
-  exec = vi.fn();
-}
-const fakeDb = new FakeDatabase();
+vi.mock("./data.js", () => ({
+  listWorkspaces: mockListWorkspaces,
+  addWorkspace: mockAddWorkspace,
+  renameWorkspace: mockRenameWorkspace,
+  deleteWorkspace: mockDeleteWorkspace,
+}));
+vi.mock("../../runtime.js", () => ({
+  runMain: vi.fn((effect) => effect as unknown as Promise<unknown>),
+}));
 
 import { registerWorkspacesIpc } from "./ipc.js";
 
@@ -37,11 +55,11 @@ const CHANNELS = [
 ];
 
 function register(): void {
-  registerWorkspacesIpc({ db: fakeDb as unknown as DB });
+  registerWorkspacesIpc();
 }
 
 function handler(channel: string): (e: unknown, args: unknown) => unknown {
-  const entry = fakeIpcMain.handle.mock.calls.find((c) => c[0] === channel);
+  const entry = mockIpcMain.handle.mock.calls.find((c) => c[0] === channel);
   if (!entry) {
     throw new Error(`channel "${channel}" not registered`);
   }
@@ -49,73 +67,68 @@ function handler(channel: string): (e: unknown, args: unknown) => unknown {
 }
 
 beforeEach(() => {
-  fakeIpcMain.handle.mockClear();
-  fakeDialog.showOpenDialog.mockReset();
+  mockIpcMain.handle.mockClear();
+  mockDialog.showOpenDialog.mockReset();
   mockRandomUUID.mockClear();
-  fakeDb.prepare.mockClear();
-  fakeDb.statement.run.mockClear();
+  [
+    mockListWorkspaces,
+    mockAddWorkspace,
+    mockRenameWorkspace,
+    mockDeleteWorkspace,
+  ].forEach((fn) => { fn.mockReset(); });
 });
 
 describe("registerWorkspacesIpc", () => {
   it("registers all 5 channels", () => {
     register();
-    const channels = fakeIpcMain.handle.mock.calls.map((c) => c[0]);
+    const channels = mockIpcMain.handle.mock.calls.map((c) => c[0]);
     expect(channels).toEqual(CHANNELS);
   });
 
-  it("listWorkspaces returns empty array when no rows", () => {
+  it("listWorkspaces calls data.listWorkspaces", async () => {
     register();
-    const result = handler("listWorkspaces")(undefined, undefined);
-    expect(result).toEqual([]);
+    mockListWorkspaces.mockResolvedValue([]);
+    await handler("listWorkspaces")(undefined, undefined);
+    expect(mockListWorkspaces).toHaveBeenCalledWith();
   });
 
-  it("addWorkspace inserts a row and returns the mapped workspace", () => {
+  it("addWorkspace forwards input object", async () => {
     register();
-    const result = handler("addWorkspace")(undefined, { label: "Docs", rootPath: "C:/docs" });
-    expect(fakeDb.prepare).toHaveBeenCalledWith(
-      expect.stringContaining("INSERT INTO workspaces"),
-    );
-    expect(fakeDb.statement.run).toHaveBeenCalledWith(
-      "mock-uuid",
-      "Docs",
-      "C:/docs",
-      expect.any(Number),
-    );
-    expect(result).toEqual({
-      id: "mock-uuid",
-      label: "Docs",
-      rootPath: "C:/docs",
-      createdAt: expect.any(Number),
-    });
+    const input = { label: "Docs", rootPath: "C:/docs" };
+    mockAddWorkspace.mockResolvedValue({ id: "w1", label: "Docs", rootPath: "C:/docs", createdAt: 123 });
+    await handler("addWorkspace")(undefined, input);
+    expect(mockAddWorkspace).toHaveBeenCalledWith(input);
   });
 
-  it("renameWorkspace runs an UPDATE", () => {
+  it("renameWorkspace forwards id and label", async () => {
     register();
-    handler("renameWorkspace")(undefined, { id: "w1", label: "New Name" });
-    expect(fakeDb.prepare).toHaveBeenCalledWith(
-      expect.stringContaining("UPDATE workspaces"),
-    );
-    expect(fakeDb.statement.run).toHaveBeenCalledWith("New Name", "w1");
+    await handler("renameWorkspace")(undefined, { id: "w1", label: "New Name" });
+    expect(mockRenameWorkspace).toHaveBeenCalledWith("w1", "New Name");
   });
 
-  it("deleteWorkspace runs a DELETE", () => {
+  it("deleteWorkspace forwards id", async () => {
     register();
-    handler("deleteWorkspace")(undefined, { id: "w1" });
-    expect(fakeDb.prepare).toHaveBeenCalledWith(
-      expect.stringContaining("DELETE FROM workspaces"),
-    );
-    expect(fakeDb.statement.run).toHaveBeenCalledWith("w1");
+    await handler("deleteWorkspace")(undefined, { id: "w1" });
+    expect(mockDeleteWorkspace).toHaveBeenCalledWith("w1");
   });
 
   it("pickWorkspacePath returns null when dialog is canceled", async () => {
     register();
-    fakeDialog.showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
+    mockDialog.showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
     await expect(handler("pickWorkspacePath")(undefined, undefined)).resolves.toBeNull();
   });
 
   it("pickWorkspacePath returns the first filePath when not canceled", async () => {
     register();
-    fakeDialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ["/x"] });
+    mockDialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ["/x"] });
     await expect(handler("pickWorkspacePath")(undefined, undefined)).resolves.toBe("/x");
+  });
+
+  it("handler returns value from data function", async () => {
+    const expected = { id: "w1", label: "Docs", rootPath: "C:/docs", createdAt: 123 };
+    mockAddWorkspace.mockResolvedValue(expected);
+    register();
+    const result = await handler("addWorkspace")(undefined, { label: "Docs" });
+    expect(result).toBe(expected);
   });
 });
