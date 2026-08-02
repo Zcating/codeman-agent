@@ -3,6 +3,8 @@ import { validateProvider } from "@codeman-frontend/features/chat/lib/runtime-va
 import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
 
 const makeProvider = (overrides: Partial<ProviderConfig> = {}): ProviderConfig => ({
+  id: "test-id",
+  models: [],
   apiKey: "",
   baseUrl: "https://api.anthropic.com",
   defaultModel: "claude-sonnet-4-20250514",

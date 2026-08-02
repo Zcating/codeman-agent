@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { sanitize, type Settings, type Provider } from "./settings-schema";
+import { enforceDefaultModelInvariant } from "./provider-invariant";
 
 export class SettingsState {
   private cache: Settings | null = null;
@@ -27,6 +28,13 @@ export class SettingsState {
   update(patch: Partial<Settings>): Settings {
     this.load();
     this.cache = sanitize({ ...this.cache!, ...patch });
+    this.cache = {
+      ...this.cache!,
+      providers: this.cache!.providers.map((p) => ({
+        ...p,
+        llm: enforceDefaultModelInvariant(p.llm),
+      })),
+    };
     this.save();
     return this.cache!;
   }

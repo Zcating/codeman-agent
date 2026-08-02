@@ -5,6 +5,19 @@ import userEvent from "@testing-library/user-event";
 
 
 import { createProviderFormDialog } from "@codeman-frontend/features/settings/components/add-provider-dialog";
+import { enforceDefaultModelInvariant } from "@codeman-frontend/shared/lib/provider-invariant";
+import { codemanToast } from "@codeman-frontend/shared/components/internal/codeman-toast";
+
+vi.mock("@codeman-frontend/shared/components/internal/codeman-toast", () => ({
+  codemanToast: {
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}));
+
+vi.mock("@codeman-frontend/shared/lib/provider-invariant", () => ({
+  enforceDefaultModelInvariant: vi.fn((llm) => llm),
+}));
 
 
 async function flushPromises(): Promise<void> {
@@ -35,7 +48,10 @@ function cleanupDialogContainers(): void {
 
 describe("createProviderFormDialog", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // Reset mock implementation but keep mock functions alive
+    (enforceDefaultModelInvariant as ReturnType<typeof vi.fn>).mockReset();
+    codemanToast.error = vi.fn();
+    codemanToast.success = vi.fn();
   });
 
   afterEach(() => {
@@ -135,5 +151,49 @@ describe("createProviderFormDialog", () => {
     expect(provider).not.toBeNull();
     expect(provider!.llm.baseUrl).toBe("http://127.0.0.1:51000/mock/anthropic");
     expect(provider!.id).toMatch(/^mock-/);
+  });
+
+  it("onSubmit 时 enforceDefaultModelInvariant 被调用", async () => {
+    const user = userEvent.setup();
+
+    const promise = createProviderFormDialog();
+    await flushPromises();
+
+    await user.type(screen.getByTestId("provider-field-label"), "Test");
+    await user.type(screen.getByTestId("provider-field-base-url"), "https://api.test.com");
+    await user.type(screen.getByTestId("provider-field-default-model"), "gpt-4o");
+    await user.type(screen.getByTestId("provider-field-api-key"), "sk-key");
+
+    await user.click(screen.getByTestId("provider-add-button"));
+
+    const provider = await promise;
+    expect(enforceDefaultModelInvariant).toHaveBeenCalledWith(provider!.llm);
+  });
+
+  it("defaultModel 被纠正时 toast.error 被调用且 provider 使用纠正后的值", async () => {
+    const user = userEvent.setup();
+
+    // Simulate invariant correction: user typed "invalid" but it was corrected to "fallback-model"
+    vi.mocked(enforceDefaultModelInvariant).mockImplementationOnce(() => ({
+      defaultModel: "fallback-model",
+      baseUrl: "https://api.test.com",
+      apiType: "anthropic-messages" as const,
+      models: [{ id: "fallback-model", label: "fallback-model", deprecated: false, thinking: false }],
+      modelsEndpoint: "",
+    }));
+
+    const promise = createProviderFormDialog();
+    await flushPromises();
+
+    await user.type(screen.getByTestId("provider-field-label"), "Test");
+    await user.type(screen.getByTestId("provider-field-base-url"), "https://api.test.com");
+    await user.type(screen.getByTestId("provider-field-default-model"), "invalid-model");
+    await user.type(screen.getByTestId("provider-field-api-key"), "sk-key");
+
+    await user.click(screen.getByTestId("provider-add-button"));
+
+    const provider = await promise;
+    expect(codemanToast.error).toHaveBeenCalledWith("Default model fell back to fallback-model");
+    expect(provider!.llm.defaultModel).toBe("fallback-model");
   });
 });

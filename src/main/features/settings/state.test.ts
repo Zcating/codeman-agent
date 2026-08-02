@@ -5,6 +5,10 @@ import { join } from "node:path";
 import { SettingsState } from "./state.js";
 import type { Settings } from "./settings-schema";
 
+const { mockEnforce } = vi.hoisted(() => ({
+  mockEnforce: vi.fn((llm: any) => llm),
+}));
+
 vi.mock("./settings-schema", () => ({
   sanitize: vi.fn(
     (input: Partial<Settings>) =>
@@ -12,11 +16,16 @@ vi.mock("./settings-schema", () => ({
   ),
 }));
 
+vi.mock("./provider-invariant", () => ({
+  enforceDefaultModelInvariant: mockEnforce,
+}));
+
 describe("SettingsState", () => {
   let dir: string;
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), "codeman-settings-"));
+    mockEnforce.mockReset();
   });
 
   it("load() reads empty/nonexistent file and sanitizes to defaults", () => {
@@ -58,5 +67,51 @@ describe("SettingsState", () => {
     writeFileSync(file, JSON.stringify({ providers: [{ id: "p1" }] }));
     const state = new SettingsState(file);
     expect(state.deleteProvider("nope")).toEqual([{ id: "p1" }]);
+  });
+
+  it("update() applies enforceDefaultModelInvariant to each provider", () => {
+    const file = join(dir, "settings.json");
+    const state = new SettingsState(file);
+    state.update({
+      providers: [{
+        id: "p1",
+        label: "Test",
+        enabled: true,
+        apiKey: "key",
+        llm: {
+          defaultModel: "gone",
+          baseUrl: "https://api.test.com",
+          apiType: "anthropic-messages",
+          models: [{ id: "m1", label: "m1" }],
+          modelsEndpoint: "",
+        },
+      }],
+    });
+    expect(mockEnforce).toHaveBeenCalled();
+  });
+
+  it("update() corrects defaultModel not in models list to models[0].id", () => {
+    mockEnforce.mockImplementationOnce((llm: any) => ({
+      ...llm,
+      defaultModel: llm.models[0].id,
+    }));
+    const file = join(dir, "settings.json");
+    const state = new SettingsState(file);
+    const result = state.update({
+      providers: [{
+        id: "p1",
+        label: "Test",
+        enabled: true,
+        apiKey: "key",
+        llm: {
+          defaultModel: "gone",
+          baseUrl: "https://api.test.com",
+          apiType: "anthropic-messages",
+          models: [{ id: "m1", label: "m1" }],
+          modelsEndpoint: "",
+        },
+      }],
+    });
+    expect(result.providers[0].llm.defaultModel).toBe("m1");
   });
 });

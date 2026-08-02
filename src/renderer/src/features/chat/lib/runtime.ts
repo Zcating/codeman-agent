@@ -1,13 +1,13 @@
 
 import { Effect, Exit, Stream } from "effect";
 import { match } from "ts-pattern";
-import type { Message } from "@codeman-frontend/shared/lib/types";
+import type { Message, ModelMeta } from "@codeman-frontend/shared/lib/types";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 import type { CompactionEntry } from "@codeman-frontend/shared/lib/types";
 import { logger } from "@codeman-frontend/shared/lib/logger";
-import { anthropicStream } from "@codeman-frontend/features/chat/lib/anthropic-transport";
+import { anthropicStream } from "./anthropic-stream-fn";
+import { createProviderFromConfig, findDefaultModel } from "./pi-provider-adapter";
 import { Agent, type AgentEvent, type AgentTool } from "@earendil-works/pi-agent-core";
-import type { Model } from "@earendil-works/pi-ai";
 import { createFileTools } from "@codeman-frontend/tools/file-ops";
 import { webfetchTool } from "@codeman-frontend/tools/webfetch";
 import { formatSkillsManifestSection } from "@codeman-frontend/plugins/skills/lib/skill-injector";
@@ -91,6 +91,8 @@ interface RuntimeEmitter {
 
 
 export interface ProviderConfig {
+  id: string;
+  models: ModelMeta[];
   apiKey?: string;
   baseUrl: string;
   defaultModel: string;
@@ -297,18 +299,14 @@ export function createAgentRuntime(options: CreateAgentRuntimeOptions = {}): Age
           return;
         }
 
-        const model: Model<"anthropic-messages"> = {
-          id: provider.defaultModel || "auto",
-          name: provider.systemPrompt.slice(0, 20) || "agent",
-          api: "anthropic-messages",
-          provider: "anthropic",
+        const piProvider = createProviderFromConfig({
+          id: provider.id,
+          name: provider.id,
           baseUrl: provider.baseUrl,
-          reasoning: true,
-          input: ["text"],
-          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-          contextWindow: 128000,
-          maxTokens: 8192,
-        };
+          apiKey: provider.apiKey ?? "",
+          models: provider.models,
+        });
+        const model = findDefaultModel(piProvider, provider.defaultModel);
 
         const fileTools = createFileTools(provider.workspaceId);
         const mcpTools = buildMcpTools(mcpAllTools$());
