@@ -566,7 +566,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
 
           {/* Main content */}
           <Show when={props.children}>
-            <div class="flex-1 min-h-0">
+            <div class="flex-1 min-h-0 overflow-y-auto">
               {props.children}
             </div>
           </Show>

@@ -585,6 +585,22 @@ describe("CodemanSidebar (PR 2)", () => {
       expect(inset).toBeTruthy();
       expect(inset!.className).not.toContain("overflow-y-auto");
     });
+
+    it("content wrapper (children host) has overflow-y-auto (Bug V2.10: non-chat pages lost scrolling)", () => {
+      // Bug V2.10: 2bf2d7d removed SidebarInset overflow-y-auto so the top toolbar
+      // stays fixed, but the content wrapper (the flex-1 div hosting route content)
+      // never received a scroll channel. On pages taller than the viewport (plugins,
+      // settings sections) the content was clipped by the resizable panel's
+      // overflow:hidden with no scroll container anywhere — wheel scrolling did
+      // nothing. ChatView worked only because it owns its own overflow-y-auto.
+      // The content wrapper must be the scroll container for all other routes.
+      const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+      const contentHost = container.querySelector("[data-testid='main-content']")?.parentElement;
+      expect(contentHost).toBeTruthy();
+      expect(contentHost!.className).toContain("flex-1");
+      expect(contentHost!.className).toContain("min-h-0");
+      expect(contentHost!.className).toContain("overflow-y-auto");
+    });
   });
 
   describe("Resizable + Collapsible behavior", () => {
