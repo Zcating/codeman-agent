@@ -29,7 +29,8 @@ export function registerSettingsIpc(deps: {
     return config;
   });
 
-  ipcMain.handle("subAgents:update", (_, id: string, patch: unknown) => {
+  ipcMain.handle("subAgents:update", (_, args: { id: string; patch: unknown }) => {
+    const { id, patch } = args;
     const settings = deps.settings.load();
     const newSubAgents = (settings.subAgents ?? []).map((c) =>
       c.id === id ? { ...c, ...(patch as object), updatedAt: Date.now() } : c

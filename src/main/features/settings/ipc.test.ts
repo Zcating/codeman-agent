@@ -79,4 +79,29 @@ describe("registerSettingsIpc", () => {
     expect(deleteProvider).toHaveBeenCalledWith("p1");
     expect(result).toEqual([{ id: "p2" }]);
   });
+
+  it("subAgents:update handler receives single args object and correctly destructures id and patch", async () => {
+    const update = vi.fn().mockReturnValue({ subAgents: [] });
+    const mockSubAgents = [
+      { id: "agent-1", name: "Agent 1", description: "", systemPrompt: "", modelId: "", thinkingLevel: "off" as const, allowedTools: [], enabled: true, createdAt: 0, updatedAt: 0 },
+    ];
+    registerSettingsIpc({
+      settings: {
+        load: vi.fn().mockReturnValue({ subAgents: mockSubAgents }),
+        update,
+        deleteProvider: vi.fn(),
+      } as unknown as SettingsState,
+    });
+    const handler = fakeIpcMain.handle.mock.calls.find(
+      (c) => c[0] === "subAgents:update",
+    )![1] as (e: unknown, args: { id: string; patch: unknown }) => unknown;
+    // This is the RED test: invoke with single object args (how preload calls it)
+    const result = await handler(undefined, { id: "agent-1", patch: { name: "Updated Agent" } });
+    expect(update).toHaveBeenCalledWith({
+      subAgents: expect.arrayContaining([
+        expect.objectContaining({ id: "agent-1", name: "Updated Agent" }),
+      ]),
+    });
+    expect(result).toEqual(expect.objectContaining({ id: "agent-1", name: "Updated Agent" }));
+  });
 });
