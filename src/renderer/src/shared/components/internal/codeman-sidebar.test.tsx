@@ -801,6 +801,38 @@ describe("CodemanSidebar (PR 2)", () => {
       });
     });
 
+    describe("Collapse/expand animation (V2.10 bug fix: collapse toggle snapped with no animation)", () => {
+      it("sidebar panel carries width transition classes incl. flex-grow (it drives the width via flex: X 1 0px)", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const sidebarPanel = container.querySelector("[data-id='sidebar']") as HTMLElement | null;
+        expect(sidebarPanel).toBeTruthy();
+        const cls = sidebarPanel!.className;
+        // min-width + flex-basis alone are not enough: zag sets flex-basis to 0 in BOTH
+        // states, so the visible width is produced by flex-grow (20 when expanded).
+        // Transitioning only min-width/flex-basis left a ~126px snap on collapse and
+        // no animation at all on expand.
+        expect(cls).toContain("transition-[min-width,flex-basis,flex-grow]");
+        expect(cls).toContain("motion-safe:duration-300");
+        expect(cls).toContain("ease-out");
+      });
+
+      it("sidebar panel disables transition while the group is dragging (no rubber-band lag)", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const sidebarPanel = container.querySelector("[data-id='sidebar']") as HTMLElement | null;
+        expect(sidebarPanel).toBeTruthy();
+        // zag marks the SplitterRoot (panel-group) with data-dragging during resize;
+        // the panel must drop its transition then, or the width chases the pointer.
+        expect(sidebarPanel!.className).toContain("group-data-[dragging]:transition-none");
+      });
+
+      it("ResizablePanelGroup carries the 'group' marker so data-[dragging] on it reaches the panel", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const group = container.querySelector("[data-slot='resizable-panel-group']");
+        expect(group).toBeTruthy();
+        expect(group!.className).toContain("group");
+      });
+    });
+
     describe("localStorage persistence", () => {
       it("reads default width of 256px when no stored value", () => {
         window.localStorage.removeItem("codeman.sidebar.width");

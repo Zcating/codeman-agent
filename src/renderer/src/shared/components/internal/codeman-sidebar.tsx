@@ -489,6 +489,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
 
   return (
     <ResizablePanelGroup
+      class="group"
       defaultSize={[width()]}
       onResizeEnd={handleResizeEnd}
       onCollapse={handleCollapse}
@@ -502,6 +503,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
 
       <ResizablePanel
         id="sidebar"
+        class="transition-[min-width,flex-basis,flex-grow] motion-safe:duration-300 ease-out group-data-[dragging]:transition-none"
         style={sidebarPanelStyle()}
       >
         <div
