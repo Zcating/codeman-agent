@@ -173,6 +173,7 @@ export class JsonRpcConnection {
     for (const [, entry] of this.#pending) {
       Deferred.unsafeDone(entry.deferred, Exit.fail(err));
     }
+    this.#pending.clear();
   }
 
   #writeLine(line: string): void {
