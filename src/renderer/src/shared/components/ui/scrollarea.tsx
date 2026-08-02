@@ -63,6 +63,7 @@ export function ScrollBar(props: ScrollBarProps): JSX.Element {
       orientation={local.orientation ?? "vertical"}
       class={cn(
         "flex touch-none p-px transition-colors select-none",
+        "!end-1",
         "data-[orientation=vertical]:h-full data-[orientation=vertical]:w-2.5 data-[orientation=vertical]:border-l data-[orientation=vertical]:border-l-transparent",
         "data-[orientation=horizontal]:h-2.5 data-[orientation=horizontal]:flex-col data-[orientation=horizontal]:border-t data-[orientation=horizontal]:border-t-transparent",
         local.class,

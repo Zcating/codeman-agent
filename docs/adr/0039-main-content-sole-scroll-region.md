@@ -23,9 +23,9 @@
   └─ SidebarInset（flex-col min-h-0）
       ├─ 工具栏（h-10 shrink-0）— 永远钉住，不滚动
       └─ ScrollArea（唯一滚动容器）─ 路由内容
-          ├─ 非 chat 路由：ScrollArea 的 Viewport 是活动滚动区
+          ├─ 非 chat 路由：内容 wrapper div 是活动滚动区（原生 overflow:auto，无自定义滚动条）
           └─ chat 路由：conversation-route h-full overflow-hidden 恰好贴合
-             → wrapper Viewport 无溢出，ChatView 消息区（另一个 ScrollArea）成为活动滚动区
+             → wrapper 无溢出，ChatView 消息区 ScrollArea 的 Viewport 成为活动滚动区
 ```
 
 **不变量**：主栏内「活动滚动区」（`scrollHeight > clientHeight` 的 `[data-scroll-region]` 元素）**恰好一个**。
@@ -39,14 +39,14 @@
 滚动契约的全部知识收敛到 shadcn `ScrollArea` 原语（项目内已有 `.repos/shadcn/scroll-area.tsx` 的 Solid 移植版 `ui/scrollarea.tsx`，基于 `@ark-ui/solid/scroll-area`）。**契约标记落点**：`data-scroll-region` 与 `data-testid` 透传到 **Viewport**（真正的滚动元素）——zag 在 Viewport 上注入 `style: { overflow: "auto" }`，Root 只是定位壳（`relative overflow-hidden`），`scrollHeight`/`clientHeight` 语义属于 Viewport。**尺寸链**：`flex-1 min-h-0` 在 Root（flex item 定位），Viewport `size-full` 填满 Root。
 
 **两个消费方**（真实消费方 justify 这条 seam）：
-- `codeman-sidebar.tsx` 内容 wrapper → `<ScrollArea class="flex-1 min-h-0" data-scroll-region="true" data-testid="main-content-scroll">`
-- `chat-view.tsx` 消息区 → `<ScrollArea class="flex-1 min-h-0" data-scroll-region="true">`（内容 `p-4 space-y-3` 下沉到内层 div）
+- `codeman-sidebar.tsx` 内容 wrapper → `<div class="flex-1 min-h-0 overflow-auto" data-scroll-region="true" data-testid="main-content-scroll">`（**layout 容器，div，不是 ScrollArea**——wrapper 的唯一职责是承载路由 + 原生滚动通道，不该渲染自定义滚动条，否则会与内层 ScrollArea 的 ScrollBar 在右侧重叠。zag 的 ScrollBar 始终挂载，无溢出时也常驻显示。）
+- `chat-view.tsx` 消息区 → `<ScrollArea class="flex-1 min-h-0" data-scroll-region="true">`（内容 `p-4 space-y-3` 下沉到内层 div；真正的内容区域，溢出时显示自定义滚动条 — `!end-1` 让 ScrollBar 离右侧 4px，覆盖 zag 注入的 `insetInlineEnd:0`）
 
 **拒绝**：让消费方手写 `flex-1 min-h-0 overflow-y-auto`（两份副本漂移风险 = 两个回归的温床）；自建 `ScrollRegion` div 原语（与已存在的 shadcn `ScrollArea` 重复，滚动策略两处定义）。
 
 ### D3 — 契约身份：`data-testid="main-content-scroll"`
 
-内容 wrapper 有可寻址身份，单测 / e2e 直接定位，不再依赖 `parentElement` 脆弱查询。`data-scroll-region` 是类型标记（可能多个），`data-testid="main-content-scroll"` 是主内容 wrapper 的专属身份（恰好一个）。两者都落在 Viewport 上（滚动元素即契约主体）。
+内容 wrapper 有可寻址身份，单测 / e2e 直接定位，不再依赖 `parentElement` 脆弱查询。`data-scroll-region` 是类型标记（可能多个），`data-testid="main-content-scroll"` 是主内容 wrapper 的专属身份（恰好一个）。**wrapper 是普通 div**——契约标记直接落在 div 上（不再走 ScrollArea Viewport）。ScrollArea 的契约标记透传机制（Viewport 接收）保留给真正的内容 ScrollArea（如 chat 消息区）。
 
 ### D4 — 断言模块（shared/lib/scroll-region.ts）
 
@@ -83,20 +83,21 @@ accepted
 ### 正面
 
 - **契约有名字、有身份、有守卫**：`data-scroll-region` + `main-content-scroll` + 单测 + e2e，V2.9/V2.10 变成合并前的自动拦截
-- **滚动策略一处定义**：滚动通道收敛到 shadcn `ScrollArea` 的 Viewport（`overflow:auto` 由 zag 注入），消费方不再手写 `overflow-y-auto`
+- **滚动策略一处定义**：消息区等真正内容 ScrollArea 的滚动通道收敛到 Viewport（`overflow:auto` 由 zag 注入），消费方不再手写 `overflow-y-auto`；wrapper 作为 layout 容器走原生 div `overflow-auto`，与 ScrollArea 职责清晰分离
+- **双滚动条回归被结构防御**：wrapper 不渲染自定义 ScrollBar（div 而非 ScrollArea），即使内容不溢出也不会有常驻 track 与内层 ScrollArea 的 ScrollBar 重叠
 - **locality**：滚动相关 bug 的排查入口收敛到 `scroll-region.ts` 断言模块
 - **术语进 glossary**：CONTEXT.md「Scroll Region」词条，plan/code/commit 同词
 
 ### 负面 / 风险
 
-- **ScrollArea 成为新公共原语**：后续新路由若需要"滚动 body + 钉住 footer"布局，必须消费它而非手写类名——需要 code review 把关
+- **ScrollArea 成为新公共原语**：后续新路由若需要"滚动 body + 钉住 footer"布局，必须消费它而非手写类名——需要 code review 把关；wrapper 这种 layout 容器只能走 div，**不要**再用 ScrollArea（防双滚动条）
 - **e2e wheel 模拟依赖 Chromium 对合成 WheelEvent 的默认滚动**：若未来 Chromium 行为变化，断言可能失效；`activeCount` 结构断言仍是主防线，wheel 断言是行为补强
-- **契约标记在 Viewport**：`data-testid`/`data-scroll-region` 语义从"Root 容器"变为"滚动元素"，e2e 定位器与单测选择器需以 viewport 为准；ScrollArea 的 Root 上不再有这两个属性
+- **契约标记在 Viewport（仅 ScrollArea 消费方）**：ScrollArea 的 `data-testid`/`data-scroll-region` 落在 Viewport（真正的滚动元素），Root 上没有这两个属性；wrapper（div）这两个标记落在自己身上
 
 ### 兼容性
 
-- 消费方 DOM 变化：内容 wrapper 从 `<div class="flex-1 min-h-0 overflow-y-auto">` 变为 ScrollArea（Root `relative overflow-hidden flex-1 min-h-0` + Viewport `size-full` + scrollbar）——既有选择器（`div.flex-1.min-h-0` 等）不再直接命中消息区滚动容器，chat-view.test.tsx 的 V2.8 断言已改为按 `[data-slot="scroll-area-viewport"][data-scroll-region]` 定位
-- ScrollArea 视觉新增：shadcn 自定义滚动条（`data-slot="scroll-area-scrollbar"`，2.5px 竖条）替代原生滚动条——这是 shadcn 组件的既定外观
+- 消费方 DOM 变化：内容 wrapper 从 `<ScrollArea class="flex-1 min-h-0">` **回退**为 `<div class="flex-1 min-h-0 overflow-auto">`（layout 容器不该渲染自定义滚动条，避免与内层 ScrollArea 的 ScrollBar 在右侧重叠）；chat-view 消息区仍是 ScrollArea，既有 `[data-slot="scroll-area-viewport"][data-scroll-region]` 选择器继续生效
+- ScrollArea 视觉微调：自定义滚动条 `!end-1` 让滚动条离右侧 4px（覆盖 zag 注入的 `insetInlineEnd:0`）
 - 无新增依赖（ScrollArea 复用 `@ark-ui/solid/scroll-area`，已有）；无 electron / IPC 改动
 - e2e spec 编号 03（该序号此前空缺，不冲突）
 

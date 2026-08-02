@@ -42,20 +42,23 @@ describe("ScrollArea (shadcn-style, .repos/shadcn/scroll-area.tsx 移植)", () =
     const viewport = container.querySelector("[data-slot='scroll-area-viewport']");
     expect(root!.className).toContain("relative");
     expect(root!.className).toContain("overflow-hidden");
-    // flex 尺寸链在 Root 上
     expect(root!.className).toContain("flex-1");
     expect(root!.className).toContain("min-h-0");
-    // 滚动通道在 Viewport 上（zag getViewportProps 注入 style.overflow=auto）
     expect((viewport as HTMLElement).style.overflow).toBe("auto");
   });
 
   it("双滚动条守卫: Viewport 隐藏原生滚动条（scrollbar-width:none + ::-webkit-scrollbar），与自定义 ScrollBar 不重复", () => {
     const { container } = render(() => <ScrollArea>content</ScrollArea>);
     const viewport = container.querySelector("[data-slot='scroll-area-viewport']");
-    // scrollbar-width: none（Firefox / 现代 Chromium 标准属性）
     expect(viewport!.className).toContain("[scrollbar-width:none]");
-    // ::-webkit-scrollbar { display: none }（Chromium/WebKit）
     expect(viewport!.className).toContain("[&::-webkit-scrollbar]:hidden");
+  });
+
+  it("ScrollBar 与右侧有 4px 间隔（!end-1）—覆盖 zag 注入的 insetInlineEnd:0", () => {
+    const { container } = render(() => <ScrollArea>content</ScrollArea>);
+    const bar = container.querySelector("[data-slot='scroll-area-scrollbar']");
+    expect(bar).toBeTruthy();
+    expect(bar!.className).toContain("!end-1");
   });
 
   it("merges custom class on Root", () => {

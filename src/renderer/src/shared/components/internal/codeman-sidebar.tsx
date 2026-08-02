@@ -25,7 +25,6 @@ import {
 } from "@codeman-frontend/shared/components/ui/sidebar";
 import { useSplitterContext } from "@ark-ui/solid/splitter";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@codeman-frontend/shared/components/ui/resizable";
-import { ScrollArea } from "@codeman-frontend/shared/components/ui/scrollarea";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-solid";
 
 // ─── Persistence keys ────────────────────────────────────────────────────────────
@@ -566,12 +565,18 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
           </div>
 
           {/* Main content — the sole scroll region of the main column (ADR-0039).
-              data-scroll-region/data-testid 落在 ScrollArea 的 Viewport（真正的
-              滚动元素）上；Root 只承担 flex 尺寸链（flex-1 min-h-0）。 */}
+              Wrapper 是 layout 容器（不是 ScrollArea）— 它的唯一职责是承载路由内容并
+              提供原生滚动通道（overflow-auto + flex-1 min-h-0）。消息区等真正的内容
+              区域会自己嵌套 ScrollArea，自带自定义滚动条。wrapper 不渲染自定义滚动条
+              是为了避免与内层 ScrollArea 的滚动条在右侧重叠（zag 的 ScrollBar 始终挂载）。 */}
           <Show when={props.children}>
-            <ScrollArea class="flex-1 min-h-0" data-scroll-region="true" data-testid="main-content-scroll">
+            <div
+              class="flex-1 min-h-0 overflow-auto"
+              data-scroll-region="true"
+              data-testid="main-content-scroll"
+            >
               {props.children}
-            </ScrollArea>
+            </div>
           </Show>
         </SidebarInset>
         </div>
