@@ -1,12 +1,5 @@
 
 import { createServer } from "node:http";
-import { lookupQaAnswer } from "./qa-lookup";
-import { buildSseEvents, buildSseTurnEvents } from "./sse";
-import {
-  extractLastUserText,
-  extractFirstUserText,
-  countAssistantMessages,
-} from "./request-parser";
 import { readMockServerConfig } from "../../config-service";
 import { handleRequest } from "./http-handler";
 import { logger } from "../../logger";
@@ -55,11 +48,3 @@ export function stopMockServer(): Promise<void> {
   });
 }
 
-export {
-  lookupQaAnswer,
-  buildSseEvents,
-  buildSseTurnEvents,
-  extractLastUserText,
-  extractFirstUserText,
-  countAssistantMessages,
-};
