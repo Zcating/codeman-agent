@@ -66,7 +66,7 @@ export class McpManager {
             await server.stop();
             this.#servers.delete(cfg.name);
             logger.warn(
-              `[mcp] tool name collision: "${agentName}" â€?first server="${firstServer}", duplicate server="${cfg.name}"; duplicate stopped per D3`,
+              `[mcp] tool name collision: "${agentName}" â€”first server="${firstServer}", duplicate server="${cfg.name}"; duplicate stopped per D3`,
             );
             throw new JsonRpcProtocolError({
               message: `duplicate tool name: ${agentName}`,
