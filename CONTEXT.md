@@ -17,12 +17,13 @@
 
 ### Providers
 
-- **Provider (提供商)** — 公司维度的统一记录，承载一种或多种"对外能力"。一条记录 = 一家公司。shape: `{ id, label, enabled, apiKey, llm: {...}, billing?: {...} }`。`apiKey` 是该 provider 的对外调用凭据（明文存于 Settings JSON，见 ADR-0015）；`llm` 必选，`billing` 可选。_避免_：client、vendor、service。
+- **Provider (提供商)** — 公司维度的统一记录，承载一种或多种"对外能力"。一条记录 = 一家公司。shape: `{ id, label, comment?, apiKey, llm: {...}, billing?: {...} }`。`apiKey` 是该 provider 的对外调用凭据（明文存于 Settings JSON，见 ADR-0015）；`comment` 可选备注，用于区分同厂商多 key（label 可重复，靠 comment 区分）；`llm` 必选，`billing` 可选。_避免_：client、vendor、service。
+- **Provider Preset (厂商预设)** — `add-provider-dialog` 内置的厂商模板库（移植自 CC-Switch `claudeProviderPresets.ts`，MIT），60+ 厂商。每个预设含 `baseUrl` / `defaultModel` / `models`（硬编码清单）/ `modelsEndpoint`（已知厂商填，其余留空），`apiKey` 留空待用户填。用户点选预设 → 表单自动预填 → 补 label + apiKey 保存。预设/自定义 provider 落盘后无区别（无 `source` 字段）。_避免_：provider template、厂商模板。
 - **Provider.llm (LLM 能力)** — Provider 必选子对象。shape: `{ defaultModel, baseUrl, apiType, models, modelsEndpoint }`。`apiType` 锁 `"anthropic-messages"`；`models: ModelMeta[]` 用户在 Settings 中可编辑；`modelsEndpoint: string` provider 维度的模型列表拉取 URL。**不变量**：`defaultModel` 始终是 `models` 数组中某个元素的 `id` 或 `""`（见 Default Model Invariant，ADR-0016）。Agent 的"燃料"。pi-ai 调 LLM 时 `Authorization: Bearer <Provider.apiKey>`。_避免_：model provider、API provider、AI provider。
 - **Provider.billing (计费能力)** — Provider 可选子对象。shape: `{ kind }`。`kind` = `"balance" | "plan_quota"`。Agent 的一级工具目标。billing adapter 调计费端点时复用 `Provider.apiKey` 作 `Authorization: Bearer`。_避免_：billing source、计费源。
 - **Protocol (协议)** — LLM 上游调用的 HTTP/SSE 形态。锁定 anthropic-messages（Anthropic Messages API 的请求/响应形状）；pi-ai 按 `api` 字段路由到对应 transport 实现。_避免_：API format、API type（实现细节）、wire format。
 - **Adapter (适配器)** — 每个计费提供方的 HTTP 客户端与响应解析器，将 API key 转换为 `Snapshot`。位于 TS 端 (`src/features/billing/lib/adapters/`)：deepseek 仅实现 `balance`，minimax 实现 `plan_quota`（balance 端点未公开验证）。_避免_：HTTP client（过载）。
-- **ModelMeta (模型元数据)** — `Provider.llm.models[]` 元素。shape: `{ id, label, contextWindow?, deprecated?, thinking? }`；用户在 Settings 中可增删编辑。`ProviderService.getModels(id)` 静态读出此列表（读 settings）；`ProviderService.fetchModels(id)` 调 `modelsEndpoint` 拉最新（OpenAI-compatible `/v1/models` 格式，`label` 默认 = `id`）。_避免_：model config、model info。
+- **ModelMeta (模型元数据)** — `Provider.llm.models[]` 元素。shape: `{ id, label, contextWindow?, deprecated?, thinking? }`；用户在 Settings 中可增删编辑（模型表格编辑器，随预设预填硬编码清单，不靠运行时拉取）。_避免_：model config、model info。
 - **Models Endpoint (模型列表端点)** — `Provider.llm.modelsEndpoint`。per-provider 可配置 URL，用于 `fetchModels()` 拉模型列表。
 - **Default Model Invariant (默认模型不变量)** — `Provider.llm.defaultModel` 始终是 `Provider.llm.models` 数组中某个元素的 `id`，或 `""`（models 为空时）。`appStore.refreshProviderModels` 在写 state 时强制执行：若 `defaultModel` 不在新数组中且数组非空，改成 `models[0].id`；若数组为空，改成 `""`（ADR-0016）。防止 UI dropdown 跳到默认第一项而 store 里 `defaultModel` 仍是无效值的"UI 看似 OK / store 不一致"的 bug。
 - **Balance (余额)** — 计费提供方持有的可充值信用池。时点状态，可充值。
