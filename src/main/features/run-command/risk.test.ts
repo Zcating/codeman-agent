@@ -27,4 +27,10 @@ describe("assessRisk", () => {
     const tags = result.reasons.map((r) => r.tag);
     expect(tags.some((t) => /path[_-]?escape|path[_-]?out[_-]?of[_-]?bounds/i.test(t))).toBe(true);
   });
+
+  it("safe command", () => {
+    const result = assessRisk({ command: "git status", cwd: "C:\\work" });
+    expect(result.kind).toBe("low");
+    expect(result.needsModelFallback).toBe(false);
+  });
 });
