@@ -13,7 +13,7 @@ import {
   extractFirstUserText,
   countAssistantMessages,
 } from "./mock-server";
-import { loadQaTable, resetQaLoaderForTest, type QaTurn } from "./qa-loader";
+import { loadQaTable, resetQaLoaderForTest, type QaTurn } from "./features/mock-server/qa-loader";
 
 
 describe("lookupQaAnswer — substring match", () => {

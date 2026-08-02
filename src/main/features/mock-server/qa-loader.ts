@@ -34,9 +34,9 @@ function candidateSeedPaths(): string[] {
   const path = require("node:path") as typeof import("node:path");
   const candidates = [
     path.join(process.cwd(), "src", "assets", "qa.dev.json"),
-    path.join(__dirname, "..", "assets", "qa.dev.json"),
-    path.join(__dirname, "..", "..", "src", "assets", "qa.dev.json"),
+    path.join(__dirname, "..", "..", "assets", "qa.dev.json"),
     path.join(__dirname, "..", "..", "..", "src", "assets", "qa.dev.json"),
+    path.join(__dirname, "..", "..", "..", "..", "src", "assets", "qa.dev.json"),
   ];
   return Array.from(new Set(candidates));
 }

@@ -5,7 +5,7 @@ import { app, BrowserWindow, Menu, protocol, net } from "electron";
 import { join, sep, normalize } from "node:path";
 import { pathToFileURL } from "node:url";
 import { registerIpcHandlers } from "./ipc";
-import { loadQaTable } from "./qa-loader";
+import { loadQaTable } from "./features/mock-server/qa-loader";
 import { startMockServer } from "./mock-server";
 import { ensurePreinstalledSkills, registerSkillHandlers } from "./skills-host";
 import { McpManager } from "./mcp-manager";

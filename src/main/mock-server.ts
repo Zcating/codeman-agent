@@ -1,6 +1,6 @@
 
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
-import { loadQaTable, type QaEntry, type QaTurn } from "./qa-loader";
+import { loadQaTable, type QaEntry, type QaTurn } from "./features/mock-server/qa-loader";
 import { readMockServerConfig } from "./config-service";
 
 
