@@ -58,7 +58,7 @@ export function startMockServer(): void {
         // 挂起: fiber 持续运行，scope 保持打开，server 正常运行
         return Effect.never;
       }),
-      Effect.scoped(),
+      Effect.scoped,
     ),
   );
 
