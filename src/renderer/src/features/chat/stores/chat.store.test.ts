@@ -228,6 +228,8 @@ const mockHistory: Message[] = [
 ];
 
 const defaultProvider: ProviderConfig = {
+  id: "test-provider",
+  models: [{ id: "m1", label: "m1" }],
   apiKey: "test-key",
   baseUrl: "https://api.test.com",
   defaultModel: "test-model",

@@ -14,9 +14,8 @@ import {
 } from "@codeman-frontend/features/chat/lib/runtime";
 import { toPiMessages } from "@codeman-frontend/features/chat/lib/runtime-to-pi-messages";
 import { generateSummary } from "@earendil-works/pi-agent-core";
-import { createModels, type ApiKeyAuth } from "@earendil-works/pi-ai";
-import { buildModel } from "@codeman-frontend/features/chat/lib/build-model";
-import { anthropicStream } from "@codeman-frontend/features/chat/lib/anthropic-transport";
+import { createModels } from "@earendil-works/pi-ai";
+import { createProviderFromConfig, findDefaultModel } from "@codeman-frontend/features/chat/lib/pi-provider-adapter";
 import {
   ConversationApi,
   ConversationApiLive,
@@ -169,33 +168,19 @@ const doCompaction = Effect.fn(
         if (!appProvider) {
           throw new CompactionFailed({ reason: "no_provider" });
         }
-        let model;
-        try {
-          model = buildModel(appProvider, appProvider.llm.defaultModel);
-        } catch (e) {
+        if (!appProvider.apiKey) {
           throw new CompactionFailed({ reason: "no_api_key" });
         }
 
-        // Build a pi-ai Provider adapter wrapping the app's provider
-        const apiKeyAuth: ApiKeyAuth = {
-          name: "app-provider",
-          resolve: async () => ({ auth: { apiKey: appProvider.apiKey } }),
-        };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const piProvider: any = {
+        const piProvider = createProviderFromConfig({
           id: appProvider.id,
           name: appProvider.label,
           baseUrl: appProvider.llm.baseUrl,
-          auth: { apiKey: apiKeyAuth },
-          getModels: () => [model],
-          streamSimple: (model: any, context: any, options: any) => {
-            const effectiveOptions = {
-              ...options,
-              apiKey: options?.apiKey ?? appProvider.apiKey,
-            };
-            return anthropicStream(model, context, effectiveOptions);
-          },
-        };
+          apiKey: appProvider.apiKey,
+          models: appProvider.llm.models,
+          modelsEndpoint: appProvider.llm.modelsEndpoint,
+        });
+        const model = findDefaultModel(piProvider, appProvider.llm.defaultModel);
 
         // Build a Models collection with the current provider
         const models = createModels();

@@ -41,6 +41,8 @@ vi.mock("@earendil-works/pi-agent-core", () => {
 });
 
 const mockProvider: ProviderConfig = {
+    id: "test-provider",
+    models: [{ id: "m1", label: "m1" }],
     apiKey: "test-key",
     baseUrl: "https://mock.local",
     defaultModel: "mock-model",
