@@ -93,7 +93,6 @@ export async function executeCommand(input: ExecuteCommandInput): Promise<RunCom
 
     child.on("error", (err) => {
       clearTimeout(timer);
-      const durationMs = Date.now() - start;
       resolve({ status: "error", error: { kind: "ProcessError", message: err.message } });
     });
   });
