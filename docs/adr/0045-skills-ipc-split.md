@@ -164,14 +164,14 @@ it("registers all 40 expected ipcMain.handle channels", async () => {
 
 ### D5 — skills-host.ts 内部 import 路径深度调整
 
-`src/main/features/skills/skills-host.ts` 从 `src/main/skills-host.ts` move 进来后,line 3 的 `app.getPath` 不变,line 10 的类型 import 路径深度需要调整:
+`src/main/features/skills/skills-host.ts` 从 `src/main/skills-host.ts` move 进来后,line 3 的 `app.getPath` 不变,line 10 的类型 import 路径深度需要调整(文件位置深度从 1 层 `src/main/` → 3 层 `src/main/features/skills/`,所以相对路径 +2):
 
 ```ts
 // before (src/main/skills-host.ts:10)
 import type { SkillManifest } from "../renderer/src/shared/lib/types";
 
 // after (src/main/features/skills/skills-host.ts:10)
-import type { SkillManifest } from "../../renderer/src/shared/lib/types";  // depth +1
+import type { SkillManifest } from "../../../renderer/src/shared/lib/types";  // depth +2
 ```
 
 ### D6 — 不新增 `features/skills/ipc.test.ts`(对齐 MCP precedent)
@@ -221,7 +221,7 @@ import type { SkillManifest } from "../../renderer/src/shared/lib/types";  // de
 - `registerMcpIpcHandlers` / `registerSettingsIpc` 等其他域 register 函数
 - `src/main/ipc.ts` barrel(不参与本 ADR)
 - `src/main/features/skills/lib/`(ADR-0044 已就位)
-- 285 → 303 测试计数(本 ADR 不新增 test case,只更新 EXPECTED_CHANNELS)
+- 测试计数 303 → 303(本 ADR 不新增 test case,只更新 `EXPECTED_CHANNELS` 列表 — 285 → 303 是 ADR-0044 的 delta,本 ADR 不变)
 
 ## 已知缺陷(从 ADR-0044 继承,本 ADR 不修)
 
