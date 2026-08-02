@@ -1,51 +1,23 @@
 // http-handler.test.ts — handleRequest 的 end-to-end 集成测试(拆自 src/main/mock-server.test.ts)
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { startMockServer, stopMockServer } from "./index";
+import { writeFileSync } from "node:fs";
 import { loadQaTable, resetQaLoaderForTest } from "./qa-loader";
+import { startMockServerForTest } from "./__test-helpers__/lifecycle";
+import type { MockServerTestContext } from "./__test-helpers__/lifecycle";
 
 describe("mock-server HTTP — POST /mock/anthropic/v1/messages", () => {
-  let tmpDir: string;
+  let ctx: MockServerTestContext;
   let qaPath: string;
-  const TEST_PORT = 50003; 
-  const TEST_HOST = "127.0.0.1";
-  const BASE_URL = `http://${TEST_HOST}:${TEST_PORT}`;
+  const TEST_PORT = 50003;
+  const BASE_URL = `http://127.0.0.1:${TEST_PORT}`;
 
   beforeAll(async () => {
-    tmpDir = mkdtempSync(join(tmpdir(), "mock-server-test-"));
-    qaPath = join(tmpDir, "qa.json");
-    writeFileSync(
-      qaPath,
-      JSON.stringify([
-        { question: "hello", turns: [{ text: "world" }] },
-        { question: "ping", turns: [{ text: "pong" }] },
-        { question: "*", turns: [{ text: "default-text" }], default: true },
-      ]),
-    );
-    process.env["CODEMAN_TEST_QA_TABLE"] = qaPath;
-    resetQaLoaderForTest();
-    loadQaTable();
-    process.env["CODEMAN_MOCK_PORT"] = String(TEST_PORT);
-    process.env["CODEMAN_MOCK_HOST"] = TEST_HOST;
-    delete process.env["NODE_ENV"]; 
-    delete process.env["CODEMAN_MOCK_FORCE"];
-    process.env["CODEMAN_MOCK_STREAM_DELAY_MS"] = "0"; 
-    startMockServer();
-    await waitForServer(`${BASE_URL}/mock/anthropic/v1/messages`, 2000);
+    ctx = await startMockServerForTest(TEST_PORT);
+    qaPath = ctx.qaPath;
   });
 
   afterAll(async () => {
-    await stopMockServer();
-    delete process.env["CODEMAN_TEST_QA_TABLE"];
-    delete process.env["CODEMAN_MOCK_PORT"];
-    delete process.env["CODEMAN_MOCK_HOST"];
-    delete process.env["CODEMAN_MOCK_STREAM_DELAY_MS"];
-    resetQaLoaderForTest();
-    if (tmpDir) {
-      rmSync(tmpDir, { recursive: true, force: true });
-    }
+    await ctx.cleanup();
   });
 
   it("T23: single-turn entry WITHOUT done + asstCount>=1 → serves turns[0] AGAIN (capped, no short-circuit — legacy loop behavior)", async () => {
@@ -213,25 +185,3 @@ describe("mock-server HTTP — POST /mock/anthropic/v1/messages", () => {
     expect(body).not.toContain("(mock) Script complete.");
   });
 });
-
-async function waitForServer(url: string, timeoutMs: number): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  let lastErr: unknown;
-  while (Date.now() < deadline) {
-    try {
-      const r = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: "{}",
-      });
-      if (r.status >= 200 && r.status < 500) {
-        await r.text().catch(() => {});
-        return;
-      }
-    } catch (e) {
-      lastErr = e;
-    }
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  throw new Error(`Server did not start within ${timeoutMs}ms (last error: ${String(lastErr)})`);
-}
