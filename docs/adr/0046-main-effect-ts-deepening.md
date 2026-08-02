@@ -109,7 +109,7 @@
 - 6 域 register 函数 deps 中 `db: DB` 移除(ADR-0039 D2「只声明所需」的自然结果);handler 体内 `db.prepare(sql).all()` → `mainRuntime.runPromise(dataAccessEffect)`
 - SQL 字符串第一版**原样保留**(经 `sql.unsafe`),DSL / `@effect/sql` `Model` 留后续 — 精准修改,SQL 语义零变化优先
 
-**测试 seam**:`SqliteClient.layer({ filename: ":memory:" })` 注入,替代 `vi.mock` 模块 stub。
+**测试 seam**:~~`SqliteClient.layer({ filename: ":memory:" })` 注入,替代 `vi.mock` 模块 stub~~ **修正(经实证,2026-08-03)**:`:memory:` 真实 sqlite 在 vitest 下不可行 — better-sqlite3 经 `prepare` 脚本 `@electron/rebuild` 编译为 **Electron ABI**(NODE_MODULE_VERSION 140),vitest/系统 Node 要求 141,原生模块无法加载。改为 **`vi.mock("better-sqlite3")` 注入 fake 驱动**(复用旧 db/mod.test.ts 模式),`SqliteClient.layer` 结构照跑;测试保留「精确 SQL 字符串 + 参数 + 映射返回」断言能力。真实 SQL 语义验证留给 e2e。
 
 **拒绝**:
 
