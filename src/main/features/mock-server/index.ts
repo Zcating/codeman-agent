@@ -1,24 +1,15 @@
 
 import { createServer } from "node:http";
-import { lookupQaAnswer } from "./features/mock-server/qa-lookup";
-import { buildSseEvents, buildSseTurnEvents } from "./features/mock-server/sse";
+import { lookupQaAnswer } from "./qa-lookup";
+import { buildSseEvents, buildSseTurnEvents } from "./sse";
 import {
   extractLastUserText,
   extractFirstUserText,
   countAssistantMessages,
-} from "./features/mock-server/request-parser";
-import { readMockServerConfig } from "./config-service";
-import { handleRequest } from "./features/mock-server/http-handler";
-
-
-const logger = {
-  warn(msg: string): void {
-    console.warn(msg);
-  },
-  info(msg: string): void {
-    console.log(msg);
-  },
-};
+} from "./request-parser";
+import { readMockServerConfig } from "../../config-service";
+import { handleRequest } from "./http-handler";
+import { logger } from "../../logger";
 
 let server: ReturnType<typeof createServer> | null = null;
 

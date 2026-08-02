@@ -11,16 +11,8 @@ import {
   countCurrentRunAssistants,
 } from "./request-parser";
 import { readMockServerConfig } from "../../config-service";
+import { logger } from "../../logger";
 
-
-const logger = {
-  warn(msg: string): void {
-    console.warn(msg);
-  },
-  info(msg: string): void {
-    console.log(msg);
-  },
-};
 
 export const SHORT_CIRCUIT_TEXT = "(mock) Script complete.";
 

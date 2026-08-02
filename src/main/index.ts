@@ -6,7 +6,7 @@ import { join, sep, normalize } from "node:path";
 import { pathToFileURL } from "node:url";
 import { registerIpcHandlers } from "./ipc";
 import { loadQaTable } from "./features/mock-server/qa-loader";
-import { startMockServer } from "./mock-server";
+import { startMockServer } from "./features/mock-server";
 import { ensurePreinstalledSkills, registerSkillHandlers } from "./skills-host";
 import { McpManager } from "./mcp-manager";
 import { registerMcpIpcHandlers } from "./mcp-ipc";
