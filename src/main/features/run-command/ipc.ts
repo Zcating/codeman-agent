@@ -10,7 +10,7 @@ export function registerRunCommandIpc(): void {
     const risk = assessRisk({ command: args.command, cwd });
     const decision = await confirmIfRisky({ command: args.command, cwd, risk });
     if (decision === "deny") {
-      return { status: "error", error: { kind: "PermissionDenied", message: "用户拒绝执行该命令" } };
+      return { status: "error", error: { kind: "PermissionDenied", message: "用户拒绝执行" } };
     }
     return executeCommand({ command: args.command, cwd, timeoutMs: args.timeoutMs });
   }));

@@ -1,4 +1,5 @@
 import { Effect, Exit } from "effect";
+import { match } from "ts-pattern";
 import { toToolParameters } from "@codeman-frontend/shared/lib/tool-schema";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { invoke } from "@codeman-frontend/shared/apis/invoke.api";
@@ -43,14 +44,12 @@ export const runCommandTool: AgentTool<typeof params, RunCommandResult | AppErro
       };
     }
     const r = exit.value;
-    let text: string;
-    if (r.status === "ok") {
-      text = `Exit code: ${r.exitCode}\nDuration: ${r.durationMs}ms\n--- STDOUT ---\n${r.stdout ?? ""}\n--- STDERR ---\n${r.stderr ?? ""}`;
-    } else if (r.status === "cancelled" || r.status === "timeout") {
-      text = `${r.status === "cancelled" ? "Cancelled" : "Timed out"}\n--- partial STDOUT ---\n${r.partialOutput?.stdout ?? ""}\n--- partial STDERR ---\n${r.partialOutput?.stderr ?? ""}`;
-    } else {
-      text = `Error: ${r.error?.kind ?? "Unknown"} — ${r.error?.message ?? ""}${r.error?.exitCode !== undefined ? ` (exit ${r.error.exitCode})` : ""}`;
-    }
+    const text = match(r.status)
+      .with("ok", () => `Exit code: ${r.exitCode}\nDuration: ${r.durationMs}ms\n--- STDOUT ---\n${r.stdout ?? ""}\n--- STDERR ---\n${r.stderr ?? ""}`)
+      .with("cancelled", () => `Cancelled\n--- partial STDOUT ---\n${r.partialOutput?.stdout ?? ""}\n--- partial STDERR ---\n${r.partialOutput?.stderr ?? ""}`)
+      .with("timeout", () => `Timed out\n--- partial STDOUT ---\n${r.partialOutput?.stdout ?? ""}\n--- partial STDERR ---\n${r.partialOutput?.stderr ?? ""}`)
+      .with("error", () => `Error: ${r.error?.kind ?? "Unknown"} — ${r.error?.message ?? ""}${r.error?.exitCode !== undefined ? ` (exit ${r.error.exitCode})` : ""}`)
+      .otherwise(() => `Error: Unknown status`);
     return { content: [{ type: "text" as const, text }], details: r };
   },
 };

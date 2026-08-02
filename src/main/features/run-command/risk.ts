@@ -23,7 +23,7 @@ const DANGEROUS_COMMANDS = new Set(["rm", "del", "format", "shutdown", "reg", "d
 
 const DESTRUCTIVE_FLAGS = new Set(["-rf", "-fr", "--force", "/s", "/q", "-Recurse", "-Force"]);
 
-function hasUnclosedQuotes(cmd: string): boolean {
+function checkUnclosedQuotes(cmd: string): boolean {
   let inSingle = false;
   let inDouble = false;
   let escaped = false;
@@ -46,8 +46,9 @@ function hasUnclosedQuotes(cmd: string): boolean {
   return inSingle || inDouble;
 }
 
-function looksLikePath(token: string): boolean {
-  // Contains path separators or relative path markers
+// Returns true if token contains `/`, `\`, or starts with `.` — broad enough to
+// include URLs, flags with paths, and hidden files like `.gitignore` which are valid non-escaping paths.
+function containsPathIndicator(token: string): boolean {
   return token.includes("/") || token.includes("\\") || token.startsWith(".");
 }
 
@@ -65,38 +66,39 @@ function checkPathEscape(token: string, cwd: string): boolean {
   return parts.some((p) => p === "..");
 }
 
-export function assessRisk(input: AssessRiskInput): RiskAssessment {
+function analyzeParsedTokens(tokens: (string | object)[], cwd: string): RiskReason[] {
   const reasons: RiskReason[] = [];
+  const flagPattern = /^[/-]/;
+  let isFirstToken = true;
+  for (const token of tokens) {
+    if (typeof token !== "string") continue;
+    const trimmed = token.trim();
+    const lower = trimmed.toLowerCase();
+    if (isFirstToken && DANGEROUS_COMMANDS.has(lower)) {
+      reasons.push({ tag: "dangerousCommand", message: `Dangerous command: ${trimmed}` });
+    }
+    isFirstToken = false;
+    if (flagPattern.test(trimmed) && DESTRUCTIVE_FLAGS.has(trimmed)) {
+      reasons.push({ tag: "destructiveFlag", message: `Destructive flag: ${trimmed}` });
+    }
+    if (containsPathIndicator(trimmed) && checkPathEscape(trimmed, cwd)) {
+      reasons.push({ tag: "pathEscape", message: `Path escapes working directory: ${trimmed}` });
+    }
+  }
+  return reasons;
+}
 
-  if (hasUnclosedQuotes(input.command)) {
-    reasons.push({ tag: "parseFailure", message: "Failed to parse command" });
-    return { kind: "high", reasons, needsModelFallback: true };
+export function assessRisk(input: AssessRiskInput): RiskAssessment {
+  if (checkUnclosedQuotes(input.command)) {
+    return { kind: "high", reasons: [{ tag: "parseFailure", message: "Failed to parse command" }], needsModelFallback: true };
   }
 
+  let reasons: RiskReason[] = [];
   try {
     const parsed = shellQuote.parse(input.command);
-
-    const flagPattern = /^[/-]/;
-    let isFirstToken = true;
-    for (const token of parsed) {
-      if (typeof token !== "string") continue;
-      const trimmed = token.trim();
-      const lower = trimmed.toLowerCase();
-      if (isFirstToken && DANGEROUS_COMMANDS.has(lower)) {
-        reasons.push({ tag: "dangerousCommand", message: `Dangerous command: ${trimmed}` });
-      }
-      isFirstToken = false;
-      if (flagPattern.test(trimmed) && DESTRUCTIVE_FLAGS.has(trimmed)) {
-        reasons.push({ tag: "destructiveFlag", message: `Destructive flag: ${trimmed}` });
-      }
-      // Check for path escape
-      if (looksLikePath(trimmed) && checkPathEscape(trimmed, input.cwd)) {
-        reasons.push({ tag: "pathEscape", message: `Path escapes working directory: ${trimmed}` });
-      }
-    }
+    reasons = analyzeParsedTokens(parsed, input.cwd);
   } catch {
-    reasons.push({ tag: "parseFailure", message: "Failed to parse command" });
-    return { kind: "high", reasons, needsModelFallback: true };
+    return { kind: "high", reasons: [{ tag: "parseFailure", message: "Failed to parse command" }], needsModelFallback: true };
   }
 
   return {

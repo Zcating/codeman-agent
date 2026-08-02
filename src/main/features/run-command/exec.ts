@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, exec } from "node:child_process";
 
 export type RunCommandResult =
   | { status: "ok"; exitCode: number; stdout: string; stderr: string; durationMs: number }
@@ -6,12 +6,19 @@ export type RunCommandResult =
   | { status: "timeout"; partialOutput: { stdout: string; stderr: string } }
   | { status: "error"; error: { kind: string; message: string; exitCode?: number } };
 
+// signal param removed: IPC invoke doesn't natively pass AbortSignal; V1 uses timeout-only cancel.
+// AbortController-based cancel (with per-command Map<commandId, AbortController>) will be wired in V2
+// when streaming partial results are implemented per ADR-0048 Known Limitations.
 export interface ExecuteCommandInput {
   command: string;
   cwd?: string;
   timeoutMs?: number;
   env?: Record<string, string>;
-  signal?: AbortSignal;
+}
+
+interface CommandOutput {
+  stdout: string;
+  stderr: string;
 }
 
 const isWindows = process.platform === "win32";
@@ -23,10 +30,10 @@ function getShell(command: string): { cmd: string; args: string[] } {
   return { cmd: "/bin/sh", args: ["-c", command] };
 }
 
-const SAFE_ENV_VARS = ["PATH", "HOME", "USERPROFILE", "TMP", "TEMP", "LANG", "LC_ALL", "SystemRoot"];
+const SAFE_ENV_VARS = ["PATH", "HOME", "USERPROFILE", "TMP", "TEMP", "LANG", "LC_ALL", "SystemRoot"] as const satisfies readonly string[];
 
 export async function executeCommand(input: ExecuteCommandInput): Promise<RunCommandResult> {
-  const { command, cwd, timeoutMs = 300_000, env, signal } = input;
+  const { command, cwd, timeoutMs = 300_000, env } = input;
 
   const { cmd, args } = getShell(command);
 
@@ -48,42 +55,28 @@ export async function executeCommand(input: ExecuteCommandInput): Promise<RunCom
       env: safeEnv,
     });
 
-    let stdout = "";
-    let stderr = "";
+    let output: CommandOutput = { stdout: "", stderr: "" };
 
     child.stdout?.on("data", (data) => {
-      stdout += data.toString();
+      output.stdout += data.toString();
     });
 
     child.stderr?.on("data", (data) => {
-      stderr += data.toString();
+      output.stderr += data.toString();
     });
-
-    // Attach abort signal if provided
-    if (signal) {
-      if (signal.aborted) {
-        killProcess(child);
-        resolve({ status: "cancelled", partialOutput: { stdout: truncate(stdout), stderr: truncate(stderr) } });
-        return;
-      }
-      signal.addEventListener("abort", () => {
-        killProcess(child);
-        resolve({ status: "cancelled", partialOutput: { stdout: truncate(stdout), stderr: truncate(stderr) } });
-      });
-    }
 
     // Set up timeout
     const timer = setTimeout(() => {
       killProcess(child);
-      resolve({ status: "timeout", partialOutput: { stdout: truncate(stdout), stderr: truncate(stderr) } });
+      resolve({ status: "timeout", partialOutput: { stdout: truncate(output.stdout), stderr: truncate(output.stderr) } });
     }, timeoutMs);
 
     child.on("close", (code) => {
       clearTimeout(timer);
       const durationMs = Date.now() - start;
       const exitCode = code ?? 0;
-      const truncatedStdout = truncate(stdout);
-      const truncatedStderr = truncate(stderr);
+      const truncatedStdout = truncate(output.stdout);
+      const truncatedStderr = truncate(output.stderr);
       if (exitCode !== 0) {
         resolve({ status: "error", error: { kind: "NonZeroExit", message: `Exit code ${exitCode}`, exitCode } });
       } else {
@@ -116,7 +109,10 @@ function truncate(output: string): string {
 
 function killProcess(child: ReturnType<typeof spawn>): void {
   if (isWindows) {
-    spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"]);
+    // Swallow taskkill failures — a failing taskkill is acceptable since the calling
+    // code already handles the response. exec() returns ChildProcess & Promise<{stdout,stderr}>,
+    // which exposes .catch() for unhandled rejection tracking.
+    exec(`taskkill /pid ${child.pid} /T /F`, () => {});
   } else {
     child.kill("SIGTERM");
   }

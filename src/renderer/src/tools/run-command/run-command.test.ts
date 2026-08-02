@@ -27,6 +27,20 @@ describe("runCommandTool", () => {
     expect((result.content[0] as TextContent).text).toContain("denied");
   });
 
+  it("formats cancelled result with partial stdout", async () => {
+    mockState.resolved = { status: "cancelled", partialOutput: { stdout: "partial\nstdout\n", stderr: "" } };
+    const result = await runCommandTool.execute("t4", { command: "echo partial" });
+    expect((result.content[0] as TextContent).text).toContain("Cancelled");
+    expect((result.content[0] as TextContent).text).toContain("partial");
+  });
+
+  it("formats timeout result with partial stderr", async () => {
+    mockState.resolved = { status: "timeout", partialOutput: { stdout: "", stderr: "Timed out after 30s\n" } };
+    const result = await runCommandTool.execute("t5", { command: "sleep 60" });
+    expect((result.content[0] as TextContent).text).toContain("Timed out");
+    expect((result.content[0] as TextContent).text).toContain("Timed out after 30s");
+  });
+
   it("passes command/cwd/timeoutMs via IPC invoke", async () => {
     mockState.resolved = { status: "ok", exitCode: 0, stdout: "", stderr: "", durationMs: 0 };
     await runCommandTool.execute("t3", { command: "git status", cwd: "/work", timeoutMs: 1000 });

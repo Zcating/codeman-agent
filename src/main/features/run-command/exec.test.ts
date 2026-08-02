@@ -26,16 +26,6 @@ describe("executeCommand", () => {
     expect(result.partialOutput).toBeDefined();
   });
 
-  it("AbortController.abort() returns cancelled + partialOutput", async () => {
-    const controller = new AbortController();
-    const resultPromise = executeCommand({ command: "ping -n 10 127.0.0.1", signal: controller.signal });
-    controller.abort();
-    const result = await resultPromise;
-    expect(result.status).toBe("cancelled");
-    if (result.status !== "cancelled") return;
-    expect(result.partialOutput).toBeDefined();
-  });
-
   it("output truncation > 1MiB", async () => {
     const result = await executeCommand({ command: "node -e process.stdout.write(\"x\".repeat(2000000))" });
     expect(result.status).toBe("ok");
@@ -43,5 +33,23 @@ describe("executeCommand", () => {
     // stdout should be truncated - has truncation marker and length well under 2_000_000
     expect(result.stdout.length).toBeLessThan(2_000_000);
     expect(result.stdout).toMatch(/truncated|omitted|\.\.\./);
+  });
+
+  it("truncate math: verifies omitted byte count is positive for output > 1MiB", async () => {
+    // Produce ~3 MiB of single-line output to exercise single-line truncation branch.
+    // 3 * 1024 * 1024 = 3,145,728 bytes
+    const result = await executeCommand({ command: "node -e process.stdout.write(Buffer.alloc(3145728,120).toString())" });
+    if (result.status !== "ok") {
+      console.log("truncate math result:", JSON.stringify(result));
+    }
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    // Verify omitted marker appears and byte count is positive
+    expect(result.stdout).toContain("omitted");
+    const match = result.stdout.match(/\[\.\.\. (\d+) bytes omitted \.\.\.\]/);
+    expect(match).not.toBeNull();
+    const omittedBytes = Number(match![1]);
+    // omitted = 3MiB - 2*(half) = 3MiB - 2*(1MiB/2) = 3MiB - 1MiB = 2MiB ≈ 2,097,152
+    expect(omittedBytes).toBe(2097152);
   });
 });

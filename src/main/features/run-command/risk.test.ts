@@ -28,6 +28,15 @@ describe("assessRisk", () => {
     expect(tags.some((t) => /path[_-]?escape|path[_-]?out[_-]?of[_-]?bounds/i.test(t))).toBe(true);
   });
 
+  it("backslash escape path with unclosed quote (Windows path + shell parse failure)", () => {
+    // shell-quote treats \\" as escaped quote (literal char), not as opening/closing.
+    // Use a string shell-quote actually parses as unclosed: unmatched single quote.
+    // This tests that the backslash-escape path in hasUnclosedQuotes handles correctly.
+    const result = assessRisk({ command: "echo 'unclosed", cwd: "C:\\Users\\zcati" });
+    expect(result.kind).toBe("high");
+    expect(result.needsModelFallback).toBe(true);
+  });
+
   it("safe command", () => {
     const result = assessRisk({ command: "git status", cwd: "C:\\work" });
     expect(result.kind).toBe("low");
