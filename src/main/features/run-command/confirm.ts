@@ -20,7 +20,7 @@ export async function confirmIfRisky(input: ConfirmInput): Promise<ConfirmDecisi
     cancelId: 1,
     title: "是否允许执行此命令？",
     message: input.command,
-    detail: `工作目录: ${input.cwd}\n风险: ${input.risk.kind}\n原因: ${input.risk.reasons.map((r) => r.message).join(", ")}`,
+    detail: `工作目录: ${input.cwd}\n风险: ${input.risk.kind}\n原因: ${input.risk.reasons.map((r) => `[${r.tag}] ${r.message}`).join(", ")}`,
   });
   return result.response === 0 ? "allow" : "deny";
 }
