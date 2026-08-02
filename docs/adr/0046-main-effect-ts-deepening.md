@@ -52,14 +52,16 @@
 
 ## Decision
 
-### D1 — PR-1:`jsonrpc.ts` 内部 Fiber 化(256L → ~100L)
+### D1 — PR-1:`jsonrpc.ts` 内部 Fiber 化(256L → 263L,结构收益兑现)
 
 **内部实现替换,不产生新 seam,不拆子模块:**
 
 - `request()`:`Effect.gen` + `Deferred.unsafeMake` + `Effect.timeout(timeoutMs)` — 超时即 fiber 中断,错误类型 `TimeoutException | JsonRpcProtocolError`
-- `close()`:`Fiber.interruptAll(pendingFibers)` — 统一取消路径,删 4 处重复错误驱逐代码
+- `close()`:`#failAllPending(err)`(对全部 pending Deferred 做 `Exit.fail(err)`)— 统一取消路径,删 4 处重复错误驱逐代码。**实现偏差(有意,经对抗式复核确认,2026-08-02)**:不 interrupt pending request fibers —— 若 interrupt,`Fiber.await` 会以 interrupt cause reject(`Cause.squash(Interrupt)` ≈ undefined),破坏 `JsonRpcProtocolError` 错误契约(jsonrpc.test.ts L159-164);仅 interrupt reader fiber(触发 `Effect.async` cleanup 移除 stream listeners)
 - stdin chunk 读取:`Effect.async`(**非** `tryPromise` — 见 Risks R2)
 - public API 保持 Promise 签名(`JsonRpcConnection` class + `request` / `close`)— 内部 private runtime 跑 Effect,caller 零改动
+
+**行数说明**:D1 原估 ~100L 为乐观估算,实际 263L(基文件 256L)。结构收益已验证:4 处重复错误驱逐 → 1 处 `#failAllPending`、手写 `setTimeout` 超时机器删除、`null as unknown as Promise<never>` hack 删除、Promise executor-capture 删除;净增行数来自 Effect 基础设施(Deferred / Fiber / Effect.async reader / Runtime)。不追执行数压缩(精准修改优先)。
 
 **与 ADR-0041 D8 的关系(澄清,非推翻)**:D8 锁的是「jsonrpc 不拆 seam / 不拆模块」(1 caller = 假 seam),本 PR 遵守 — jsonrpc 仍是 1 个模块、1 个 caller(`McpStdioServer` 经 `StdioTransport` 间接使用)。D8 的「不动」指**结构**,不指**实现范式**;本 PR 不动结构,只换内部实现。
 
