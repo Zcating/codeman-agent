@@ -235,6 +235,37 @@ vi.mock(import("@codeman-frontend/features/chat/lib/runtime"), async (importOrig
   };
 });
 
+vi.mock("@codeman-frontend/plugins/multi-agents/stores/sub-agents-stream.store", () => {
+  let byToolCall: Record<string, unknown> = {};
+  return {
+    subAgentsStreamStore: {
+      state: {
+        get byToolCall() { return byToolCall; },
+      },
+      actions: {
+        recordStart: vi.fn((toolCallId: string, subAgentId: string, subAgentName: string) => {
+          byToolCall = {
+            ...byToolCall,
+            [toolCallId]: { toolCallId, subAgentId, subAgentName, events: [], status: "running", startedAt: Date.now() },
+          };
+        }),
+        appendEvent: vi.fn(),
+        recordComplete: vi.fn(),
+        recordError: vi.fn(),
+        cleanup: vi.fn(),
+        _resetForTest: vi.fn(() => { byToolCall = {}; }),
+      },
+    },
+  };
+});
+
+vi.mock("@codeman-frontend/plugins/multi-agents/components/parallel-panel", () => ({
+  ParallelPanel: (props: { entries: unknown[] }) =>
+    props.entries.length > 0
+      ? <div data-testid="parallel-panel">ParallelPanel({props.entries.length})</div>
+      : null,
+}));
+
 let mockConversationsStore: { store: { byId: Record<string, { streamingMessageId: string | null; isAgentActive: boolean }> } } | undefined;
 
 describe("ChatView", () => {
@@ -1077,5 +1108,47 @@ describe("ChatView keyboard/focus regression (seam 4)", () => {
       "Hello focus test",
       expect.objectContaining({ apiKey: "test-key" }),
     );
+  });
+});
+
+
+// ============================================================
+// ParallelPanel integration at chat-view level (ADR-0049 D8)
+// ============================================================
+
+describe("ChatView parallel-panel (ADR-0049 D8)", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("ParallelPanel NOT rendered when subAgentsStreamStore is empty", async () => {
+    const { subAgentsStreamStore } = await import("@codeman-frontend/plugins/multi-agents/stores/sub-agents-stream.store");
+    // Reset store to empty
+    subAgentsStreamStore.actions._resetForTest();
+    const { container } = render(() => <ChatView convId="conv-1" />);
+    const panel = container.querySelector('[data-testid="parallel-panel"]');
+    expect(panel).toBeNull();
+  });
+
+  it("ParallelPanel rendered when subAgentsStreamStore has delegate_task entries", async () => {
+    const { subAgentsStreamStore } = await import("@codeman-frontend/plugins/multi-agents/stores/sub-agents-stream.store");
+    // Simulate a delegate_task entry in the store
+    subAgentsStreamStore.actions._resetForTest();
+    subAgentsStreamStore.actions.recordStart("tc-delegate-1", "agent-001", "Researcher");
+    const { container } = render(() => <ChatView convId="conv-1" />);
+    const panel = container.querySelector('[data-testid="parallel-panel"]');
+    expect(panel).not.toBeNull();
+    expect(panel!.textContent).toContain("ParallelPanel(1)");
+  });
+
+  it("ParallelPanel shows correct count when multiple delegate_task entries exist", async () => {
+    const { subAgentsStreamStore } = await import("@codeman-frontend/plugins/multi-agents/stores/sub-agents-stream.store");
+    subAgentsStreamStore.actions._resetForTest();
+    subAgentsStreamStore.actions.recordStart("tc-delegate-1", "agent-001", "Researcher");
+    subAgentsStreamStore.actions.recordStart("tc-delegate-2", "agent-002", "Coder");
+    const { container } = render(() => <ChatView convId="conv-1" />);
+    const panel = container.querySelector('[data-testid="parallel-panel"]');
+    expect(panel).not.toBeNull();
+    expect(panel!.textContent).toContain("ParallelPanel(2)");
   });
 });
