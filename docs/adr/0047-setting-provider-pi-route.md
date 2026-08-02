@@ -153,31 +153,42 @@ export function enforceDefaultModelInvariant(llm: ProviderLlm): ProviderLlm {
 
 ### D3 — PI `createProvider()` 迁移(关 D1 决策;核心)
 
-**新增** `src/renderer/src/features/chat/lib/pi-provider-adapter.ts`(~100L):
+> **2026-08-02 修正**:本 D3 原稿假设 "删 `streamFn` 字段,Agent 不再传" — 实测 `pi-agent-core@0.80.3` 的 `Agent` 类 **必须** `streamFn`(compat API,`agent.d.ts:9` `streamFn?: StreamFn`),不接受 `Provider<TApi>`。`createProvider()` 是新 API,产出 `Provider<TApi>` 自带 `.stream()`,`Agent` 消费不了。用户二次决策(**收敛版**):保留 `Agent` 架构,`createProvider()` 仅作 **Model 目录工厂**,transport 换 PI `anthropicMessagesApi()` 薄包装。以下为修正后设计。
+
+**新增** `src/renderer/src/features/chat/lib/pi-provider-adapter.ts`(~90L):
 
 ```ts
-import { createProvider, type Provider as PiProvider, type Model as PiModel, type ApiKeyAuth, type AuthResult, type ProviderAuth } from "@earendil-works/pi-ai";
-import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages";
-import type { Provider, ModelMeta } from "@codeman-frontend/shared/lib/types";
+import { createProvider, type Provider as PiProvider, type Model as PiModel, type ApiKeyAuth, type ProviderAuth } from "@earendil-works/pi-ai";
+import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
+import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
+
+/** 运行时向 adapter 提供的 provider 片段(非完整 settings Provider;runtime 只持有 ProviderConfig) */
+export interface PiProviderConfig {
+  id: string;
+  name: string;
+  baseUrl: string;
+  apiKey: string;
+  models: ModelMeta[];
+  modelsEndpoint?: string;
+}
 
 /** 把我们的 ModelMeta 转成 PI Model<"anthropic-messages">。缺字段 hardcoded fallback。 */
-function modelMetaToPiModel(meta: ModelMeta, baseUrl: string): PiModel<"anthropic-messages"> {
+function modelMetaToPiModel(meta: ModelMeta, baseUrl: string, providerId: string): PiModel<"anthropic-messages"> {
   return {
     id: meta.id,
     name: meta.label,
     api: "anthropic-messages",
-    provider: "<user-provider-id>",  // 由 caller 在 wrap 时填
+    provider: providerId,
     baseUrl,
     reasoning: meta.thinking ?? false,
     input: ["text"],  // V1 不支持 vision input
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },  // V1 不显示 cost
     contextWindow: meta.contextWindow ?? 200_000,
     maxTokens: 8192,  // PI default;V1 不暴露
-    deprecated: meta.deprecated ?? false,
   };
 }
 
-/** 我们的 apiKey → PI ApiKeyAuth(只接 apiKey,拒 OAuth) */
+/** 我们的 apiKey → PI ApiKeyAuth(只接 apiKey,拒 OAuth;resolve 是同步常量,透传 settings key) */
 function buildApiKeyAuth(apiKey: string): ApiKeyAuth {
   return {
     name: "API key",
@@ -185,34 +196,27 @@ function buildApiKeyAuth(apiKey: string): ApiKeyAuth {
   };
 }
 
-export function createProviderFromConfig(
-  userProvider: Provider,
-  options: { fetchModelsUrl?: string } = {},
-): PiProvider<"anthropic-messages"> {
-  const piModels: PiModel<"anthropic-messages">[] = userProvider.llm.models.map((m) =>
-    modelMetaToPiModel(m, userProvider.llm.baseUrl).with({ provider: userProvider.id })
+export function createProviderFromConfig(cfg: PiProviderConfig): PiProvider<"anthropic-messages"> {
+  const piModels: PiModel<"anthropic-messages">[] = cfg.models.map((m) =>
+    modelMetaToPiModel(m, cfg.baseUrl, cfg.id),
   );
-
-  const auth: ProviderAuth = {
-    apiKey: buildApiKeyAuth(userProvider.apiKey),
-  };
-
+  const auth: ProviderAuth = { apiKey: buildApiKeyAuth(cfg.apiKey) };
   return createProvider<"anthropic-messages">({
-    id: userProvider.id,
-    name: userProvider.label,
-    baseUrl: userProvider.llm.baseUrl,
+    id: cfg.id,
+    name: cfg.name,
+    baseUrl: cfg.baseUrl,
     auth,
     models: piModels,
-    ...(options.fetchModelsUrl
+    ...(cfg.modelsEndpoint
       ? {
           refreshModels: async () => {
-            const res = await fetch(options.fetchModelsUrl!, {
-              headers: { Authorization: `Bearer ${userProvider.apiKey}` },
+            const res = await fetch(cfg.modelsEndpoint!, {
+              headers: { Authorization: `Bearer ${cfg.apiKey}` },
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const json = await res.json();
             return parseModelsApiResponse(json).map((m) =>
-              modelMetaToPiModel(m, userProvider.llm.baseUrl).with({ provider: userProvider.id })
+              modelMetaToPiModel(m, cfg.baseUrl, cfg.id),
             );
           },
         }
@@ -220,45 +224,85 @@ export function createProviderFromConfig(
     api: anthropicMessagesApi(),
   });
 }
+
+/** 从 PI provider 的 getModels() 里找 defaultModel;models 空时返回 synthetic "auto" model(保留当前 runtime 行为) */
+export function findDefaultModel(
+  provider: PiProvider<"anthropic-messages">,
+  defaultModelId: string,
+): PiModel<"anthropic-messages"> {
+  const models = provider.getModels();
+  const found = models.find((m) => m.id === defaultModelId);
+  if (found) return found;
+  return {
+    id: defaultModelId || "auto",
+    name: defaultModelId || "auto",
+    api: "anthropic-messages",
+    provider: provider.id,
+    baseUrl: provider.baseUrl ?? "",
+    reasoning: true,
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 128000,
+    maxTokens: 8192,
+  };
+}
 ```
 
+**新增** `src/renderer/src/features/chat/lib/anthropic-stream-fn.ts`(~15L)替换 `anthropic-transport.ts`:
+
+```ts
+import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
+import type { StreamFn } from "@earendil-works/pi-agent-core";
+
+/** Agent 的 streamFn 薄包装:PProvider 的 api stream。Agent loop 已把 getApiKey 注入 options.apiKey。 */
+export const anthropicStream: StreamFn = (model, context, options) =>
+  anthropicMessagesApi().stream(model, context, options);
+```
+
+**auth header 行为**:PI transport 用 Anthropic SDK,`apiKey` 存在时发 `x-api-key`(Anthropic 标准),**不是** `Authorization: Bearer`。Anthropic 兼容端点(MiniMax `/anthropic` / DeepSeek `/anthropic`)按设计接受 Anthropic SDK 的 `x-api-key`(它们即为官方 SDK 适配)。**风险记录**:极端情况下若某兼容端点只收 Bearer,需改传 `headers: { authorization: ... }` 覆盖(`assertRequestAuth` 已支持)。QA 需对真实 provider 实测一次。
+
 **改 `src/renderer/src/features/chat/lib/runtime.ts`**:
-- 删 `buildModel()` import + 调用
-- 删 `anthropic-transport.ts` import + `streamFn` 字段(改用 PI 默认 stream)
-- `Agent` 构造改:
+- `ProviderConfig` 加 `id: string` + `models: ModelMeta[]`(runtime 需要它们构 PI provider)
+- `run()` 内删内联 Model 构造(L300-311)→
   ```ts
-  const piProvider = createProviderFromConfig(provider);
-  const model = piProvider.getModels().find((m) => m.id === provider.llm.defaultModel);
-  if (!model) {
-    // invariant 已在 store 层保证;此为 defense-in-depth
-    return yield* Effect.fail(new InvalidConfig({ message: `defaultModel not in models: ${provider.llm.defaultModel}` }));
-  }
-  const agent = new Agent({
-    model,
-    tools,
-    systemPrompt,
-    // 不再传 streamFn;PI Provider.stream 由 Agent 内部通过 models 解析
+  const piProvider = createProviderFromConfig({
+    id: provider.id,
+    name: provider.id,
+    baseUrl: provider.baseUrl,
+    apiKey: provider.apiKey ?? "",
+    models: provider.models,
   });
+  const model = findDefaultModel(piProvider, provider.defaultModel);
   ```
+- `streamFn: anthropicStream`(新薄包装 import),`getApiKey` 保留(Agent 注入 options.apiKey)
+- 删 `import { anthropicStream } from ".../anthropic-transport"`
 
-**删** `src/renderer/src/features/chat/lib/build-model.ts` + `build-model.test.ts`。
+**改 `src/renderer/src/features/chat/stores/chat.store.ts`**:
+- `sendMessage` 签名 `provider: ProviderConfig` 不变;`augmentedProvider` 的 `...provider` spread 自动带新字段
+- compaction L174 `buildModel(appProvider, ...)` → `createProviderFromConfig({ id: appProvider.id, name: appProvider.label, baseUrl: appProvider.llm.baseUrl, apiKey: appProvider.apiKey, models: appProvider.llm.models, modelsEndpoint: appProvider.llm.modelsEndpoint })` + `findDefaultModel`
+- compaction L180-202 内联 piProvider hack **删除**,直接 `createModels()` + `models.setProvider(createProviderFromConfig(...))`
+- `no_api_key` CompactionFailed 检查保留(显式 `if (!appProvider.apiKey)` 而非 buildModel throw)
 
-**改** `src/renderer/src/features/chat/stores/chat.store.ts`:
-- `sendMessage(convId, content, provider: ProviderConfig)` 改 `sendMessage(convId, content, provider: Provider)`
-- 内部调 `createProviderFromConfig(provider)` 拿 PI provider → `provider.getModels().find(...)` 拿 Model
-- `ProviderConfig` flat shape 删(若 `runtime.ts` 内部仍需,可作 internal alias 保留,无 export)
+**改组件 ProviderConfig 构造点**:
+- `home.tsx:110-116` + `chat-view.tsx:226-...`:加 `id: providerConfig?.id ?? ""`, `models: providerConfig?.llm?.models ?? []`
+- `chat.store.test.ts` `defaultProvider` fixture:加 `id` + `models`
 
-**改** `src/renderer/src/shared/lib/types.ts`:
-- `Provider.llm` 加可选 `apiKeyEnv?: string` 字段(为未来 `$ENV` 引用做准备;**V1 不实现**,V2+)
-- 其他字段不变
+**删**:`build-model.ts` + `build-model.test.ts`;`anthropic-transport.ts`(619L)+ `anthropic-transport.test.ts`(440L);`parseSseLine` / `buildAnthropicRequestBody` / `parseSseStream` 无外部引用(仅 anthropic-transport.test.ts 自用)。
 
-**改** `src/renderer/src/shared/apis/provider.api.ts`:
-- `fetchModels` 内部可改为 `createProviderFromConfig(provider, { fetchModelsUrl: provider.llm.modelsEndpoint })` + `piProvider.refreshModels()` + `parseModelsApiResponse` 统一,**但**这要拿 `AppStore.set` 写 state → 仍要 store 调,与现有 `refreshProviderModelsImpl` 等价。**不重构**;只确保 `fetchModels` 返回 shape 与 `ModelMeta` 兼容。
+**新增测试** `pi-provider-adapter.test.ts`(4 case):
+1. happy: `createProviderFromConfig` 产出 provider,`getModels()` 含 `models` 映射(id/name/baseUrl/provider 字段正确)
+2. `findDefaultModel` 命中 models 内 model → 返回它
+3. `findDefaultModel` 未命中(或空 models)→ 返回 synthetic "auto" model(id = defaultModel || "auto")
+4. 缺 modelsEndpoint → 无 `refreshModels` 选项(`refreshModels` 为 undefined)
 
-**新增** `src/renderer/src/features/chat/lib/pi-provider-adapter.test.ts`(~30L + 3 case):
-1. happy: 单 provider,1 model,`apiKey` 透传
-2. 缺 apiKey → `resolve()` 返回 `{ auth: { apiKey: "" } }`(PI 仍走 stream,空 key 在 server 端失败)
-3. 缺 modelsEndpoint → 不传 `refreshModels` 选项
+**新增测试** `anthropic-stream-fn.test.ts`(1 case):
+- mock `anthropicMessagesApi().stream` 被调,返回 stream 对象
+
+**保留**:`validateProvider()` 浅验证(超出 scope);`getApiKey` 回调机制(Agent compat API 要求);`runtime-validate-provider.ts`。
+
+**验证额外注意**:
+- `runtime.ts` 内联 Model 构造删后,`model.provider` 从硬编码 `"anthropic"` 变为 `provider.id`(user provider id)。`agent-loop.js` 的 `getApiKey(config.model.provider)` 用 `model.provider` 查 key — 现在传的是 user provider id 而非 "anthropic",但 `getApiKey: async () => provider.apiKey ?? undefined` 忽略参数,无影响。
+- mock server 兼容:PI SDK 打 `{baseUrl}/v1/messages`,mock baseUrl `http://127.0.0.1:50000/mock/anthropic` → `.../mock/anthropic/v1/messages`,与现 mock-server 路由一致。
 
 ### D4 — 接 `apiKey`,拒 OAuth(per 用户决策)
 
@@ -274,7 +318,7 @@ export function createProviderFromConfig(
 | --- | --- | --- | --- | --- |
 | 1 | `A. refactor(settings): unify schema to camelCase (ADR-0047 D1)` | `schemas.ts` + `state.ts` + `case-conversion.ts`(新)+ `types.ts` + 4 测试 | 无 | 2-3d |
 | 2 | `B. refactor(settings): centralize default-model invariant (ADR-0047 D2)` | `provider-invariant.ts`(新)+ `app.store.ts` + `add-provider-dialog.tsx` + main 端 `state.ts` 复制 + 5 测试 | A 不依赖(独立)| 1d |
-| 3 | `C+D. refactor(chat): migrate to PI createProvider() (ADR-0047 D3+D4)` | `pi-provider-adapter.ts`(新)+ `runtime.ts` + 删 `build-model.ts` + `chat.store.ts` + `types.ts` 字段加 + 3 测试 | A + B | 8-11d |
+| 3 | `C+D. refactor(chat): migrate to PI createProvider() (ADR-0047 D3+D4)` | `pi-provider-adapter.ts`(新)+ `anthropic-stream-fn.ts`(新)+ `runtime.ts` + `chat.store.ts` + `home.tsx` + `chat-view.tsx` + 删 `build-model.ts` + 删 `anthropic-transport.ts` + 4+1 测试 | A + B | 3-4d(修正:收敛版,保留 Agent) |
 
 **实施顺序**:串行(A → B → C+D)。A 和 B 改动文件集无交集,**理论上可并行**(`run_in_background=true` 派发 2 个 subagent),但**实际**为简化协调,先 A 后 B;若 A 失败 B 自动 rebase 重跑。
 
@@ -367,18 +411,19 @@ private save(): void {
 - **PI 升级方向对齐**:未来 PI 改 `Provider<TApi>` / `AuthResult` 字段我们跟得上;`createProvider()` 是 PI 官方推荐 extension API(per README "Custom Providers / createProvider()" 章节)
 - **`Model<TApi>` 字段补齐**:`cost` / `maxTokens` / `input` 字段可灌(目前 hardcoded 0/8192/["text"],V1 UI 不显示;V2+ 可用)
 - **删 `buildModel.ts` + `build-model.test.ts`**(~50L + 30L 删)
-- **删 `ProviderConfig` flat shape**:runtime 改用 PI 标准 `Model<"anthropic-messages">`,新增字段不需手 cast
-- **删 `anthropic-transport.ts`**:走 PI `anthropicMessagesApi()`,PI 升级 transport 我们免费跟随
+- **`ProviderConfig` 扩展而非删除**:加 `id` + `models` 字段,runtime 用它构 PI provider(收敛版修正,`Agent` compat API 仍需 streamFn,ProviderConfig 保留)
+- **删 `anthropic-transport.ts`(619L)+ test(440L)**:走 PI `anthropicMessagesApi()` 薄包装,PI 升级 transport 我们免费跟随
 - **测试 seam 升级**:`pi-provider-adapter.test.ts` mock `anthropicMessagesApi` 注入;不用 mock `fetch` + `ProviderConfig` 拼装
 
 ### 负面 / 代价
 
-- **新依赖**:`@earendil-works/pi-ai/api/anthropic-messages`(per PI v0.80.3 README,直接 import 立即加载 SDK;不会 lazy);renderer bundle 体积 +~50KB(SDK 实际大小待测)
+- **新依赖**:`@earendil-works/pi-ai/api/anthropic-messages.lazy`(lazy wrapper,首次请求才加载 SDK);renderer bundle 体积 +~50KB(SDK 实际大小待测)
 - **`ModelMeta` → `Model<"anthropic-messages">` mapper 缺字段 hardcoded**:cost=0 / maxTokens=8192 / input=["text"];V1 UI 不消费,无功能损失;但**结构上不真实**,未来如要显示 cost 需重新思考数据来源
 - **`SettingsState` IPC 边界转换**:2 个纯函数 + 4 单测,~30L;但只 main 端有,renderer 端 schema 改后无转换
-- **`createProviderFromConfig` adapter 复杂度**:~100L;`buildModel()` 是 ~30L;adapter 大 3x 是因为接 `Provider<TApi>` 全套接口(`auth.resolve` / `getModels` / `refreshModels`)
-- **删 `ProviderConfig` 是公共 API 破坏**:只在 `chat.store.ts` 内部使用,**不算 breaking change**(per AGENTS.md "内聚封装" 词条)
-- **PI `api` import 立即加载 SDK**:`@earendil-works/pi-ai/api/anthropic-messages` per README 立即加载;`anthropicMessagesApi()` 是函数调用,lazy wrapper 是 `.lazy` 后缀;V1 直接 import 立即加载可接受
+- **`createProviderFromConfig` adapter 复杂度**:~90L;`buildModel()` 是 ~30L;adapter 大 3x 是因为接 `Provider<TApi>` 全套接口(`auth.resolve` / `getModels` / `refreshModels`)
+- **auth header 变化风险**:PI transport 发 `x-api-key`(Anthropic SDK 标准),非 `Authorization: Bearer`。Anthropic 兼容端点按设计接受;QA 需对真实 provider 实测,若失败改传 `headers: { authorization }` 覆盖
+- **`runtime.ts` 内联 Model 构造删后 `model.provider` 从 `"anthropic"` 变 user provider id**:`getApiKey` 忽略参数,无影响;但需在代码注释 + 本 ADR 记录(防未来读者困惑)
+- **`ProviderConfig` 加字段 = 3 个构造点改动**:`home.tsx` + `chat-view.tsx` + `chat.store.test.ts` fixture;30+ test 调用点共享 fixture,改 1 处即可
 - **未来 OAuth 接入的预留**:`createProviderFromConfig` 形参留 `oauth?: OAuthAuth`(D4 决定 V1 不实现,V3+)
 
 ### 不变
