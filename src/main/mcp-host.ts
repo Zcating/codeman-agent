@@ -1,50 +1,14 @@
-
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
 import { PassThrough, type Readable, type Writable } from "node:stream";
 import { JsonRpcConnection } from "./jsonrpc";
+import { StdioTransport } from "./mcp-stdio-transport";
+import { performHandshake, HandshakeError } from "./mcp-handshake";
 import { logger } from "./logger";
 import { JsonRpcProtocolError } from "../renderer/src/shared/lib/errors";
+import type { McpServerConfig, McpServerStatus, McpTool, McpCallResult, StatusChangeHandler } from "./mcp-types";
 
+export type { McpServerConfig, McpServerStatus, McpTool, McpCallResult, StatusChangeHandler };
 
-export interface McpServerConfig {
-  name: string;                     
-  command: string;                  
-  args: string[];                   
-  env?: Record<string, string>;    
-  enabled: boolean;                
-}
-
-export type McpServerStatus =
-  | { kind: "starting" }
-  | { kind: "connected"; toolCount: number }
-  | { kind: "spawn_failed"; error: string }
-  | { kind: "crashed"; exitCode: number | null; signal: NodeJS.Signals | null; error: string }
-  | { kind: "disabled" }
-  | { kind: "protocol_error"; error: string };
-
-export interface McpTool {
-  name: string;
-  description: string;
-  inputSchema: unknown;
-}
-
-export interface McpCallResult {
-  content: Array<{ type: "text"; text: string } | { type: string; [k: string]: unknown }>;
-  isError?: boolean;
-}
-
-export type StatusChangeHandler = (status: McpServerStatus) => void;
-
-
-interface InitializeResult {
-  protocolVersion: string;
-  capabilities: Record<string, unknown>;
-  serverInfo: { name: string; version: string };
-}
-
-interface ToolsListResult {
-  tools: Array<{ name: string; description?: string; inputSchema?: unknown }>;
-}
 
 interface ToolsCallResult {
   content: Array<{ type: string; text?: string }>;
@@ -52,7 +16,7 @@ interface ToolsCallResult {
 
 
 export class McpStdioServer {
-  private child: ChildProcess | null = null;
+  private readonly transport: StdioTransport;
   private connection: JsonRpcConnection | null = null;
   private tools: McpTool[] = [];
   private status: McpServerStatus = { kind: "disabled" };
@@ -60,8 +24,15 @@ export class McpStdioServer {
 
   constructor(
     private readonly config: McpServerConfig,
-    private readonly spawnFn: typeof spawn = spawn,
-  ) {}
+    spawnFn: typeof spawn = spawn,
+  ) {
+    this.transport = new StdioTransport(
+      config.command,
+      config.args,
+      config.env,
+      spawnFn,
+    );
+  }
 
 
   getConfig(): McpServerConfig { return this.config; }
@@ -75,74 +46,53 @@ export class McpStdioServer {
     }
 
     if (this.status.kind === "connected") {
-      return; 
+      return;
     }
 
     this.setStatus({ kind: "starting" });
 
     try {
-      this.child = this.spawnFn(this.config.command, this.config.args, {
-        env: { ...process.env, ...this.config.env },
-        stdio: ["pipe", "pipe", "pipe"],
-      });
+      this.transport.start();
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.setStatus({ kind: "spawn_failed", error: msg });
       return;
     }
 
-    if (!this.child.stdin || !this.child.stdout) {
+    const stdin = this.transport.stdin;
+    const stdout = this.transport.stdout;
+    if (!stdin || !stdout) {
       this.setStatus({ kind: "spawn_failed", error: "stdin/stdout not available" });
-      this.cleanup();
+      await this.transport.kill();
       return;
     }
 
-    this.connection = new JsonRpcConnection(this.child.stdout, this.child.stdin);
+    this.connection = new JsonRpcConnection(stdout, stdin);
 
-    this.child.on("exit", (code, signal) => {
+    this.transport.setOnExit((code, signal) => {
       if (this.status.kind === "connected") {
         this.setStatus({
           kind: "crashed",
-          exitCode: code ?? null,
-          signal: signal ?? null,
+          exitCode: code,
+          signal,
           error: `Exited with code ${code}, signal ${signal}`,
         });
       }
-      this.cleanup();
+      this.connection = null;
     });
 
-    this.child.on("error", (err) => {
+    this.transport.setOnError((err) => {
       this.setStatus({ kind: "spawn_failed", error: err.message });
-      this.cleanup();
+      this.connection = null;
     });
 
     try {
-      const initResult = await this.connection.request<InitializeResult>("initialize", {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "codeman-agent", version: "0.3.0" },
-      });
-      logger.info(`[mcp] ${this.config.name} initialized: serverInfo=${JSON.stringify(initResult.serverInfo)}`);
+      this.tools = await performHandshake(this.connection, this.config.name);
     } catch (err) {
+      const phase = err instanceof HandshakeError ? err.phase : "initialize";
       const msg = err instanceof Error ? err.message : String(err);
-      this.setStatus({ kind: "protocol_error", error: `initialize failed: ${msg}` });
-      this.cleanup();
-      return;
-    }
-
-    this.connection.notify("notifications/initialized", {});
-
-    try {
-      const toolsResult = await this.connection.request<ToolsListResult>("tools/list", {});
-      this.tools = (toolsResult.tools ?? []).map((t) => ({
-        name: t.name,
-        description: t.description ?? "",
-        inputSchema: t.inputSchema ?? {},
-      }));
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.setStatus({ kind: "protocol_error", error: `tools/list failed: ${msg}` });
-      this.cleanup();
+      this.setStatus({ kind: "protocol_error", error: `${phase} failed: ${msg}` });
+      await this.transport.kill();
       return;
     }
 
@@ -152,15 +102,9 @@ export class McpStdioServer {
 
   async stop(): Promise<void> {
     this.connection?.close();
-    if (this.child && !this.child.killed) {
-      this.child.kill("SIGTERM");
-      setTimeout(() => {
-        if (this.child && !this.child.killed) {
-          this.child.kill("SIGKILL");
-        }
-      }, 5_000);
-    }
-    this.cleanup();
+    await this.transport.kill();
+    this.connection = null;
+    this.tools = [];
   }
 
   async callTool(name: string, args: unknown): Promise<McpCallResult> {
@@ -191,15 +135,6 @@ export class McpStdioServer {
   private setStatus(status: McpServerStatus): void {
     this.status = status;
     this.statusHandlers.forEach((h) => h(status));
-  }
-
-  private cleanup(): void {
-    if (this.child && !this.child.killed) {
-      try { this.child.kill("SIGTERM"); } catch {  }
-    }
-    this.child = null;
-    this.connection = null;
-    this.tools = [];
   }
 }
 
