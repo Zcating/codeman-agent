@@ -2,6 +2,7 @@
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { loadQaTable, type QaEntry, type QaTurn } from "./features/mock-server/qa-loader";
 import { writeHeadWithCors } from "./features/mock-server/cors";
+import { lookupQaAnswer } from "./features/mock-server/qa-lookup";
 import { readMockServerConfig } from "./config-service";
 
 
@@ -13,24 +14,6 @@ const logger = {
     console.log(msg);
   },
 };
-
-interface QaMiss { readonly _tag: "QaMiss"; readonly question: string }
-type QaResult = { readonly _tag: "Right"; readonly right: QaEntry } | { readonly _tag: "Left"; readonly left: QaMiss };
-
-function lookupQaAnswer(table: QaEntry[], userText: string): QaResult {
-  for (const entry of table) {
-    if (userText.includes(entry.question)) {
-      return { _tag: "Right", right: entry };
-    }
-  }
-  for (const entry of table) {
-    if (entry.default === true) {
-      return { _tag: "Right", right: entry };
-    }
-  }
-  return { _tag: "Left", left: { _tag: "QaMiss", question: userText } };
-}
-
 
 function buildSseTurnEvents(turn: QaTurn, deltaSize: number): string[] {
   const events: string[] = [];
