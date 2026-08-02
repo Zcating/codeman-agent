@@ -101,6 +101,15 @@
 - **MCP-Enabled Tool Set (MCP 启用工具集)** — `runtime.tools[]` 中由 MCP server 注入的子集。**每次 `run()` 时 lazy fetch**（不缓存）——反映 MCP server enable/disable 最新状态；fetch 失败（IPC error）→ log warning + 空数组（不阻塞 LLM 启动）。per ADR-0032 D8。
 - **MCP Server Status (MCP 服务器状态)** — 单 server 在 UI 显示的运行态枚举：`connected` / `spawn_failed` / `crashed` / `disabled` / `protocol_error` / `timeout`。每个状态有对应 lucide icon + 灰标错误信息。per ADR-0032 D5。
 
+### Multi-Agents (V3.1, Plan → ADR-0049)
+
+- **Multi-Agents Plugin (多 agent 插件)** — renderer Plugin Registry 第 3 个内置插件（与 `skills` / `mcp` 平级），提供「Sub-Agent Delegation」能力：主 Agent 可委派子任务给用户配置的 sub-agent。在 `src/renderer/src/plugins/multi-agents/` 目录。per [ADR-0049](./adr/0049-multi-agents-sub-agent-delegation.md)。_避免_：把 multi-agents 当成「多 session」(本质是 session 模型扩展而非 agent 协作)、当成「orchestrator」(V1 不引入新 Orchestrator 抽象)。
+- **Sub-Agent (子代理)** — 用户在 Settings → Multi-Agents 中定义的 agent 配置。形态：`SubAgentConfig { id, name, description, systemPrompt, modelId, thinkingLevel, allowedTools, enabled, createdAt, updatedAt }`。Sub-agent 在被主 agent 委派时**现场实例化**——每次调用 `delegate_task` 新建独立 `Agent`（per ADR-0019 per-run transient），与主 agent 完全隔离。per ADR-0049 D1。_避免_：叫「worker」「child agent」「helper agent」(与现有 Conversation/Agent 词汇冲突)。
+- **Delegate Task Tool (`delegate_task`)** — Multi-Agents 插件注入主 agent 工具集的**单个** generic AgentTool（不是 N 个专属工具）。name 固定 `delegate_task`，parameters: `{ agent_name: string, task: string }`。executionMode = `"parallel"`——主 agent 同一 turn 调多次时并发跑多个 sub-agent。**当用户未配置任何 enabled sub-agent 时,工具不注入**(避免给 LLM 投毒)。per ADR-0049 D5/D6。_避免_：每个 sub-agent 一个 `delegate_to_<name>` 专属工具(工具列表随 sub-agent 增长而膨胀,prompt bloat)。
+- **Sub-Agent Delegation (子任务委派)** — 主 agent 调 `delegate_task` 触发。Dispatcher 按 `agent_name` 查找对应 SubAgentConfig → 实例化新 `Agent`(注入 `allowedTools` 子集,**排除 `delegate_task` 本身**防止递归, V1 决议)→ 跑 `agent.prompt(task)` → 仅返回最终 assistant 文本作为 tool result content。per ADR-0049 D4/D5。_避免_：sub-agent 接收主 conv 历史(隔离失败,token 高);sub-agent 返回完整消息史(token 高,主 agent 不需要看过程);sub-agent 递归调用 `delegate_task`(V1 不允许)。
+- **Parallel Panel (并行面板)** — chat-view 在检测到 `delegate_task` toolCall 触发时挂载的 UI 容器，按 toolCallId 渲染 N 列 sub-agent live streaming（每列 = 一个 sub-agent 的 status badge + markdown streaming）。`tool_execution_end` 后所有列保留 + 状态变 "completed"，用户可折叠整组。per ADR-0049 D8。
+- **Sub-Agent Stream Entry (子代理流条目)** — `sub-agents-stream.store.ts` Solid store 的 entry shape：`{ toolCallId, subAgentId, subAgentName, events, status: "running" | "completed" | "error", startedAt, completedAt?, finalText?, error? }`。Key = `toolCallId`（一个 toolCall = 一个 sub-agent 流）。LRU 清理（暂定 50 条）。per ADR-0049 D7。
+
 ### 密钥
 
 - **API Key (API 密钥)** — Provider 的对外调用凭据，shape 为 `Provider.apiKey: string`。**明文存于 Settings JSON**（`%LocalAppData%\codeman-agent\settings.json`，由 `app.setPath('userData', '%LocalAppData%\\codeman-agent')` 锁定，per ADR-0024），与 Settings 其它字段同档；不再分 LLM / Billing 二分（ADR-0015）。LLM 调用和计费工具调端点都复用同一 key。V1 单机单用户威胁模型下接受明文；如未来需 OS 级密钥管理（keytar / Windows Credential Manager / Electron `safeStorage`）需重做 ADR-0015。_避免_：把 key 单独走 OS keychain 再走 IPC（V1.7+ 前的设计，已废止）。
