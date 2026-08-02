@@ -122,6 +122,20 @@ describe("ResizableHandle", () => {
     expect(el?.className).not.toMatch(/focus-visible:ring-offset/);
   });
 
+  it("suppresses browser default outline so host OS accent does not bleed through (orange on Windows orange-accent themes)", () => {
+    const { container } = render(() => (
+      <ResizablePanelGroup panels={[{ id: "a" }, { id: "b" }]}>
+        <ResizablePanel id="a">Panel 1</ResizablePanel>
+        <ResizableHandle id="a:b" />
+        <ResizablePanel id="b">Panel 2</ResizablePanel>
+      </ResizablePanelGroup>
+    ));
+    const el = container.querySelector("[data-slot='resizable-handle']");
+    // The native <button> would otherwise render outline:auto (AccentColor).
+    expect(el?.className).toMatch(/outline-none/);
+    expect(el?.className).toMatch(/focus-visible:outline-none/);
+  });
+
   it("does not apply muted-foreground hover (neutral hover only)", () => {
     const { container } = render(() => (
       <ResizablePanelGroup panels={[{ id: "a" }, { id: "b" }]}>
