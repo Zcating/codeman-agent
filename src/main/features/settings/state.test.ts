@@ -3,9 +3,9 @@ import { mkdtempSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SettingsState } from "./state.js";
-import type { Settings } from "../../settings-schema";
+import type { Settings } from "./settings-schema";
 
-vi.mock("../../settings-schema", () => ({
+vi.mock("./settings-schema", () => ({
   sanitize: vi.fn(
     (input: Partial<Settings>) =>
       ({ providers: [], ...(input ?? {}) }) as Settings,

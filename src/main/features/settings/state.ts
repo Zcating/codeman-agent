@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { sanitize, type Settings, type Provider } from "../../settings-schema";
+import { sanitize, type Settings, type Provider } from "./settings-schema";
 
 export class SettingsState {
   private cache: Settings | null = null;
