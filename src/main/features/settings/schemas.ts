@@ -1,20 +1,8 @@
 import { Schema } from "effect";
+import { SubAgentConfigSchema, ThinkingLevelSchema } from "@codeman-frontend/shared/lib/sub-agent-schema";
 
-
-const ThinkingLevelStruct = Schema.Literal("off", "minimal", "low", "medium", "high", "xhigh");
-
-const SubAgentConfigStruct = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  description: Schema.String,
-  systemPrompt: Schema.String,
-  modelId: Schema.String,
-  thinkingLevel: ThinkingLevelStruct,
-  allowedTools: Schema.Array(Schema.String),
-  enabled: Schema.Boolean,
-  createdAt: Schema.Number,
-  updatedAt: Schema.Number,
-});
+// Re-export shared schema as Struct for settings schema composition
+const SubAgentConfigStruct = SubAgentConfigSchema;
 
 const ModelMetaStruct = Schema.Struct({
   id: Schema.String,
@@ -77,5 +65,5 @@ export type ProviderBilling = Schema.Schema.Type<typeof ProviderBillingStruct>;
 export type ProviderLlm = Schema.Schema.Type<typeof ProviderLlmStruct>;
 export type Provider = Schema.Schema.Type<typeof ProviderStruct>;
 export type Settings = Schema.Schema.Type<typeof SettingStruct>;
-export type SubAgentConfig = Schema.Schema.Type<typeof SubAgentConfigStruct>;
-export type ThinkingLevel = Schema.Schema.Type<typeof ThinkingLevelStruct>;
+export type SubAgentConfig = Schema.Schema.Type<typeof SubAgentConfigSchema>;
+export type ThinkingLevel = Schema.Schema.Type<typeof ThinkingLevelSchema>;
