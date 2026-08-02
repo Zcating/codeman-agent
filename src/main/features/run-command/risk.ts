@@ -1,5 +1,5 @@
 import shellQuote from "shell-quote";
-import { resolve, normalize, isAbsolute, sep } from "node:path";
+import { resolve, normalize, sep } from "node:path";
 
 export type RiskKind = "low" | "high";
 
