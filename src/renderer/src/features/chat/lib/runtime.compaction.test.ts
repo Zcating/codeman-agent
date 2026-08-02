@@ -47,7 +47,7 @@ const mockProvider = {
     apiKey: "test-key",
     baseUrl: "https://mock.local",
     defaultModel: "mock-model",
-    models: [{ id: "mock-model", label: "mock-model" }],
+    models: [{ id: "mock-model", label: "mock-model", deprecated: false, thinking: false }],
     systemPrompt: "You are a helpful assistant.",
     tools: [],
 };

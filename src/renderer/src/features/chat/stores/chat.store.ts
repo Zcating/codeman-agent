@@ -171,6 +171,9 @@ const doCompaction = Effect.fn(
         if (!appProvider.apiKey) {
           throw new CompactionFailed({ reason: "no_api_key" });
         }
+        if (appProvider.llm.models.length === 0) {
+          throw new CompactionFailed({ reason: "no_models" });
+        }
 
         const piProvider = createProviderFromConfig({
           id: appProvider.id,

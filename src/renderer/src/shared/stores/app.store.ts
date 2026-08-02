@@ -100,7 +100,7 @@ const refreshImpl = Effect.fn(function* () {
   const fresh = yield* ipcInvoke<Settings>("getSettings");
   const freshWithInvariant: Settings = {
     ...fresh,
-    providers: fresh.providers.map((p) => ({
+    providers: (fresh.providers ?? []).map((p) => ({
       ...p,
       llm: enforceDefaultModelInvariant(p.llm),
     })),

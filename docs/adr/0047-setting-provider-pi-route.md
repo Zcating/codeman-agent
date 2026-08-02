@@ -261,6 +261,8 @@ export const anthropicStream: StreamFn = (model, context, options) =>
 
 **auth header 行为**:PI transport 用 Anthropic SDK,`apiKey` 存在时发 `x-api-key`(Anthropic 标准),**不是** `Authorization: Bearer`。Anthropic 兼容端点(MiniMax `/anthropic` / DeepSeek `/anthropic`)按设计接受 Anthropic SDK 的 `x-api-key`(它们即为官方 SDK 适配)。**风险记录**:极端情况下若某兼容端点只收 Bearer,需改传 `headers: { authorization: ... }` 覆盖(`assertRequestAuth` 已支持)。QA 需对真实 provider 实测一次。
 
+**`refreshModels` auth header 特别记录**:`refreshModels` 的 fetch 使用 `Authorization: Bearer`(与 streaming 的 `x-api-key` 不一致,QA 需覆盖此路径)。
+
 **改 `src/renderer/src/features/chat/lib/runtime.ts`**:
 - `ProviderConfig` 加 `id: string` + `models: ModelMeta[]`(runtime 需要它们构 PI provider)
 - `run()` 内删内联 Model 构造(L300-311)→
@@ -396,7 +398,7 @@ private save(): void {
 
 | 选 | 描述 | 选 / 不选 |
 | --- | --- | --- |
-| 1 | **全量迁 PI `createProvider()`**(本 ADR D3) | **选** — 与 PI v0.80.3 升级方向对齐;`ProviderAuth` 抽象层为未来 OAuth 留 seam;`Model` 字段补齐 |
+| 1 | **收敛至 PI `createProvider()`(保留 Agent)**(本 ADR D3) | **选** — 与 PI v0.80.3 升级方向对齐;`ProviderAuth` 抽象层为未来 OAuth 留 seam;`Model` 字段补齐 |
 | 2 | Adapter 层,保留 `ProviderConfig` + 现有 `getApiKey` 回调 | 不选 — scope 小但重复 PI 抽象;用户已选全量 |
 | 3 | Plugin 路线(3 个选项平型走) | 不选 — doubles 代码量 |
 | 4 | 推迟 PI 路线,只做 A+B | 不选 — 用户已选全量 |

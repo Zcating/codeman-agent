@@ -1,5 +1,8 @@
 import type { ProviderLlm } from "./schemas.js";
 
+// 与 src/renderer/src/shared/lib/provider-invariant.ts 的 enforceDefaultModelInvariant 是同步副本。
+// 修改任一处必须同步另一处(per ADR-0047 D2: main 端避免跨层 import,故复制而非共享)。
+
 export function enforceDefaultModelInvariant(llm: ProviderLlm): ProviderLlm {
   if (llm.models.length === 0) {
     return { ...llm, defaultModel: "" };

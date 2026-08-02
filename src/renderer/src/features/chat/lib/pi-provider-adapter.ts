@@ -10,6 +10,11 @@ import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messag
 import { parseModelsApiResponse } from "@codeman-frontend/shared/lib/parse-models-api-response";
 import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 
+// V1 限制:UI 不消费 cost / maxTokens / vision input,hardcode 占位(per ADR-0047 Consequences)
+const V1_ZERO_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } as const;
+const V1_MAX_TOKENS = 8192;
+const V1_INPUT_MODALITIES: ("image" | "text")[] = ["text"];
+
 /** 运行时向 adapter 提供的 provider 片段(非完整 settings Provider;runtime 只持有 ProviderConfig) */
 export interface PiProviderConfig {
   id: string;
@@ -28,10 +33,10 @@ function modelMetaToPiModel(meta: ModelMeta, baseUrl: string, providerId: string
     provider: providerId,
     baseUrl,
     reasoning: meta.thinking ?? false,
-    input: ["text"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    input: V1_INPUT_MODALITIES,
+    cost: V1_ZERO_COST,
     contextWindow: meta.contextWindow ?? 200_000,
-    maxTokens: 8192,
+    maxTokens: V1_MAX_TOKENS,
   };
 }
 
@@ -85,9 +90,9 @@ export function findDefaultModel(
     provider: provider.id,
     baseUrl: provider.baseUrl ?? "",
     reasoning: true,
-    input: ["text"],
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    input: V1_INPUT_MODALITIES,
+    cost: V1_ZERO_COST,
     contextWindow: 128000,
-    maxTokens: 8192,
+    maxTokens: V1_MAX_TOKENS,
   };
 }
