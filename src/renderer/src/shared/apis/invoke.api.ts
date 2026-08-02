@@ -14,6 +14,7 @@ import type {
   McpServerInfo,
   McpTool,
   McpToolEntry,
+  CompactionEntry,
 } from "../lib/types";
 
 export interface StreamSubscription {
@@ -98,6 +99,17 @@ export interface CodemanApi {
     contentType: string;
     body: ArrayBuffer;
   }>;
+
+  // Compaction
+  readonly compactionList: (args: { conversationId?: string }) => Promise<CompactionEntry[]>;
+  readonly compactionAppend: (args: {
+    conversationId?: string;
+    summary: string;
+    model: string;
+    tokensBefore: number;
+    kind: "auto" | "manual";
+    firstKeptMessageId: string;
+  }) => Promise<CompactionEntry>;
 }
 
 declare global {

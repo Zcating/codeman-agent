@@ -59,6 +59,13 @@
 
 - **`tools/` 目录 (6+1 白名单)** — `src/renderer/src/tools/<name>/` 顶层目录（与 `features/` 同级），存放 LLM-facing AgentTool 定义。每个 `<name>/` 根级仅允许 `index.ts`（barrel）+ `AGENTS.md`。ADR-0010 原 5+1 白名单（5 个 feature 子目录 + 1 个 shared），ADR-0038 扩展为 6+1（新增 `tools/`）。当前成员：`file-ops/`（5 个文件工具，从 `features/file-tools` 迁入）、`webfetch/`（网页抓取工具）。_避免_：放到 `features/<feature>/tools/`（已在 ADR-0010 被合并到 `lib/`）；`tools/` 下嵌套子目录（扁平约束）。
 
+### 上下文压缩
+
+- **Context Compaction (上下文压缩)** — 当 Conversation 的消息历史长度达到预设阈值时，自动将早前消息压缩为摘要，以控制 token 消耗的机制。支持手动触发（用户点击压缩按钮）和自动触发（达阈值后静默压缩）。
+- **Compaction Entry (压缩条目)** — 被压缩进摘要的原始消息段。每段在 UI 中渲染为一个 `data-testid="compaction-marker"` 的可折叠块，展开后显示该段落的原始内容摘要。
+- **Compaction Marker (压缩标记)** — UI 中标识已压缩消息段的视觉元素，`data-testid="compaction-marker"`。点击标记的摘要区域可展开查看 `data-testid="compaction-summary-body"`。
+- **Auto Compaction Threshold (自动压缩阈值)** — 触发自动上下文压缩的 token 数量上限。当对话累计 token 达到此值时，Agent 自动执行压缩并插入 Compaction Marker，无需用户操作。
+
 ### Schema 与错误模型 (ADR-0025)
 
 - **Schema (`effect/Schema`)** — `effect` 包内置的 schema/validation 模块（`import { Schema } from "effect"`），用于同时表达**运行时校验**与**TypeScript 类型**。`Schema.Struct({...})` 替代传统 `interface Foo { ... }`：编解码、JSON 序列化、错误实例化全部内建。V3.0 起 `src/` 全栈采用 effect/Schema 作为默认 schema 来源；不再使用 `@sinclair/typebox`（typebox 降级为 pi-ai 间接传递依赖，仅在 pi-ai 边界 `AgentTool<TParameters extends TSchema>` 出现）。_避免_：手写 `interface` + 单独 validator；引入 `@effect/schema` standalone 旧包（已被 effect@3.x 合并）；引入 zod / valibot（与 Effect 生态割裂）。

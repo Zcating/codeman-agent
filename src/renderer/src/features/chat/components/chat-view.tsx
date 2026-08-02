@@ -1,9 +1,10 @@
 import { createEffect, createMemo, For, Show, onMount, type JSX } from "solid-js";
 import { Effect, Exit } from "effect";
-import { Square, Send } from "lucide-solid";
+import { Square, Send, Minimize2, Loader2 } from "lucide-solid";
 import { createForm } from "@tanstack/solid-form";
 import { MessageBubble } from "@codeman-frontend/features/chat/components/message-bubble";
-import { store, sendMessage, cancel } from "@codeman-frontend/features/chat/stores/chat.store";
+import { CompactionMarker } from "@codeman-frontend/features/chat/components/compaction-marker";
+import { store, sendMessage, cancel, compactNow } from "@codeman-frontend/features/chat/stores/chat.store";
 import {
   ContextRing,
   computeUsedTokensEst,
@@ -101,6 +102,59 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     return store.byId[id]?.messages ?? [];
   };
 
+  const compactionEntries = () => {
+    const id = convId();
+    if (!id) { return []; }
+    return store.byId[id]?.compactionEntries ?? [];
+  };
+
+  const compactionStatus = () => {
+    const id = convId();
+    if (!id) { return { _tag: "idle" } as const; }
+    return store.byId[id]?.compactionStatus ?? { _tag: "idle" };
+  };
+
+  type InterleavedItem =
+    | { _tag: "message"; message: (ReturnType<typeof currentMessages>[number]) }
+    | { _tag: "compaction"; entry: (ReturnType<typeof compactionEntries>[number]) };
+
+  const interleavedItems = (): InterleavedItem[] => {
+    const msgs = currentMessages();
+    const entries = compactionEntries();
+    const result: InterleavedItem[] = [];
+    let msgIdx = 0;
+    let entryIdx = 0;
+
+    while (msgIdx < msgs.length || entryIdx < entries.length) {
+      const nextMsg = msgs[msgIdx];
+      const nextEntry = entries[entryIdx];
+
+      if (!nextMsg) {
+        // All messages consumed, append remaining entries
+        while (entryIdx < entries.length) {
+          result.push({ _tag: "compaction", entry: entries[entryIdx++] });
+        }
+        break;
+      }
+      if (!nextEntry) {
+        // All entries consumed, append remaining messages
+        while (msgIdx < msgs.length) {
+          result.push({ _tag: "message", message: msgs[msgIdx++] });
+        }
+        break;
+      }
+
+      if (nextMsg.createdAt <= nextEntry.createdAt) {
+        result.push({ _tag: "message", message: nextMsg });
+        msgIdx++;
+      } else {
+        result.push({ _tag: "compaction", entry: nextEntry });
+        entryIdx++;
+      }
+    }
+    return result;
+  };
+
   const ringInfo = createMemo(() => {
     const providers = appStore.state.value.providers ?? [];
     const pid = appStore.state.value.defaultLlmProviderId;
@@ -145,6 +199,14 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     if (err) { codemanToast.error(err); }
   });
 
+  // Show toast when compaction fails
+  createEffect(() => {
+    const status = compactionStatus();
+    if (status._tag === "failed") {
+      codemanToast.error(status.reason);
+    }
+  });
+
   const form = createForm(() => ({
     defaultValues: {
       draft: "",
@@ -186,6 +248,16 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     cancel(id);
   };
 
+  const handleCompactNow = () => {
+    const id = convId();
+    if (!id) { return; }
+    void Effect.runPromiseExit(compactNow(id)).then((exit) => {
+      if (Exit.isFailure(exit)) {
+        codemanToast.error(String(exit.cause));
+      }
+    });
+  };
+
   const enabledSkills = createMemo((): readonly SkillManifest[] => {
     const all = skillsManifests$();
     const enabledNames = new Set(appStore.state.value.enabledSkills ?? []);
@@ -195,7 +267,12 @@ export function ChatView(props: { convId?: string }): JSX.Element {
   return (
     <>
       <div class="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
-        <For each={currentMessages()}>{(m) => <MessageBubble message={m} />}</For>
+        <For each={interleavedItems()}>
+          {(item) =>
+            item._tag === "message"
+              ? <MessageBubble message={item.message} />
+              : <CompactionMarker entry={item.entry} />}
+        </For>
         <div ref={messagesEndRef} />
       </div>
 
@@ -300,6 +377,33 @@ export function ChatView(props: { convId?: string }): JSX.Element {
               usedTokens={ringInfo().used}
               totalTokens={ringInfo().total}
             />
+
+            {}
+            <Show
+              when={compactionStatus()._tag !== "compacting"}
+              fallback={
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled
+                  aria-label="压缩中"
+                  data-testid="compaction-spinner"
+                >
+                  <Loader2 class="h-4 w-4 animate-spin" />
+                </Button>
+              }
+            >
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleCompactNow}
+                aria-label="立即压缩上下文"
+                data-testid="compact-now-button"
+              >
+                立即压缩
+                <Minimize2 class="h-4 w-4" />
+              </Button>
+            </Show>
 
             {}
             <form.Subscribe

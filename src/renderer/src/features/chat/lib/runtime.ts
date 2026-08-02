@@ -3,6 +3,7 @@ import { Effect, Exit, Stream } from "effect";
 import { match } from "ts-pattern";
 import type { Message } from "@codeman-frontend/shared/lib/types";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
+import type { CompactionEntry } from "@codeman-frontend/shared/lib/types";
 import { logger } from "@codeman-frontend/shared/lib/logger";
 import { anthropicStream } from "@codeman-frontend/features/chat/lib/anthropic-transport";
 import { Agent, type AgentEvent, type AgentTool } from "@earendil-works/pi-agent-core";
@@ -78,7 +79,10 @@ export type RuntimeEvent =
 | { type: "tool_result"; toolCallId: string; result: unknown; error?: string }
 | { type: "done"; message: Message }
 | { type: "message_stop" }
-| { type: "error"; error: { message: string } };
+| { type: "error"; error: { message: string } }
+| { type: "compactionStarted" }
+| { type: "compactionCompleted"; entry: CompactionEntry }
+| { type: "compactionFailed"; reason: string };
 
 interface RuntimeEmitter {
   readonly single: (event: RuntimeEvent) => unknown;
@@ -102,6 +106,15 @@ export interface RunOptions {
   provider: ProviderConfig;
 }
 
+export type TransformContext = (msgs: Message[], state: {
+  conversationId: string;
+  compactionEntries: CompactionEntry[];
+}) => Message[];
+
+export interface CreateAgentRuntimeOptions {
+  transformContext?: TransformContext;
+  getState?: () => { conversationId: string; compactionEntries: CompactionEntry[] };
+}
 
 export interface AgentRuntime {
   run(opts: RunOptions): Stream.Stream<RuntimeEvent, never, never>;
@@ -269,8 +282,10 @@ function handleAgentEnd(
 }
 
 
-export function createAgentRuntime(): AgentRuntime {
+export function createAgentRuntime(options: CreateAgentRuntimeOptions = {}): AgentRuntime {
+  const { transformContext, getState } = options;
   let currentAgent: Agent | null = null;
+  const defaultGetState = () => ({ conversationId: "", compactionEntries: [] as CompactionEntry[] });
 
   return {
     run({ context, provider }: RunOptions): Stream.Stream<RuntimeEvent, never, never> {
@@ -310,7 +325,12 @@ export function createAgentRuntime(): AgentRuntime {
             model,
             thinkingLevel: "medium",
             tools,
-            messages: toPiMessages(context, model),
+            messages: toPiMessages(
+              transformContext
+                ? transformContext(context, (getState ?? defaultGetState)())
+                : context,
+              model,
+            ),
           },
           streamFn: anthropicStream,
           getApiKey: async () => provider.apiKey ?? undefined,
