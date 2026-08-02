@@ -18,7 +18,6 @@ import { enforceDefaultModelInvariant } from "@codeman-frontend/shared/lib/provi
 const DEFAULT_MINIMAX_PROVIDER: Provider = {
   id: "minimax",
   label: "MiniMax",
-  enabled: true,
   apiKey: "",
   llm: {
     defaultModel: "MiniMax-M2.5-highspeed",
@@ -77,7 +76,13 @@ function applyPatch(patch: Partial<Settings>, opts?: { enforceInvariant?: boolea
         ...p,
         llm: enforceDefaultModelInvariant(p.llm),
       }));
-      return { ...prev, ...patch, providers };
+      let defaultLlmProviderId = prev.defaultLlmProviderId;
+      if (patch.defaultLlmProviderId !== undefined) {
+        defaultLlmProviderId = patch.defaultLlmProviderId;
+      } else if (defaultLlmProviderId !== null && !providers.some((p) => p.id === defaultLlmProviderId)) {
+        defaultLlmProviderId = providers.length > 0 ? providers[0].id : null;
+      }
+      return { ...prev, ...patch, providers, defaultLlmProviderId };
     }
     return { ...prev, ...patch };
   });
@@ -149,7 +154,11 @@ const pickWorkspacePathImpl = Effect.fn(
 const deleteProviderImpl = Effect.fn(
   function* (id: string) {
     const providers = (settings.value.providers ?? []).filter((p) => p.id !== id);
-    setSettings("value", (prev) => ({ ...prev, providers }));
+    let defaultLlmProviderId = settings.value.defaultLlmProviderId;
+    if (defaultLlmProviderId === id) {
+      defaultLlmProviderId = providers.length > 0 ? providers[0].id : null;
+    }
+    setSettings("value", (prev) => ({ ...prev, providers, defaultLlmProviderId }));
     const svc = yield* ProviderApi;
     yield* svc.delete(id);
   },
