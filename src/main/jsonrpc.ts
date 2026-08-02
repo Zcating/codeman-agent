@@ -1,5 +1,5 @@
 
-import { Deferred, Duration, Effect, Exit, Fiber, FiberId, Runtime } from "effect";
+import { Cause, Deferred, Duration, Effect, Exit, Fiber, FiberId, Runtime } from "effect";
 import { JsonRpcProtocolError, JsonRpcTimeoutError } from "../renderer/src/shared/lib/errors";
 
 interface JsonRpcRequest {
@@ -50,7 +50,7 @@ const runtime = Runtime.defaultRuntime;
 
 type PendingEntry = {
   deferred: Deferred.Deferred<unknown, JsonRpcProtocolError | JsonRpcTimeoutError>;
-  fiber: Fiber.RuntimeFiber<Exit.Exit<unknown>, never>;
+  fiber: Fiber.RuntimeFiber<unknown, JsonRpcProtocolError | JsonRpcTimeoutError>;
   method: string;
 };
 
@@ -137,7 +137,7 @@ export class JsonRpcConnection {
         if (exit._tag === "Success") {
           resolve(exit.value as T);
         } else {
-          reject(exit.cause.error);
+          reject(Cause.squash(exit.cause));
         }
       }).catch(reject);
     });
