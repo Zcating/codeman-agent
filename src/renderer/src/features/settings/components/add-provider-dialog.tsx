@@ -13,6 +13,8 @@ import { Checkbox } from "@codeman-frontend/shared/components/ui/checkbox";
 import { Dialog } from "@codeman-frontend/shared/components/internal/codeman-dialog";
 import type { Provider } from "@codeman-frontend/shared/lib/types";
 import { buildMockDevTemplate } from "@codeman-frontend/features/settings/lib/mock-provider-template";
+import { enforceDefaultModelInvariant } from "@codeman-frontend/shared/lib/provider-invariant";
+import { codemanToast } from "@codeman-frontend/shared/components/internal/codeman-toast";
 
 type ProviderType = "real" | "mock";
 
@@ -47,18 +49,23 @@ export function createProviderFormDialog(): Promise<Provider | null> {
       const id = type() === "mock"
         ? `mock-${Date.now().toString(36)}`
         : `provider-${Date.now().toString(36)}`;
+      const llm = {
+        defaultModel: defaultModel(),
+        baseUrl: baseUrl(),
+        apiType: "anthropic-messages" as const,
+        models: defaultModel() ? [{ id: defaultModel(), label: defaultModel(), deprecated: false, thinking: false }] : [],
+        modelsEndpoint: "",
+      };
+      const enforced = enforceDefaultModelInvariant(llm);
+      if (enforced.defaultModel !== llm.defaultModel) {
+        codemanToast.error(`Default model fell back to ${enforced.defaultModel}`);
+      }
       resolve({
         id,
         label: label(),
         enabled: enabled(),
         apiKey: apiKey(),
-        llm: {
-          defaultModel: defaultModel(),
-          baseUrl: baseUrl(),
-          apiType: "anthropic-messages",
-          models: defaultModel() ? [{ id: defaultModel(), label: defaultModel(), deprecated: false, thinking: false }] : [],
-          modelsEndpoint: "",
-        },
+        llm: enforced,
       });
     };
 
