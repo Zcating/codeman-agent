@@ -1,6 +1,7 @@
 
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { loadQaTable, type QaEntry, type QaTurn } from "./features/mock-server/qa-loader";
+import { writeHeadWithCors } from "./features/mock-server/cors";
 import { readMockServerConfig } from "./config-service";
 
 
@@ -12,23 +13,6 @@ const logger = {
     console.log(msg);
   },
 };
-
-
-const CORS_HEADERS: Readonly<Record<string, string>> = Object.freeze({
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, x-api-key",
-  "Access-Control-Max-Age": "86400",
-});
-
-function writeHeadWithCors(
-  res: ServerResponse,
-  status: number,
-  extra: Record<string, string>,
-): void {
-  res.writeHead(status, { ...CORS_HEADERS, ...extra });
-}
-
 
 interface QaMiss { readonly _tag: "QaMiss"; readonly question: string }
 type QaResult = { readonly _tag: "Right"; readonly right: QaEntry } | { readonly _tag: "Left"; readonly left: QaMiss };
