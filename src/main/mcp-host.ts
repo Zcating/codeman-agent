@@ -2,22 +2,13 @@ import { spawn } from "node:child_process";
 import { PassThrough, type Readable, type Writable } from "node:stream";
 import { JsonRpcConnection } from "./jsonrpc";
 import { StdioTransport } from "./mcp-stdio-transport";
+import { performHandshake, HandshakeError } from "./mcp-handshake";
 import { logger } from "./logger";
 import { JsonRpcProtocolError } from "../renderer/src/shared/lib/errors";
 import type { McpServerConfig, McpServerStatus, McpTool, McpCallResult, StatusChangeHandler } from "./mcp-types";
 
 export type { McpServerConfig, McpServerStatus, McpTool, McpCallResult, StatusChangeHandler };
 
-
-interface InitializeResult {
-  protocolVersion: string;
-  capabilities: Record<string, unknown>;
-  serverInfo: { name: string; version: string };
-}
-
-interface ToolsListResult {
-  tools: Array<{ name: string; description?: string; inputSchema?: unknown }>;
-}
 
 interface ToolsCallResult {
   content: Array<{ type: string; text?: string }>;
@@ -96,31 +87,11 @@ export class McpStdioServer {
     });
 
     try {
-      const initResult = await this.connection.request<InitializeResult>("initialize", {
-        protocolVersion: "2024-11-05",
-        capabilities: {},
-        clientInfo: { name: "codeman-agent", version: "0.3.0" },
-      });
-      logger.info(`[mcp] ${this.config.name} initialized: serverInfo=${JSON.stringify(initResult.serverInfo)}`);
+      this.tools = await performHandshake(this.connection, this.config.name);
     } catch (err) {
+      const phase = err instanceof HandshakeError ? err.phase : "initialize";
       const msg = err instanceof Error ? err.message : String(err);
-      this.setStatus({ kind: "protocol_error", error: `initialize failed: ${msg}` });
-      await this.transport.kill();
-      return;
-    }
-
-    this.connection.notify("notifications/initialized", {});
-
-    try {
-      const toolsResult = await this.connection.request<ToolsListResult>("tools/list", {});
-      this.tools = (toolsResult.tools ?? []).map((t) => ({
-        name: t.name,
-        description: t.description ?? "",
-        inputSchema: t.inputSchema ?? {},
-      }));
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.setStatus({ kind: "protocol_error", error: `tools/list failed: ${msg}` });
+      this.setStatus({ kind: "protocol_error", error: `${phase} failed: ${msg}` });
       await this.transport.kill();
       return;
     }

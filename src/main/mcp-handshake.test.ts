@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { JsonRpcProtocolError } from "../renderer/src/shared/lib/errors";
-import { performHandshake } from "./mcp-handshake";
+import { performHandshake, HandshakeError } from "./mcp-handshake";
 
 
 function fakeConnection(handlers: {
@@ -93,7 +93,7 @@ describe("performHandshake", () => {
     ]);
   });
 
-  it("propagates initialize errors and skips notifications/initialized", async () => {
+  it("propagates initialize errors as HandshakeError('initialize') and skips notifications/initialized", async () => {
     const fake = fakeConnection({
       request: async () => {
         throw new JsonRpcProtocolError({ message: "initialize blew up", code: -32603 });
@@ -101,10 +101,16 @@ describe("performHandshake", () => {
     });
 
     await expect(performHandshake(fake as never, "x")).rejects.toThrow(/initialize blew up/);
+    try {
+      await performHandshake(fake as never, "x");
+    } catch (e) {
+      expect(e).toBeInstanceOf(HandshakeError);
+      expect((e as HandshakeError).phase).toBe("initialize");
+    }
     expect((fake as { notify: ReturnType<typeof vi.fn> }).notify).not.toHaveBeenCalled();
   });
 
-  it("propagates tools/list errors after sending notifications/initialized", async () => {
+  it("propagates tools/list errors as HandshakeError('tools_list') after sending notifications/initialized", async () => {
     const fake = fakeConnection({
       request: async (method) => {
         if (method === "initialize") {
@@ -115,5 +121,11 @@ describe("performHandshake", () => {
     });
 
     await expect(performHandshake(fake as never, "x")).rejects.toThrow(/tools\/list blew up/);
+    try {
+      await performHandshake(fake as never, "x");
+    } catch (e) {
+      expect(e).toBeInstanceOf(HandshakeError);
+      expect((e as HandshakeError).phase).toBe("tools_list");
+    }
   });
 });
