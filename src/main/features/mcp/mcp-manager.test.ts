@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { InvalidConfig, JsonRpcProtocolError } from "../../../renderer/src/shared/lib/errors";
+import { JsonRpcProtocolError, NotFound } from "../../../renderer/src/shared/lib/errors";
 
 vi.mock("electron", () => ({
+  app: { getPath: vi.fn(() => "/tmp") },
   shell: { openPath: vi.fn().mockResolvedValue("") },
 }));
 
@@ -29,8 +30,8 @@ describe("McpManager", () => {
     await expect(manager.callTool("invalid", "someTool", {})).rejects.toThrow(JsonRpcProtocolError);
   });
 
-  it("restart throws InvalidConfig for nonexistent server", async () => {
+  it("restart throws NotFound for nonexistent server", async () => {
     const manager = new McpManager();
-    await expect(manager.restart("nonexistent")).rejects.toThrow(InvalidConfig);
+    await expect(manager.restart("nonexistent")).rejects.toThrow(NotFound);
   });
 });
