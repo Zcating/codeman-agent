@@ -1,7 +1,16 @@
+/**
+ * file-ops/ipc.ts
+ *
+ * ADR-0046 D3: getWorkspaceById 移到 data.ts，handler 经 runMain 执行。
+ * 删 db dep，删 better-sqlite3 import。
+ */
+
 import { ipcMain } from "electron";
 import { readFile, unlink, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
-import type { Database as DB } from "better-sqlite3";
+
+import { runMain } from "../../runtime.js";
+import { getWorkspaceById } from "./data.js";
 import {
   validatePathInWorkspace,
   readFileInWorkspace,
@@ -9,27 +18,16 @@ import {
 } from "../../file-sandbox.js";
 import { sandboxHandler } from "../../lib/sandbox-handler.js";
 
-interface RawWorkspace {
-  id: string;
-  label: string;
-  root_path: string;
-  created_at: number;
-}
-
-async function getWorkspaceById(db: DB, id: string): Promise<RawWorkspace> {
-  const row = db.prepare("SELECT * FROM workspaces WHERE id = ?").get(id) as RawWorkspace | undefined;
-  if (!row) {
-    throw new Error(`Workspace not found: ${id}`);
-  }
-  return row;
-}
+// ---------------------------------------------------------------------------
+// helpers（保留原有 applyEdit 等纯函数）
+// ---------------------------------------------------------------------------
 
 export function applyEdit(
   content: string,
   oldText: string,
   newText: string,
   replaceAll: boolean,
-  path: string,
+  path: string
 ):
   | { kind: "ok"; newContent: string }
   | { kind: "notFound" | "ambiguous"; message: string } {
@@ -48,7 +46,10 @@ export function applyEdit(
     return { kind: "notFound", message: `Pattern not found in ${path}. Searched for: ${quoted}` };
   }
   if (occurrences > 1 && !replaceAll) {
-    return { kind: "ambiguous", message: `Pattern matches ${occurrences} times in ${path}. Searched for: ${quoted}. Use replaceAll=true or make the pattern more specific.` };
+    return {
+      kind: "ambiguous",
+      message: `Pattern matches ${occurrences} times in ${path}. Searched for: ${quoted}. Use replaceAll=true or make the pattern more specific.`,
+    };
   }
 
   const replaced = replaceAll
@@ -62,7 +63,7 @@ export function applyEdit(
 async function searchFilesInWorkspace(
   root: string,
   glob: string,
-  contentPattern: string | null,
+  contentPattern: string | null
 ): Promise<Array<{ path: string; line: number; text: string }>> {
   const results: Array<{ path: string; line: number; text: string }> = [];
   await walkDir(root, async (relPath) => {
@@ -89,8 +90,17 @@ async function searchFilesInWorkspace(
   return results;
 }
 
-async function walkDir(root: string, visit: (relPath: string) => Promise<void>): Promise<void> {
-  const skip = new Set([".git", "node_modules", "dist", "dist-electron", ".electron-builder-cache"]);
+async function walkDir(
+  root: string,
+  visit: (relPath: string) => Promise<void>
+): Promise<void> {
+  const skip = new Set([
+    ".git",
+    "node_modules",
+    "dist",
+    "dist-electron",
+    ".electron-builder-cache",
+  ]);
   const stack: Array<{ abs: string; rel: string }> = [{ abs: root, rel: "" }];
   while (stack.length > 0) {
     const item = stack.pop()!;
@@ -124,46 +134,84 @@ function matchGlob(relPath: string, glob: string): boolean {
     .replace(/[.+^${}()|[\]\\]/g, "\\$&")
     .replace(/\*\*/g, "::DOUBLESTAR::")
     .replace(/\*/g, "[^/]*")
-    .replace(/\?/g, "[^/]")
-    .replace(/::DOUBLESTAR::/g, ".*");
-  return new RegExp(`^${escaped}$`).test(relPath);
+    .replace(/\?/g, "[^/]");
+  return new RegExp(`^${escaped.replace(/::DOUBLESTAR::/g, ".*")}$`).test(
+    relPath
+  );
 }
 
-export function registerFileOpsIpc(deps: { db: DB }): void {
-  ipcMain.handle("readFile", sandboxHandler(async (args: { workspaceId?: string; path: string }) => {
-    const wsId = args.workspaceId ?? "";
-    const ws = await getWorkspaceById(deps.db, wsId);
-    return await readFileInWorkspace(ws.root_path, args.path);
-  }));
+// ---------------------------------------------------------------------------
+// IPC handlers
+// ---------------------------------------------------------------------------
 
-  ipcMain.handle("writeFile", sandboxHandler(async (args: { workspaceId?: string; path: string; content: string }) => {
-    const wsId = args.workspaceId ?? "";
-    const ws = await getWorkspaceById(deps.db, wsId);
-    await writeFileInWorkspace(ws.root_path, args.path, args.content);
-  }));
+export function registerFileOpsIpc(): void {
+  ipcMain.handle(
+    "readFile",
+    sandboxHandler(async (args: { workspaceId?: string; path: string }) => {
+      const wsId = args.workspaceId ?? "";
+      const ws = await runMain(getWorkspaceById(wsId));
+      return await readFileInWorkspace(ws.root_path, args.path);
+    })
+  );
 
-  ipcMain.handle("editFile", sandboxHandler(async (args: { workspaceId?: string; path: string; oldText: string; newText: string; replaceAll?: boolean }) => {
-    const wsId = args.workspaceId ?? "";
-    const ws = await getWorkspaceById(deps.db, wsId);
-    const abs = await validatePathInWorkspace(args.path, ws.root_path);
-    const content = await readFile(abs, "utf-8");
-    const result = applyEdit(content, args.oldText, args.newText, args.replaceAll ?? false, args.path);
-    if (result.kind !== "ok") {
-      throw new Error(result.message);
+  ipcMain.handle(
+    "writeFile",
+    sandboxHandler(async (args: { workspaceId?: string; path: string; content: string }) => {
+      const wsId = args.workspaceId ?? "";
+      const ws = await runMain(getWorkspaceById(wsId));
+      await writeFileInWorkspace(ws.root_path, args.path, args.content);
+    })
+  );
+
+  ipcMain.handle(
+    "editFile",
+    sandboxHandler(
+      async (args: {
+        workspaceId?: string;
+        path: string;
+        oldText: string;
+        newText: string;
+        replaceAll?: boolean;
+      }) => {
+        const wsId = args.workspaceId ?? "";
+        const ws = await runMain(getWorkspaceById(wsId));
+        const abs = await validatePathInWorkspace(args.path, ws.root_path);
+        const content = await readFile(abs, "utf-8");
+        const result = applyEdit(
+          content,
+          args.oldText,
+          args.newText,
+          args.replaceAll ?? false,
+          args.path
+        );
+        if (result.kind !== "ok") {
+          throw new Error(result.message);
+        }
+        await writeFileInWorkspace(ws.root_path, args.path, result.newContent);
+      }
+    )
+  );
+
+  ipcMain.handle(
+    "searchFiles",
+    async (_e, args: { workspaceId?: string; glob: string; contentPattern?: string | null }) => {
+      const wsId = args.workspaceId ?? "";
+      const ws = await runMain(getWorkspaceById(wsId));
+      return await searchFilesInWorkspace(
+        ws.root_path,
+        args.glob,
+        args.contentPattern ?? null
+      );
     }
-    await writeFileInWorkspace(ws.root_path, args.path, result.newContent);
-  }));
+  );
 
-  ipcMain.handle("searchFiles", async (_e, args: { workspaceId?: string; glob: string; contentPattern?: string | null }) => {
-    const wsId = args.workspaceId ?? "";
-    const ws = await getWorkspaceById(deps.db, wsId);
-    return await searchFilesInWorkspace(ws.root_path, args.glob, args.contentPattern ?? null);
-  });
-
-  ipcMain.handle("deleteFile", sandboxHandler(async (args: { workspaceId?: string; path: string }) => {
-    const wsId = args.workspaceId ?? "";
-    const ws = await getWorkspaceById(deps.db, wsId);
-    const abs = await validatePathInWorkspace(args.path, ws.root_path);
-    await unlink(abs);
-  }));
+  ipcMain.handle(
+    "deleteFile",
+    sandboxHandler(async (args: { workspaceId?: string; path: string }) => {
+      const wsId = args.workspaceId ?? "";
+      const ws = await runMain(getWorkspaceById(wsId));
+      const abs = await validatePathInWorkspace(args.path, ws.root_path);
+      await unlink(abs);
+    })
+  );
 }

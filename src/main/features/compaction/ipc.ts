@@ -1,49 +1,38 @@
+/**
+ * compaction/ipc.ts
+ *
+ * ADR-0046 D3: 接线到 data.ts Effect 函数，经 runMain 边界执行。
+ * 删 db dep，删 better-sqlite3 import，删 try/catch wrap
+ *（Database AppError 映射已在 data.ts 完成，行为等价）。
+ */
+
 import { ipcMain } from "electron";
-import { randomUUID } from "node:crypto";
-import type { Database as DB } from "better-sqlite3";
-import { toCompactionEntry, fromCompactionEntry, type CompactionEntry } from "./mappers.js";
 
-export function registerCompactionIpc(deps: { db: DB }): void {
-  ipcMain.handle("compaction:list", (_e, args: { conversationId?: string }) => {
-    const convId = args.conversationId;
-    if (!convId) {return [];}
-    const rows = deps.db.prepare(
-      "SELECT * FROM compaction_entries WHERE conversation_id = ? ORDER BY created_at ASC",
-    ).all(convId) as Parameters<typeof toCompactionEntry>[0][];
-    return rows.map(toCompactionEntry);
-  });
+import { runMain } from "../../runtime.js";
+import { listCompactionEntries, appendCompactionEntry } from "./data.js";
 
-  ipcMain.handle("compaction:append", async (_e, args: {
-    conversationId?: string;
-    summary: string;
-    model: string;
-    tokensBefore: number;
-    kind: "auto" | "manual";
-    firstKeptMessageId: string;
-  }) => {
-    const id = randomUUID();
-    const now = Date.now();
-    const convId = args?.conversationId ?? "";
-    const entry: CompactionEntry = {
-      id,
-      conversationId: convId,
-      summary: args.summary,
-      model: args.model,
-      tokensBefore: args.tokensBefore,
-      kind: args.kind,
-      createdAt: now,
-      firstKeptMessageId: args.firstKeptMessageId,
-    };
-    try {
-      deps.db.prepare(
-        "INSERT INTO compaction_entries (id, conversation_id, summary, model, tokens_before, kind, created_at, first_kept_message_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      ).run(...fromCompactionEntry(entry));
-    } catch (e: unknown) {
-      if (e && typeof e === "object" && "code" in e) {
-        throw new Error(JSON.stringify({ kind: "Database", message: String(e) }));
-      }
-      throw e;
+export function registerCompactionIpc(): void {
+  ipcMain.handle(
+    "compaction:list",
+    async (_e, args: { conversationId?: string }) => {
+      return runMain(listCompactionEntries(args.conversationId ?? ""));
     }
-    return entry;
-  });
+  );
+
+  ipcMain.handle(
+    "compaction:append",
+    async (
+      _e,
+      args: {
+        conversationId?: string;
+        summary: string;
+        model: string;
+        tokensBefore: number;
+        kind: "auto" | "manual";
+        firstKeptMessageId: string;
+      }
+    ) => {
+      return runMain(appendCompactionEntry(args));
+    }
+  );
 }

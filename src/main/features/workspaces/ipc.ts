@@ -1,38 +1,42 @@
+/**
+ * workspaces/ipc.ts
+ *
+ * ADR-0046 D3: 接线到 data.ts Effect 函数，经 runMain 边界执行。
+ * 删 db dep，删 better-sqlite3 import，删 try/catch wrap
+ *（错误映射已在 data.ts 完成，行为等价）。
+ */
+
 import { ipcMain, dialog } from "electron";
-import { randomUUID } from "node:crypto";
-import type { Database as DB } from "better-sqlite3";
-import { toWorkspace, type RawWorkspace } from "../workspaces/mappers.js";
 
-export function registerWorkspacesIpc(deps: { db: DB }): void {
-  ipcMain.handle("listWorkspaces", () => {
-    const rows = deps.db
-      .prepare("SELECT * FROM workspaces ORDER BY created_at DESC")
-      .all() as RawWorkspace[];
-    return rows.map(toWorkspace);
+import { runMain } from "../../runtime.js";
+import {
+  listWorkspaces,
+  addWorkspace,
+  renameWorkspace,
+  deleteWorkspace,
+} from "./data.js";
+
+export function registerWorkspacesIpc(): void {
+  ipcMain.handle("listWorkspaces", async () => {
+    return runMain(listWorkspaces());
   });
 
-  ipcMain.handle("addWorkspace", (_e, args: { label?: string; rootPath?: string }) => {
-    const id = randomUUID();
-    const now = Math.floor(Date.now() / 1000);
-    const label = args.label ?? "Workspace";
-    const rootPath = args.rootPath ?? "";
-    try {
-      deps.db
-        .prepare("INSERT INTO workspaces (id, label, root_path, created_at) VALUES (?, ?, ?, ?)")
-        .run(id, label, rootPath, now);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(`addWorkspace failed: ${msg}`);
+  ipcMain.handle(
+    "addWorkspace",
+    async (_e, args: { label?: string; rootPath?: string }) => {
+      return runMain(addWorkspace(args));
     }
-    return toWorkspace({ id, label, root_path: rootPath, created_at: now });
-  });
+  );
 
-  ipcMain.handle("renameWorkspace", (_e, args: { id: string; label: string }) => {
-    deps.db.prepare("UPDATE workspaces SET label = ? WHERE id = ?").run(args.label, args.id);
-  });
+  ipcMain.handle(
+    "renameWorkspace",
+    async (_e, args: { id: string; label: string }) => {
+      return runMain(renameWorkspace(args.id, args.label));
+    }
+  );
 
-  ipcMain.handle("deleteWorkspace", (_e, args: { id: string }) => {
-    deps.db.prepare("DELETE FROM workspaces WHERE id = ?").run(args.id);
+  ipcMain.handle("deleteWorkspace", async (_e, args: { id: string }) => {
+    return runMain(deleteWorkspace(args.id));
   });
 
   ipcMain.handle("pickWorkspacePath", async () => {

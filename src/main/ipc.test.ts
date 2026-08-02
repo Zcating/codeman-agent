@@ -22,13 +22,7 @@ vi.mock("electron", () => ({
   shell: fakeShell,
 }));
 
-vi.mock("./db/mod", () => ({
-  getOrInitDatabase: () => ({
-    prepare: () => ({ all: () => [], get: () => undefined, run: () => undefined }),
-    exec: () => undefined,
-    pragma: () => undefined,
-  }),
-}));
+// getOrInitDatabase 已删除（db 层改用 Effect Layer）
 
 vi.mock("./mcp-host", () => ({
   McpStdioServer: vi.fn().mockImplementation(function () {
