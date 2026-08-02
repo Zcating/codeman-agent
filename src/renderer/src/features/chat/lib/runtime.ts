@@ -329,9 +329,13 @@ export function createAgentRuntime(options: CreateAgentRuntimeOptions = {}): Age
           } else if (event.type === "message_update") {
             subAgentsStreamStore.actions.appendEvent(toolCallId, event);
           } else if (event.type === "agent_end") {
-            const endEvent = event as { type: "agent_end"; finalText?: string; usage?: { inputTokens: number; outputTokens: number } };
-            const finalText = endEvent.finalText ?? "";
-            subAgentsStreamStore.actions.recordComplete(toolCallId, finalText, endEvent.usage);
+            const endEvent = event as { type: "agent_end"; finalText?: string; usage?: { inputTokens: number; outputTokens: number }; isError?: boolean; error?: string };
+            if (endEvent.isError || endEvent.error) {
+              subAgentsStreamStore.actions.recordError(toolCallId, endEvent.error ?? "sub-agent error");
+            } else {
+              const finalText = endEvent.finalText ?? "";
+              subAgentsStreamStore.actions.recordComplete(toolCallId, finalText, endEvent.usage);
+            }
           }
         };
         const delegateTaskTool = enabledSubAgents.length > 0
