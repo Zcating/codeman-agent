@@ -32,4 +32,15 @@ describe("confirmIfRisky", () => {
 
     expect(result).toBe("deny");
   });
+
+  it("low-risk returns 'allow' without calling dialog", async () => {
+    const result = await confirmIfRisky({
+      command: "git status",
+      cwd: "C:\\work",
+      risk: { kind: "low", reasons: [], needsModelFallback: false },
+    });
+
+    expect(result).toBe("allow");
+    expect(mockShowMessageBox).not.toHaveBeenCalled();
+  });
 });
