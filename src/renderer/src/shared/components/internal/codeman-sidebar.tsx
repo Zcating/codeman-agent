@@ -508,9 +508,9 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
           data-testid="sidebar-content-wrapper"
           data-collapsed={collapsed() ? "true" : undefined}
           inert={collapsed() ? true : undefined}
-          class="flex h-full w-full"
+          class="block h-full w-full"
         >
-          <Sidebar class={cn("w-full h-full", props.class)}>
+          <Sidebar class={cn("flex-1 min-w-0 h-full", props.class)}>
             <Show when={props.header}>
               <SidebarHeader>{props.header}</SidebarHeader>
             </Show>
@@ -549,6 +549,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
       </ResizableHandle>
 
       <ResizablePanel id="main">
+        <div class="grid h-full w-full">
         <SidebarInset class="min-h-0 overflow-y-auto flex flex-col">
           {/* Toolbar row at top of SidebarInset */}
           <div
@@ -568,6 +569,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
             </div>
           </Show>
         </SidebarInset>
+        </div>
       </ResizablePanel>
     </ResizablePanelGroup>
   );

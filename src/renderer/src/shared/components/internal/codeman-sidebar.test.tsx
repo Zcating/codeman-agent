@@ -619,12 +619,15 @@ describe("CodemanSidebar (PR 2)", () => {
         expect(inset).toBeTruthy();
       });
 
-      it("Sidebar inside ResizablePanel has w-full h-full to fill panel", () => {
+      it("Sidebar inside ResizablePanel has flex-1 h-full to fill panel", () => {
+        // Aside uses flex-1 (not w-full) because the Sidebar primitive's root
+        // is a flex row container; flex-1 lets aside grow to fill the row
+        // alongside the (hidden) gap.
         const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
         const sidebarPanel = container.querySelector("[data-id='sidebar']");
         const sidebar = sidebarPanel?.querySelector("aside");
         expect(sidebar).toBeTruthy();
-        expect(sidebar!.className).toContain("w-full");
+        expect(sidebar!.className).toContain("flex-1");
         expect(sidebar!.className).toContain("h-full");
       });
 
@@ -632,10 +635,54 @@ describe("CodemanSidebar (PR 2)", () => {
         const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
         const wrapper = container.querySelector("[data-testid='sidebar-content-wrapper']");
         expect(wrapper).toBeTruthy();
-        // Without w-full, the wrapper is a flex item with content-sized width;
-        // the inner aside's w-full would resolve to content size, not panel size,
-        // so dragging the handle wider would not extend the bg-sidebar.
         expect(wrapper!.className).toContain("w-full");
+      });
+
+      it("sidebar-content-wrapper uses block h-full w-full so the inner sidebar root fills panel width AND height", () => {
+        // The Sidebar primitive's outer root (data-slot="sidebar") now has
+        // flex h-full w-full min-w-0 (matches shadcn upstream). Inside, the
+        // gap (data-slot="sidebar-gap") is hidden because the gap's fixed
+        // w-(--sidebar-width)=256px otherwise forces the flex row to allocate
+        // 256 to gap and squeeze aside. With gap hidden, aside's flex-1 grows
+        // to fill the full panel width at any size including the 160px min.
+        // The wrapper is block (not grid) because root's flex h-full w-full
+        // already drives both dimensions; grid caused column auto-sizing to
+        // match root's content (256px gap), defeating the wrapper.
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const wrapper = container.querySelector("[data-testid='sidebar-content-wrapper']");
+        expect(wrapper).toBeTruthy();
+        expect(wrapper!.className).toContain("block");
+        expect(wrapper!.className).toContain("h-full");
+        expect(wrapper!.className).toContain("w-full");
+      });
+
+      it("Sidebar primitive root has flex h-full w-full min-w-0 so aside can shrink below content size", () => {
+        // The sidebar gap has w-(--sidebar-width)=256px which would otherwise
+        // force root to be >=256px wide (overflowing narrow panels like the
+        // 160px min). Adding min-w-0 to root allows it to shrink below its
+        // content size, and the gap is hidden via display:none so it doesn't
+        // claim flex space.
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const root = container.querySelector("[data-slot='sidebar']");
+        expect(root).toBeTruthy();
+        expect(root!.className).toContain("flex");
+        expect(root!.className).toContain("h-full");
+        expect(root!.className).toContain("w-full");
+        expect(root!.className).toContain("min-w-0");
+      });
+
+      it("SidebarInset is wrapped in a grid container so its bg-background fills panel height", () => {
+        // ResizablePanel primitive is a block element with no height class;
+        // flex-1 on SidebarInset cannot resolve against a block parent. The
+        // grid wrapper around SidebarInset makes its height track the panel.
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const inset = container.querySelector("[data-slot='sidebar-inset']");
+        expect(inset).toBeTruthy();
+        const gridWrap = inset!.parentElement;
+        expect(gridWrap).toBeTruthy();
+        expect(gridWrap!.className).toContain("grid");
+        expect(gridWrap!.className).toContain("h-full");
+        expect(gridWrap!.className).toContain("w-full");
       });
     });
 
