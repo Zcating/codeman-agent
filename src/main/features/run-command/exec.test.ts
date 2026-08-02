@@ -25,4 +25,14 @@ describe("executeCommand", () => {
     if (result.status !== "timeout") return;
     expect(result.partialOutput).toBeDefined();
   });
+
+  it("AbortController.abort() returns cancelled + partialOutput", async () => {
+    const controller = new AbortController();
+    const resultPromise = executeCommand({ command: "ping -n 10 127.0.0.1", signal: controller.signal });
+    controller.abort();
+    const result = await resultPromise;
+    expect(result.status).toBe("cancelled");
+    if (result.status !== "cancelled") return;
+    expect(result.partialOutput).toBeDefined();
+  });
 });
