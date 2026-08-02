@@ -25,7 +25,7 @@ const ProviderLlmStruct = Schema.Struct({
 const ProviderStruct = Schema.Struct({
   id: Schema.String,
   label: Schema.String,
-  enabled: Schema.Boolean,
+  comment: Schema.optional(Schema.String),
   apiKey: Schema.String,
   llm: ProviderLlmStruct,
   billing: Schema.optional(ProviderBillingStruct),

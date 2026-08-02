@@ -12,7 +12,6 @@ export const DEFAULT_SETTINGS: Settings = {
     {
       id: "minimax",
       label: "MiniMax",
-      enabled: true,
       apiKey: "",
       llm: {
         defaultModel: MINIMAX_DEFAULT_MODEL,

@@ -19,7 +19,7 @@ export interface ProviderLlm {
 export interface Provider {
   id: string;
   label: string;
-  enabled: boolean;
+  comment?: string;
   apiKey: string;
   llm: ProviderLlm;
 }
