@@ -1,4 +1,6 @@
 
+import { logger } from "../../logger";
+
 export interface QaToolUse {
   name: string;
   input: Record<string, unknown>;
@@ -19,24 +21,13 @@ export interface QaEntry {
 
 let cache: QaEntry[] | null = null;
 
-
-const loaderLogger = {
-  warn(msg: string, ...rest: unknown[]): void {
-    console.warn(`[qa-loader] ${msg}`, ...rest);
-  },
-  info(msg: string, ...rest: unknown[]): void {
-    console.log(`[qa-loader] ${msg}`, ...rest);
-  },
-};
-
-
 function candidateSeedPaths(): string[] {
   const path = require("node:path") as typeof import("node:path");
   const candidates = [
     path.join(process.cwd(), "src", "assets", "qa.dev.json"),
-    path.join(__dirname, "..", "assets", "qa.dev.json"),
-    path.join(__dirname, "..", "..", "src", "assets", "qa.dev.json"),
+    path.join(__dirname, "..", "..", "assets", "qa.dev.json"),
     path.join(__dirname, "..", "..", "..", "src", "assets", "qa.dev.json"),
+    path.join(__dirname, "..", "..", "..", "..", "src", "assets", "qa.dev.json"),
   ];
   return Array.from(new Set(candidates));
 }
@@ -53,11 +44,11 @@ export function loadQaTable(): QaEntry[] {
       const parsed = JSON.parse(raw) as unknown;
       if (Array.isArray(parsed)) {
         cache = normalizeQaEntries(parsed);
-        loaderLogger.info(`loaded from CODEMAN_TEST_QA_TABLE=${envPath} (${cache.length} entries)`);
+        logger.info(`loaded from CODEMAN_TEST_QA_TABLE=${envPath} (${cache.length} entries)`);
         return cache;
       }
     } catch (e) {
-      loaderLogger.warn(
+      logger.warn(
         `failed to read CODEMAN_TEST_QA_TABLE=${envPath}:`,
         e instanceof Error ? e.message : String(e),
       );
@@ -74,18 +65,18 @@ export function loadQaTable(): QaEntry[] {
           const parsed = JSON.parse(raw) as unknown;
           if (Array.isArray(parsed)) {
             cache = normalizeQaEntries(parsed);
-            loaderLogger.info(`loaded ${cache.length} entries from ${seedPath}`);
+            logger.info(`loaded ${cache.length} entries from ${seedPath}`);
             return cache;
           }
         } catch {
         }
       }
-      loaderLogger.warn(
+      logger.warn(
         `no dev seed found. Tried: ${candidateSeedPaths().join(", ")}. ` +
           `mock-server will emit "[mock] no canned response queued" for every request.`,
       );
     } catch (e) {
-      loaderLogger.warn(
+      logger.warn(
         `unexpected error during dev seed load:`,
         e instanceof Error ? e.message : String(e),
       );
