@@ -100,6 +100,9 @@ export interface CodemanApi {
     body: ArrayBuffer;
   }>;
 
+  // Run command
+  readonly runCommand: (args: { command: string; cwd?: string; timeoutMs?: number }) => Promise<unknown>;
+
   // Compaction
   readonly compactionList: (args: { conversationId?: string }) => Promise<CompactionEntry[]>;
   readonly compactionAppend: (args: {

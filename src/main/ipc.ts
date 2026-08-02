@@ -11,6 +11,7 @@ import { registerSystemIpc } from "./features/system/ipc.js";
 import { CancelMap } from "./features/webfetch/cancel-map.js";
 import { registerWebfetchIpc } from "./features/webfetch/ipc.js";
 import { registerWorkspacesIpc } from "./features/workspaces/ipc.js";
+import { registerRunCommandIpc } from "./features/run-command/ipc.js";
 
 const settingsState = new SettingsState(join(app.getPath("userData"), "settings.json"));
 const cancelMap = new CancelMap();
@@ -28,6 +29,7 @@ export function registerIpcHandlers(_deps: {
   registerFileOpsIpc({ db });
   registerSystemIpc();
   registerWebfetchIpc({ cancelMap });
+  registerRunCommandIpc();
 }
 
 export function emitStreamChunk(evt: unknown): void {
