@@ -567,7 +567,7 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
-  describe("SidebarInset scroll boundary (Bug B fix)", () => {
+  describe("SidebarInset scroll boundary (V2.9 bug fix: 2 scrollbars + scrolling toolbar)", () => {
     it("data-slot=sidebar-inset has min-h-0 (allows flex child to shrink)", () => {
       const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
       const inset = container.querySelector("[data-slot='sidebar-inset']");
@@ -575,11 +575,15 @@ describe("CodemanSidebar (PR 2)", () => {
       expect(inset!.className).toContain("min-h-0");
     });
 
-    it("data-slot=sidebar-inset has overflow-y-auto (enables scrolling)", () => {
+    it("data-slot=sidebar-inset does NOT have overflow-y-auto (Bug V2.9: keep toolbar fixed, let inner content scroll)", () => {
+      // Bug V2.9: SidebarInset having overflow-y-auto produced 2 scrollbars in the
+      // chat panel (SidebarInset + ChatView messages wrapper) and caused the top
+      // toolbar to scroll away with the content. Inner panels handle their own
+      // scrolling; SidebarInset is just a flex column that hosts toolbar + main.
       const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
       const inset = container.querySelector("[data-slot='sidebar-inset']");
       expect(inset).toBeTruthy();
-      expect(inset!.className).toContain("overflow-y-auto");
+      expect(inset!.className).not.toContain("overflow-y-auto");
     });
   });
 

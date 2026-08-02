@@ -550,7 +550,7 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
 
       <ResizablePanel id="main">
         <div class="grid h-full w-full">
-        <SidebarInset class="min-h-0 overflow-y-auto flex flex-col">
+        <SidebarInset class="min-h-0 flex flex-col">
           {/* Toolbar row at top of SidebarInset */}
           <div
             data-testid="sidebar-toolbar"
