@@ -14,6 +14,7 @@ import {
 } from "@codeman-frontend/shared/apis";
 import { WorkspaceService, WorkspaceServiceLive } from "@codeman-frontend/shared/lib/workspace-service";
 import { lookupContextWindow } from "@codeman-frontend/features/chat/lib/context-window-fallback";
+import { enforceDefaultModelInvariant } from "@codeman-frontend/shared/lib/provider-invariant";
 const DEFAULT_MINIMAX_PROVIDER: Provider = {
   id: "minimax",
   label: "MiniMax",
@@ -69,8 +70,17 @@ const [settings, setSettings] = createStore<{ value: Settings }>({
   value: defaultSettings,
 });
 
-function applyPatch(patch: Partial<Settings>): void {
-  setSettings("value", (prev) => ({ ...prev, ...patch }));
+function applyPatch(patch: Partial<Settings>, opts?: { enforceInvariant?: boolean }): void {
+  setSettings("value", (prev) => {
+    if (opts?.enforceInvariant !== false && patch.providers) {
+      const providers = patch.providers.map((p) => ({
+        ...p,
+        llm: enforceDefaultModelInvariant(p.llm),
+      }));
+      return { ...prev, ...patch, providers };
+    }
+    return { ...prev, ...patch };
+  });
 }
 
 function toAppError(e: unknown): AppError {
@@ -88,8 +98,15 @@ const flushImpl = Effect.fn(function* () {
 
 const refreshImpl = Effect.fn(function* () {
   const fresh = yield* ipcInvoke<Settings>("getSettings");
-  setSettings("value", fresh);
-  return fresh;
+  const freshWithInvariant: Settings = {
+    ...fresh,
+    providers: fresh.providers.map((p) => ({
+      ...p,
+      llm: enforceDefaultModelInvariant(p.llm),
+    })),
+  };
+  setSettings("value", freshWithInvariant);
+  return freshWithInvariant;
 });
 
 const refreshProviderModelsImpl = Effect.fn(
@@ -109,12 +126,7 @@ const refreshProviderModelsImpl = Effect.fn(
         if (p.id !== id) {
           return p;
         }
-        const newLlm = { ...p.llm, models };
-        if (models.length > 0 && !models.some((m) => m.id === p.llm.defaultModel)) {
-          newLlm.defaultModel = models[0].id;
-        } else if (models.length === 0) {
-          newLlm.defaultModel = "";
-        }
+        const newLlm = enforceDefaultModelInvariant({ ...p.llm, models });
         return { ...p, llm: newLlm };
       });
       return { ...prev, providers };
@@ -157,8 +169,8 @@ const clearAllHistoryImpl = Effect.fn(
 export const appStore = {
   state: settings,
 
-  set(patch: Partial<Settings>): void {
-    applyPatch(patch);
+  set(patch: Partial<Settings>, opts?: { enforceInvariant?: boolean }): void {
+    applyPatch(patch, opts);
   },
 
   forceFlush(): Effect.Effect<void, AppError> {

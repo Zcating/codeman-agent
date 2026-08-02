@@ -446,6 +446,95 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     }
   });
 
+  it("set() with providers: defaultModel not in models → fallback to models[0].id", async () => {
+    appStore.set({
+      providers: [
+        {
+          id: "test-provider",
+          label: "Test",
+          enabled: true,
+          apiKey: "",
+          llm: {
+            defaultModel: "ghost-model",
+            baseUrl: "https://api.example.com/v1",
+            apiType: "anthropic-messages" as const,
+            models: [
+              { id: "model-A", label: "Model A", deprecated: false, thinking: false },
+              { id: "model-B", label: "Model B", deprecated: false, thinking: false },
+            ],
+            modelsEndpoint: "https://api.example.com/v1/models",
+          },
+        },
+      ],
+    });
+    const provider = (appStore.state.value as any).providers.find((p: any) => p.id === "test-provider");
+    expect(provider.llm.defaultModel).toBe("model-A");
+  });
+
+  it("set(..., { enforceInvariant: false }): defaultModel not in models → preserved as-is", async () => {
+    appStore.set(
+      {
+        providers: [
+          {
+            id: "test-provider",
+            label: "Test",
+            enabled: true,
+            apiKey: "",
+            llm: {
+              defaultModel: "ghost-model",
+              baseUrl: "https://api.example.com/v1",
+              apiType: "anthropic-messages" as const,
+              models: [
+                { id: "model-A", label: "Model A", deprecated: false, thinking: false },
+              ],
+              modelsEndpoint: "https://api.example.com/v1/models",
+            },
+          },
+        ],
+      },
+      { enforceInvariant: false },
+    );
+    const provider = (appStore.state.value as any).providers.find((p: any) => p.id === "test-provider");
+    expect(provider.llm.defaultModel).toBe("ghost-model");
+  });
+
+  it("refreshProviderModels: defaultModel='' and models non-empty → preserves '' (ADR-0047 new semantics)", async () => {
+    mockState.settings = {
+      ...mockState.settings,
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          enabled: true,
+          apiKey: "",
+          llm: {
+            defaultModel: "",
+            baseUrl: "https://api.example.com/v1",
+            apiType: "anthropic-messages" as const,
+            models: [{ id: "some-model", label: "Some", deprecated: false, thinking: false }],
+            modelsEndpoint: "https://api.example.com/v1/models",
+          },
+        },
+      ],
+    };
+    await Effect.runPromise(appStore.refresh());
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            { id: "new-model-A", name: "New A" },
+            { id: "new-model-B", name: "New B" },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    await Effect.runPromiseExit(appStore.refreshProviderModels("minimax"));
+    const provider = (appStore.state.value as any).providers.find((p: any) => p.id === "minimax");
+    expect(provider.llm.defaultModel).toBe("");
+    fetchSpy.mockRestore();
+  });
+
   it("deleteProvider(id) 客户端变更先于 IPC 调用 — 即使 IPC 报错 provider 也被移除", async () => {
     mockState.settings = {
       ...mockState.settings,
