@@ -8,50 +8,68 @@ describe("settings schemas (ADR-0025 PR 4)", () => {
       id: "minimax",
       label: "MiniMax",
       enabled: true,
-      api_key: "sk-xxx",
+      apiKey: "sk-xxx",
       llm: {
-        default_model: "claude-opus",
-        base_url: "https://api.example.com/v1",
-        api_type: "anthropic-messages" as const,
+        defaultModel: "claude-opus",
+        baseUrl: "https://api.example.com/v1",
+        apiType: "anthropic-messages" as const,
         models: [],
-        models_endpoint: "https://api.example.com/v1/models",
+        modelsEndpoint: "https://api.example.com/v1/models",
       },
     };
     const decoded = ProviderSchema.make(valid);
     expect(decoded.id).toBe("minimax");
-    expect(decoded.llm.default_model).toBe("claude-opus");
+    expect(decoded.llm.defaultModel).toBe("claude-opus");
   });
 
   it("SettingsSchema decodes a minimal valid Settings", () => {
     const minimal = {
-      user_language: "auto" as const,
+      userLanguage: "auto" as const,
       theme: "system" as const,
-      start_at_login: false,
+      startAtLogin: false,
       window: {
-        remember_position: true,
-        remember_size: true,
-        default_size: { width: 800, height: 600 },
-        min_size: { width: 400, height: 300 },
+        rememberPosition: true,
+        rememberSize: true,
+        defaultSize: { width: 800, height: 600 },
+        minSize: { width: 400, height: 300 },
       },
-      system_prompt: { default: "", user_can_edit: true },
-      conversations: { auto_archive_after_days: 30, max_history: 1000 },
-      llm_providers: [],
+      systemPrompt: { default: "", userCanEdit: true },
+      conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
     };
     const decoded = SettingsSchema.make(minimal);
-    expect(decoded.user_language).toBe("auto");
-    expect(decoded.llm_providers).toEqual([]);
+    expect(decoded.userLanguage).toBe("auto");
   });
 
   it("SettingsSchema rejects missing required field", () => {
     const invalid = {
       theme: "system" as const,
-      start_at_login: false,
+      startAtLogin: false,
       window: {},
-      system_prompt: {},
+      systemPrompt: {},
       conversations: {},
-      llm_providers: [],
     };
     expect(() => SettingsSchema.make(invalid as never)).toThrow();
+  });
+});
+
+describe("ProviderSchema decodes camelCase fields (ADR-0047 D1)", () => {
+  it("decodes a Provider with camelCase fields matching types.ts Provider interface", () => {
+    const camelProvider = {
+      id: "minimax",
+      label: "MiniMax",
+      enabled: true,
+      apiKey: "sk-xxx",
+      llm: {
+        defaultModel: "claude-opus",
+        baseUrl: "https://api.example.com/v1",
+        apiType: "anthropic-messages" as const,
+        models: [],
+        modelsEndpoint: "https://api.example.com/v1/models",
+      },
+    };
+    const decoded = ProviderSchema.make(camelProvider);
+    expect(decoded.id).toBe("minimax");
+    expect(decoded.llm.defaultModel).toBe("claude-opus");
   });
 });
 
@@ -59,13 +77,12 @@ describe("SettingsSchema — opaque sub-schemas typed (ADR-0025 review J1)", () 
   it("rejects partial settings when window is missing required fields", () => {
     const partialSettings = {
       providers: [],
-      user_language: "auto" as const,
+      userLanguage: "auto" as const,
       theme: "system" as const,
-      start_at_login: false,
-      window: { remember_position: true },
-      system_prompt: { default: "", user_can_edit: true },
-      conversations: { auto_archive_after_days: 30, max_history: 1000 },
-      llm_providers: [],
+      startAtLogin: false,
+      window: { rememberPosition: true },
+      systemPrompt: { default: "", userCanEdit: true },
+      conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
     };
     const decoded = Schema.decodeUnknownEither(SettingsSchema)(partialSettings);
     expect(decoded._tag).toBe("Left");
@@ -74,18 +91,17 @@ describe("SettingsSchema — opaque sub-schemas typed (ADR-0025 review J1)", () 
   it("accepts a full settings blob matching WindowSettings / SystemPromptSettings / ConversationSettings", () => {
     const fullSettings = {
       providers: [],
-      user_language: "auto" as const,
+      userLanguage: "auto" as const,
       theme: "system" as const,
-      start_at_login: false,
+      startAtLogin: false,
       window: {
-        remember_position: true,
-        remember_size: true,
-        default_size: { width: 800, height: 600 },
-        min_size: { width: 400, height: 300 },
+        rememberPosition: true,
+        rememberSize: true,
+        defaultSize: { width: 800, height: 600 },
+        minSize: { width: 400, height: 300 },
       },
-      system_prompt: { default: "", user_can_edit: true },
-      conversations: { auto_archive_after_days: 30, max_history: 1000 },
-      llm_providers: [],
+      systemPrompt: { default: "", userCanEdit: true },
+      conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
     };
     const decoded = Schema.decodeUnknownEither(SettingsSchema)(fullSettings);
     expect(decoded._tag).toBe("Right");

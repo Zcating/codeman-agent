@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { sanitize, type Settings, type Provider } from "./settings-schema";
+import { camelToSnake, snakeToCamel } from "./case-conversion";
 
 export class SettingsState {
   private cache: Settings | null = null;
@@ -19,7 +20,7 @@ export class SettingsState {
         raw = {};
       }
     }
-    this.cache = sanitize(raw as Partial<Settings>);
+    this.cache = sanitize(snakeToCamel(raw) as Partial<Settings>);
     this.save();
     return this.cache;
   }
@@ -44,6 +45,6 @@ export class SettingsState {
 
   private save(): void {
     if (this.cache === null) { return; }
-    writeFileSync(this.filePath, JSON.stringify(this.cache, null, 2), "utf-8");
+    writeFileSync(this.filePath, JSON.stringify(camelToSnake(this.cache), null, 2), "utf-8");
   }
 }
