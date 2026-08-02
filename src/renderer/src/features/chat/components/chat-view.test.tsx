@@ -848,25 +848,40 @@ describe("ChatView Scroll: 首次进入对话不应动画滚动", () => {
 describe("ChatView inner scroll (V2.8, Variant A from /prototype/chat-textarea-fixed)", () => {
   afterEach(() => cleanup());
 
-  it("V2.8: messages wrapper owns overflow-y-auto so it scrolls independently of the form", () => {
+  // 消息区 ScrollArea：Root 带 data-slot=scroll-area（含 flex-1 min-h-0 尺寸链），
+  // Viewport 带 data-scroll-region 契约标记 + 真正承担滚动（zag 注入 overflow:auto）。
+  const findMessagesScrollArea = (container: HTMLElement) => {
+    const viewport = container.querySelector(
+      '[data-slot="scroll-area-viewport"][data-scroll-region="true"]',
+    );
+    if (!viewport) {
+      return null;
+    }
+    return viewport.closest('[data-slot="scroll-area"]');
+  };
+
+  it("V2.8: messages area is a ScrollArea whose viewport owns the scroll channel", () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
-    const messagesWrapper = container.querySelector("div.flex-1.min-h-0");
-    expect(messagesWrapper).toBeTruthy();
-    expect(messagesWrapper!.className).toContain("overflow-y-auto");
+    const messagesScrollArea = findMessagesScrollArea(container);
+    expect(messagesScrollArea).toBeTruthy();
+    const viewport = messagesScrollArea!.querySelector('[data-slot="scroll-area-viewport"]');
+    expect(viewport).toBeTruthy();
+    expect(viewport!.className).toContain("size-full");
   });
 
-  it("V2.8: messages wrapper still has min-h-0 (allows it to shrink within flex parent)", () => {
+  it("V2.8: messages ScrollArea root still has flex-1 min-h-0 (allows it to shrink within flex parent)", () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
-    const messagesWrapper = container.querySelector("div.flex-1.min-h-0");
-    expect(messagesWrapper).toBeTruthy();
-    expect(messagesWrapper!.className).toContain("min-h-0");
+    const messagesScrollArea = findMessagesScrollArea(container);
+    expect(messagesScrollArea).toBeTruthy();
+    expect(messagesScrollArea!.className).toContain("flex-1");
+    expect(messagesScrollArea!.className).toContain("min-h-0");
   });
 
-  it("V2.8: textarea is a SIBLING of messages wrapper (not nested inside scrollable area)", () => {
+  it("V2.8: textarea is a SIBLING of messages ScrollArea (not nested inside scrollable area)", () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
-    const messagesWrapper = container.querySelector("div.flex-1.min-h-0");
-    expect(messagesWrapper).toBeTruthy();
-    const textareaInsideScroll = messagesWrapper!.querySelector("textarea");
+    const messagesScrollArea = findMessagesScrollArea(container);
+    expect(messagesScrollArea).toBeTruthy();
+    const textareaInsideScroll = messagesScrollArea!.querySelector("textarea");
     expect(textareaInsideScroll).toBeNull();
   });
 });

@@ -585,6 +585,40 @@ describe("CodemanSidebar (PR 2)", () => {
       expect(inset).toBeTruthy();
       expect(inset!.className).not.toContain("overflow-y-auto");
     });
+
+    it("content wrapper is the named scroll region (ADR-0039 contract: main-content-scroll owns overflow)", () => {
+      // Bug V2.10: 2bf2d7d removed SidebarInset overflow-y-auto so the top toolbar
+      // stays fixed, but the content wrapper (the flex-1 div hosting route content)
+      // never received a scroll channel. On pages taller than the viewport (plugins,
+      // settings sections) the content was clipped by the resizable panel's
+      // overflow:hidden with no scroll container anywhere — wheel scrolling did
+      // nothing. ChatView worked only because it owns its own overflow-y-auto.
+      // The content wrapper must be the scroll container for all other routes,
+      // and it must be addressable by e2e/unit tests via data-testid.
+      // Wrapper 是 layout 容器（普通 div，不是 ScrollArea）—— 契约标记直接落 div：
+      // div 上有 overflow-auto + flex-1 + min-h-0，无需 ScrollArea 包装。这样避免
+      // wrapper 的自定义 ScrollBar 与内层 ScrollArea 的 ScrollBar 在右侧重叠
+      // （zag 的 ScrollBar 始终挂载，wrapper 不溢出时也会显示）。
+      const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+      const scrollRegion = container.querySelector("[data-testid='main-content-scroll']");
+      expect(scrollRegion).toBeTruthy();
+      expect(scrollRegion!.getAttribute("data-scroll-region")).toBe("true");
+      expect(scrollRegion!.tagName).toBe("DIV");
+      // flex 尺寸链 + overflow 在 wrapper div 上
+      expect(scrollRegion!.className).toContain("flex-1");
+      expect(scrollRegion!.className).toContain("min-h-0");
+      expect(scrollRegion!.className).toContain("overflow-auto");
+      // wrapper 不再是 ScrollArea（防双滚动条）
+      expect(scrollRegion!.closest("[data-slot='scroll-area']")).toBeNull();
+    });
+
+    it("exactly one data-scroll-region in the two-column shell (sole scroll contract)", () => {
+      // ADR-0039: 主栏内恰好一个滚动区。两栏 shell 本身（sidebar + inset）不应
+      // 出现第二个滚动区；多个滚动区 = V2.9 双滚动条回归，零个 = V2.10 无滚动回归。
+      const { container } = renderSidebar({ children: <div>Hello</div> });
+      const regions = container.querySelectorAll("[data-scroll-region]");
+      expect(regions.length).toBe(1);
+    });
   });
 
   describe("Resizable + Collapsible behavior", () => {
