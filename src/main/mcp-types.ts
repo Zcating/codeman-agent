@@ -26,3 +26,16 @@ export interface McpCallResult {
 }
 
 export type StatusChangeHandler = (status: McpServerStatus) => void;
+
+
+export function slug(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "") || "unnamed";
+}
+
+
+export function mcpAgentName(serverName: string, toolName: string): string {
+  return `mcp_${slug(serverName)}_${slug(toolName)}`;
+}

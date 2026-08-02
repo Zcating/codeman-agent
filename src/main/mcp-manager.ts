@@ -1,11 +1,12 @@
-
 import { shell } from "electron";
 import { Effect, Exit } from "effect";
 import { logger } from "./logger";
 import { McpStdioServer } from "./mcp-host";
 import type { McpServerConfig, McpServerStatus, McpTool, McpCallResult } from "./mcp-types";
+import { mcpAgentName } from "./mcp-types";
 import { MCP_CONFIG_PATH, readMcpConfig, writeMcpConfig } from "./mcp-config";
 import { InvalidConfig, JsonRpcProtocolError, NotFound } from "../renderer/src/shared/lib/errors";
+
 
 export interface McpServerInfo {
   config: McpServerConfig;
@@ -15,11 +16,22 @@ export interface McpServerInfo {
 
 export interface McpToolEntry {
   serverName: string;
-  agentName: string; 
+  agentName: string;
   toolName: string;
   description: string;
   inputSchema: unknown;
 }
+
+type McpConfigFile = { version: 1; servers: McpServerConfig[] };
+
+const DISABLED_STATUS = { kind: "disabled" } as const;
+const EMPTY_CONFIG: McpServerConfig = {
+  name: "",
+  command: "",
+  args: [],
+  enabled: false,
+};
+
 
 export class McpManager {
   readonly #servers = new Map<string, McpStdioServer>();
@@ -36,8 +48,7 @@ export class McpManager {
       return;
     }
     const config = exit.value;
-
-    const seenAgentNames = new Map<string, string>(); 
+    const seenAgentNames = new Map<string, string>();
 
     for (const cfg of config.servers) {
       this.#configs.set(cfg.name, cfg);
@@ -48,11 +59,10 @@ export class McpManager {
 
       try {
         await server.start();
-
         for (const tool of server.listTools()) {
-          const agentName = `mcp_${slug(server.getConfig().name)}_${slug(tool.name)}`;
-          if (seenAgentNames.has(agentName)) {
-            const firstServer = seenAgentNames.get(agentName)!;
+          const agentName = mcpAgentName(cfg.name, tool.name);
+          const firstServer = seenAgentNames.get(agentName);
+          if (firstServer !== undefined) {
             await server.stop();
             this.#servers.delete(cfg.name);
             logger.warn(
@@ -84,44 +94,25 @@ export class McpManager {
   }
 
   async restart(name: string): Promise<void> {
-    const exit = await Effect.runPromiseExit(readMcpConfig());
-    if (Exit.isFailure(exit)) {
-      throw new InvalidConfig({ field: "mcp_servers.json", message: String(exit.cause) });
-    }
-    const config = exit.value;
+    const config = await this.#loadConfigOrThrow();
     const newCfg = config.servers.find((s) => s.name === name);
     if (!newCfg) {
       throw new NotFound({ message: `MCP server not found in config: ${name}` });
     }
-
-    const oldServer = this.#servers.get(name);
-    if (oldServer) {
-      try { await oldServer.stop(); } catch (e) { logger.warn(`[mcp] ${name} stop failed: ${String(e)}`); }
-    }
-
-    this.#configs.set(name, newCfg);
-    const newServer = new McpStdioServer(newCfg);
-    this.#servers.set(name, newServer);
-    await newServer.start();
+    await this.#swapServer(name, newCfg);
   }
 
   listServers(): McpServerInfo[] {
-    const all = new Set<string>();
-    for (const name of this.#configs.keys()) all.add(name);
-    for (const name of this.#servers.keys()) all.add(name);
-    return Array.from(all).map((name) => {
+    const names = new Set<string>([...this.#configs.keys(), ...this.#servers.keys()]);
+    return Array.from(names).map((name) => {
       const server = this.#servers.get(name);
       const config = this.#configs.get(name) ?? server?.getConfig();
       if (!config) {
-        return {
-          config: { name, command: "", args: [], enabled: false },
-          status: { kind: "disabled" } as const,
-          tools: [],
-        };
+        return { config: { ...EMPTY_CONFIG, name }, status: DISABLED_STATUS, tools: [] };
       }
       return {
         config,
-        status: server?.getStatus() ?? ({ kind: "disabled" } as const),
+        status: server?.getStatus() ?? DISABLED_STATUS,
         tools: server?.listTools() ?? [],
       };
     });
@@ -131,11 +122,11 @@ export class McpManager {
     const out: McpToolEntry[] = [];
     for (const [, server] of this.#servers) {
       if (server.getStatus().kind !== "connected") continue;
+      const serverName = server.getConfig().name;
       for (const tool of server.listTools()) {
-        const agentName = `mcp_${slug(server.getConfig().name)}_${slug(tool.name)}`;
         out.push({
-          serverName: server.getConfig().name,
-          agentName,
+          serverName,
+          agentName: mcpAgentName(serverName, tool.name),
           toolName: tool.name,
           description: tool.description,
           inputSchema: tool.inputSchema,
@@ -169,11 +160,7 @@ export class McpManager {
   }
 
   async setEnabled(name: string, enabled: boolean): Promise<void> {
-    const readExit = await Effect.runPromiseExit(readMcpConfig());
-    if (Exit.isFailure(readExit)) {
-      throw new InvalidConfig({ field: "mcp_servers.json", message: String(readExit.cause) });
-    }
-    const config = readExit.value;
+    const config = await this.#loadConfigOrThrow();
     const serverIdx = config.servers.findIndex((s) => s.name === name);
     if (serverIdx < 0) {
       throw new NotFound({ message: `MCP server not found: ${name}` });
@@ -182,36 +169,49 @@ export class McpManager {
     const updatedServers = config.servers.map((s) =>
       s.name === name ? { ...s, enabled } : s,
     );
-    const newConfig = { version: config.version as 1, servers: updatedServers };
-
-    const writeExit = await Effect.runPromiseExit(writeMcpConfig(newConfig));
-    if (Exit.isFailure(writeExit)) {
-      throw new InvalidConfig({ field: "mcp_servers.json", message: String(writeExit.cause) });
-    }
+    const newConfig: McpConfigFile = { version: 1, servers: updatedServers };
+    await this.#writeConfigOrThrow(newConfig);
 
     this.#configs.set(name, { ...config.servers[serverIdx], enabled });
 
     if (enabled) {
-      const oldServer = this.#servers.get(name);
-      if (oldServer) {
-        try { await oldServer.stop(); } catch (e) { logger.warn(`[mcp] ${name} stop failed: ${String(e)}`); }
-      }
-      const newServer = new McpStdioServer(this.#configs.get(name)!);
-      this.#servers.set(name, newServer);
-      await newServer.start();
+      await this.#swapServer(name, this.#configs.get(name)!);
     } else {
-      const server = this.#servers.get(name);
-      if (server) {
-        try { await server.stop(); } catch (e) { logger.warn(`[mcp] ${name} stop failed: ${String(e)}`); }
-        this.#servers.delete(name);
-      }
+      await this.#stopAndRemove(name);
     }
   }
-}
 
-function slug(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "") || "unnamed";
+
+  async #loadConfigOrThrow(): Promise<McpConfigFile> {
+    const exit = await Effect.runPromiseExit(readMcpConfig());
+    if (Exit.isFailure(exit)) {
+      throw new InvalidConfig({ field: "mcp_servers.json", message: String(exit.cause) });
+    }
+    return exit.value;
+  }
+
+  async #writeConfigOrThrow(config: McpConfigFile): Promise<void> {
+    const exit = await Effect.runPromiseExit(writeMcpConfig(config));
+    if (Exit.isFailure(exit)) {
+      throw new InvalidConfig({ field: "mcp_servers.json", message: String(exit.cause) });
+    }
+  }
+
+  async #swapServer(name: string, newConfig: McpServerConfig): Promise<void> {
+    const oldServer = this.#servers.get(name);
+    if (oldServer) {
+      try { await oldServer.stop(); } catch (e) { logger.warn(`[mcp] ${name} stop failed: ${String(e)}`); }
+    }
+    this.#configs.set(name, newConfig);
+    const newServer = new McpStdioServer(newConfig);
+    this.#servers.set(name, newServer);
+    await newServer.start();
+  }
+
+  async #stopAndRemove(name: string): Promise<void> {
+    const server = this.#servers.get(name);
+    if (!server) return;
+    try { await server.stop(); } catch (e) { logger.warn(`[mcp] ${name} stop failed: ${String(e)}`); }
+    this.#servers.delete(name);
+  }
 }
