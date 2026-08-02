@@ -63,29 +63,31 @@ export async function executeCommand(input: ExecuteCommandInput): Promise<RunCom
     if (signal) {
       if (signal.aborted) {
         killProcess(child);
-        resolve({ status: "cancelled", partialOutput: { stdout, stderr } });
+        resolve({ status: "cancelled", partialOutput: { stdout: truncate(stdout), stderr: truncate(stderr) } });
         return;
       }
       signal.addEventListener("abort", () => {
         killProcess(child);
-        resolve({ status: "cancelled", partialOutput: { stdout, stderr } });
+        resolve({ status: "cancelled", partialOutput: { stdout: truncate(stdout), stderr: truncate(stderr) } });
       });
     }
 
     // Set up timeout
     const timer = setTimeout(() => {
       killProcess(child);
-      resolve({ status: "timeout", partialOutput: { stdout, stderr } });
+      resolve({ status: "timeout", partialOutput: { stdout: truncate(stdout), stderr: truncate(stderr) } });
     }, timeoutMs);
 
     child.on("close", (code) => {
       clearTimeout(timer);
       const durationMs = Date.now() - start;
       const exitCode = code ?? 0;
+      const truncatedStdout = truncate(stdout);
+      const truncatedStderr = truncate(stderr);
       if (exitCode !== 0) {
         resolve({ status: "error", error: { kind: "NonZeroExit", message: `Exit code ${exitCode}`, exitCode } });
       } else {
-        resolve({ status: "ok", exitCode, stdout, stderr, durationMs });
+        resolve({ status: "ok", exitCode, stdout: truncatedStdout, stderr: truncatedStderr, durationMs });
       }
     });
 
@@ -95,6 +97,22 @@ export async function executeCommand(input: ExecuteCommandInput): Promise<RunCom
       resolve({ status: "error", error: { kind: "ProcessError", message: err.message } });
     });
   });
+}
+
+const ONE_MIB = 1024 * 1024;
+
+function truncate(output: string): string {
+  if (output.length <= ONE_MIB) return output;
+  const lines = output.split("\n");
+  if (lines.length > 400) {
+    const head = lines.slice(0, 200);
+    const tail = lines.slice(-200);
+    const omitted = output.length - head.join("\n").length - tail.join("\n").length - 2 * 200;
+    return head.join("\n") + "\n" + `[... ${omitted} bytes omitted ...]\n` + tail.join("\n");
+  }
+  // Single-line or few-lines output > 1 MiB: keep first half + marker + last half
+  const half = Math.floor(ONE_MIB / 2);
+  return output.slice(0, half) + "\n[... " + (output.length - 2 * half) + " bytes omitted ...]\n" + output.slice(-half);
 }
 
 function killProcess(child: ReturnType<typeof spawn>): void {

@@ -35,4 +35,13 @@ describe("executeCommand", () => {
     if (result.status !== "cancelled") return;
     expect(result.partialOutput).toBeDefined();
   });
+
+  it("output truncation > 1MiB", async () => {
+    const result = await executeCommand({ command: "node -e process.stdout.write(\"x\".repeat(2000000))" });
+    expect(result.status).toBe("ok");
+    if (result.status !== "ok") return;
+    // stdout should be truncated - has truncation marker and length well under 2_000_000
+    expect(result.stdout.length).toBeLessThan(2_000_000);
+    expect(result.stdout).toMatch(/truncated|omitted|\.\.\./);
+  });
 });
