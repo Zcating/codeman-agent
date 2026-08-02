@@ -18,4 +18,11 @@ describe("executeCommand", () => {
     expect(result.error.kind).toBeDefined();
     expect(result.error.exitCode).toBe(2);
   });
+
+  it("timeoutMs returns timeout + partialOutput", async () => {
+    const result = await executeCommand({ command: "ping -n 6 127.0.0.1", timeoutMs: 100 });
+    expect(result.status).toBe("timeout");
+    if (result.status !== "timeout") return;
+    expect(result.partialOutput).toBeDefined();
+  });
 });
