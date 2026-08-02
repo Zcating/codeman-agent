@@ -229,6 +229,20 @@ test.describe("03 — Layout contract: 主内容区 = 唯一滚动容器", () =>
     expect(snap.wrapperOverflows, "wrapper 必须恰好贴合（无双滚动条）").toBe(false);
     expect(snap.toolbarTop, "工具栏钉在顶部").toBe(0);
 
+    // 双滚动条回归守卫：消息区 viewport 隐藏原生滚动条（zag 只注入
+    // overflow:auto），否则与 shadcn 自定义 ScrollBar 并排 = 两个重复滚动条。
+    const viewportScrollbarWidth = await page.evaluate(() => {
+      const main =
+        document.querySelector('[data-slot="resizable-panel"][data-id="main"]') ?? document.body;
+      const vp = main.querySelector<HTMLElement>(
+        '[data-slot="scroll-area-viewport"][data-scroll-region="true"]',
+      );
+      return vp ? getComputedStyle(vp).scrollbarWidth : "no-viewport";
+    });
+    expect(viewportScrollbarWidth, "消息区 viewport 原生滚动条应隐藏（scrollbar-width: none）").toBe(
+      "none",
+    );
+
     const wheel = await wheelActiveRegion(page, -400);
     expect(wheel.delta, "消息区 wheel 向上应改变 scrollTop").toBeLessThan(0);
 

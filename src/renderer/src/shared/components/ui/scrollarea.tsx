@@ -38,7 +38,10 @@ export function ScrollArea(props: ScrollAreaProps): JSX.Element {
         data-slot="scroll-area-viewport"
         data-scroll-region={local["data-scroll-region"]}
         data-testid={local["data-testid"]}
-        class="size-full rounded-[inherit] outline-none"
+        // 隐藏原生滚动条（zag 只注入 overflow:auto，不隐藏）：原生条与
+        // 自定义 ScrollBar（position:absolute 覆盖）并排会显示两个重复
+        // 滚动条。与 base-ui 参照物（styleDisableScrollbar）行为对齐。
+        class="size-full rounded-[inherit] outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {local.children}
       </ArkScrollArea.Viewport>

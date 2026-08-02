@@ -49,6 +49,15 @@ describe("ScrollArea (shadcn-style, .repos/shadcn/scroll-area.tsx 移植)", () =
     expect((viewport as HTMLElement).style.overflow).toBe("auto");
   });
 
+  it("双滚动条守卫: Viewport 隐藏原生滚动条（scrollbar-width:none + ::-webkit-scrollbar），与自定义 ScrollBar 不重复", () => {
+    const { container } = render(() => <ScrollArea>content</ScrollArea>);
+    const viewport = container.querySelector("[data-slot='scroll-area-viewport']");
+    // scrollbar-width: none（Firefox / 现代 Chromium 标准属性）
+    expect(viewport!.className).toContain("[scrollbar-width:none]");
+    // ::-webkit-scrollbar { display: none }（Chromium/WebKit）
+    expect(viewport!.className).toContain("[&::-webkit-scrollbar]:hidden");
+  });
+
   it("merges custom class on Root", () => {
     const { container } = render(() => <ScrollArea class="custom-class">content</ScrollArea>);
     const root = container.querySelector("[data-slot='scroll-area']");
