@@ -50,7 +50,6 @@ const runtime = Runtime.defaultRuntime;
 
 type PendingEntry = {
   deferred: Deferred.Deferred<unknown, JsonRpcProtocolError | JsonRpcTimeoutError>;
-  fiber: Fiber.RuntimeFiber<unknown, JsonRpcProtocolError | JsonRpcTimeoutError>;
   method: string;
 };
 
@@ -130,7 +129,7 @@ export class JsonRpcConnection {
       ),
     );
 
-    this.#pending.set(id, { deferred, fiber, method });
+    this.#pending.set(id, { deferred, method });
 
     const promise = new Promise<T>((resolve, reject) => {
       Runtime.runPromise(runtime)(Fiber.await(fiber)).then((exit) => {
