@@ -67,6 +67,8 @@
     "turndown": "^7.2.4"
   },
   "devDependencies": {
+    "@effect/platform": "0.96.1",
+    "@effect/platform-node": "0.107.0",
     "@effect/vitest": "^0.25.0",
     "@electron-toolkit/tsconfig": "^2.0.0",
     "@electron/rebuild": "~4.0.6",
