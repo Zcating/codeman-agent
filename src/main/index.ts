@@ -8,8 +8,8 @@ import { registerIpcHandlers } from "./ipc";
 import { loadQaTable } from "./features/mock-server/qa-loader";
 import { startMockServer } from "./features/mock-server";
 import { ensurePreinstalledSkills, registerSkillHandlers } from "./skills-host";
-import { McpManager } from "./mcp-manager";
-import { registerMcpIpcHandlers } from "./mcp-ipc";
+import { McpManager } from "./features/mcp/mcp-manager";
+import { registerMcpIpcHandlers } from "./features/mcp/mcp-ipc";
 
 const WORKER = process.env.CODEMAN_TEST_WORKER ?? "";
 

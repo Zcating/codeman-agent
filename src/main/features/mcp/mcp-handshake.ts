@@ -1,5 +1,5 @@
-import { JsonRpcConnection } from "./jsonrpc";
-import { logger } from "./logger";
+import { JsonRpcConnection } from "../../jsonrpc";
+import { logger } from "../../logger";
 import type { McpTool } from "./mcp-types";
 
 

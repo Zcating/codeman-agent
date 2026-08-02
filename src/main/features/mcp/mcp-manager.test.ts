@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { InvalidConfig, JsonRpcProtocolError } from "../renderer/src/shared/lib/errors";
+import { InvalidConfig, JsonRpcProtocolError } from "../../../renderer/src/shared/lib/errors";
 
 vi.mock("electron", () => ({
   shell: { openPath: vi.fn().mockResolvedValue("") },

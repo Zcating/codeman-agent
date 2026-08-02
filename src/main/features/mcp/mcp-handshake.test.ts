@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { JsonRpcProtocolError } from "../renderer/src/shared/lib/errors";
+import { JsonRpcProtocolError } from "../../../renderer/src/shared/lib/errors";
 import { performHandshake, HandshakeError } from "./mcp-handshake";
 
 
@@ -14,7 +14,7 @@ function fakeConnection(handlers: {
 }
 
 describe("performHandshake", () => {
-  it("calls initialize â†’ notifications/initialized â†’ tools/list in order", async () => {
+  it("calls initialize â†?notifications/initialized â†?tools/list in order", async () => {
     const order: string[] = [];
     const fake = fakeConnection({
       request: async (method) => {
