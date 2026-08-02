@@ -2,7 +2,8 @@
 import { shell } from "electron";
 import { Effect, Exit } from "effect";
 import { logger } from "./logger";
-import { McpStdioServer, type McpServerConfig, type McpServerStatus, type McpTool, type McpCallResult } from "./mcp-host";
+import { McpStdioServer } from "./mcp-host";
+import type { McpServerConfig, McpServerStatus, McpTool, McpCallResult } from "./mcp-types";
 import { MCP_CONFIG_PATH, readMcpConfig, writeMcpConfig } from "./mcp-config";
 import { InvalidConfig, JsonRpcProtocolError, NotFound } from "../renderer/src/shared/lib/errors";
 
