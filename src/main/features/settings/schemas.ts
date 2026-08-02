@@ -1,6 +1,21 @@
 import { Schema } from "effect";
 
 
+const ThinkingLevelStruct = Schema.Literal("off", "minimal", "low", "medium", "high", "xhigh");
+
+const SubAgentConfigStruct = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  description: Schema.String,
+  systemPrompt: Schema.String,
+  modelId: Schema.String,
+  thinkingLevel: ThinkingLevelStruct,
+  allowedTools: Schema.Array(Schema.String),
+  enabled: Schema.Boolean,
+  createdAt: Schema.Number,
+  updatedAt: Schema.Number,
+});
+
 const ModelMetaStruct = Schema.Struct({
   id: Schema.String,
   label: Schema.String,
@@ -53,6 +68,7 @@ export const SettingStruct = Schema.Struct({
     maxHistory: Schema.Number,
   }),
   enabledSkills: Schema.optional(Schema.Array(Schema.String)),
+  subAgents: Schema.optional(Schema.Array(SubAgentConfigStruct)),
 });
 
 
@@ -61,3 +77,5 @@ export type ProviderBilling = Schema.Schema.Type<typeof ProviderBillingStruct>;
 export type ProviderLlm = Schema.Schema.Type<typeof ProviderLlmStruct>;
 export type Provider = Schema.Schema.Type<typeof ProviderStruct>;
 export type Settings = Schema.Schema.Type<typeof SettingStruct>;
+export type SubAgentConfig = Schema.Schema.Type<typeof SubAgentConfigStruct>;
+export type ThinkingLevel = Schema.Schema.Type<typeof ThinkingLevelStruct>;

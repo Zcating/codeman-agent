@@ -46,4 +46,5 @@ export const DEFAULT_SETTINGS: Settings = {
   systemPrompt: { default: "", userCanEdit: true },
   conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
   enabledSkills: ["commit-helper", "code-review", "explain-error", "summarize"],
+  subAgents: [],
 };
