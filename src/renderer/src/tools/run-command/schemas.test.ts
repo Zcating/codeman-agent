@@ -12,4 +12,10 @@ describe("RunCommandParamsSchema", () => {
       Schema.decodeUnknownSync(RunCommandParamsSchema)({ command: "git status", timeoutMs: 1_800_001 })
     ).toThrow();
   });
+
+  it("rejects cwd containing '..'", () => {
+    expect(() =>
+      Schema.decodeUnknownSync(RunCommandParamsSchema)({ command: "git status", cwd: "../etc" })
+    ).toThrow();
+  });
 });
