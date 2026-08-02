@@ -16,6 +16,7 @@ import type {
   McpToolEntry,
   CompactionEntry,
 } from "../lib/types";
+import type { SubAgentConfig } from "@codeman-frontend/plugins/multi-agents/lib/sub-agent.types";
 
 export interface StreamSubscription {
   readonly onStreamChunk: (handler: (evt: unknown) => void) => () => void;
@@ -113,6 +114,13 @@ export interface CodemanApi {
     kind: "auto" | "manual";
     firstKeptMessageId: string;
   }) => Promise<CompactionEntry>;
+
+  // Sub-Agents
+  readonly subAgentsList: () => Promise<readonly SubAgentConfig[]>;
+  readonly subAgentsAdd: (config: SubAgentConfig) => Promise<SubAgentConfig>;
+  readonly subAgentsUpdate: (args: { id: string; patch: Partial<SubAgentConfig> }) => Promise<SubAgentConfig>;
+  readonly subAgentsDelete: (args: { id: string }) => Promise<void>;
+  readonly subAgentsSetEnabled: (args: { id: string; enabled: boolean }) => Promise<SubAgentConfig>;
 }
 
 declare global {

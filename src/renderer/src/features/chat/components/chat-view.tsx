@@ -5,6 +5,8 @@ import { createForm } from "@tanstack/solid-form";
 import { MessageBubble } from "@codeman-frontend/features/chat/components/message-bubble";
 import { CompactionMarker } from "@codeman-frontend/features/chat/components/compaction-marker";
 import { store, sendMessage, cancel, compactNow } from "@codeman-frontend/features/chat/stores/chat.store";
+import { ParallelPanel } from "@codeman-frontend/plugins/multi-agents/components/parallel-panel";
+import { subAgentsStreamStore } from "@codeman-frontend/plugins/multi-agents/stores/sub-agents-stream.store";
 import {
   ContextRing,
   computeUsedTokensEst,
@@ -267,6 +269,11 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     return all.filter((s) => enabledNames.has(s.name));
   });
 
+  // All parallel panel entries (from sub-agent stream store) — rendered below message list
+  const allParallelPanelEntries = createMemo(() =>
+    Object.values(subAgentsStreamStore.state.byToolCall),
+  );
+
   return (
     <>
       <ScrollArea class="flex-1 min-h-0" data-scroll-region="true">
@@ -280,6 +287,8 @@ export function ChatView(props: { convId?: string }): JSX.Element {
           <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
+
+      <ParallelPanel entries={allParallelPanelEntries()} />
 
       <form
         class="flex flex-col gap-2 p-3 border-t border-border bg-card"

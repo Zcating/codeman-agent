@@ -12,6 +12,7 @@ import type {
   McpToolEntry,
   CompactionEntry,
 } from "@codeman-frontend/shared/lib/types";
+import type { SubAgentConfig } from "@codeman-frontend/plugins/multi-agents/lib/sub-agent.types";
 
 export interface StreamSubscription {
   readonly onStreamChunk: (handler: (evt: unknown) => void) => () => void;
@@ -109,6 +110,13 @@ export interface CodemanApi {
     kind: "auto" | "manual";
     firstKeptMessageId: string;
   }) => Promise<CompactionEntry>;
+
+  // Sub-Agents
+  readonly subAgentsList: () => Promise<readonly SubAgentConfig[]>;
+  readonly subAgentsAdd: (config: SubAgentConfig) => Promise<SubAgentConfig>;
+  readonly subAgentsUpdate: (args: { id: string; patch: Partial<SubAgentConfig> }) => Promise<SubAgentConfig>;
+  readonly subAgentsDelete: (args: { id: string }) => Promise<void>;
+  readonly subAgentsSetEnabled: (args: { id: string; enabled: boolean }) => Promise<SubAgentConfig>;
 }
 
 export type CodemanApiExposed = CodemanApi &
@@ -170,6 +178,12 @@ const codeman: CodemanApiExposed = {
 
   compactionList: (args) => ipcRenderer.invoke("compaction:list", args),
   compactionAppend: (args) => ipcRenderer.invoke("compaction:append", args),
+
+  subAgentsList: () => ipcRenderer.invoke("subAgents:list"),
+  subAgentsAdd: (config) => ipcRenderer.invoke("subAgents:add", config),
+  subAgentsUpdate: (args) => ipcRenderer.invoke("subAgents:update", args),
+  subAgentsDelete: (args) => ipcRenderer.invoke("subAgents:delete", args),
+  subAgentsSetEnabled: (args) => ipcRenderer.invoke("subAgents:setEnabled", args),
 
   onStreamChunk: (handler) => {
     const listener = (_e: unknown, evt: unknown) => handler(evt);

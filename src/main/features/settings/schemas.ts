@@ -1,5 +1,8 @@
 import { Schema } from "effect";
+import { SubAgentConfigSchema, ThinkingLevelSchema } from "@codeman-frontend/shared/lib/sub-agent-schema";
 
+// Re-export shared schema as Struct for settings schema composition
+const SubAgentConfigStruct = SubAgentConfigSchema;
 
 const ModelMetaStruct = Schema.Struct({
   id: Schema.String,
@@ -53,6 +56,7 @@ export const SettingStruct = Schema.Struct({
     maxHistory: Schema.Number,
   }),
   enabledSkills: Schema.optional(Schema.Array(Schema.String)),
+  subAgents: Schema.optional(Schema.Array(SubAgentConfigStruct)),
 });
 
 
@@ -61,3 +65,5 @@ export type ProviderBilling = Schema.Schema.Type<typeof ProviderBillingStruct>;
 export type ProviderLlm = Schema.Schema.Type<typeof ProviderLlmStruct>;
 export type Provider = Schema.Schema.Type<typeof ProviderStruct>;
 export type Settings = Schema.Schema.Type<typeof SettingStruct>;
+export type SubAgentConfig = Schema.Schema.Type<typeof SubAgentConfigSchema>;
+export type ThinkingLevel = Schema.Schema.Type<typeof ThinkingLevelSchema>;

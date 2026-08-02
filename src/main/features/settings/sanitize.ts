@@ -50,6 +50,8 @@ export function sanitize(input: Partial<Settings>): Settings {
     maxHistory: Math.max(MIN_MAX_HISTORY, mergedConversations.maxHistory | 0),
   };
 
+  const rawSubAgents = safe.subAgents ?? DEFAULT_SETTINGS.subAgents;
+
   const clampedMinSize = {
     width: Math.max(MIN_SIZE_WIDTH, mergedWindow.minSize.width | 0),
     height: Math.max(MIN_SIZE_HEIGHT, mergedWindow.minSize.height | 0),
@@ -74,5 +76,6 @@ export function sanitize(input: Partial<Settings>): Settings {
     },
     systemPrompt: rawSystemPrompt,
     conversations: clampedConversations,
+    subAgents: rawSubAgents,
   };
 }

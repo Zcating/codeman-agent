@@ -15,4 +15,44 @@ export function registerSettingsIpc(deps: {
   ipcMain.handle("deleteProvider", sandboxHandler(async (args: { id: string }) => {
     return deps.settings.deleteProvider(args.id);
   }));
+
+  // Sub-agents CRUD handlers
+  ipcMain.handle("subAgents:list", () => {
+    const settings = deps.settings.load();
+    return settings.subAgents ?? [];
+  });
+
+  ipcMain.handle("subAgents:add", (_, config: unknown) => {
+    const settings = deps.settings.load();
+    const newSubAgents = [...(settings.subAgents ?? []), config];
+    deps.settings.update({ subAgents: newSubAgents } as Partial<Settings>);
+    return config;
+  });
+
+  ipcMain.handle("subAgents:update", (_, args: { id: string; patch: unknown }) => {
+    const { id, patch } = args;
+    const settings = deps.settings.load();
+    const newSubAgents = (settings.subAgents ?? []).map((c) =>
+      c.id === id ? { ...c, ...(patch as object), updatedAt: Date.now() } : c
+    );
+    deps.settings.update({ subAgents: newSubAgents } as Partial<Settings>);
+    const updated = newSubAgents.find((c) => c.id === id);
+    return updated;
+  });
+
+  ipcMain.handle("subAgents:delete", (_, id: string) => {
+    const settings = deps.settings.load();
+    const newSubAgents = (settings.subAgents ?? []).filter((c) => c.id !== id);
+    deps.settings.update({ subAgents: newSubAgents } as Partial<Settings>);
+  });
+
+  ipcMain.handle("subAgents:setEnabled", (_, id: string, enabled: boolean) => {
+    const settings = deps.settings.load();
+    const newSubAgents = (settings.subAgents ?? []).map((c) =>
+      c.id === id ? { ...c, enabled, updatedAt: Date.now() } : c
+    );
+    deps.settings.update({ subAgents: newSubAgents } as Partial<Settings>);
+    const updated = newSubAgents.find((c) => c.id === id);
+    return updated;
+  });
 }
