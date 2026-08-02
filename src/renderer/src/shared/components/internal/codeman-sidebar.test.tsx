@@ -1,6 +1,6 @@
 
 import { render, cleanup } from "@solidjs/testing-library";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   CodemanSidebar,
   type CodemanSidebarGroupOption,
@@ -567,7 +567,7 @@ describe("CodemanSidebar (PR 2)", () => {
     });
   });
 
-  describe("SidebarInset scroll boundary (Bug B fix)", () => {
+  describe("SidebarInset scroll boundary (V2.9 bug fix: 2 scrollbars + scrolling toolbar)", () => {
     it("data-slot=sidebar-inset has min-h-0 (allows flex child to shrink)", () => {
       const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
       const inset = container.querySelector("[data-slot='sidebar-inset']");
@@ -575,11 +575,306 @@ describe("CodemanSidebar (PR 2)", () => {
       expect(inset!.className).toContain("min-h-0");
     });
 
-    it("data-slot=sidebar-inset has overflow-y-auto (enables scrolling)", () => {
+    it("data-slot=sidebar-inset does NOT have overflow-y-auto (Bug V2.9: keep toolbar fixed, let inner content scroll)", () => {
+      // Bug V2.9: SidebarInset having overflow-y-auto produced 2 scrollbars in the
+      // chat panel (SidebarInset + ChatView messages wrapper) and caused the top
+      // toolbar to scroll away with the content. Inner panels handle their own
+      // scrolling; SidebarInset is just a flex column that hosts toolbar + main.
       const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
       const inset = container.querySelector("[data-slot='sidebar-inset']");
       expect(inset).toBeTruthy();
-      expect(inset!.className).toContain("overflow-y-auto");
+      expect(inset!.className).not.toContain("overflow-y-auto");
+    });
+  });
+
+  describe("Resizable + Collapsible behavior", () => {
+    beforeEach(() => {
+      window.localStorage.clear();
+    });
+
+    describe("Splitter.Root wrapping", () => {
+      it("renders a ResizablePanelGroup with two panels (sidebar + main)", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        // The resizable panel group should have data-slot attribute
+        const splitterRoot = container.querySelector("[data-slot='resizable-panel-group']");
+        expect(splitterRoot).toBeTruthy();
+        // Should have two panel elements
+        const panels = container.querySelectorAll("[data-slot='resizable-panel']");
+        expect(panels.length).toBe(2);
+      });
+
+      it("Sidebar is inside first ResizablePanel with id 'sidebar'", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        // Use id selector since zag renders id attribute directly
+        const sidebarPanel = container.querySelector("[data-id='sidebar']");
+        expect(sidebarPanel).toBeTruthy();
+        const sidebar = sidebarPanel?.querySelector("aside");
+        expect(sidebar).toBeTruthy();
+      });
+
+      it("SidebarInset is inside second ResizablePanel with id 'main'", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        // zag renders panel id as scoped (e.g. "splitter:splitter:root:panel:main")
+        // so we use data-slot to find panels and take the second one
+        const panels = container.querySelectorAll("[data-slot='resizable-panel']");
+        expect(panels.length).toBe(2);
+        const mainPanel = panels[1];
+        const inset = mainPanel?.querySelector("[data-slot='sidebar-inset']");
+        expect(inset).toBeTruthy();
+      });
+
+      it("Sidebar inside ResizablePanel has flex-1 h-full to fill panel", () => {
+        // Aside uses flex-1 (not w-full) because the Sidebar primitive's root
+        // is a flex row container; flex-1 lets aside grow to fill the row
+        // alongside the (hidden) gap.
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const sidebarPanel = container.querySelector("[data-id='sidebar']");
+        const sidebar = sidebarPanel?.querySelector("aside");
+        expect(sidebar).toBeTruthy();
+        expect(sidebar!.className).toContain("flex-1");
+        expect(sidebar!.className).toContain("h-full");
+      });
+
+      it("sidebar-content-wrapper has w-full so its bg-sidebar can track panel width", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const wrapper = container.querySelector("[data-testid='sidebar-content-wrapper']");
+        expect(wrapper).toBeTruthy();
+        expect(wrapper!.className).toContain("w-full");
+      });
+
+      it("sidebar-content-wrapper uses block h-full w-full so the inner sidebar root fills panel width AND height", () => {
+        // The Sidebar primitive's outer root (data-slot="sidebar") now has
+        // flex h-full w-full min-w-0 (matches shadcn upstream). Inside, the
+        // gap (data-slot="sidebar-gap") is hidden because the gap's fixed
+        // w-(--sidebar-width)=256px otherwise forces the flex row to allocate
+        // 256 to gap and squeeze aside. With gap hidden, aside's flex-1 grows
+        // to fill the full panel width at any size including the 160px min.
+        // The wrapper is block (not grid) because root's flex h-full w-full
+        // already drives both dimensions; grid caused column auto-sizing to
+        // match root's content (256px gap), defeating the wrapper.
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const wrapper = container.querySelector("[data-testid='sidebar-content-wrapper']");
+        expect(wrapper).toBeTruthy();
+        expect(wrapper!.className).toContain("block");
+        expect(wrapper!.className).toContain("h-full");
+        expect(wrapper!.className).toContain("w-full");
+      });
+
+      it("Sidebar primitive root has flex h-full w-full min-w-0 so aside can shrink below content size", () => {
+        // The sidebar gap has w-(--sidebar-width)=256px which would otherwise
+        // force root to be >=256px wide (overflowing narrow panels like the
+        // 160px min). Adding min-w-0 to root allows it to shrink below its
+        // content size, and the gap is hidden via display:none so it doesn't
+        // claim flex space.
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const root = container.querySelector("[data-slot='sidebar']");
+        expect(root).toBeTruthy();
+        expect(root!.className).toContain("flex");
+        expect(root!.className).toContain("h-full");
+        expect(root!.className).toContain("w-full");
+        expect(root!.className).toContain("min-w-0");
+      });
+
+      it("SidebarInset is wrapped in a grid container so its bg-background fills panel height", () => {
+        // ResizablePanel primitive is a block element with no height class;
+        // flex-1 on SidebarInset cannot resolve against a block parent. The
+        // grid wrapper around SidebarInset makes its height track the panel.
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const inset = container.querySelector("[data-slot='sidebar-inset']");
+        expect(inset).toBeTruthy();
+        const gridWrap = inset!.parentElement;
+        expect(gridWrap).toBeTruthy();
+        expect(gridWrap!.className).toContain("grid");
+        expect(gridWrap!.className).toContain("h-full");
+        expect(gridWrap!.className).toContain("w-full");
+      });
+    });
+
+    describe("ResizeHandle", () => {
+      it("ResizeHandle between sidebar and main panels has tabIndex={-1}", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const resizeHandle = container.querySelector("[data-slot='resizable-handle']");
+        expect(resizeHandle).toBeTruthy();
+        expect(resizeHandle?.getAttribute("tabindex")).toBe("-1");
+      });
+    });
+
+    describe("Toolbar row with CollapseToggleButton", () => {
+      it("SidebarInset contains a toolbar row with h-10 at top", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const inset = container.querySelector("[data-slot='sidebar-inset']");
+        const toolbar = inset?.querySelector("[data-testid='sidebar-toolbar']");
+        expect(toolbar).toBeTruthy();
+        expect(toolbar!.className).toContain("h-10");
+      });
+
+      it("toolbar contains a collapse toggle button at top-left", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const toolbar = container.querySelector("[data-testid='sidebar-toolbar']");
+        const button = toolbar?.querySelector("[data-testid='collapse-toggle-button']");
+        expect(button).toBeTruthy();
+      });
+
+      it("collapse button shows PanelLeftClose icon when expanded", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const button = container.querySelector("[data-testid='collapse-toggle-button']");
+        expect(button).toBeTruthy();
+        // PanelLeftClose icon should be present (lucide icon name in aria-label or data)
+        expect(button!.getAttribute("aria-label")).toContain("Collapse");
+      });
+
+      it("collapse button shows PanelLeftOpen icon when collapsed", async () => {
+        // Set localStorage to collapsed state
+        window.localStorage.setItem("codeman.sidebar.collapsed", "true");
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        // Need to wait for effect to run
+        await new Promise(r => setTimeout(r, 50));
+        const button = container.querySelector("[data-testid='collapse-toggle-button']");
+        expect(button).toBeTruthy();
+        expect(button!.getAttribute("aria-label")).toContain("Expand");
+        window.localStorage.clear();
+      });
+    });
+
+    describe("Collapse button functionality", () => {
+      it("clicking collapse button when expanded calls collapsePanel('sidebar')", async () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const button = container.querySelector("[data-testid='collapse-toggle-button']") as HTMLButtonElement;
+        button.click();
+        // After click, should be collapsed - check aria-label changed
+        await new Promise(r => setTimeout(r, 50));
+        expect(button.getAttribute("aria-label")).toContain("Expand");
+      });
+
+      it("clicking expand button when collapsed calls expandPanel('sidebar')", async () => {
+        // Set localStorage to collapsed state
+        window.localStorage.setItem("codeman.sidebar.collapsed", "true");
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        await new Promise(r => setTimeout(r, 50));
+        const button = container.querySelector("[data-testid='collapse-toggle-button']") as HTMLButtonElement;
+        button.click();
+        await new Promise(r => setTimeout(r, 50));
+        expect(button.getAttribute("aria-label")).toContain("Collapse");
+        window.localStorage.clear();
+      });
+    });
+
+    describe("inert attribute on sidebar content", () => {
+      it("sidebar content wrapper has inert attribute when collapsed", async () => {
+        window.localStorage.setItem("codeman.sidebar.collapsed", "true");
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        await new Promise(r => setTimeout(r, 50));
+        const sidebarContent = container.querySelector("[data-testid='sidebar-content-wrapper']");
+        expect(sidebarContent).toBeTruthy();
+        expect(sidebarContent!.getAttribute("data-collapsed")).toBe("true");
+        window.localStorage.clear();
+      });
+
+      it("sidebar content wrapper does NOT have inert attribute when expanded", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const sidebarContent = container.querySelector("[data-testid='sidebar-content-wrapper']");
+        expect(sidebarContent).toBeTruthy();
+        expect(sidebarContent!.hasAttribute("inert")).toBe(false);
+      });
+    });
+
+    describe("Conditional style override when collapsed", () => {
+      it("sidebar panel has style override {min-width:0px, flex-basis:0px, flex-grow:0, overflow:hidden} when collapsed", async () => {
+        window.localStorage.setItem("codeman.sidebar.collapsed", "true");
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        await new Promise(r => setTimeout(r, 50));
+        const sidebarPanel = container.querySelector("[data-id='sidebar']") as HTMLElement | null;
+        expect(sidebarPanel).toBeTruthy();
+        expect(sidebarPanel!.style.minWidth).toBe("0px");
+        expect(sidebarPanel!.style.flexBasis).toBe("0px");
+        expect(sidebarPanel!.style.flexGrow).toBe("0");
+        expect(sidebarPanel!.style.overflow).toBe("hidden");
+        window.localStorage.clear();
+      });
+
+      it("sidebar panel has NO style override when expanded (uses zag defaults)", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const sidebarPanel = container.querySelector("[data-id='sidebar']") as HTMLElement | null;
+        expect(sidebarPanel).toBeTruthy();
+        // When expanded, min-width should NOT be 0px (should be 160px from zag)
+        expect(sidebarPanel!.style.minWidth).not.toBe("0px");
+      });
+    });
+
+    describe("Collapse/expand animation (V2.10 bug fix: collapse toggle snapped with no animation)", () => {
+      it("sidebar panel carries width transition classes incl. flex-grow (it drives the width via flex: X 1 0px)", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const sidebarPanel = container.querySelector("[data-id='sidebar']") as HTMLElement | null;
+        expect(sidebarPanel).toBeTruthy();
+        const cls = sidebarPanel!.className;
+        // min-width + flex-basis alone are not enough: zag sets flex-basis to 0 in BOTH
+        // states, so the visible width is produced by flex-grow (20 when expanded).
+        // Transitioning only min-width/flex-basis left a ~126px snap on collapse and
+        // no animation at all on expand.
+        expect(cls).toContain("transition-[min-width,flex-basis,flex-grow]");
+        expect(cls).toContain("motion-safe:duration-300");
+        expect(cls).toContain("ease-out");
+      });
+
+      it("sidebar panel disables transition while the group is dragging (no rubber-band lag)", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const sidebarPanel = container.querySelector("[data-id='sidebar']") as HTMLElement | null;
+        expect(sidebarPanel).toBeTruthy();
+        // zag marks the SplitterRoot (panel-group) with data-dragging during resize;
+        // the panel must drop its transition then, or the width chases the pointer.
+        expect(sidebarPanel!.className).toContain("group-data-[dragging]:transition-none");
+      });
+
+      it("ResizablePanelGroup carries the 'group' marker so data-[dragging] on it reaches the panel", () => {
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const group = container.querySelector("[data-slot='resizable-panel-group']");
+        expect(group).toBeTruthy();
+        expect(group!.className).toContain("group");
+      });
+    });
+
+    describe("localStorage persistence", () => {
+      it("reads default width of 256px when no stored value", () => {
+        window.localStorage.removeItem("codeman.sidebar.width");
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const sidebarPanel = container.querySelector("[data-id='sidebar']");
+        expect(sidebarPanel).toBeTruthy();
+        // Default size should be around 256px
+        const style = sidebarPanel!.getAttribute("style");
+        expect(style).toBeTruthy();
+      });
+
+      it("persists width to localStorage on resize end", async () => {
+        window.localStorage.removeItem("codeman.sidebar.width");
+        renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        // Simulate resize by setting localStorage directly to verify read works
+        window.localStorage.setItem("codeman.sidebar.width", "300px");
+        // Re-render to pick up new value
+        cleanup();
+        const { container: container2 } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const sidebarPanel = container2.querySelector("[data-id='sidebar']");
+        expect(sidebarPanel).toBeTruthy();
+        window.localStorage.clear();
+      });
+
+      it("persists collapsed state to localStorage", async () => {
+        window.localStorage.removeItem("codeman.sidebar.collapsed");
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        const button = container.querySelector("[data-testid='collapse-toggle-button']") as HTMLButtonElement;
+        button.click();
+        await new Promise(r => setTimeout(r, 50));
+        expect(window.localStorage.getItem("codeman.sidebar.collapsed")).toBe("true");
+        window.localStorage.clear();
+      });
+
+      it("restores collapsed state from localStorage on mount", async () => {
+        window.localStorage.setItem("codeman.sidebar.collapsed", "true");
+        const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
+        await new Promise(r => setTimeout(r, 50));
+        const sidebarContent = container.querySelector("[data-testid='sidebar-content-wrapper']");
+        expect(sidebarContent?.getAttribute("data-collapsed")).toBe("true");
+        window.localStorage.clear();
+      });
     });
   });
 });

@@ -98,11 +98,13 @@ export function Sidebar(props: SidebarProps): JSX.Element {
       data-variant={merged.variant}
       data-side={merged.side}
       data-collapsible={merged.collapsible}
+      class="flex h-full w-full min-w-0"
     >
       <div
         data-slot="sidebar-gap"
         class={cn(
-          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
+          "hidden",
+          "relative w-(--sidebar-width) min-w-0 shrink bg-transparent transition-[width] duration-200 ease-linear",
           merged.variant === "floating" || merged.variant === "inset"
             ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))]"
             : "group-data-[collapsible=icon]:w-(--sidebar-width-icon)",

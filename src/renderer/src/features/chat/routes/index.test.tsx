@@ -87,6 +87,15 @@ describe("ConversationRoute", () => {
     expect(getByTestId("chat-view")).toBeTruthy();
     expect(getByTestId("chat-view-conv-id").textContent).toBe("test-conv-id");
   });
+
+  it("Uses h-full (not h-screen) on outer wrapper (V2.9 bug fix: h-screen overflowed parent by 40px, triggering SidebarInset to scroll)", () => {
+    F.mockUseParams.mockReturnValue(() => ({ convId: "test-conv-id" }));
+
+    const { getByTestId } = render(() => <ConversationRoute />);
+    const wrapper = getByTestId("conversation-route");
+    expect(wrapper.className).not.toContain("h-screen");
+    expect(wrapper.className).toContain("h-full");
+  });
 });
 
 

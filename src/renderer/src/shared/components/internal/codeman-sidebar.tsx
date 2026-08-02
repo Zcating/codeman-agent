@@ -1,5 +1,5 @@
 
-import { For, Show, type JSX } from "solid-js";
+import { For, Show, type JSX, createSignal, createEffect } from "solid-js";
 import {
   Accordion,
   AccordionItem,
@@ -23,6 +23,115 @@ import {
   SidebarMenuSubButton,
   SidebarInset,
 } from "@codeman-frontend/shared/components/ui/sidebar";
+import { useSplitterContext } from "@ark-ui/solid/splitter";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@codeman-frontend/shared/components/ui/resizable";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-solid";
+
+// ─── Persistence keys ────────────────────────────────────────────────────────────
+
+const STORAGE_KEY_WIDTH = "codeman.sidebar.width";
+const STORAGE_KEY_COLLAPSED = "codeman.sidebar.collapsed";
+const DEFAULT_WIDTH = "256px";
+
+// ─── Persistence hook ──────────────────────────────────────────────────────────
+
+function useResizableSidebarPersistence() {
+  const safeLocalStorage = (): Storage | null => {
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        return window.localStorage;
+      }
+    } catch {
+      // jsdom may throw SecurityError in some environments
+    }
+    return null;
+  };
+
+  const storedWidth = (): string | undefined => {
+    const ls = safeLocalStorage();
+    if (!ls) { return undefined; }
+    try {
+      return ls.getItem(STORAGE_KEY_WIDTH) ?? undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
+  const storedCollapsed = (): boolean => {
+    const ls = safeLocalStorage();
+    if (!ls) { return false; }
+    try {
+      return ls.getItem(STORAGE_KEY_COLLAPSED) === "true";
+    } catch {
+      return false;
+    }
+  };
+
+  const [width, setWidth] = createSignal<string>(storedWidth() ?? DEFAULT_WIDTH);
+  const [collapsed, setCollapsed] = createSignal<boolean>(storedCollapsed());
+
+  const saveWidth = (newWidth: string): void => {
+    setWidth(newWidth);
+    const ls = safeLocalStorage();
+    if (ls) {
+      try {
+        ls.setItem(STORAGE_KEY_WIDTH, newWidth);
+      } catch {
+        // Ignore quota errors
+      }
+    }
+  };
+
+  const saveCollapsed = (isCollapsed: boolean): void => {
+    setCollapsed(isCollapsed);
+    const ls = safeLocalStorage();
+    if (ls) {
+      try {
+        ls.setItem(STORAGE_KEY_COLLAPSED, String(isCollapsed));
+      } catch {
+        // Ignore quota errors
+      }
+    }
+  };
+
+  const toggleCollapsed = (): void => {
+    saveCollapsed(!collapsed());
+  };
+
+  return {
+    width,
+    collapsed,
+    saveWidth,
+    saveCollapsed,
+    toggleCollapsed,
+    setCollapsed,
+  };
+}
+
+// ─── Collapse toggle button ────────────────────────────────────────────────────
+
+interface CollapseToggleButtonProps {
+  collapsed: boolean;
+  onToggle: () => void;
+}
+
+function CollapseToggleButton(props: CollapseToggleButtonProps): JSX.Element {
+  return (
+    <button
+      type="button"
+      data-testid="collapse-toggle-button"
+      aria-label={props.collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring transition-colors"
+      onClick={props.onToggle}
+    >
+      {props.collapsed
+        ? <PanelLeftOpen class="h-4 w-4" />
+        : <PanelLeftClose class="h-4 w-4" />}
+    </button>
+  );
+}
+
+// ─── Types ─────────────────────────────────────────────────────────────────────
 
 export interface CodemanSidebarGroupOption {
   label: string;
@@ -103,6 +212,8 @@ interface CodemanSidebarGroupViewProps {
   onEmptyGroupClick?: ((groupValue: string) => void);
   isMenuActive: (menu: CodemanSidebarMenuOption) => boolean;
 }
+
+// ─── Sub-components ─────────────────────────────────────────────────────────────
 
 function CodemanSidebarEmptyState(
   props: CodemanSidebarEmptyStateProps,
@@ -310,48 +421,158 @@ function makeIsMenuActive(
   return (menu) => menu.value === currentValue;
 }
 
+// ─── Startup restore component ─────────────────────────────────────────────────
+//
+// This component must be rendered inside Splitter.Root to access the splitter context.
+// It handles the startup-restore of the collapsed state from localStorage.
+interface SplitterStartupRestoreProps {
+  setCollapsed: (v: boolean) => void;
+}
+
+function SplitterStartupRestore(props: SplitterStartupRestoreProps): JSX.Element {
+  const splitterApi = useSplitterContext();
+  createEffect(() => {
+    // Re-read localStorage directly at effect time (not from signal) to handle
+    // cases where localStorage was set after the signal was initially created.
+    const wasCollapsed = (() => {
+      try {
+        return window.localStorage.getItem(STORAGE_KEY_COLLAPSED) === "true";
+      } catch {
+        return false;
+      }
+    })();
+    if (wasCollapsed) {
+      props.setCollapsed(true);
+      splitterApi().collapsePanel("sidebar");
+    }
+  });
+  return <></>;
+}
+
+// ─── Main component ────────────────────────────────────────────────────────────
+
 export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
   const isMenuActive = makeIsMenuActive(props.currentValue, props.isActive);
+  const { width, collapsed, saveWidth, saveCollapsed, toggleCollapsed, setCollapsed } = useResizableSidebarPersistence();
+
+  const handleResizeEnd = (details: { size: number[] }): void => {
+    // Width is reported as percentage by zag. Store as percentage string for defaultSize.
+    if (details.size && details.size[0] !== undefined) {
+      saveWidth(`${details.size[0]}%`);
+    }
+  };
+
+  const handleCollapse = (details: { panelId: string; size: number }): void => {
+    if (details.panelId === "sidebar") {
+      saveCollapsed(true);
+    }
+  };
+
+  const handleExpand = (details: { panelId: string; size: number }): void => {
+    if (details.panelId === "sidebar") {
+      saveCollapsed(false);
+    }
+  };
+
+  // Determine sidebar panel style - conditional override when collapsed
+  const sidebarPanelStyle = (): JSX.CSSProperties | undefined => {
+    if (collapsed()) {
+      return {
+        "min-width": "0px",
+        "flex-basis": "0px",
+        "flex-grow": "0",
+        "overflow": "hidden",
+      };
+    }
+    return undefined;
+  };
 
   return (
-    <div class="flex h-full w-full flex-col">
-      <div class="flex flex-1 min-h-0">
-        <Sidebar class={props.class}>
-          <Show when={props.header}>
-            <SidebarHeader>{props.header}</SidebarHeader>
-          </Show>
+    <ResizablePanelGroup
+      class="group"
+      defaultSize={[width()]}
+      onResizeEnd={handleResizeEnd}
+      onCollapse={handleCollapse}
+      onExpand={handleExpand}
+      panels={[
+        { id: "sidebar", minSize: "160px", maxSize: "480px", collapsible: true, collapsedSize: "0px" },
+        { id: "main", minSize: 0 },
+      ]}
+    >
+      <SplitterStartupRestore setCollapsed={setCollapsed} />
 
-          <SidebarContent>
-            <Show
-              when={props.options.length > 0}
-              fallback={<CodemanSidebarEmptyState message={props.emptyMessage} />}
-            >
-              <For each={props.options}>
-                {(group) => (
-                  <CodemanSidebarGroupView
-                    group={group}
-                    renderMenuGroup={props.renderMenuGroup}
-                    renderMenu={props.renderMenu}
-                    renderGroupHeader={props.renderGroupHeader}
-                    onMenuGroupSelect={props.onMenuGroupSelect}
-                    onMenuSelect={props.onMenuSelect}
-                    onEmptyGroupClick={props.onEmptyGroupClick}
-                    isMenuActive={isMenuActive}
-                  />
-                )}
-              </For>
+      <ResizablePanel
+        id="sidebar"
+        class="transition-[min-width,flex-basis,flex-grow] motion-safe:duration-300 ease-out group-data-[dragging]:transition-none"
+        style={sidebarPanelStyle()}
+      >
+        <div
+          data-testid="sidebar-content-wrapper"
+          data-collapsed={collapsed() ? "true" : undefined}
+          inert={collapsed() ? true : undefined}
+          class="block h-full w-full"
+        >
+          <Sidebar class={cn("flex-1 min-w-0 h-full", props.class)}>
+            <Show when={props.header}>
+              <SidebarHeader>{props.header}</SidebarHeader>
             </Show>
-          </SidebarContent>
 
-          <Show when={props.footer}>
-            <SidebarFooter>{props.footer}</SidebarFooter>
+            <SidebarContent>
+              <Show
+                when={props.options.length > 0}
+                fallback={<CodemanSidebarEmptyState message={props.emptyMessage} />}
+              >
+                <For each={props.options}>
+                  {(group) => (
+                    <CodemanSidebarGroupView
+                      group={group}
+                      renderMenuGroup={props.renderMenuGroup}
+                      renderMenu={props.renderMenu}
+                      renderGroupHeader={props.renderGroupHeader}
+                      onMenuGroupSelect={props.onMenuGroupSelect}
+                      onMenuSelect={props.onMenuSelect}
+                      onEmptyGroupClick={props.onEmptyGroupClick}
+                      isMenuActive={isMenuActive}
+                    />
+                  )}
+                </For>
+              </Show>
+            </SidebarContent>
+
+            <Show when={props.footer}>
+              <SidebarFooter>{props.footer}</SidebarFooter>
+            </Show>
+          </Sidebar>
+        </div>
+      </ResizablePanel>
+
+      <ResizableHandle id="sidebar:main" tabIndex={-1} withHandle>
+        <div class="w-1 h-full bg-transparent hover:bg-sidebar-border/50 cursor-col-resize transition-colors" />
+      </ResizableHandle>
+
+      <ResizablePanel id="main">
+        <div class="grid h-full w-full">
+        <SidebarInset class="min-h-0 flex flex-col">
+          {/* Toolbar row at top of SidebarInset */}
+          <div
+            data-testid="sidebar-toolbar"
+            class="h-10 shrink-0 flex items-center px-2 border-b border-sidebar-border"
+          >
+            <CollapseToggleButton
+              collapsed={collapsed()}
+              onToggle={toggleCollapsed}
+            />
+          </div>
+
+          {/* Main content */}
+          <Show when={props.children}>
+            <div class="flex-1 min-h-0">
+              {props.children}
+            </div>
           </Show>
-        </Sidebar>
-
-        <Show when={props.children}>
-          <SidebarInset class="min-h-0 overflow-y-auto">{props.children}</SidebarInset>
-        </Show>
-      </div>
-    </div>
+        </SidebarInset>
+        </div>
+      </ResizablePanel>
+    </ResizablePanelGroup>
   );
 }

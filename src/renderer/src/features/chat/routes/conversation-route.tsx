@@ -7,7 +7,7 @@ export function ConversationRoute(): JSX.Element {
   const convId = (): string | undefined => params().convId;
 
   return (
-    <div class="flex-1 h-screen overflow-hidden flex flex-col">
+    <div data-testid="conversation-route" class="flex-1 h-full overflow-hidden flex flex-col">
       <ChatView convId={convId()} />
     </div>
   );
