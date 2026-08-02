@@ -102,7 +102,7 @@ ADR-0016 D2 不变量 `Provider.llm.defaultModel ∈ Provider.llm.models[].id �
 | `schema_version` | `schemaVersion` |
 | `llm_providers` | `llmProviders` (legacy) |
 
-**JSON on-disk 格式不变**(仍是 snake_case;在 `SettingsState.load/save` IPC 边界做 `camelToSnake` / `snakeToCamel` 显式转换,每边 ~10 行;见 D1.5)。
+**JSON on-disk 格式保持 camelCase**(per ADR-0024 D10 已定 wire format = camelCase;`SettingsState.load/save` 不做任何转换,直接 read/write camelCase)。
 
 **保留 helper**:`withMessage`, `BaseUrlSchema`, `ModelSchema`, `ApiKeySchema`(已 camelCase)。
 
@@ -110,13 +110,17 @@ ADR-0016 D2 不变量 `Provider.llm.defaultModel ∈ Provider.llm.models[].id �
 
 **类型导出路径**:`type Provider = Schema.Schema.Type<typeof ProviderSchema>`(from `schemas.ts`)**与** `interface Provider`(from `types.ts`)**统一为后者**;前者用 `Schema` derive 改用 `interface` 直接写,types.ts 为 single source of truth。
 
-#### D1.5 — IPC 边界 snake_case ↔ camelCase 转换
+#### D1.5 — on-disk wire format:保持 camelCase,无转换层
 
-`src/main/features/settings/state.ts` 的 `load()` 之后立即 `camelToSnake(raw)`(反序,因 `sanitize()` decode 用 main schema camelCase);`save()` 之前 `snakeToCamel(this.cache)`(正序)。两个纯函数放 `src/main/features/settings/case-conversion.ts`(~15L + 4 单测)。
+`src/main/features/settings/state.ts` 的 `load()` 直接 `sanitize(raw)`(main schema 已是 camelCase),`save()` 直接 `JSON.stringify(this.cache)`。**不引入** snake_case ↔ camelCase 转换层:
+
+- wire format 已是 camelCase(ADR-0024 D10:V3.1 起新写盘 / 新读盘全 camel,含一次性 `migrateV15SnakeToCamel()` 迁移存量 snake 文件)
+- 应用未正式上线,无真实用户 settings.json 需要保持 snake_case 兼容;转换层是无谓复杂度(违反简单优先)
+- ADR-0024 D10 明确拒绝过「wire snake + IPC 层 bridge」(其 Rejected (a))——本 D1 不复活该方案
 
 **拒绝**:
 - A. 在 renderer schema 内部做 snake_case ↔ camelCase 转换:违反 simple 优先(双重映射)
-- B. 把 main schema 也改 snake_case:破坏 ADR-0016 D2 已立的 camelCase runtime 形状
+- B. 把 main schema 也改 snake_case:破坏 ADR-0016 D2 已立的 camelCase runtime 形状 + ADR-0024 D10 的 camelCase wire
 - C. 跨进程共享 schema(`src/shared/schema`):架构变更,需独立 ADR;不绑本 PR
 
 ### D2 — `Default Model Invariant` 集中化
@@ -318,7 +322,7 @@ export const anthropicStream: StreamFn = (model, context, options) =>
 
 | # | Commit | 文件 | 依赖 | 估时 |
 | --- | --- | --- | --- | --- |
-| 1 | `A. refactor(settings): unify schema to camelCase (ADR-0047 D1)` | `schemas.ts` + `state.ts` + `case-conversion.ts`(新)+ `types.ts` + 4 测试 | 无 | 2-3d |
+| 1 | `A. refactor(settings): unify schema to camelCase (ADR-0047 D1)` | `schemas.ts` + `state.ts` + `types.ts` + 2 测试 | 无 | 2-3d |
 | 2 | `B. refactor(settings): centralize default-model invariant (ADR-0047 D2)` | `provider-invariant.ts`(新)+ `app.store.ts` + `add-provider-dialog.tsx` + main 端 `state.ts` 复制 + 5 测试 | A 不依赖(独立)| 1d |
 | 3 | `C+D. refactor(chat): migrate to PI createProvider() (ADR-0047 D3+D4)` | `pi-provider-adapter.ts`(新)+ `anthropic-stream-fn.ts`(新)+ `runtime.ts` + `chat.store.ts` + `home.tsx` + `chat-view.tsx` + 删 `build-model.ts` + 删 `anthropic-transport.ts` + 4+1 测试 | A + B | 3-4d(修正:收敛版,保留 Agent) |
 
@@ -328,11 +332,10 @@ export const anthropicStream: StreamFn = (model, context, options) =>
 - A、B、C+D 各自分配独立 subagent,每个 subagent 配 `workdir=<worktree-absolute-path>`(per /work-work 护栏)
 - 主会话**不写一行代码**,只做 TDD 拆 + subagent 派发 + 复核
 
-### D6 — `SettingsState` IPC 边界(snake_case on disk)
+### D6 — `SettingsState` IPC 边界(on-disk 保持 camelCase)
 
-D1.5 决策的细则:
+D1.5 决策的细则。`SettingsState` 在 `load()` / `save()` 两端都**不做字段名转换**,直接读写 camelCase(与 main schema、ADR-0024 D10 wire format 一致):
 
-`SettingsState.load()` 现行:
 ```ts
 load(): Settings {
   if (this.cache !== null) return this.cache;
@@ -344,37 +347,21 @@ load(): Settings {
   this.save();
   return this.cache;
 }
-```
-
-D1.5 改:
-```ts
-load(): Settings {
-  if (this.cache !== null) return this.cache;
-  let raw: unknown = {};
-  if (existsSync(this.filePath)) {
-    try {
-      const onDisk = JSON.parse(readFileSync(this.filePath, "utf-8"));
-      raw = snakeToCamel(onDisk);  // 显式转换 on-disk snake → runtime camel
-    } catch { raw = {}; }
-  }
-  this.cache = sanitize(raw as Partial<Settings>);
-  return this.cache;
-}
 
 private save(): void {
   if (this.cache === null) return;
-  const onDisk = camelToSnake(this.cache);
-  writeFileSync(this.filePath, JSON.stringify(onDisk, null, 2), "utf-8");
+  writeFileSync(this.filePath, JSON.stringify(this.cache, null, 2), "utf-8");
 }
 ```
 
+**为什么不做 snakeToCamel / camelToSnake**:
+
+- `sanitize()` 走 `Schema.decode(SettingStruct)`,`SettingStruct` 是 camelCase;on-disk 直接存 camelCase,无 decode 失败问题。
+- on-disk snake_case 的「历史兼容旧 V1.x settings.json」理由不成立:应用未正式上线,无真实用户数据;ADR-0024 D10 已用一次性 `migrateV15SnakeToCamel()` 处理存量 snake 文件,且明确拒绝「wire snake + IPC bridge」方案。
+- 若未来需兼容旧 snake 文件,应走 ADR-0024 D10 的 migration 管线(load 入口一次迁移),而非每次 load/save 都做转换。
+
 **测试**:
-- `state.test.ts` 加 round-trip:write camel 对象 → read snake → 等于原对象
-- `case-conversion.test.ts` 4 case(嵌套对象 / 数组 / 不变字段 / 数组内对象)
-
-**为什么 `load()` 内 `snakeToCamel`**:`sanitize()` 走 `Schema.decode(SettingStruct)`,`SettingStruct` 是 camelCase。如果 on-disk 是 snake_case,直接喂会 decode 失败。
-
-**为什么 `save()` 内 `camelToSnake`**:保证 on-disk 格式 snake_case,历史兼容旧 V1.x settings.json(per CONTEXT.md "settings.json 兼容" 词条)。
+- `state.test.ts` 已有覆盖(load 空文件 / 写盘 round-trip 等)
 
 ## Considered Options
 
@@ -445,7 +432,7 @@ private save(): void {
 - **R1**: `pi-provider-adapter.ts` 100L 是新模块,需 TDD 严格红绿重构;`buildModel` 删前必须有等价 PI Model 输出测试(防"功能回归")
 - **R2**: `anthropicMessagesApi()` 立即加载 SDK,bundle size +50KB(估);若超 600KB 阈值需改用 `.lazy` 后缀
 - **R3**: `ModelMeta` → `Model<"anthropic-messages">` mapper 的 `provider` 字段必须填 user provider id(per `modelMetaToPiModel` 的 `.with({ provider })`);漏填 PI 内部路由失败
-- **R4**: `SettingsState` snakeToCamel 转换是 O(n) 整个 settings;V1 settings 字段 ~20,无性能影响;但若未来加 100+ 字段,需 memoize
+- **R4**: `SettingsState` load/save 不做字段名转换,on-disk 即 camelCase(ADR-0024 D10);性能无转换开销
 - **R5**: `enforceDefaultModelInvariant` 是 fallback 而非 throw,用户编辑 `defaultModel` 后 save 之前会"自动跳"到 `models[0]`,可能让用户困惑(为何我改完点 Save 字段没保存);**ADR 章节记录行为**(per /work-work Must NOT 解除);V2+ 加 UI warning
 
 ## Verification
@@ -455,23 +442,23 @@ private save(): void {
 ```
 # Commit 1 (A: schema 统一)
 vp run typecheck                  → exit 0
-vp run test                       → 285 + 4 = 289 全过
+vp run test                       → 285 + 0 = 285 全过 (无 case-conversion 测试 — D1.5 无转换层)
 vp run lint                       → 无新违规
 
 # Commit 2 (B: invariant 集中化)
 vp run typecheck                  → exit 0
-vp run test                       → 289 + 5 = 294 全过
+vp run test                       → 285 + 5 = 290 全过
 vp run lint                       → 无新违规
 
 # Commit 3 (C+D: PI route)
 vp run typecheck                  → exit 0
-vp run test                       → 294 - 1(删) + 3(新) = 296 全过
+vp run test                       → 290 - 1(删) + 3(新) = 292 全过
 vp run lint                       → 无新违规
 grep -r "buildModel\|ProviderConfig" src/  → 仅在 plan/ADR 出现
 
 # Manual smoke test
 vp run dev
-# 1. Settings → 改 MiniMax baseUrl → Save → 验证 settings.json on-disk 仍 snake_case
+# 1. Settings → 改 MiniMax baseUrl → Save → 验证 settings.json on-disk 仍 camelCase
 # 2. Settings → 改 model → Save → 重启 app → refresh() 加载后 defaultModel 不变
 # 3. Chat → 发消息 → 走 PI `createProviderFromConfig` → stream 成功
 # 4. Settings → Add Provider → 加 OpenAI-compatible 自定义 → Refresh models 成功
