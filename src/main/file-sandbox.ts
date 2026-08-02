@@ -1,6 +1,6 @@
-
 import { realpath } from "node:fs/promises";
-import { join, sep } from "node:path";
+import { dirname, join, basename, isAbsolute, resolve, sep } from "node:path";
+
 
 export type AppError =
   | { kind: "NotFound"; path: string }
@@ -8,24 +8,23 @@ export type AppError =
   | { kind: "Unknown"; message: string };
 
 const BLOCKED_PATH_PATTERNS: RegExp[] = [
-  /^\\\\\?\\/i, 
-  /::/i, 
+  /^\\\\\?\\/i,
+  /::/i,
 ];
 
-export async function validatePathForWrite(
-  inputPath: string,
-  workspaceRoot: string,
-): Promise<string> {
-  let realRoot: string;
+
+async function resolveRealRoot(workspaceRoot: string): Promise<string> {
   try {
-    realRoot = await realpath(workspaceRoot);
-  } catch {
+    return await realpath(workspaceRoot);
+  } catch (e) {
     throw {
       kind: "Unknown" as const,
-      message: `workspace realpath failed`,
+      message: `workspace realpath failed: ${String(e)}`,
     };
   }
+}
 
+function checkBlockedPatterns(inputPath: string, realRoot: string): void {
   for (const re of BLOCKED_PATH_PATTERNS) {
     if (re.test(inputPath)) {
       throw {
@@ -36,11 +35,29 @@ export async function validatePathForWrite(
       };
     }
   }
+}
 
-  const { dirname, basename, isAbsolute, resolve } = await import("node:path");
-  const absolutePath = isAbsolute(inputPath)
-    ? inputPath
-    : resolve(workspaceRoot, inputPath);
+function isInside(candidate: string, realRoot: string): boolean {
+  return candidate === realRoot || candidate.startsWith(realRoot + sep);
+}
+
+function toAbsolutePath(inputPath: string, workspaceRoot: string): string {
+  return isAbsolute(inputPath) ? inputPath : resolve(workspaceRoot, inputPath);
+}
+
+function asNotFound(path: string): AppError {
+  return { kind: "NotFound", path };
+}
+
+
+export async function validatePathForWrite(
+  inputPath: string,
+  workspaceRoot: string,
+): Promise<string> {
+  const realRoot = await resolveRealRoot(workspaceRoot);
+  checkBlockedPatterns(inputPath, realRoot);
+
+  const absolutePath = toAbsolutePath(inputPath, workspaceRoot);
   const parent = dirname(absolutePath);
   let realParent: string;
   try {
@@ -48,16 +65,16 @@ export async function validatePathForWrite(
   } catch (e: unknown) {
     const code = (e as NodeJS.ErrnoException)?.code;
     if (code === "ENOENT") {
-      const err: AppError = { kind: "NotFound", path: parent };
-      throw err;
+      throw asNotFound(parent);
     }
-    throw { kind: "Unknown" as const, message: `parent realpath failed: ${String(e)}` };
+    throw {
+      kind: "Unknown" as const,
+      message: `parent realpath failed: ${String(e)}`,
+    };
   }
 
   const candidate = join(realParent, basename(absolutePath));
-  const inside =
-    candidate === realRoot || candidate.startsWith(realRoot + sep);
-  if (!inside) {
+  if (!isInside(candidate, realRoot)) {
     throw {
       kind: "SandboxViolation" as const,
       path: candidate,
@@ -71,32 +88,10 @@ export async function validatePathInWorkspace(
   inputPath: string,
   workspaceRoot: string,
 ): Promise<string> {
-  let realRoot: string;
-  try {
-    realRoot = await realpath(workspaceRoot);
-  } catch (e: unknown) {
-    const err: AppError = {
-      kind: "Unknown",
-      message: `workspace realpath failed: ${String(e)}`,
-    };
-    throw err;
-  }
+  const realRoot = await resolveRealRoot(workspaceRoot);
+  checkBlockedPatterns(inputPath, realRoot);
 
-  for (const re of BLOCKED_PATH_PATTERNS) {
-    if (re.test(inputPath)) {
-      throw {
-        kind: "SandboxViolation" as const,
-        path: inputPath,
-        workspaceRoot: realRoot,
-        message: "Long-path prefix or NTFS alternate data stream not allowed",
-      };
-    }
-  }
-
-  const { isAbsolute, resolve } = await import("node:path");
-  const absolutePath = isAbsolute(inputPath)
-    ? inputPath
-    : resolve(workspaceRoot, inputPath);
+  const absolutePath = toAbsolutePath(inputPath, workspaceRoot);
 
   let real: string;
   try {
@@ -104,27 +99,21 @@ export async function validatePathInWorkspace(
   } catch (e: unknown) {
     const code = (e as NodeJS.ErrnoException)?.code;
     if (code === "ENOENT") {
-      const err: AppError = { kind: "NotFound", path: inputPath };
-      throw err;
+      throw asNotFound(inputPath);
     }
-    const err: AppError = {
-      kind: "Unknown",
+    throw {
+      kind: "Unknown" as const,
       message: `realpath failed: ${String(e)}`,
     };
-    throw err;
   }
 
-  const inside =
-    real === realRoot || real.startsWith(realRoot + sep);
-  if (!inside) {
-    const err: AppError = {
-      kind: "SandboxViolation",
+  if (!isInside(real, realRoot)) {
+    throw {
+      kind: "SandboxViolation" as const,
       path: real,
       workspaceRoot: realRoot,
     };
-    throw err;
   }
-
   return real;
 }
 
