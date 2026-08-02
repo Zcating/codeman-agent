@@ -10,4 +10,12 @@ describe("executeCommand", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout.trim()).toBe("hi");
   });
+
+  it("non-zero exit code returns error result", async () => {
+    const result = await executeCommand({ command: "node -e process.exit(2)" });
+    expect(result.status).toBe("error");
+    if (result.status !== "error") return;
+    expect(result.error.kind).toBeDefined();
+    expect(result.error.exitCode).toBe(2);
+  });
 });

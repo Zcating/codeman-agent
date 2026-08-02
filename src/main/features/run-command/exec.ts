@@ -81,7 +81,12 @@ export async function executeCommand(input: ExecuteCommandInput): Promise<RunCom
     child.on("close", (code) => {
       clearTimeout(timer);
       const durationMs = Date.now() - start;
-      resolve({ status: "ok", exitCode: code ?? 0, stdout, stderr, durationMs });
+      const exitCode = code ?? 0;
+      if (exitCode !== 0) {
+        resolve({ status: "error", error: { kind: "NonZeroExit", message: `Exit code ${exitCode}`, exitCode } });
+      } else {
+        resolve({ status: "ok", exitCode, stdout, stderr, durationMs });
+      }
     });
 
     child.on("error", (err) => {
