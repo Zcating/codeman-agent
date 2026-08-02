@@ -1,4 +1,5 @@
 import shellQuote from "shell-quote";
+import { resolve, normalize, isAbsolute, sep } from "node:path";
 
 export type RiskKind = "low" | "high";
 
@@ -45,6 +46,25 @@ function hasUnclosedQuotes(cmd: string): boolean {
   return inSingle || inDouble;
 }
 
+function looksLikePath(token: string): boolean {
+  // Contains path separators or relative path markers
+  return token.includes("/") || token.includes("\\") || token.startsWith(".");
+}
+
+function checkPathEscape(token: string, cwd: string): boolean {
+  // Resolve the path relative to cwd
+  const resolved = resolve(cwd, token);
+  const normalized = normalize(resolved);
+  // Escape if resolved path is not within cwd
+  if (!normalized.startsWith(normalize(cwd) + sep) && normalized !== normalize(cwd)) {
+    return true;
+  }
+  // Also flag if the normalized path contains .. after normalization
+  // (resolve already normalizes, but check original token has .. segments)
+  const parts = normalized.split(sep);
+  return parts.some((p) => p === "..");
+}
+
 export function assessRisk(input: AssessRiskInput): RiskAssessment {
   const reasons: RiskReason[] = [];
 
@@ -68,6 +88,10 @@ export function assessRisk(input: AssessRiskInput): RiskAssessment {
       isFirstToken = false;
       if (flagPattern.test(trimmed) && DESTRUCTIVE_FLAGS.has(trimmed)) {
         reasons.push({ tag: "destructiveFlag", message: `Destructive flag: ${trimmed}` });
+      }
+      // Check for path escape
+      if (looksLikePath(trimmed) && checkPathEscape(trimmed, input.cwd)) {
+        reasons.push({ tag: "pathEscape", message: `Path escapes working directory: ${trimmed}` });
       }
     }
   } catch {

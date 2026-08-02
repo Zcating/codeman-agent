@@ -21,4 +21,10 @@ describe("assessRisk", () => {
     expect(result.needsModelFallback).toBe(true);
     expect(result.reasons.some((r) => r.tag === "parseFailure")).toBe(true);
   });
+
+  it("path escape", () => {
+    const result = assessRisk({ command: "rm ./node_modules/../../etc", cwd: "C:\\work" });
+    const tags = result.reasons.map((r) => r.tag);
+    expect(tags.some((t) => /path[_-]?escape|path[_-]?out[_-]?of[_-]?bounds/i.test(t))).toBe(true);
+  });
 });
