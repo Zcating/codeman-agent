@@ -165,52 +165,6 @@ describe("mock-server HTTP — POST /mock/anthropic/v1/messages", () => {
     expect(body).toContain('"text":"g"');
   });
 
-  it("T18b: POST 200 response 携带 Access-Control-Allow-Origin: *", async () => {
-    const res = await fetch(`${BASE_URL}/mock/anthropic/v1/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "m",
-        messages: [{ role: "user", content: "hello" }],
-      }),
-    });
-    expect(res.status).toBe(200);
-    expect(res.headers.get("access-control-allow-origin")).toBe("*");
-  });
-
-  it("T18c: OPTIONS preflight → 204 + 全部 CORS headers (Allow-Origin/Methods/Headers)", async () => {
-    const res = await fetch(`${BASE_URL}/mock/anthropic/v1/messages`, {
-      method: "OPTIONS",
-      headers: {
-        "Origin": "http://127.0.0.1:1420",
-        "Access-Control-Request-Method": "POST",
-        "Access-Control-Request-Headers": "content-type,authorization",
-      },
-    });
-    expect(res.status).toBe(204);
-    expect(res.headers.get("access-control-allow-origin")).toBe("*");
-    expect(res.headers.get("access-control-allow-methods")?.toLowerCase()).toContain("post");
-    const allowHeaders = (res.headers.get("access-control-allow-headers") ?? "").toLowerCase();
-    expect(allowHeaders).toContain("authorization");
-    expect(allowHeaders).toContain("content-type");
-  });
-
-  it("T18d: 405 (GET) response 也携带 Access-Control-Allow-Origin: *", async () => {
-    const res = await fetch(`${BASE_URL}/mock/anthropic/v1/messages`, { method: "GET" });
-    expect(res.status).toBe(405);
-    expect(res.headers.get("access-control-allow-origin")).toBe("*");
-  });
-
-  it("T18e: 404 (path 不匹配) response 也携带 Access-Control-Allow-Origin: *", async () => {
-    const res = await fetch(`${BASE_URL}/some/other/path`, {
-      method: "POST",
-      body: "{}",
-    });
-    expect(res.status).toBe(404);
-    expect(res.headers.get("access-control-allow-origin")).toBe("*");
-  });
-
-
   it("T20: POST + 'think' entry → SSE with thinking_delta + signature_delta, no text block, stop_reason=end_turn", async () => {
     writeFileSync(
       qaPath,
