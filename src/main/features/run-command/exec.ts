@@ -1,4 +1,4 @@
-import { spawn, exec } from "node:child_process";
+import { spawn } from "node:child_process";
 
 export type RunCommandResult =
   | { status: "ok"; exitCode: number; stdout: string; stderr: string; durationMs: number }
@@ -110,9 +110,9 @@ function truncate(output: string): string {
 function killProcess(child: ReturnType<typeof spawn>): void {
   if (isWindows) {
     // Swallow taskkill failures — a failing taskkill is acceptable since the calling
-    // code already handles the response. exec() returns ChildProcess & Promise<{stdout,stderr}>,
-    // which exposes .catch() for unhandled rejection tracking.
-    exec(`taskkill /pid ${child.pid} /T /F`, () => {});
+    // code already handles the response. Using spawn() array form avoids shell interpolation.
+    const taskkill = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"]);
+    taskkill.on("error", () => { /* swallow: child may already be dead */ });
   } else {
     child.kill("SIGTERM");
   }

@@ -14,8 +14,8 @@ export async function confirmIfRisky(input: ConfirmInput): Promise<ConfirmDecisi
     return "allow";
   }
   // ADR-0048 D5 prose says 3 buttons in illustration: [允许一次] [拒绝] [停止当前任务].
-    // The actual implementation uses 2 buttons because "停止当前任务" is handled by the chat
-    // runtime's session-level cancel (not a dialog option). The 3-button ASCII art is illustrative.
+  // The actual implementation uses 2 buttons because "停止当前任务" is handled by the chat
+  // runtime's session-level cancel (not a dialog option). The 3-button ASCII art is illustrative.
   const result = await dialog.showMessageBox({
     type: "warning",
     buttons: ["允许一次", "拒绝"],
