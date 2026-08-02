@@ -1,10 +1,10 @@
 import { spawn } from "node:child_process";
 import { PassThrough, type Readable, type Writable } from "node:stream";
-import { JsonRpcConnection } from "./jsonrpc";
+import { JsonRpcConnection } from "../../jsonrpc";
 import { StdioTransport } from "./mcp-stdio-transport";
 import { performHandshake, HandshakeError } from "./mcp-handshake";
-import { logger } from "./logger";
-import { JsonRpcProtocolError } from "../renderer/src/shared/lib/errors";
+import { logger } from "../../logger";
+import { JsonRpcProtocolError } from "../../../renderer/src/shared/lib/errors";
 import type { McpServerConfig, McpServerStatus, McpTool, McpCallResult, StatusChangeHandler } from "./mcp-types";
 
 export type { McpServerConfig, McpServerStatus, McpTool, McpCallResult, StatusChangeHandler };

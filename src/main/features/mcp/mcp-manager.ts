@@ -1,11 +1,11 @@
 import { shell } from "electron";
 import { Effect, Exit } from "effect";
-import { logger } from "./logger";
+import { logger } from "../../logger";
 import { McpStdioServer } from "./mcp-host";
 import type { McpServerConfig, McpServerStatus, McpTool, McpCallResult } from "./mcp-types";
 import { mcpAgentName } from "./mcp-types";
 import { MCP_CONFIG_PATH, readMcpConfig, writeMcpConfig } from "./mcp-config";
-import { InvalidConfig, JsonRpcProtocolError, NotFound } from "../renderer/src/shared/lib/errors";
+import { InvalidConfig, JsonRpcProtocolError, NotFound } from "../../../renderer/src/shared/lib/errors";
 
 
 export interface McpServerInfo {
@@ -66,7 +66,7 @@ export class McpManager {
             await server.stop();
             this.#servers.delete(cfg.name);
             logger.warn(
-              `[mcp] tool name collision: "${agentName}" â€” first server="${firstServer}", duplicate server="${cfg.name}"; duplicate stopped per D3`,
+              `[mcp] tool name collision: "${agentName}" â€?first server="${firstServer}", duplicate server="${cfg.name}"; duplicate stopped per D3`,
             );
             throw new JsonRpcProtocolError({
               message: `duplicate tool name: ${agentName}`,
