@@ -15,4 +15,10 @@ describe("assessRisk", () => {
     expect(hasRmReason).toBe(true);
     expect(hasRfReason).toBe(true);
   });
+
+  it("parse failure fallback", () => {
+    const result = assessRisk({ command: 'echo "unclosed quote', cwd: "C:\\work" });
+    expect(result.needsModelFallback).toBe(true);
+    expect(result.reasons.some((r) => r.tag === "parseFailure")).toBe(true);
+  });
 });
