@@ -18,6 +18,30 @@ const EmptyTestLayer = Layer.succeed(Context.empty() as any, {} as any);
 // Shared mock fn instance — hoisted by vi.hoisted so it's ready before vi.mock factory runs
 const mockPerformCompaction = vi.hoisted(() => vi.fn());
 
+// Mock entries returned by CompactionApi.list via invoke
+const mockCompactEntries: CompactionEntry[] = [
+  {
+    id: "entry-1",
+    conversationId: "c1",
+    summary: "Summary 1",
+    model: "test-model",
+    tokensBefore: 500,
+    kind: "auto",
+    createdAt: 10,
+    firstKeptMessageId: "u1",
+  },
+  {
+    id: "entry-2",
+    conversationId: "c1",
+    summary: "Summary 2",
+    model: "test-model",
+    tokensBefore: 1000,
+    kind: "manual",
+    createdAt: 20,
+    firstKeptMessageId: "u2",
+  },
+];
+
 vi.mock("@codeman-frontend/features/chat/lib/compaction", () => ({
   performCompaction: mockPerformCompaction,
   shouldTriggerAutoCompaction: vi.fn().mockReturnValue(false),
@@ -32,6 +56,23 @@ vi.mock("@codeman-frontend/features/chat/lib/compaction", () => ({
     readonly _tag = "CompactionCancelled";
   },
 }));
+
+// Mock invoke to return compaction entries so async loading works in tests
+// invoke returns Effect<R, AppError>, so we use Effect.succeed to wrap the mock data
+vi.mock("@codeman-frontend/shared/apis/invoke.api", async () => {
+  const { Effect } = await import("effect");
+  return {
+    invoke: vi.fn().mockImplementation((method: string, args: { conversationId?: string }) => {
+      if (method === "compactionList" && args?.conversationId === "c1") {
+        return Effect.succeed(mockCompactEntries);
+      }
+      if (method === "compactionList") {
+        return Effect.succeed([]);
+      }
+      return Effect.succeed({} as any);
+    }),
+  };
+});
 
 
 const mockConv: Conversation = {
@@ -193,5 +234,20 @@ describe("RuntimeEvent bridging — seam 5: compactionStarted/Completed/Failed",
     const evt: RuntimeEvent = { type: "compactionFailed", reason: "summarize" };
     expect(evt.type).toBe("compactionFailed");
     expect(evt.reason).toBe("summarize");
+  });
+});
+
+
+describe("setupConvState async compaction loading — F8 regression", () => {
+  it("compactionEntries starts empty synchronously (async load dispatched)", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, mockHistory);
+      // Synchronously: entries should be empty (async loading dispatched but not yet complete)
+      const cs = store.byId["c1"] as ConversationState;
+      expect(cs.compactionEntries).toEqual([]);
+      // compactionStatus should be idle (not "loading")
+      expect(cs.compactionStatus._tag).toBe("idle");
+      dispose();
+    });
   });
 });

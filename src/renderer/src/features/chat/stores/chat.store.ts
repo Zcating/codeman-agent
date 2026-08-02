@@ -90,26 +90,6 @@ export function setSelectedWorkspaceId(id: string | null): void {
 
 
 export function setupConvState(conv: Conversation, history: Message[]): ConversationState {
-  // Load compaction entries from DB (if any)
-  // Note: We use a sync approach here since setupConvState is called synchronously
-  // The CompactionApi.list call is Effect-based, so we run it synchronously for initialization
-  let compactionEntries: CompactionEntry[] = [];
-
-  const loadEffect = CompactionApi.pipe(
-    Effect.flatMap((api) => api.list(conv.id)),
-    Effect.catchTag("Database", () => {
-      return Effect.succeed([] as CompactionEntry[]);
-    }),
-  );
-
-  const exit = Effect.runSyncExit(loadEffect.pipe(Effect.provide(CompactionApiLive)));
-  if (exit._tag === "Success") {
-    compactionEntries = exit.value;
-  }
-
-  // Sort entries by createdAt ASC
-  compactionEntries = [...compactionEntries].sort((a, b) => a.createdAt - b.createdAt);
-
   const runtime = createAgentRuntime({
     getState: () => ({
       conversationId: conv.id,
@@ -129,11 +109,31 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
     isAgentActive: false,
     lastError: null,
     runtime,
-    compactionEntries,
+    compactionEntries: [],
     compactionStatus: { _tag: "idle" },
   };
   setStore("byId", conv.id, cs);
   setConversationsSignal(Object.values(store.byId));
+
+  // Load compaction entries asynchronously — do not block conv initialization
+  const loadEffect = CompactionApi.pipe(
+    Effect.flatMap((api) => api.list(conv.id)),
+    Effect.catchTag("Database", () => {
+      return Effect.succeed([] as CompactionEntry[]);
+    }),
+  );
+
+  void Effect.runPromise(loadEffect.pipe(Effect.provide(CompactionApiLive))).then(
+    (entries) => {
+      if (!store.byId[conv.id]) return;
+      const sorted = [...entries].sort((a, b) => a.createdAt - b.createdAt);
+      setStore("byId", conv.id, "compactionEntries", sorted);
+    },
+    (err) => {
+      logger.error("[chat.store] loadCompactEntries failed:", err);
+    },
+  );
+
   return cs;
 }
 
