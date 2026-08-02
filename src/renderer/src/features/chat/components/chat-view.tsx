@@ -10,7 +10,7 @@ import {
 } from "@codeman-frontend/features/chat/components/context-ring";
 import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
 import { Button } from "@codeman-frontend/shared/components/ui/button";
-import { ScrollRegion } from "@codeman-frontend/shared/components/ui/scroll-region";
+import { ScrollArea } from "@codeman-frontend/shared/components/ui/scrollarea";
 import { ComboTextarea } from "@codeman-frontend/features/chat/components/combo-textarea";
 import { CodemanGroupSelect } from "@codeman-frontend/shared/components/internal/codeman-group-select";
 import { codemanToast } from "@codeman-frontend/shared/components/internal/codeman-toast";
@@ -195,10 +195,12 @@ export function ChatView(props: { convId?: string }): JSX.Element {
 
   return (
     <>
-      <ScrollRegion class="p-4 space-y-3">
-        <For each={currentMessages()}>{(m) => <MessageBubble message={m} />}</For>
-        <div ref={messagesEndRef} />
-      </ScrollRegion>
+      <ScrollArea class="flex-1 min-h-0" data-scroll-region="true">
+        <div class="p-4 space-y-3">
+          <For each={currentMessages()}>{(m) => <MessageBubble message={m} />}</For>
+          <div ref={messagesEndRef} />
+        </div>
+      </ScrollArea>
 
       <form
         class="flex flex-col gap-2 p-3 border-t border-border bg-card"

@@ -25,7 +25,7 @@ import {
 } from "@codeman-frontend/shared/components/ui/sidebar";
 import { useSplitterContext } from "@ark-ui/solid/splitter";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@codeman-frontend/shared/components/ui/resizable";
-import { ScrollRegion } from "@codeman-frontend/shared/components/ui/scroll-region";
+import { ScrollArea } from "@codeman-frontend/shared/components/ui/scrollarea";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-solid";
 
 // ─── Persistence keys ────────────────────────────────────────────────────────────
@@ -565,11 +565,13 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
             />
           </div>
 
-          {/* Main content — the sole scroll region of the main column (ADR-0039) */}
+          {/* Main content — the sole scroll region of the main column (ADR-0039).
+              data-scroll-region/data-testid 落在 ScrollArea 的 Viewport（真正的
+              滚动元素）上；Root 只承担 flex 尺寸链（flex-1 min-h-0）。 */}
           <Show when={props.children}>
-            <ScrollRegion data-testid="main-content-scroll">
+            <ScrollArea class="flex-1 min-h-0" data-scroll-region="true" data-testid="main-content-scroll">
               {props.children}
-            </ScrollRegion>
+            </ScrollArea>
           </Show>
         </SidebarInset>
         </div>

@@ -13,19 +13,31 @@ export interface ScrollAreaProps extends ArkScrollAreaRootProps {
   class?: string;
   children?: JSX.Element;
   "data-testid"?: string;
+  /**
+   * ADR-0039 滚动契约标记。落在 Viewport（真正的滚动元素）上，而非 Root：
+   * Root 只是定位壳（relative overflow-hidden），zag 在 Viewport 上注入
+   * overflow:auto，scrollHeight/clientHeight 语义属于 Viewport。
+   */
+  "data-scroll-region"?: string;
 }
 
 export function ScrollArea(props: ScrollAreaProps): JSX.Element {
-  const [local, rest] = splitProps(props, ["class", "children", "data-testid"]);
+  const [local, rest] = splitProps(props, [
+    "class",
+    "children",
+    "data-testid",
+    "data-scroll-region",
+  ]);
   return (
     <ArkScrollArea.Root
       data-slot="scroll-area"
-      data-testid={local["data-testid"]}
       class={cn("relative overflow-hidden", local.class)}
       {...rest}
     >
       <ArkScrollArea.Viewport
         data-slot="scroll-area-viewport"
+        data-scroll-region={local["data-scroll-region"]}
+        data-testid={local["data-testid"]}
         class="size-full rounded-[inherit] outline-none"
       >
         {local.children}

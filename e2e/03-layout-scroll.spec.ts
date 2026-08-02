@@ -11,7 +11,8 @@
 // wheel 走 CDP Input.dispatchMouseEvent(mouseWheel) 真实输入路径（合成
 // WheelEvent dispatchEvent 不触发 Chromium 默认滚动）。
 //
-// 断言锚点：[data-scroll-region]（ScrollRegion 原语）+ [data-testid="main-content-scroll"]。
+// 断言锚点：[data-scroll-region]（shadcn ScrollArea 的 Viewport 契约标记，
+// 即真正的滚动元素）+ [data-testid="main-content-scroll"]。
 
 import { test, expect, assert, invoke, submitForm, type TauriPage } from "./fixtures";
 import { useMockProvider } from "./mock-provider";

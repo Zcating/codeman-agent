@@ -595,13 +595,17 @@ describe("CodemanSidebar (PR 2)", () => {
       // nothing. ChatView worked only because it owns its own overflow-y-auto.
       // The content wrapper must be the scroll container for all other routes,
       // and it must be addressable by e2e/unit tests via data-testid.
+      // ADR-0039 契约标记落在 ScrollArea 的 Viewport（真正的滚动元素）上。
       const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
       const scrollRegion = container.querySelector("[data-testid='main-content-scroll']");
       expect(scrollRegion).toBeTruthy();
       expect(scrollRegion!.getAttribute("data-scroll-region")).toBe("true");
-      expect(scrollRegion!.className).toContain("flex-1");
-      expect(scrollRegion!.className).toContain("min-h-0");
-      expect(scrollRegion!.className).toContain("overflow-y-auto");
+      expect(scrollRegion!.className).toContain("size-full");
+      // flex 尺寸链在 ScrollArea 的 Root 上
+      const scrollAreaRoot = scrollRegion!.closest("[data-slot='scroll-area']");
+      expect(scrollAreaRoot).toBeTruthy();
+      expect(scrollAreaRoot!.className).toContain("flex-1");
+      expect(scrollAreaRoot!.className).toContain("min-h-0");
     });
 
     it("exactly one data-scroll-region in the two-column shell (sole scroll contract)", () => {

@@ -31,6 +31,25 @@ if (typeof window !== "undefined" && !window.ResizeObserver) {
   };
 }
 
+// ─── IntersectionObserver mock ─────────────────────────────────
+//
+// jsdom does not implement IntersectionObserver. zag-js scroll-area
+// machine calls trackViewportVisibility on mount — add a minimal mock
+// so ark-ui ScrollArea can render in tests.
+if (typeof window !== "undefined" && !window.IntersectionObserver) {
+  window.IntersectionObserver = class IntersectionObserver {
+    observe(_target: Element): void {}
+    unobserve(_target: Element): void {}
+    disconnect(): void {}
+    takeRecords(): IntersectionObserverEntry[] {
+      return [];
+    }
+    root = null;
+    rootMargin = "";
+    thresholds = [0];
+  } as unknown as typeof IntersectionObserver;
+}
+
 // ─── localStorage polyfill ─────────────────────────────────────
 //
 // jsdom requires a proper origin (non-opaque) for localStorage to work.
