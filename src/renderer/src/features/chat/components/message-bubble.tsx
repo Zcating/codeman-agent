@@ -6,6 +6,8 @@ import { ThinkingPanel } from "@codeman-frontend/features/chat/components/thinki
 import type { Message, ToolResult, FileMatch, ToolCall } from "@codeman-frontend/shared/lib/types";
 import { store } from "@codeman-frontend/features/chat/stores/chat.store";
 import { renderMarkdown } from "@codeman-frontend/features/chat/lib/markdown";
+import { ParallelPanel } from "@codeman-frontend/plugins/multi-agents/components/parallel-panel";
+import { subAgentsStreamStore } from "@codeman-frontend/plugins/multi-agents/stores/sub-agents-stream.store";
 
 function escapeHtml(s: string): string {
   return s
@@ -38,6 +40,22 @@ export function MessageBubble(props: { message: Message }) {
 
   const pairedTools = createMemo(() => pairToolCalls(props.message));
   const hasTools = () => pairedTools().length > 0;
+
+  // Separate delegate_task calls from other tool calls
+  const delegateTaskToolCalls = createMemo(() =>
+    pairedTools().filter((it) => it.toolCall.name === "delegate_task"),
+  );
+  const otherToolCalls = createMemo(() =>
+    pairedTools().filter((it) => it.toolCall.name !== "delegate_task"),
+  );
+  const hasDelegateTasks = () => delegateTaskToolCalls().length > 0;
+
+  // Get parallel panel entries for delegate_task calls
+  const parallelPanelEntries = createMemo(() => {
+    const delegateIds = new Set(delegateTaskToolCalls().map((it) => it.toolCall.id));
+    const allEntries = Object.values(subAgentsStreamStore.state.byToolCall);
+    return allEntries.filter((entry) => delegateIds.has(entry.toolCallId));
+  });
   const hasThinking = () => !!(props.message.thinking && props.message.thinking.length > 0);
   const hasContent = () => !!props.message.content && props.message.content.length > 0;
   return (
@@ -61,9 +79,13 @@ export function MessageBubble(props: { message: Message }) {
             />
           </Show>
 
-          <Show when={hasTools()}>
+          <Show when={hasDelegateTasks()}>
+            <ParallelPanel entries={parallelPanelEntries()} />
+          </Show>
+
+          <Show when={otherToolCalls().length > 0}>
             <div class="space-y-1.5" data-testid="inline-tool-calls">
-              <For each={pairedTools()}>
+              <For each={otherToolCalls()}>
                 {(it) => (
                   <ToolCallPanel
                     toolCall={it.toolCall}

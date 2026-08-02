@@ -1,0 +1,18 @@
+[
+  {
+    "question": "multiagents::simple-delegate",
+    "turns": [
+      {
+        "text": "Use the Researcher sub-agent to search for the latest news about TypeScript."
+      }
+    ]
+  },
+  {
+    "question": "multiagents::parallel-delegate",
+    "turns": [
+      {
+        "text": "Use both the Researcher and Coder sub-agents in parallel to research TypeScript best practices and write a summary."
+      }
+    ]
+  }
+]

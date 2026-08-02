@@ -3,6 +3,7 @@ import { pluginRegistry } from "@codeman-frontend/plugins/lib/plugin-registry";
 import type { PluginDescriptor } from "@codeman-frontend/plugins/lib/plugin-registry";
 import { initializeSkillsManifests } from "@codeman-frontend/plugins/skills/stores/skills.store";
 import { initializeMcp } from "@codeman-frontend/plugins/mcp/stores/store";
+import "@codeman-frontend/plugins/multi-agents/index";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
 
 

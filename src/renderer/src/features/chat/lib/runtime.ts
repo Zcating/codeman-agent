@@ -28,6 +28,7 @@ import { AppError } from "@codeman-frontend/shared/lib/errors";
 import type { TSchema } from "@sinclair/typebox";
 import { subAgentsStore } from "@codeman-frontend/plugins/multi-agents/stores/sub-agents.store";
 import { buildDelegateTaskTool } from "@codeman-frontend/plugins/multi-agents/lib/delegate-task-tool";
+import { subAgentsStreamStore } from "@codeman-frontend/plugins/multi-agents/stores/sub-agents-stream.store";
 
 
 function buildMcpTools(entries: readonly McpToolEntry[]): AgentTool<TSchema, unknown>[] {
@@ -321,8 +322,20 @@ export function createAgentRuntime(options: CreateAgentRuntimeOptions = {}): Age
 
         // Conditionally add delegate_task tool if there are enabled sub-agents
         const enabledSubAgents = Object.values(subAgentsStore.state.byId).filter((s) => s.enabled);
+        const onStreamEvent = (event: AgentEvent, toolCallId: string, subAgentId: string): void => {
+          if (event.type === "agent_start") {
+            const config = enabledSubAgents.find((c) => c.id === subAgentId);
+            subAgentsStreamStore.actions.recordStart(toolCallId, subAgentId, config?.name ?? "Unknown");
+          } else if (event.type === "message_update") {
+            subAgentsStreamStore.actions.appendEvent(toolCallId, event);
+          } else if (event.type === "agent_end") {
+            const endEvent = event as { type: "agent_end"; finalText?: string; usage?: { inputTokens: number; outputTokens: number } };
+            const finalText = endEvent.finalText ?? "";
+            subAgentsStreamStore.actions.recordComplete(toolCallId, finalText, endEvent.usage);
+          }
+        };
         const delegateTaskTool = enabledSubAgents.length > 0
-          ? buildDelegateTaskTool(enabledSubAgents, provider, toolRegistry, () => {})
+          ? buildDelegateTaskTool(enabledSubAgents, provider, toolRegistry, onStreamEvent)
           : null;
         const tools = delegateTaskTool ? [...baseTools, delegateTaskTool] : baseTools;
 
