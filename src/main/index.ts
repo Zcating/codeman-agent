@@ -1,7 +1,7 @@
 
 import "dotenv/config";
 
-import { app, BrowserWindow, Menu, protocol, net } from "electron";
+import { app, BrowserWindow, protocol, net } from "electron";
 import { join, sep, normalize } from "node:path";
 import { pathToFileURL } from "node:url";
 import { registerIpcHandlers } from "./ipc";
@@ -107,26 +107,8 @@ function createMainWindow(): BrowserWindow {
   return win;
 }
 
-function buildAppMenu(): void {
-
-  const menu = Menu.buildFromTemplate([
-    {
-      label: "File",
-      submenu: [
-        {
-          label: "Quit",
-          accelerator: "CmdOrCtrl+Q",
-          click: () => app.exit(0),
-        },
-      ],
-    },
-  ]);
-  Menu.setApplicationMenu(menu);
-}
-
 app.whenReady().then(() => {
 	registerAppProtocol();
-	buildAppMenu();
 	registerIpcHandlers({ getMainWindow: () => mainWindow });
 	registerSkillsIpc();
 	loadQaTable();
