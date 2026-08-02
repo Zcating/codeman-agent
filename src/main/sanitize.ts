@@ -1,5 +1,6 @@
 import { Schema } from "effect";
-import { SettingStruct, DEFAULT_SETTINGS, type Settings } from "./settings-schema";
+import { SettingStruct, type Settings } from "./schemas";
+import { DEFAULT_SETTINGS } from "./defaults";
 
 
 const MIN_SIZE_WIDTH = 100;
