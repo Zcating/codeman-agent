@@ -224,6 +224,8 @@ export function ChatView(props: { convId?: string }): JSX.Element {
       const providerId = appStore.state.value.defaultLlmProviderId;
       const providerConfig = appStore.state.value.providers?.find((p) => p.id === providerId);
       const provider: ProviderConfig = {
+        id: providerConfig?.id ?? "",
+        models: providerConfig?.llm?.models ?? [],
         apiKey: providerConfig?.apiKey,
         baseUrl: providerConfig?.llm?.baseUrl ?? "",
         defaultModel: providerConfig?.llm?.defaultModel ?? "auto",
