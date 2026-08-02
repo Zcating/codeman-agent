@@ -25,6 +25,7 @@ import {
 } from "@codeman-frontend/shared/components/ui/sidebar";
 import { useSplitterContext } from "@ark-ui/solid/splitter";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@codeman-frontend/shared/components/ui/resizable";
+import { ScrollRegion } from "@codeman-frontend/shared/components/ui/scroll-region";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-solid";
 
 // ─── Persistence keys ────────────────────────────────────────────────────────────
@@ -564,11 +565,11 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
             />
           </div>
 
-          {/* Main content */}
+          {/* Main content — the sole scroll region of the main column (ADR-0039) */}
           <Show when={props.children}>
-            <div class="flex-1 min-h-0 overflow-y-auto">
+            <ScrollRegion data-testid="main-content-scroll">
               {props.children}
-            </div>
+            </ScrollRegion>
           </Show>
         </SidebarInset>
         </div>

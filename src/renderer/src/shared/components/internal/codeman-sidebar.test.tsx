@@ -586,20 +586,30 @@ describe("CodemanSidebar (PR 2)", () => {
       expect(inset!.className).not.toContain("overflow-y-auto");
     });
 
-    it("content wrapper (children host) has overflow-y-auto (Bug V2.10: non-chat pages lost scrolling)", () => {
+    it("content wrapper is the named scroll region (ADR-0039 contract: main-content-scroll owns overflow)", () => {
       // Bug V2.10: 2bf2d7d removed SidebarInset overflow-y-auto so the top toolbar
       // stays fixed, but the content wrapper (the flex-1 div hosting route content)
       // never received a scroll channel. On pages taller than the viewport (plugins,
       // settings sections) the content was clipped by the resizable panel's
       // overflow:hidden with no scroll container anywhere — wheel scrolling did
       // nothing. ChatView worked only because it owns its own overflow-y-auto.
-      // The content wrapper must be the scroll container for all other routes.
+      // The content wrapper must be the scroll container for all other routes,
+      // and it must be addressable by e2e/unit tests via data-testid.
       const { container } = renderSidebar({ children: <div data-testid="main-content">Hello</div> });
-      const contentHost = container.querySelector("[data-testid='main-content']")?.parentElement;
-      expect(contentHost).toBeTruthy();
-      expect(contentHost!.className).toContain("flex-1");
-      expect(contentHost!.className).toContain("min-h-0");
-      expect(contentHost!.className).toContain("overflow-y-auto");
+      const scrollRegion = container.querySelector("[data-testid='main-content-scroll']");
+      expect(scrollRegion).toBeTruthy();
+      expect(scrollRegion!.getAttribute("data-scroll-region")).toBe("true");
+      expect(scrollRegion!.className).toContain("flex-1");
+      expect(scrollRegion!.className).toContain("min-h-0");
+      expect(scrollRegion!.className).toContain("overflow-y-auto");
+    });
+
+    it("exactly one data-scroll-region in the two-column shell (sole scroll contract)", () => {
+      // ADR-0039: 主栏内恰好一个滚动区。两栏 shell 本身（sidebar + inset）不应
+      // 出现第二个滚动区；多个滚动区 = V2.9 双滚动条回归，零个 = V2.10 无滚动回归。
+      const { container } = renderSidebar({ children: <div>Hello</div> });
+      const regions = container.querySelectorAll("[data-scroll-region]");
+      expect(regions.length).toBe(1);
     });
   });
 
