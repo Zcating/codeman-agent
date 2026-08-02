@@ -136,6 +136,23 @@ describe("mock-server HTTP — POST /mock/anthropic/v1/messages", () => {
     expect(body).toContain('"text":"g"');
   });
 
+  it("T18c: OPTIONS preflight → 204 + 全部 CORS headers (Allow-Origin/Methods/Headers)", async () => {
+    const res = await fetch(`${BASE_URL}/mock/anthropic/v1/messages`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: "http://127.0.0.1:1420",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type,authorization",
+      },
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get("access-control-allow-origin")).toBe("*");
+    expect(res.headers.get("access-control-allow-methods")?.toLowerCase()).toContain("post");
+    const allowHeaders = (res.headers.get("access-control-allow-headers") ?? "").toLowerCase();
+    expect(allowHeaders).toContain("authorization");
+    expect(allowHeaders).toContain("content-type");
+  });
+
   it("T29: POST + last user msg wins in entry lookup (resume-friendly)", async () => {
     writeFileSync(
       qaPath,
