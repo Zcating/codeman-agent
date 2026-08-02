@@ -1,7 +1,7 @@
 
 import "dotenv/config";
 
-import { app, BrowserWindow, protocol, net } from "electron";
+import { app, BrowserWindow, Menu, protocol, net } from "electron";
 import { join, sep, normalize } from "node:path";
 import { pathToFileURL } from "node:url";
 import { registerIpcHandlers } from "./ipc";
@@ -108,6 +108,7 @@ function createMainWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
+	Menu.setApplicationMenu(null);
 	registerAppProtocol();
 	registerIpcHandlers({ getMainWindow: () => mainWindow });
 	registerSkillsIpc();
