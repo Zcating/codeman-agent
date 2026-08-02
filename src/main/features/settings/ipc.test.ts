@@ -16,8 +16,17 @@ describe("registerSettingsIpc", () => {
   it("registers getSettings/updateSettings/deleteProvider channels", () => {
     registerSettingsIpc({ settings: new SettingsState("/tmp/x") });
     const channels = fakeIpcMain.handle.mock.calls.map((c) => c[0]);
-    expect(channels).toEqual(["getSettings", "updateSettings", "deleteProvider"]);
-    expect(fakeIpcMain.handle).toHaveBeenCalledTimes(3);
+    expect(channels).toEqual([
+      "getSettings",
+      "updateSettings",
+      "deleteProvider",
+      "subAgents:list",
+      "subAgents:add",
+      "subAgents:update",
+      "subAgents:delete",
+      "subAgents:setEnabled",
+    ]);
+    expect(fakeIpcMain.handle).toHaveBeenCalledTimes(8);
   });
 
   it("getSettings handler delegates to settings.load()", () => {
