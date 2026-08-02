@@ -1,4 +1,4 @@
-import type { SkillManifest } from "@codeman-frontend/plugins/skills/lib/skill-loader-schema";
+import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
 export function formatSkillsManifestSection(
 	manifests: readonly SkillManifest[],

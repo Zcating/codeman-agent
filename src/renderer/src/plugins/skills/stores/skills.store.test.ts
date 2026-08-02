@@ -11,7 +11,7 @@ import {
 } from "@codeman-frontend/plugins/skills/stores/skills.store";
 import { SkillsApi } from "@codeman-frontend/shared/apis";
 import { Unknown } from "@codeman-frontend/shared/lib/errors";
-import type { SkillManifest } from "@codeman-frontend/plugins/skills/lib/skill-loader-schema";
+import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
 const SAMPLE: SkillManifest[] = [
 	{ name: "foo", description: "Foo", source: "user", path: "/fake/foo/SKILL.md" },

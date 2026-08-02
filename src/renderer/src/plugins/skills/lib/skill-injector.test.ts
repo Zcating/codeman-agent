@@ -1,7 +1,7 @@
 
 import { describe, it, expect } from "vitest";
 import { formatSkillsManifestSection } from "@codeman-frontend/plugins/skills/lib/skill-injector";
-import type { SkillManifest } from "@codeman-frontend/plugins/skills/lib/skill-loader-schema";
+import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
 const SKILL = (
 	name: string,

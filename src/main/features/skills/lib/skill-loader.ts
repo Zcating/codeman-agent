@@ -3,7 +3,7 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import type { Dirent } from "node:fs";
 import { NotFound, InvalidConfig } from "@codeman-frontend/shared/lib/errors";
-import { SkillFrontmatterSchema, type SkillFrontmatter, type SkillManifest, type SkillSource } from "@codeman-frontend/plugins/skills/lib/skill-loader-schema";
+import { SkillFrontmatterSchema, type SkillFrontmatter, type SkillManifest, type SkillSource } from "./skill-loader-schema";
 
 const FRONT_MATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 
