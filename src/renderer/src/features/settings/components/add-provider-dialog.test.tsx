@@ -1,12 +1,13 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen } from "@solidjs/testing-library";
+import { screen, fireEvent } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
 
 import { createProviderFormDialog } from "@codeman-frontend/features/settings/components/add-provider-dialog";
 import { enforceDefaultModelInvariant } from "@codeman-frontend/shared/lib/provider-invariant";
 import { codemanToast } from "@codeman-frontend/shared/components/internal/codeman-toast";
 import { PROVIDER_PRESETS } from "@codeman-frontend/features/settings/lib/provider-presets";
+import type { CodemanSelectOption } from "@codeman-frontend/shared/components/internal/codeman-select";
 
 vi.mock("@codeman-frontend/shared/components/internal/codeman-toast", () => ({
   codemanToast: {
@@ -18,6 +19,95 @@ vi.mock("@codeman-frontend/shared/components/internal/codeman-toast", () => ({
 vi.mock("@codeman-frontend/shared/lib/provider-invariant", () => ({
   enforceDefaultModelInvariant: vi.fn((llm) => llm),
 }));
+
+let mockIsOpen = false;
+let sharedOnValueChange: ((details: { value: string[] }) => void) | null = null;
+
+vi.mock("@ark-ui/solid", async () => {
+  const actual = await vi.importActual("@ark-ui/solid");
+
+  return {
+    ...actual,
+    Select: {
+      Root: (props: any) => {
+        sharedOnValueChange = props.onValueChange ?? null;
+        return <>{props.children}</>;
+      },
+      Control: (props: any) => <>{props.children}</>,
+      Trigger: (props: any) => (
+        <button
+          {...props}
+          data-state={mockIsOpen ? "open" : "closed"}
+          onClick={() => {
+            mockIsOpen = !mockIsOpen;
+          }}
+          aria-expanded={mockIsOpen}
+        >
+          {props.children}
+        </button>
+      ),
+      ValueText: (props: any) => (
+        <span data-part="value-text" {...props}>
+          {props.placeholder || props.children}
+        </span>
+      ),
+      Indicator: (props: any) => <span data-part="indicator" {...props}>{props.children}</span>,
+      Positioner: (props: any) => (
+        <div
+          data-part="positioner"
+          {...props}
+          style={{ display: mockIsOpen ? "block" : "none" }}
+        >
+          {props.children}
+        </div>
+      ),
+      Content: (props: any) => (
+        <div
+          data-part="content"
+          data-state={mockIsOpen ? "open" : "closed"}
+          {...props}
+        >
+          {props.children}
+        </div>
+      ),
+      List: (props: any) => <ul data-part="list" {...props}>{props.children}</ul>,
+      Item: (props: any) => {
+        const itemValue = props.item?.value ?? props.value;
+        return (
+          <li
+            data-value={itemValue}
+            data-disabled={props.item?.disabled || false}
+            {...props}
+            onClick={() => {
+              if (!props.item?.disabled) {
+                if (sharedOnValueChange) {
+                  sharedOnValueChange({ value: [itemValue] });
+                }
+                mockIsOpen = false;
+              }
+            }}
+          >
+            {props.children}
+          </li>
+        );
+      },
+      ItemText: (props: any) => <span {...props}>{props.children}</span>,
+      ItemIndicator: (props: any) => <span data-part="item-indicator" {...props}>{props.children}</span>,
+    },
+    createListCollection: vi.fn(({ items }: { items: CodemanSelectOption[] }) => ({
+      items,
+      filteredItems: items,
+      getItemValue: (item: CodemanSelectOption) => item.value,
+      getItemDisabled: (item: CodemanSelectOption) => item.disabled ?? false,
+      stringifyItem: (item: CodemanSelectOption) => item.label,
+    })),
+    useSelectContext: vi.fn(() => () => ({
+      setOpen: (open: boolean) => {
+        mockIsOpen = open;
+      }
+    })),
+  };
+});
 
 async function flushPromises(): Promise<void> {
   for (let i = 0; i < 5; i++) {
@@ -49,6 +139,8 @@ describe("createProviderFormDialog", () => {
     (enforceDefaultModelInvariant as ReturnType<typeof vi.fn>).mockReset();
     codemanToast.error = vi.fn();
     codemanToast.success = vi.fn();
+    mockIsOpen = false;
+    sharedOnValueChange = null;
   });
 
   afterEach(() => {
@@ -97,11 +189,20 @@ describe("createProviderFormDialog", () => {
       // Check pre-filled values
       const labelInput = screen.getByTestId("provider-field-label") as HTMLInputElement;
       const baseUrlInput = screen.getByTestId("provider-field-base-url") as HTMLInputElement;
-      const defaultModelInput = screen.getByTestId("provider-field-default-model") as HTMLInputElement;
 
       expect(labelInput.value).toBe("DeepSeek");
       expect(baseUrlInput.value).toBe("https://api.deepseek.com/anthropic");
-      expect(defaultModelInput.value).toBe("deepseek-v4-pro");
+
+      // Default model 是 CodemanSelect(trigger 存在,选项来自预设模型)
+      expect(
+        screen.getByTestId("provider-field-default-model-trigger"),
+      ).toBeInTheDocument();
+      expect(
+        document.querySelector('li[data-value="deepseek-v4-pro"]'),
+      ).toBeInTheDocument();
+      expect(
+        document.querySelector('li[data-value="deepseek-v4-flash"]'),
+      ).toBeInTheDocument();
 
       // apiKey should be empty
       const apiKeyInput = screen.getByTestId("provider-field-api-key") as HTMLInputElement;
@@ -111,6 +212,31 @@ describe("createProviderFormDialog", () => {
       await user.click(screen.getByTestId("provider-cancel-button"));
       const result = await promise;
       expect(result).toBeNull();
+    });
+
+    it("点选厂商 tag → Default model 是 CodemanSelect 且列出预设模型", async () => {
+      const user = userEvent.setup();
+      const promise = createProviderFormDialog();
+      await flushPromises();
+
+      await user.click(screen.getByTestId("provider-tag-deepseek"));
+
+      expect(
+        screen.getByTestId("provider-field-default-model-trigger"),
+      ).toBeInTheDocument();
+
+      const optionIds = Array.from(
+        document.querySelectorAll('li[data-value]'),
+      ).map((li) => li.getAttribute("data-value"));
+      expect(optionIds).toEqual(["deepseek-v4-pro", "deepseek-v4-flash"]);
+
+      // 选择 flash 后提交,defaultModel 跟随变化
+      fireEvent.click(document.querySelector('li[data-value="deepseek-v4-flash"]')!);
+      await user.click(screen.getByTestId("provider-add-button"));
+
+      const provider = await promise;
+      expect(provider).not.toBeNull();
+      expect(provider!.llm.defaultModel).toBe("deepseek-v4-flash");
     });
 
     it("点选厂商 tag → models 清单自动带出（不可编辑，仅展示）", async () => {
@@ -163,11 +289,17 @@ describe("createProviderFormDialog", () => {
 
       const labelInput = screen.getByTestId("provider-field-label") as HTMLInputElement;
       const baseUrlInput = screen.getByTestId("provider-field-base-url") as HTMLInputElement;
-      const defaultModelInput = screen.getByTestId("provider-field-default-model") as HTMLInputElement;
 
       expect(labelInput.value).toBe("Mock");
       expect(baseUrlInput.value).toBe("http://127.0.0.1:50000/mock/anthropic");
-      expect(defaultModelInput.value).toBe("mock-default");
+
+      // Mock 模板带模型清单 → Default model 是 CodemanSelect
+      expect(
+        screen.getByTestId("provider-field-default-model-trigger"),
+      ).toBeInTheDocument();
+      expect(
+        document.querySelector('li[data-value="mock-default"]'),
+      ).toBeInTheDocument();
 
       // Cancel
       await user.click(screen.getByTestId("provider-cancel-button"));
@@ -293,7 +425,7 @@ describe("createProviderFormDialog", () => {
       await flushPromises();
 
       await user.click(screen.getByTestId("provider-tag-deepseek"));
-      await user.type(screen.getByTestId("provider-field-default-model"), "invalid-model");
+      fireEvent.click(document.querySelector('li[data-value="deepseek-v4-flash"]')!);
       await user.type(screen.getByTestId("provider-field-api-key"), "sk-key");
 
       await user.click(screen.getByTestId("provider-add-button"));

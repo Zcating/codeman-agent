@@ -9,6 +9,7 @@ import {
 } from "@codeman-frontend/shared/components/ui/dialog";
 import { Button } from "@codeman-frontend/shared/components/ui/button";
 import { CodemanInput } from "@codeman-frontend/shared/components/internal/codeman-input";
+import { CodemanSelect } from "@codeman-frontend/shared/components/internal/codeman-select";
 import { Dialog } from "@codeman-frontend/shared/components/internal/codeman-dialog";
 import type { Provider } from "@codeman-frontend/shared/lib/types";
 import { buildMockDevTemplate } from "@codeman-frontend/features/settings/lib/mock-provider-template";
@@ -194,11 +195,24 @@ export function createProviderFormDialog(): Promise<Provider | null> {
               </div>
               <div>
                 <label class="text-xs text-muted-foreground">Default model</label>
-                <CodemanInput
-                  data-testid="provider-field-default-model"
-                  value={defaultModel()}
-                  onValueChange={setDefaultModel}
-                />
+                {presetModels().length > 0 ? (
+                  <CodemanSelect
+                    data-testid="provider-field-default-model"
+                    options={presetModels().map((m) => ({
+                      value: m.id,
+                      label: m.deprecated ? `${m.label} (deprecated)` : m.label,
+                    }))}
+                    value={defaultModel()}
+                    onChange={setDefaultModel}
+                    placeholder="选择默认模型"
+                  />
+                ) : (
+                  <CodemanInput
+                    data-testid="provider-field-default-model"
+                    value={defaultModel()}
+                    onValueChange={setDefaultModel}
+                  />
+                )}
               </div>
               {presetModels().length > 0 && (
                 <div>
