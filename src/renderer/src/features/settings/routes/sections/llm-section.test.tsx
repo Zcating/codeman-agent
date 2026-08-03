@@ -92,7 +92,7 @@ const baseSettings = {
   },
   systemPrompt: { default: "You are a helpful assistant.", userCanEdit: true },
   conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
-  llmProviders: [] as unknown[],
+  llmProviders: [],
 };
 
 describe("LlmSection — accordion + explicit save (ADR-0050 D2/D5)", () => {
@@ -319,8 +319,8 @@ describe("LlmSection — accordion + explicit save (ADR-0050 D2/D5)", () => {
 
   it("registers beforeunload listener on mount", async () => {
     const addSpy = vi.spyOn(window, "addEventListener");
-    let capturedHandler: EventListener | null = null;
-    addSpy.mockImplementation((event: string, handler: EventListener) => {
+    let capturedHandler: EventListenerOrEventListenerObject | null = null;
+    addSpy.mockImplementation((event: string, handler: EventListenerOrEventListenerObject) => {
       if (event === "beforeunload") {capturedHandler = handler;}
       return undefined as unknown as void;
     });
@@ -336,11 +336,7 @@ describe("LlmSection — accordion + explicit save (ADR-0050 D2/D5)", () => {
 
   it("unregisters beforeunload listener on unmount", async () => {
     const removeSpy = vi.spyOn(window, "removeEventListener");
-    let capturedHandler: EventListener | null = null;
-    removeSpy.mockImplementation((event: string, handler: EventListener) => {
-      if (event === "beforeunload") {capturedHandler = handler;}
-      return undefined as unknown as void;
-    });
+    removeSpy.mockImplementation(() => undefined as unknown as void);
 
     const { unmount } = render(() => <LlmSection />);
     await wait();
