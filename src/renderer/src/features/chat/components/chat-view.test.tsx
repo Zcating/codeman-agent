@@ -318,7 +318,6 @@ describe("ChatView", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "test-key",
           llm: {
             defaultModel: "MiniMax-M2.5-highspeed",

@@ -113,13 +113,12 @@ vi.mock("../../../shared/stores/app.store", () => ({
         workspaces: [] as Array<{ id: string; label: string; rootPath: string; enabled: boolean }>,
         get defaultLlmProviderId() { return mockDefaultLlmProvider.id; },
         providers: [
-          {
-            id: "minimax",
-            label: "MiniMax",
-            apiKey: "test-key",
-            enabled: true,
-            llm: {
-              defaultModel: "MiniMax-M2.5-highspeed",
+      {
+        id: "minimax",
+        label: "MiniMax",
+        apiKey: "test-key",
+        llm: {
+          defaultModel: "MiniMax-M2.5-highspeed",
               baseUrl: "https://api.minimaxi.com/anthropic",
               apiType: "anthropic-messages" as const,
               modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
@@ -315,7 +314,6 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
       {
         id: "minimax",
         label: "MiniMax",
-        enabled: true,
         apiKey: "test-key",
         llm: {
           defaultModel: "m",
@@ -435,7 +433,6 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
         id: "minimax",
         label: "MiniMax",
         apiKey: "test-key",
-        enabled: true,
         llm: {
           defaultModel: "MiniMax-M2.5-highspeed",
           baseUrl: "https://api.minimaxi.com/anthropic",
@@ -565,7 +562,6 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
         id: "provider-1",
         label: "Provider One",
         apiKey: "key1",
-        enabled: true,
         llm: {
           defaultModel: "model-1",
           baseUrl: "https://api.one.com",
@@ -580,7 +576,6 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
         id: "provider-2",
         label: "Provider Two",
         apiKey: "key2",
-        enabled: true,
         llm: {
           defaultModel: "model-2",
           baseUrl: "https://api.two.com",
@@ -613,7 +608,6 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
         id: "provider-1",
         label: "Provider One",
         apiKey: "key1",
-        enabled: true,
         llm: {
           defaultModel: "model-1",
           baseUrl: "https://api.one.com",
@@ -628,7 +622,6 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
         id: "provider-2",
         label: "Provider Two",
         apiKey: "key2",
-        enabled: true,
         llm: {
           defaultModel: "model-2",
           baseUrl: "https://api.two.com",
@@ -686,7 +679,6 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
         id: "provider-multi",
         label: "MultiModel Provider",
         apiKey: "key-multi",
-        enabled: true,
         llm: {
           defaultModel: "model-first",
           baseUrl: "https://api.multi.com",
@@ -741,7 +733,6 @@ describe("HomeAgentForm — Ctrl+Enter / Cmd+Enter send shortcut (T4.3)", () => 
         id: "minimax",
         label: "MiniMax",
         apiKey: "test-key",
-        enabled: true,
         llm: {
           defaultModel: "MiniMax-M2.5-highspeed",
           baseUrl: "https://api.minimaxi.com/anthropic",

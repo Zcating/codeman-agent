@@ -12,7 +12,6 @@ import { TauriError } from "./invoke.api";
 const mockProvider: Provider = {
   id: "minimax",
   label: "MiniMax",
-  enabled: true,
   apiKey: "",
   llm: {
     defaultModel: "MiniMax-M2.5-highspeed",
@@ -35,7 +34,7 @@ const mockProviderList: Provider[] = [mockProvider];
 
 
 const MockProviderApiLive = Layer.succeed(ProviderApi, {
-  list: () => Effect.succeed(mockProviderList.filter((p) => p.enabled)),
+  list: () => Effect.succeed(mockProviderList),
   get: (id) => {
     const provider = mockProviderList.find((p) => p.id === id);
     if (!provider) {

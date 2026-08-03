@@ -8,12 +8,11 @@ export function buildEnabledProviders(
   providers: Array<{
     id: string;
     label: string;
-    enabled: boolean;
     llm?: { models: Array<{ id: string; label: string }> };
   }>
 ): EnabledProvider[] {
   return providers
-    .filter((p) => p.enabled && p.llm != null)
+    .filter((p) => p.llm != null)
     .map((p) => ({
       id: p.id,
       label: p.label,

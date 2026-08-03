@@ -38,7 +38,6 @@ import { appStore, _resetAppStoreForTest } from "@codeman-frontend/shared/stores
 const mockMiniMaxProvider: Provider = {
   id: "minimax",
   label: "MiniMax",
-  enabled: true,
   apiKey: "",
   llm: {
     defaultModel: "MiniMax-M2.5-highspeed",
@@ -59,7 +58,6 @@ const mockMiniMaxProvider: Provider = {
 const mockDeepSeekProvider: Provider = {
   id: "deepseek",
   label: "DeepSeek",
-  enabled: true,
   apiKey: "",
   llm: {
     defaultModel: "deepseek-chat",
