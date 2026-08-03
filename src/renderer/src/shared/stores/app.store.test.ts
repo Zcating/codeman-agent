@@ -98,7 +98,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "old-model",
@@ -141,7 +140,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "old-model",
@@ -173,7 +171,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "old-model",
@@ -210,7 +207,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "MiniMax-M2.7-highspeed",
@@ -249,7 +245,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "x",
@@ -310,7 +305,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "some-model",
@@ -371,7 +365,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "MiniMax-M2.5-highspeed",
@@ -384,7 +377,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "deepseek",
           label: "DeepSeek",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "deepseek-chat",
@@ -411,7 +403,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "deepseek",
           label: "DeepSeek",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "deepseek-chat",
@@ -503,7 +494,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "",
@@ -540,7 +530,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "MiniMax-M2.5-highspeed",
@@ -568,7 +557,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "MiniMax-M2.5-highspeed",
@@ -581,7 +569,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "deepseek",
           label: "DeepSeek",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "deepseek-chat",
@@ -607,7 +594,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "MiniMax-M2.5-highspeed",
@@ -633,7 +619,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "MiniMax-M2.5-highspeed",
@@ -646,7 +631,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "deepseek",
           label: "DeepSeek",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "deepseek-chat",
