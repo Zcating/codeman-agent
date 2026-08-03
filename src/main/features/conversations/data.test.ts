@@ -1,94 +1,6 @@
-/**
- * conversations/data.test.ts
- *
- * ADR-0046 D3 测试策略：
- * - mock better-sqlite3 原生模块 → 纯 JS FakeDatabase
- * - 真实 @effect/sql-sqlite-node/SqliteClient 可加载（不 crash）
- * - 真实 SqliteClient Tag 提供 fakeDb client
- * - 每个测试预注册 SELECT 查询的返回结果（INSERT 数据通过 fakeDb 查询返回）
- */
-
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { createRequire } from "node:module";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const require_ = createRequire(import.meta.url);
-const Effect = require_("effect").Effect;
-
-// ---------------------------------------------------------------------------
-// FakeDatabase (shared via vi.hoisted)
-// ---------------------------------------------------------------------------
-
-const fakeDb = vi.hoisted(() => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { FakeDatabase } = require("../../db/__fake__.ts") as {
-    FakeDatabase: new (filename: string) => import("../../db/__fake__.ts").FakeDatabase;
-  };
-  const db = new FakeDatabase(":memory:");
-  return db;
-});
-
-// ---------------------------------------------------------------------------
-// Mock better-sqlite3 → pure JS FakeDatabase
-// ---------------------------------------------------------------------------
-
-vi.mock("better-sqlite3", () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { FakeDatabase } = require("../../db/__fake__.ts") as {
-    FakeDatabase: new (filename: string) => import("../../db/__fake__.ts").FakeDatabase;
-  };
-  return { default: FakeDatabase };
-});
-
-// ---------------------------------------------------------------------------
-// Mock @effect/sql-sqlite-node/SqliteClient
-// ---------------------------------------------------------------------------
-
-vi.mock("@effect/sql-sqlite-node/SqliteClient", () => {
-  const { createRequire } = require("node:module");
-  const require_ = createRequire(import.meta.url);
-  const E = require_("effect");
-  const Eff = E.Effect;
-  const Lay = E.Layer;
-  const Ctx = E.Context;
-
-  // Load the real module to get the actual Context tag
-  const sqliteModule = require_("@effect/sql-sqlite-node/SqliteClient");
-  const realSqliteTag: any = sqliteModule.SqliteClient;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fakeClient: any = {
-    unsafe: (sql: string, params?: unknown[]) => {
-      fakeDb.prepareCalls.push({ sql });
-      const stmt = fakeDb.prepare(sql);
-      // Real sql.unsafe() returns Effect<rows>
-      return Eff.succeed(
-        stmt.reader ? (stmt.all(...(params ?? [])) as unknown[]) : null
-      );
-    },
-    execute: vi.fn(() => Eff.succeed({ rowsAffected: 0 })),
-    executeRaw: vi.fn(() => Eff.succeed({ rowsAffected: 0 })),
-    executeValues: vi.fn(() => Eff.succeed([])),
-    executeUnprepared: vi.fn(() => Eff.succeed({ rowsAffected: 0 })),
-    executeStream: vi.fn(),
-    export: Eff.succeed(Buffer.from("")),
-    backup: vi.fn(),
-    loadExtension: vi.fn(),
-  };
-
-  const fakeLayer = Lay.succeedContext(
-    Ctx.empty().pipe(Ctx.add(realSqliteTag as any, fakeClient))
-  );
-
-  return {
-    SqliteClient: realSqliteTag,
-    SqlClient: sqliteModule.SqlClient,
-    layer: vi.fn(() => fakeLayer),
-  };
-});
-
-vi.mock("electron", () => ({
-  app: { getPath: vi.fn(() => "/tmp") },
-}));
+import { describe, it, expect, beforeEach } from "vitest";
+import { Effect } from "effect";
+import * as SqliteNS from "@effect/sql-sqlite-node/SqliteClient";
 
 import {
   listConversations,
@@ -99,377 +11,138 @@ import {
   renameConversation,
   listMessages,
   appendMessage,
+  searchMessagesSafe,
   clearAllHistory,
 } from "./data.js";
 
-import * as SqliteNS from "@effect/sql-sqlite-node/SqliteClient";
+const fake = (() => {
+  const calls: Array<{ sql: string; params: readonly unknown[] }> = [];
+  const rowsBySql = new Map<string, unknown[]>();
+  const failBySql = new Map<string, Error>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = {
+    unsafe(sql: string, params?: readonly unknown[]): Effect.Effect<unknown[], Error, never> {
+      calls.push({ sql, params: params ?? [] });
+      const fail = failBySql.get(sql);
+      if (fail) { return Effect.fail(fail); }
+      return Effect.succeed(rowsBySql.get(sql) ?? []);
+    },
+  } as any;
+  return {
+    client,
+    calls,
+    addQuery(sql: string, rows: unknown[]) { rowsBySql.set(sql, rows); },
+    failQuery(sql: string, err: Error) { failBySql.set(sql, err); },
+  };
+})();
 
-const testLayer = SqliteNS.layer({ filename: ":memory:" });
-
-/** 执行带 :memory: SqliteClient 的 Effect */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function run(effect: any): Promise<any> {
-  return Effect.runPromise(Effect.provide(effect, testLayer));
-}
-
-/** 建表夹具 */
-async function setupTables(): Promise<void> {
-  await run(
-    Effect.gen(function* () {
-      const sql = yield* SqliteNS.SqliteClient;
-      yield* sql.unsafe(`CREATE TABLE conversations (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT '', system_prompt TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, archived_at INTEGER, workspace_id TEXT NOT NULL DEFAULT '')`);
-      yield* sql.unsafe(`CREATE TABLE messages (id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, thinking TEXT, tool_calls TEXT, tool_results TEXT, model TEXT, input_tokens INTEGER, output_tokens INTEGER, created_at INTEGER NOT NULL)`);
-      yield* sql.unsafe(`CREATE VIRTUAL TABLE messages_fts USING fts5(content, content=messages, content_rowid=rowid)`);
-      yield* sql.unsafe(`CREATE TABLE workspaces (id TEXT PRIMARY KEY, label TEXT NOT NULL DEFAULT 'Workspace', root_path TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL)`);
-      yield* sql.unsafe(`CREATE TABLE compaction_entries (id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL, summary TEXT NOT NULL, model TEXT NOT NULL, tokens_before INTEGER NOT NULL, kind TEXT NOT NULL, created_at INTEGER NOT NULL, first_kept_message_id TEXT NOT NULL)`);
-      yield* sql.unsafe(`CREATE TABLE _migrations (name TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)`);
-    })
+  return Effect.runPromise(
+    effect.pipe(Effect.provideService(SqliteNS.SqliteClient, fake.client as unknown as SqliteNS.SqliteClient)),
   );
 }
 
-beforeEach(async () => {
-  fakeDb.prepareCalls.length = 0;
-  fakeDb.calls.length = 0;
-  await setupTables();
-});
+beforeEach(() => { fake.calls.length = 0; fake.addQuery("SELECT * FROM conversations WHERE archived_at IS NULL", []); });
 
-// ---------------------------------------------------------------------------
-// listConversations
-// ---------------------------------------------------------------------------
-
-describe("listConversations", () => {
-  it("returns empty array when no conversations", async () => {
-    // Pre-register empty result for the SELECT
-    fakeDb.addQuery(
-      "SELECT * FROM conversations WHERE archived_at IS NULL",
-      []
-    );
+describe("conversations data access", () => {
+  it("listConversations maps rows to Conversation shape (active only)", async () => {
+    fake.addQuery("SELECT * FROM conversations WHERE archived_at IS NULL", [
+      { id: "conv-1", title: "Test", system_prompt: null, created_at: 1000, updated_at: 1000, archived_at: null, workspace_id: "" },
+    ]);
     const result = await run(listConversations(false));
-    expect(result).toEqual([]);
+    expect(result).toEqual([{ id: "conv-1", title: "Test", systemPrompt: null, workspaceId: "", createdAt: 1000, updatedAt: 1000, archivedAt: null }]);
   });
 
-  it("returns only non-archived by default", async () => {
-    // Pre-register the SELECT results for this test
-    fakeDb.addQuery(
-      "SELECT * FROM conversations WHERE archived_at IS NULL",
-      [
-        {
-          id: "conv-1",
-          title: "active",
-          system_prompt: null,
-          created_at: 1234567890,
-          updated_at: 1234567890,
-          archived_at: null,
-          workspace_id: "",
-        },
-      ]
-    );
-    fakeDb.addQuery(
-      "SELECT * FROM conversations",
-      [
-        {
-          id: "conv-1",
-          title: "active",
-          system_prompt: null,
-          created_at: 1234567890,
-          updated_at: 1234567890,
-          archived_at: null,
-          workspace_id: "",
-        },
-        {
-          id: "conv-2",
-          title: "archived",
-          system_prompt: null,
-          created_at: 1234567890,
-          updated_at: 1234567890,
-          archived_at: 1234567900,
-          workspace_id: "w1",
-        },
-      ]
-    );
-    const all = await run(listConversations(true));
-    const active = await run(listConversations(false));
-    expect(all.length).toBe(2);
-    expect(active.length).toBe(1);
-    expect(active[0]!.title).toBe("active");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getConversation
-// ---------------------------------------------------------------------------
-
-describe("getConversation", () => {
-  it("throws Error when not found", async () => {
-    fakeDb.addQuery(
-      "SELECT * FROM conversations WHERE id = ?",
-      []
-    );
-    await expect(run(getConversation("nonexistent"))).rejects.toThrow(
-      "Conversation not found: nonexistent"
-    );
+  it("listConversations returns all when includeArchived=true", async () => {
+    fake.addQuery("SELECT * FROM conversations", [
+      { id: "conv-1", title: "active", system_prompt: null, created_at: 1000, updated_at: 1000, archived_at: null, workspace_id: "" },
+      { id: "conv-2", title: "archived", system_prompt: null, created_at: 1000, updated_at: 1000, archived_at: 2000, workspace_id: "" },
+    ]);
+    const result = await run(listConversations(true));
+    expect(result.length).toBe(2);
   });
 
-  it("returns mapped conversation", async () => {
-    const row = {
-      id: "conv-1",
-      title: "test",
-      system_prompt: null,
-      created_at: 1234567890,
-      updated_at: 1234567890,
-      archived_at: null,
-      workspace_id: "",
-    };
-    fakeDb.addQuery("SELECT * FROM conversations WHERE id = ?", [row]);
+  it("listConversations returns [] when empty", async () => {
+    fake.addQuery("SELECT * FROM conversations WHERE archived_at IS NULL", []);
+    expect(await run(listConversations(false))).toEqual([]);
+  });
+
+  it("getConversation throws Error when not found", async () => {
+    fake.addQuery("SELECT * FROM conversations WHERE id = ?", []);
+    await expect(run(getConversation("nonexistent"))).rejects.toThrow("Conversation not found: nonexistent");
+  });
+
+  it("getConversation returns mapped conversation", async () => {
+    fake.addQuery("SELECT * FROM conversations WHERE id = ?", [
+      { id: "conv-1", title: "Test", system_prompt: "sys", created_at: 1000, updated_at: 1000, archived_at: null, workspace_id: "ws1" },
+    ]);
     const result = await run(getConversation("conv-1"));
-    expect(result.id).toBe("conv-1");
-    expect(result.title).toBe("test");
+    expect(result).toEqual({ id: "conv-1", title: "Test", systemPrompt: "sys", workspaceId: "ws1", createdAt: 1000, updatedAt: 1000, archivedAt: null });
   });
-});
 
-// ---------------------------------------------------------------------------
-// createConversation
-// ---------------------------------------------------------------------------
-
-describe("createConversation", () => {
-  it("creates and returns mapped conversation", async () => {
-    // Pre-register the INSERT result
-    fakeDb.addMutation(
-      "INSERT INTO conversations (id, title, system_prompt, created_at, updated_at, archived_at, workspace_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
-    );
-    // Pre-register the SELECT after insert
-    const row = {
-      id: "new-uuid",
-      title: "Hello",
-      system_prompt: "You are helpful",
-      created_at: 1234567890,
-      updated_at: 1234567890,
-      archived_at: null,
-      workspace_id: "ws1",
-    };
-    fakeDb.addQuery("SELECT * FROM conversations WHERE id = ?", [row]);
-    const result = await run(
-      createConversation({
-        title: "Hello",
-        workspaceId: "ws1",
-        systemPrompt: "You are helpful",
-      })
-    );
+  it("createConversation inserts and returns mapped conversation", async () => {
+    const result = await run(createConversation({ title: "Hello", workspaceId: "ws1", systemPrompt: "sys" }));
     expect(result.title).toBe("Hello");
     expect(result.workspaceId).toBe("ws1");
-    expect(result.systemPrompt).toBe("You are helpful");
-    expect(result.archivedAt).toBe(null);
+    expect(result.systemPrompt).toBe("sys");
+    expect(fake.calls[0].sql).toBe("INSERT INTO conversations (id, title, system_prompt, created_at, updated_at, archived_at, workspace_id) VALUES (?, ?, ?, ?, ?, NULL, ?)");
   });
 
-  it("defaults empty fields", async () => {
-    fakeDb.addMutation(
-      "INSERT INTO conversations (id, title, system_prompt, created_at, updated_at, archived_at, workspace_id) VALUES (?, ?, ?, ?, ?, ?, ?)"
-    );
-    const row = {
-      id: "new-uuid",
-      title: "",
-      system_prompt: null,
-      created_at: 1234567890,
-      updated_at: 1234567890,
-      archived_at: null,
-      workspace_id: "",
-    };
-    fakeDb.addQuery("SELECT * FROM conversations WHERE id = ?", [row]);
+  it("createConversation defaults empty fields", async () => {
     const result = await run(createConversation({}));
     expect(result.title).toBe("");
     expect(result.workspaceId).toBe("");
     expect(result.systemPrompt).toBe(null);
   });
-});
 
-// ---------------------------------------------------------------------------
-// archiveConversation
-// ---------------------------------------------------------------------------
-
-describe("archiveConversation", () => {
-  it("archives a conversation", async () => {
-    fakeDb.addQuery("SELECT * FROM conversations WHERE id = ?", [
-      {
-        id: "conv-1",
-        title: "to archive",
-        system_prompt: null,
-        created_at: 1234567890,
-        updated_at: 1234567890,
-        archived_at: null,
-        workspace_id: "",
-      },
-    ]);
-    fakeDb.addMutation(
-      "UPDATE conversations SET archived_at = ? WHERE id = ?"
-    );
-    fakeDb.addQuery("SELECT * FROM conversations WHERE id = ?", [
-      {
-        id: "conv-1",
-        title: "to archive",
-        system_prompt: null,
-        created_at: 1234567890,
-        updated_at: 1234567890,
-        archived_at: 1234567900,
-        workspace_id: "",
-      },
-    ]);
-    const conv = { id: "conv-1", title: "to archive" };
-    await run(archiveConversation(conv.id));
-    const result = await run(getConversation(conv.id));
-    expect(result.archivedAt).not.toBe(null);
+  it("archiveConversation runs UPDATE", async () => {
+    await run(archiveConversation("conv-1"));
+    expect(fake.calls[0].sql).toBe("UPDATE conversations SET archived_at = ? WHERE id = ?");
   });
-});
 
-// ---------------------------------------------------------------------------
-// deleteConversation
-// ---------------------------------------------------------------------------
-
-describe("deleteConversation", () => {
-  it("deletes a conversation", async () => {
-    fakeDb.addQuery("SELECT * FROM conversations WHERE id = ?", [
-      {
-        id: "conv-1",
-        title: "to delete",
-        system_prompt: null,
-        created_at: 1234567890,
-        updated_at: 1234567890,
-        archived_at: null,
-        workspace_id: "",
-      },
-    ]);
-    fakeDb.addMutation("DELETE FROM conversations WHERE id = ?");
-    // After delete, SELECT returns empty
-    fakeDb.addQuery("SELECT * FROM conversations WHERE id = ?", []);
-    const conv = { id: "conv-1", title: "to delete" };
-    await run(deleteConversation(conv.id));
-    await expect(run(getConversation(conv.id))).rejects.toThrow();
+  it("deleteConversation runs DELETE", async () => {
+    await run(deleteConversation("conv-1"));
+    expect(fake.calls[0].sql).toBe("DELETE FROM conversations WHERE id = ?");
+    expect(fake.calls[0].params).toEqual(["conv-1"]);
   });
-});
 
-// ---------------------------------------------------------------------------
-// renameConversation
-// ---------------------------------------------------------------------------
-
-describe("renameConversation", () => {
-  it("renames a conversation", async () => {
-    fakeDb.addQuery("SELECT * FROM conversations WHERE id = ?", [
-      {
-        id: "conv-1",
-        title: "old name",
-        system_prompt: null,
-        created_at: 1234567890,
-        updated_at: 1234567890,
-        archived_at: null,
-        workspace_id: "",
-      },
-    ]);
-    fakeDb.addMutation(
-      "UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?"
-    );
-    fakeDb.addQuery("SELECT * FROM conversations WHERE id = ?", [
-      {
-        id: "conv-1",
-        title: "new name",
-        system_prompt: null,
-        created_at: 1234567890,
-        updated_at: 1234567890,
-        archived_at: null,
-        workspace_id: "",
-      },
-    ]);
-    await run(renameConversation("conv-1", "new name"));
-    const result = await run(getConversation("conv-1"));
-    expect(result.title).toBe("new name");
+  it("renameConversation runs UPDATE", async () => {
+    await run(renameConversation("conv-1", "new title"));
+    expect(fake.calls[0].sql).toBe("UPDATE conversations SET title = ? WHERE id = ?");
+    expect(fake.calls[0].params).toEqual(["new title", "conv-1"]);
   });
-});
 
-// ---------------------------------------------------------------------------
-// listMessages
-// ---------------------------------------------------------------------------
-
-describe("listMessages", () => {
-  it("returns empty array when no messages", async () => {
-    fakeDb.addQuery(
-      "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at",
-      []
-    );
-    const result = await run(listMessages("nonexistent"));
+  it("listMessages returns [] when conversationId empty", async () => {
+    const result = await run(listMessages(""));
     expect(result).toEqual([]);
   });
 
-  it("returns messages for conversation", async () => {
-    fakeDb.addQuery(
-      "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
-      [
-        {
-          id: "msg-1",
-          conversation_id: "conv-1",
-          role: "user",
-          content: "hello",
-          thinking: null,
-          tool_calls: null,
-          tool_results: null,
-          model: null,
-          input_tokens: null,
-          output_tokens: null,
-          created_at: 1234567890,
-        },
-      ]
-    );
-    const messages = await run(listMessages("conv-1"));
-    expect(messages.length).toBe(1);
-    expect(messages[0]!.content).toBe("hello");
+  it("listMessages returns mapped messages", async () => {
+    fake.addQuery("SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC", [
+      { id: "msg-1", conversation_id: "conv-1", role: "user", content: "hi", thinking: null, tool_calls: null, tool_results: null, model: null, input_tokens: null, output_tokens: null, created_at: 1000 },
+    ]);
+    const result = await run(listMessages("conv-1"));
+    expect(result.length).toBe(1);
+    expect(result[0].content).toBe("hi");
+    expect(result[0].role).toBe("user");
   });
-});
 
-// ---------------------------------------------------------------------------
-// appendMessage
-// ---------------------------------------------------------------------------
-
-describe("appendMessage", () => {
-  it("appends and returns mapped message", async () => {
-    fakeDb.addMutation(
-      "INSERT INTO messages (id, conversation_id, role, content, thinking, tool_calls, tool_results, model, input_tokens, output_tokens, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)"
-    );
-    const row = {
-      id: "new-uuid",
-      conversation_id: "conv-1",
-      role: "user",
-      content: "hello",
-      thinking: null,
-      tool_calls: null,
-      tool_results: null,
-      model: null,
-      input_tokens: null,
-      output_tokens: null,
-      created_at: 1234567890,
-    };
-    fakeDb.addQuery("SELECT * FROM messages WHERE id = ?", [row]);
-    const msg = await run(
-      appendMessage({
-        conversationId: "conv-1",
-        role: "user",
-        content: "hello",
-      })
-    );
-    expect(msg.content).toBe("hello");
-    expect(msg.role).toBe("user");
+  it("appendMessage inserts and returns mapped message", async () => {
+    const result = await run(appendMessage({ conversationId: "conv-1", role: "user", content: "hello" }));
+    expect(result.content).toBe("hello");
+    expect(result.role).toBe("user");
+    expect(fake.calls[0].sql).toBe("INSERT INTO messages (id, conversation_id, role, content, thinking, tool_calls, tool_results, model, input_tokens, output_tokens, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)");
   });
-});
 
-// ---------------------------------------------------------------------------
-// clearAllHistory
-// ---------------------------------------------------------------------------
+  it("searchMessages returns [] on FTS failure", async () => {
+    fake.failQuery("SELECT m.* FROM messages m JOIN messages_fts f ON m.rowid = f.rowid WHERE messages_fts MATCH ? ORDER BY rank LIMIT ?", new Error("FTS error"));
+    const result = await run(searchMessagesSafe("hello"));
+    expect(result).toEqual([]);
+  });
 
-describe("clearAllHistory", () => {
-  it("deletes all conversations", async () => {
-    fakeDb.addMutation("DELETE FROM conversations");
-    fakeDb.addQuery(
-      "SELECT * FROM conversations WHERE archived_at IS NULL",
-      []
-    );
+  it("clearAllHistory runs DELETE", async () => {
     await run(clearAllHistory());
-    const result = await run(listConversations(false));
-    expect(result).toEqual([]);
+    expect(fake.calls[0].sql).toBe("DELETE FROM conversations");
   });
 });
