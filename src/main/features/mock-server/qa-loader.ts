@@ -34,11 +34,11 @@ function candidateSeedPaths(): string[] {
 }
 
 // 辅助：读取并 normalize QA 文件，失败时返回 CandidateFailed
-function readQaFile(path: string): Effect<QaEntry[], { _tag: "CandidateFailed"; path: string }> {
+function readQaFile(path: string): Effect.Effect<QaEntry[], { _tag: "CandidateFailed"; path: string }> {
   return Effect.gen(function* () {
     const fs = require("node:fs") as typeof import("node:fs");
-    const raw = fs.readFileSync(path, "utf-8");
-    const parsed = JSON.parse(raw) as unknown;
+    const raw = yield* Effect.try(() => fs.readFileSync(path, "utf-8"));
+    const parsed = yield* Effect.try(() => JSON.parse(raw) as unknown);
     if (!Array.isArray(parsed)) {
       return yield* Effect.fail({ _tag: "CandidateFailed", path });
     }
@@ -62,8 +62,8 @@ export function loadQaTable(): QaEntry[] {
       return yield* Effect.fail("skip" as const);
     }
     const fs = require("node:fs") as typeof import("node:fs");
-    const raw = fs.readFileSync(envPath, "utf-8");
-    const parsed = JSON.parse(raw) as unknown;
+    const raw = yield* Effect.try(() => fs.readFileSync(envPath, "utf-8"));
+    const parsed = yield* Effect.try(() => JSON.parse(raw) as unknown);
     if (!Array.isArray(parsed)) {
       return yield* Effect.fail("skip" as const);
     }
@@ -71,12 +71,12 @@ export function loadQaTable(): QaEntry[] {
     logger.info(`loaded from CODEMAN_TEST_QA_TABLE=${envPath} (${entries.length} entries)`);
     return entries;
   }).pipe(
-    Effect.mapError((e) => {
+    Effect.catchAll((e) => {
       // env 失败: warn 并返回 "skip" 以落入下一个
       logger.warn(
         `failed to read CODEMAN_TEST_QA_TABLE: ${e instanceof Error ? e.message : String(e)}`,
       );
-      return "skip" as const;
+      return Effect.fail("skip" as const);
     }),
   );
 
@@ -109,7 +109,7 @@ export function loadQaTable(): QaEntry[] {
   const chain = Effect.orElse(envEffect, () => candidatesEffect);
 
   const result = Effect.runSync(
-    Effect.firstSuccessOf([chain, fallbackEffect]),
+    Effect.firstSuccessOf([chain, fallbackEffect]).pipe(Effect.orDie),
   );
 
   cache = result;
