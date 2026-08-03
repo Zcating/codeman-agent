@@ -4,6 +4,10 @@ import "dotenv/config";
 import { app, BrowserWindow, Menu, protocol, net } from "electron";
 import { join, sep, normalize } from "node:path";
 import { pathToFileURL } from "node:url";
+import { Cause, Effect, Exit, Scope } from "effect";
+import { logger } from "./logger";
+import { mainRuntime } from "./runtime.js";
+import { stopMockServer } from "./features/mock-server";
 import { registerIpcHandlers } from "./ipc";
 import { loadQaTable } from "./features/mock-server/qa-loader";
 import { startMockServer } from "./features/mock-server";
@@ -33,6 +37,7 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let mainWindow: BrowserWindow | null = null;
+let mainScope: Scope.CloseableScope | null = null;
 
 function appUrlToDistPath(urlString: string): string | null {
   let pathname: string;
@@ -124,26 +129,57 @@ function buildAppMenu(): void {
 }
 
 app.whenReady().then(() => {
-	registerAppProtocol();
-	buildAppMenu();
-	registerIpcHandlers({ getMainWindow: () => mainWindow });
-	registerSkillHandlers();
-	loadQaTable();
-	startMockServer();
-	void ensurePreinstalledSkills().catch((e) => {
-		console.error("[skills-host] ensurePreinstalledSkills failed:", e);
-	});
+  mainRuntime.runFork(
+    Effect.gen(function* () {
+      // 捕获 boot scope,供 before-quit 统一 close
+      mainScope = (yield* Effect.scope) as Scope.CloseableScope;
 
-	const mcpManager = new McpManager();
-	registerMcpIpcHandlers(mcpManager);
-	void mcpManager.startAll().catch((e) => {
-		console.error("[mcp] startAll failed:", e);
-	});
-	app.on("before-quit", () => {
-		void mcpManager.stopAll();
-	});
+      registerAppProtocol();
+      buildAppMenu();
+      registerIpcHandlers({ getMainWindow: () => mainWindow });
+      registerSkillHandlers();
+      loadQaTable();
 
-	mainWindow = createMainWindow();
+      // mock-server:资源 finalizer 挂进 mainScope,close 时自动停
+      startMockServer();
+      yield* Effect.addFinalizer(() => Effect.promise(() => stopMockServer()));
+
+      // ensurePreinstalledSkills:fork 出去跑,失败经 Cause 统一日志
+      yield* Effect.forkScoped(
+        Effect.tryPromise(() => ensurePreinstalledSkills()).pipe(
+          Effect.catchAllCause((cause) =>
+            Effect.sync(() => logger.error("[skills-host] ensurePreinstalledSkills failed:", Cause.pretty(cause))),
+          ),
+        ),
+      );
+
+      const mcpManager = new McpManager();
+      registerMcpIpcHandlers(mcpManager);
+      // mcp 资源 finalizer 挂进 mainScope
+      yield* Effect.addFinalizer(() => Effect.promise(() => mcpManager.stopAll()));
+      yield* Effect.tryPromise(() => mcpManager.startAll()).pipe(
+        Effect.catchAllCause((cause) =>
+          Effect.sync(() => logger.error("[mcp] startAll failed:", Cause.pretty(cause))),
+        ),
+      );
+
+      mainWindow = createMainWindow();
+
+      // 保持 scope 存活直到 before-quit 显式 close
+      yield* Effect.never;
+    }).pipe(
+      Effect.scoped,
+      Effect.catchAllCause((cause) =>
+        Effect.sync(() => logger.error("[boot] boot sequence failed:", Cause.pretty(cause))),
+      ),
+    ),
+  );
+});
+
+app.on("before-quit", () => {
+  if (mainScope !== null) {
+    mainRuntime.runFork(Scope.close(mainScope, Exit.void));
+  }
 });
 
 app.on("window-all-closed", () => {
