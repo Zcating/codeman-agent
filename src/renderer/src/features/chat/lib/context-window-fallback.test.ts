@@ -10,7 +10,6 @@ function makeProvider(llmOverrides: Partial<Provider["llm"]> = {}): Provider {
   return {
     id: "test-provider",
     label: "Test",
-    enabled: true,
     apiKey: "",
     llm: {
       defaultModel: "test-model",

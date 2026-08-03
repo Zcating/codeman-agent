@@ -80,7 +80,7 @@ function applyPatch(patch: Partial<Settings>, opts?: { enforceInvariant?: boolea
       if (patch.defaultLlmProviderId !== undefined) {
         defaultLlmProviderId = patch.defaultLlmProviderId;
       } else if (defaultLlmProviderId !== null && !providers.some((p) => p.id === defaultLlmProviderId)) {
-        defaultLlmProviderId = providers.length > 0 ? providers[0].id : null;
+        defaultLlmProviderId = providers.length > 0 ? providers[0].id : undefined;
       }
       return { ...prev, ...patch, providers, defaultLlmProviderId };
     }
@@ -156,7 +156,7 @@ const deleteProviderImpl = Effect.fn(
     const providers = (settings.value.providers ?? []).filter((p) => p.id !== id);
     let defaultLlmProviderId = settings.value.defaultLlmProviderId;
     if (defaultLlmProviderId === id) {
-      defaultLlmProviderId = providers.length > 0 ? providers[0].id : null;
+      defaultLlmProviderId = providers.length > 0 ? providers[0].id : undefined;
     }
     setSettings("value", (prev) => ({ ...prev, providers, defaultLlmProviderId }));
     const svc = yield* ProviderApi;

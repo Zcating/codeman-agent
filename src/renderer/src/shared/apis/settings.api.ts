@@ -27,13 +27,12 @@ export const SettingsApiLive = Layer.succeed(SettingsApi, {
       return yield* Effect.succeed(
         (() => {
           const p = (settings.providers ?? []).find(
-            (p) => p.id === id && p.enabled,
+            (p) => p.id === id,
           );
           if (!p || !p.llm) {return null;}
           const v1: LLMProvider = {
             id: p.id,
             label: p.label,
-            enabled: p.enabled,
             defaultModel: p.llm.defaultModel,
             baseUrl: p.llm.baseUrl,
             apiType: p.llm.apiType,

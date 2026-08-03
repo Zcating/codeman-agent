@@ -452,7 +452,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "test-provider",
           label: "Test",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "ghost-model",
@@ -478,7 +477,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
           {
             id: "test-provider",
             label: "Test",
-            enabled: true,
             apiKey: "",
             llm: {
               defaultModel: "ghost-model",
@@ -625,7 +623,7 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     await Effect.runPromise(appStore.refresh());
     const exit = await Effect.runPromiseExit(appStore.deleteProvider("minimax"));
     expect(exit._tag).toBe("Success");
-    expect((appStore.state.value as any).defaultLlmProviderId).toBeNull();
+    expect((appStore.state.value as any).defaultLlmProviderId).toBeUndefined();
   });
 
   it("deleteProvider(id) 删除非默认 provider → defaultLlmProviderId 不变", async () => {

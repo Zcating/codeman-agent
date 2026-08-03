@@ -42,7 +42,6 @@ export interface Settings {
 export interface LLMProvider {
   id: string;
   label: string;
-  enabled: boolean;
   defaultModel?: string;
   baseUrl?: string;
   apiType: "anthropic-messages";
