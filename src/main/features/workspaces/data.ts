@@ -20,7 +20,7 @@ import { toWorkspace, type Workspace } from "./mappers.js";
 /**
  * 列出所有工作空间，按创建时间倒序。
  */
-export function listWorkspaces(): Effect.Effect<Workspace[], never, SqliteClient> {
+export function listWorkspaces(): Effect.Effect<Workspace[], Database, SqliteClient> {
   return Effect.gen(function* () {
     const sql = yield* SqliteClient;
     const rows = (yield* sql
@@ -83,7 +83,7 @@ export function addWorkspace(
 export function renameWorkspace(
   id: string,
   label: string
-): Effect.Effect<void, never, SqliteClient> {
+): Effect.Effect<void, Database, SqliteClient> {
   return Effect.gen(function* () {
     const sql = yield* SqliteClient;
     yield* sql
@@ -105,7 +105,7 @@ export function renameWorkspace(
 
 export function deleteWorkspace(
   id: string
-): Effect.Effect<void, never, SqliteClient> {
+): Effect.Effect<void, Database, SqliteClient> {
   return Effect.gen(function* () {
     const sql = yield* SqliteClient;
     yield* sql

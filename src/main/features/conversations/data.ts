@@ -42,7 +42,7 @@ function mapMsg(row: RawMsgRow): Message {
  */
 export function listConversations(
   includeArchived: boolean
-): Effect.Effect<Conversation[], never, SqliteClient> {
+): Effect.Effect<Conversation[], Database, SqliteClient> {
   return Effect.gen(function* () {
     const sql = yield* SqliteClient;
     const sqlText = includeArchived
@@ -99,7 +99,7 @@ export interface CreateConversationInput {
  */
 export function createConversation(
   input: CreateConversationInput
-): Effect.Effect<Conversation, never, SqliteClient> {
+): Effect.Effect<Conversation, Database, SqliteClient> {
   return Effect.gen(function* () {
     const sql = yield* SqliteClient;
     const id = randomUUID();
@@ -137,7 +137,7 @@ export function createConversation(
 
 export function archiveConversation(
   id: string
-): Effect.Effect<void, never, SqliteClient> {
+): Effect.Effect<void, Database, SqliteClient> {
   return Effect.gen(function* () {
     const sql = yield* SqliteClient;
     yield* sql
@@ -159,7 +159,7 @@ export function archiveConversation(
 
 export function deleteConversation(
   id: string
-): Effect.Effect<void, never, SqliteClient> {
+): Effect.Effect<void, Database, SqliteClient> {
   return Effect.gen(function* () {
     const sql = yield* SqliteClient;
     yield* sql.unsafe("DELETE FROM conversations WHERE id = ?", [id]).pipe(
@@ -177,7 +177,7 @@ export function deleteConversation(
 export function renameConversation(
   id: string,
   title: string
-): Effect.Effect<void, never, SqliteClient> {
+): Effect.Effect<void, Database, SqliteClient> {
   return Effect.gen(function* () {
     const sql = yield* SqliteClient;
     yield* sql
@@ -203,7 +203,7 @@ export function renameConversation(
  */
 export function listMessages(
   conversationId: string
-): Effect.Effect<Message[], never, SqliteClient> {
+): Effect.Effect<Message[], Database, SqliteClient> {
   if (!conversationId) {
     return Effect.succeed([]);
   }
@@ -242,7 +242,7 @@ export interface AppendMessageInput {
  */
 export function appendMessage(
   input: AppendMessageInput
-): Effect.Effect<Message, never, SqliteClient> {
+): Effect.Effect<Message, Database, SqliteClient> {
   return Effect.gen(function* () {
     const sql = yield* SqliteClient;
     const id = randomUUID();
@@ -300,7 +300,7 @@ export function appendMessage(
 export function searchMessages(
   query: string,
   limit: number = 20
-): Effect.Effect<Message[], never, SqliteClient> {
+): Effect.Effect<Message[], Database, SqliteClient> {
   return Effect.gen(function* () {
     const sql = yield* SqliteClient;
     const rows = (yield* sql
@@ -343,7 +343,7 @@ export function searchMessagesSafe(
 /**
  * 清空所有对话（DELETE FROM conversations）。
  */
-export function clearAllHistory(): Effect.Effect<void, never, SqliteClient> {
+export function clearAllHistory(): Effect.Effect<void, Database, SqliteClient> {
   return Effect.gen(function* () {
     const sql = yield* SqliteClient;
     yield* sql.unsafe("DELETE FROM conversations").pipe(

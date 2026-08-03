@@ -112,24 +112,21 @@ export const applyMigrationsEffect = Effect.gen(function* () {
 
 /**
  * MigrationsLive：在 SqliteLive 之后运行，执行迁移 + 开启 foreign_keys。
- * Layer.provide(SqliteLive) 保证 SqliteClient 可用。
+ * 由 DbLive = Layer.provide(Layer.mergeAll(SqliteLive, MigrationsLive), SqliteLive) 提供 SqliteClient。
  */
 export const MigrationsLive = Layer.effectDiscard(
-  Effect.flatMap(
-    SqliteNS.SqliteClient,
-    (client) =>
-      Effect.as(
-        client.unsafe("PRAGMA foreign_keys = ON"),
-        void 0
-      )
-  ).pipe(
-    Effect.flatMap(() => applyMigrationsEffect),
-    Effect.scoped
-  )
-).pipe(Layer.provide(SqliteLive));
+  Effect.gen(function* () {
+    const sql = yield* SqliteNS.SqliteClient;
+    yield* sql.unsafe("PRAGMA foreign_keys = ON");
+    yield* applyMigrationsEffect;
+  })
+);
 
-// ---------------------------------------------------------------------------
-// DbLive
-// ---------------------------------------------------------------------------
-
-export const DbLive = Layer.mergeAll(SqliteLive, MigrationsLive);
+/**
+ * DbLive = Layer.provide(Layer.mergeAll(SqliteLive, MigrationsLive), SqliteLive)。
+ * Layer.provide 将 SqliteLive 注入合并层上下文，使 MigrationsLive 能访问 SqliteClient。
+ */
+export const DbLive = Layer.provide(
+  Layer.mergeAll(SqliteLive, MigrationsLive),
+  SqliteLive
+);

@@ -25,7 +25,7 @@ import {
  */
 export function listCompactionEntries(
   conversationId: string
-): Effect.Effect<CompactionEntry[], never, SqliteClient> {
+): Effect.Effect<CompactionEntry[], Database, SqliteClient> {
   if (!conversationId) {
     return Effect.succeed([]);
   }
