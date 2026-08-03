@@ -1,46 +1,110 @@
-import { describe, it, expect, vi } from "vitest";
+/**
+ * db/mod.test.ts
+ *
+ * ADR-0046 D3 测试策略：
+ * - 使用 provideService 注入 fake SqliteClient
+ * - 直接测试 applyMigrationsEffect（不通过 Layer.launch，避免 scoped timeout）
+ */
 
-const fakeApp = vi.hoisted(() => ({
-  getPath: vi.fn().mockReturnValue("/tmp/codeman-agent-test"),
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { Effect } from "effect";
+import * as SqliteNS from "@effect/sql-sqlite-node/SqliteClient";
+
+vi.mock("electron", () => ({
+  app: { getPath: vi.fn(() => "/tmp") },
 }));
 
-vi.mock("electron", () => ({ app: fakeApp }));
+import { applyMigrationsEffect, splitSqlStatements } from "./mod.js";
 
-const dbInstances = vi.hoisted(() => [] as unknown[]);
-
-const FakeDatabase = vi.hoisted(() => {
-  return class FakeDatabase {
-    constructor(_path: string) {
-      dbInstances.push(this);
-    }
-    pragma(): void {}
-    exec(): void {}
-    prepare() {
-      return {
-        all: () => [],
-        get: () => undefined,
-        run: () => undefined,
-      };
-    }
-    close(): void {}
+const fake = (() => {
+  const calls: Array<{ sql: string; params: readonly unknown[] }> = [];
+  const rowsBySql = new Map<string, unknown[]>();
+  const failBySql = new Map<string, Error>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const client = {
+    unsafe(sql: string, params?: readonly unknown[]): Effect.Effect<unknown[], Error, never> {
+      calls.push({ sql, params: params ?? [] });
+      const fail = failBySql.get(sql);
+      if (fail) { return Effect.fail(fail); }
+      return Effect.succeed(rowsBySql.get(sql) ?? []);
+    },
+  } as any;
+  return {
+    client,
+    calls,
+    addQuery(sql: string, rows: unknown[]) { rowsBySql.set(sql, rows); },
+    failQuery(sql: string, err: Error) { failBySql.set(sql, err); },
+    reset() { calls.length = 0; rowsBySql.clear(); failBySql.clear(); },
   };
-});
+})();
 
-vi.mock("better-sqlite3", () => ({ default: FakeDatabase }));
+// Run applyMigrationsEffect directly (includes CREATE TABLE and migrations)
+async function runMigrations(): Promise<void> {
+  await Effect.runPromise(
+    applyMigrationsEffect.pipe(
+      Effect.provideService(SqliteNS.SqliteClient, fake.client as unknown as SqliteNS.SqliteClient),
+    ),
+  );
+}
 
-import { getOrInitDatabase } from "./mod";
+beforeEach(() => { fake.reset(); });
 
-describe("getOrInitDatabase", () => {
-  it("initializes and returns a Database on first call", () => {
-    const db = getOrInitDatabase();
-    expect(db).toBeInstanceOf(FakeDatabase);
-    expect(dbInstances).toHaveLength(1);
+describe("splitSqlStatements", () => {
+  it("splits multi-statement SQL into individual statements", () => {
+    const statements = splitSqlStatements(
+      "CREATE TABLE a (id TEXT);\n\nCREATE INDEX idx ON a(id);\nCREATE VIRTUAL TABLE f USING fts5(content);"
+    );
+    expect(statements.length).toBe(3);
+    expect(statements[0]).toBe("CREATE TABLE a (id TEXT)");
+    expect(statements[1]).toBe("CREATE INDEX idx ON a(id)");
+    expect(statements[2]).toBe("CREATE VIRTUAL TABLE f USING fts5(content)");
   });
 
-  it("returns the same instance on repeated calls", () => {
-    const a = getOrInitDatabase();
-    const b = getOrInitDatabase();
-    expect(a).toBe(b);
-    expect(dbInstances).toHaveLength(1);
+  it("keeps semicolons inside string literals intact", () => {
+    const statements = splitSqlStatements(
+      "INSERT INTO t (v) VALUES ('a;b');\nSELECT * FROM t;"
+    );
+    expect(statements.length).toBe(2);
+    expect(statements[0]).toBe("INSERT INTO t (v) VALUES ('a;b')");
+  });
+
+  it("strips -- line comments", () => {
+    const statements = splitSqlStatements(
+      "-- header comment\nCREATE TABLE a (id TEXT);\n-- trailing\n"
+    );
+    expect(statements).toEqual(["CREATE TABLE a (id TEXT)"]);
+  });
+
+  it("matches the real 0001_initial.sql statement count (4)", () => {
+    const sql = [
+      "CREATE TABLE conversations (id TEXT PRIMARY KEY, title TEXT NOT NULL);",
+      "CREATE TABLE messages (id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE);",
+      "CREATE INDEX idx_messages_conv_created ON messages(conversation_id, created_at);",
+      "CREATE VIRTUAL TABLE messages_fts USING fts5(content, content='messages', content_rowid='rowid');",
+    ];
+    expect(splitSqlStatements(sql.join("\n\n")).length).toBe(4);
+  });
+});
+
+describe("applyMigrationsEffect", () => {
+  it("creates _migrations table", async () => {
+    fake.addQuery("SELECT name FROM _migrations", []);
+    await runMigrations();
+    expect(fake.calls.some(c => c.sql.includes("CREATE TABLE IF NOT EXISTS _migrations"))).toBe(true);
+  });
+
+  it("is idempotent: does not INSERT when migrations already applied", async () => {
+    // Pre-register all migrations as already applied
+    fake.addQuery("SELECT name FROM _migrations", [
+      { name: "0001_initial.sql" },
+      { name: "0002_conversation_workspace.sql" },
+      { name: "0003_workspaces.sql" },
+      { name: "0004_messages_thinking.sql" },
+      { name: "0005_compaction_entries.sql" },
+    ]);
+    await runMigrations();
+    // INSERT INTO _migrations should NOT be called when all are already applied
+    const insertCalls = fake.calls.filter(c => c.sql.includes("INSERT INTO _migrations"));
+    expect(insertCalls.length).toBe(0);
   });
 });

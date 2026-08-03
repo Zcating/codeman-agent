@@ -56,7 +56,7 @@ export class StdioTransport {
     return new Promise<void>((resolve) => {
       let done = false;
       const finish = (): void => {
-        if (done) return;
+        if (done) { return; }
         done = true;
         this.#child = null;
         resolve();

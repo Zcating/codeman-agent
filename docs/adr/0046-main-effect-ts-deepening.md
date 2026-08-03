@@ -52,14 +52,16 @@
 
 ## Decision
 
-### D1 — PR-1:`jsonrpc.ts` 内部 Fiber 化(256L → ~100L)
+### D1 — PR-1:`jsonrpc.ts` 内部 Fiber 化(256L → 263L,结构收益兑现)
 
 **内部实现替换,不产生新 seam,不拆子模块:**
 
 - `request()`:`Effect.gen` + `Deferred.unsafeMake` + `Effect.timeout(timeoutMs)` — 超时即 fiber 中断,错误类型 `TimeoutException | JsonRpcProtocolError`
-- `close()`:`Fiber.interruptAll(pendingFibers)` — 统一取消路径,删 4 处重复错误驱逐代码
+- `close()`:`#failAllPending(err)`(对全部 pending Deferred 做 `Exit.fail(err)`)— 统一取消路径,删 4 处重复错误驱逐代码。**实现偏差(有意,经对抗式复核确认,2026-08-02)**:不 interrupt pending request fibers —— 若 interrupt,`Fiber.await` 会以 interrupt cause reject(`Cause.squash(Interrupt)` ≈ undefined),破坏 `JsonRpcProtocolError` 错误契约(jsonrpc.test.ts L159-164);仅 interrupt reader fiber(触发 `Effect.async` cleanup 移除 stream listeners)
 - stdin chunk 读取:`Effect.async`(**非** `tryPromise` — 见 Risks R2)
 - public API 保持 Promise 签名(`JsonRpcConnection` class + `request` / `close`)— 内部 private runtime 跑 Effect,caller 零改动
+
+**行数说明**:D1 原估 ~100L 为乐观估算,实际 263L(基文件 256L)。结构收益已验证:4 处重复错误驱逐 → 1 处 `#failAllPending`、手写 `setTimeout` 超时机器删除、`null as unknown as Promise<never>` hack 删除、Promise executor-capture 删除;净增行数来自 Effect 基础设施(Deferred / Fiber / Effect.async reader / Runtime)。不追执行数压缩(精准修改优先)。
 
 **与 ADR-0041 D8 的关系(澄清,非推翻)**:D8 锁的是「jsonrpc 不拆 seam / 不拆模块」(1 caller = 假 seam),本 PR 遵守 — jsonrpc 仍是 1 个模块、1 个 caller(`McpStdioServer` 经 `StdioTransport` 间接使用)。D8 的「不动」指**结构**,不指**实现范式**;本 PR 不动结构,只换内部实现。
 
@@ -68,21 +70,21 @@
 - A. 引入 `@effect/rpc`:无 stdio transport,见 Context 修正表
 - C. 拆 jsonrpc 子模块:违反 ADR-0041 D8
 
-### D2 — PR-2:MCP 生命周期 Effect 化 + 引入 `@effect/platform-node`
+### D2 — PR-2:MCP 生命周期 Effect 化(runtime + 分裂人格消除)
 
-**范围(三件套):**
+**范围(两件套;transport 部分见「范围缩减」):**
 
-1. **`mcp-stdio-transport.ts` 内部**:spawn / kill → `@effect/platform-node` `ChildProcessSpawner`(SIGTERM → `forceKillAfter` SIGKILL 升级**内建**,替代裸 `setTimeout` fallback;process group kill 语义附带)。`StdioTransport` class 外壳与 public API 不变(ADR-0041 D3 保留)
-2. **分裂人格消除**:mcp-manager 内 `Effect.runPromiseExit(readMcpConfig())` 调用点统一改经 `src/main/runtime.ts` 的 `mainRuntime.runPromise` 执行;`Exit` 手工解包删除,`InvalidConfig` typed error 沿 Promise rejection 到 `sandboxHandler` 边界。`McpManager` class + 9 public methods + mutable `Map` 状态不变(ADR-0041 D6 保留)
+1. ~~`mcp-stdio-transport.ts` 内部:spawn / kill → `ChildProcessSpawner`~~ **范围缩减(经对抗式复核,2026-08-03)**:`ChildProcessSpawner` 仅存在于 `@effect/platform-node` **V4 线**(V3 最新 0.107.0 及全部 V3 版本无 Spawner API,包源码实证)。项目锁定 effect ^3.21.4、禁升 v4,故 **transport 保留 node:child_process 实现,本 PR 不改**;SIGTERM→SIGKILL 升级(`forceKillAfter`)与 process group kill 留待 effect v4 迁移专项 ADR。`StdioTransport` class 与 ADR-0041 D3 外壳保持原样
+2. **分裂人格消除**:mcp-manager 内 `Effect.runPromiseExit(readMcpConfig())` 调用点(3 处)统一改经 `src/main/runtime.ts` 的 `mainRuntime.runPromise` 执行;`Exit` 手工解包删除。**事实修正**:`Runtime.runPromise` 失败时 reject **`FiberFailure` 包装**而非 typed error(effect 源码 `throw fiberFailure(cause)` 实证),故 typed error 在 catch 处**重建**(`new InvalidConfig({ field, message: String(e) })`,与改造前 L188 同一模式),错误契约不变。`McpManager` class + 9 public methods + mutable `Map` 状态不变(ADR-0041 D6 保留)
 3. **新增 `src/main/runtime.ts`**:`export const mainRuntime = ManagedRuntime.make(MainLive)` — main 进程唯一 Effect 边界。本 PR 建空壳(`MainLive = Layer.empty`),D3 挂 `DbLive`,D5 收编 boot。module singleton 形态是 Effect 官方 edge pattern(参照 `NodeRuntime.runMain`),与 D3 消除的 db 资源 singleton 性质不同(那是**资源**,这是**运行时**)
 
-**新增依赖**:`@effect/platform-node`(v3 线,与 `effect ^3.21.4` 兼容版本,pnpm 解析锁定;**禁升 v4 线**)。
+**新增依赖**:~~`@effect/platform-node`~~ **未引入**(transport 范围缩减后无使用方;已装 `@effect/platform-node@0.107.0` / `@effect/platform@0.96.1` 随后移除)。
 
 **与 ADR-0041 D6 的关系(澄清,非推翻)**:D6 拒绝的是「McpManager 完全 functional 化」(mutable Map 状态改用闭包表达),本 PR 不做 — manager 结构原样。本 PR 做的是 transport **内部**实现替换 + 错误通道打通,两个不同轴。
 
 **拒绝**:
 
-- A. 自包 `acquireRelease` 包 `node:child_process`(~30L):重造 `ChildProcessSpawner` 已内建的 SIGTERM→SIGKILL 升级 + process group kill + exit `Deferred`;且失去平台包后续维护
+- A. 自包 `acquireRelease` 包 `node:child_process`(~30L):重造 `ChildProcessSpawner` 已内建的 SIGTERM→SIGKILL 升级 + process group kill + exit `Deferred`;且失去平台包后续维护 ~~(该拒绝基于 ChildProcessSpawner 存在于 V3 线的假设,已随范围缩减失效;v3 线 transport 现状即 node:child_process 实现,升级动作整体推迟到 v4 迁移 ADR)~~
 - C. `McpManager` 全 Effect 化(`startAll` 返回 `Effect<void, McpBootError, Scope>`):违反 ADR-0041 D6;manager 是协调器不是资源持有者,收益边际
 
 ### D3 — PR-3:`db/mod.ts` → `@effect/sql-sqlite-node@0.52.0`
@@ -107,7 +109,7 @@
 - 6 域 register 函数 deps 中 `db: DB` 移除(ADR-0039 D2「只声明所需」的自然结果);handler 体内 `db.prepare(sql).all()` → `mainRuntime.runPromise(dataAccessEffect)`
 - SQL 字符串第一版**原样保留**(经 `sql.unsafe`),DSL / `@effect/sql` `Model` 留后续 — 精准修改,SQL 语义零变化优先
 
-**测试 seam**:`SqliteClient.layer({ filename: ":memory:" })` 注入,替代 `vi.mock` 模块 stub。
+**测试 seam**:~~`SqliteClient.layer({ filename: ":memory:" })` 注入,替代 `vi.mock` 模块 stub~~ **修正(经实证,2026-08-03)**:`:memory:` 真实 sqlite 在 vitest 下不可行 — better-sqlite3 经 `prepare` 脚本 `@electron/rebuild` 编译为 **Electron ABI**(NODE_MODULE_VERSION 140),vitest/系统 Node 要求 141,原生模块无法加载。改为 **`vi.mock("better-sqlite3")` 注入 fake 驱动**(复用旧 db/mod.test.ts 模式),`SqliteClient.layer` 结构照跑;测试保留「精确 SQL 字符串 + 参数 + 映射返回」断言能力。真实 SQL 语义验证留给 e2e。
 
 **拒绝**:
 

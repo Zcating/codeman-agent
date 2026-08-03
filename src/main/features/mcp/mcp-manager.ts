@@ -1,6 +1,6 @@
 import { shell } from "electron";
-import { Effect, Exit } from "effect";
 import { logger } from "../../logger";
+import { mainRuntime } from "../../runtime";
 import { McpStdioServer } from "./mcp-host";
 import type { McpServerConfig, McpServerStatus, McpTool, McpCallResult } from "./mcp-types";
 import { mcpAgentName } from "./mcp-types";
@@ -39,20 +39,21 @@ export class McpManager {
   #started = false;
 
   async startAll(): Promise<void> {
-    if (this.#started) return;
+    if (this.#started) { return; }
     this.#started = true;
 
-    const exit = await Effect.runPromiseExit(readMcpConfig());
-    if (Exit.isFailure(exit)) {
-      logger.warn(`[mcp] Cannot read config: ${String(exit.cause)}`);
+    let config: McpConfigFile;
+    try {
+      config = await mainRuntime.runPromise(readMcpConfig());
+    } catch (e) {
+      logger.warn(`[mcp] Cannot read config: ${String(e)}`);
       return;
     }
-    const config = exit.value;
     const seenAgentNames = new Map<string, string>();
 
     for (const cfg of config.servers) {
       this.#configs.set(cfg.name, cfg);
-      if (!cfg.enabled) continue;
+      if (!cfg.enabled) { continue; }
 
       const server = new McpStdioServer(cfg);
       this.#servers.set(cfg.name, server);
@@ -121,7 +122,7 @@ export class McpManager {
   listAllTools(): McpToolEntry[] {
     const out: McpToolEntry[] = [];
     for (const [, server] of this.#servers) {
-      if (server.getStatus().kind !== "connected") continue;
+      if (server.getStatus().kind !== "connected") { continue; }
       const serverName = server.getConfig().name;
       for (const tool of server.listTools()) {
         out.push({
@@ -183,17 +184,18 @@ export class McpManager {
 
 
   async #loadConfigOrThrow(): Promise<McpConfigFile> {
-    const exit = await Effect.runPromiseExit(readMcpConfig());
-    if (Exit.isFailure(exit)) {
-      throw new InvalidConfig({ field: "mcp_servers.json", message: String(exit.cause) });
+    try {
+      return await mainRuntime.runPromise(readMcpConfig());
+    } catch (e) {
+      throw new InvalidConfig({ field: "mcp_servers.json", message: String(e) });
     }
-    return exit.value;
   }
 
   async #writeConfigOrThrow(config: McpConfigFile): Promise<void> {
-    const exit = await Effect.runPromiseExit(writeMcpConfig(config));
-    if (Exit.isFailure(exit)) {
-      throw new InvalidConfig({ field: "mcp_servers.json", message: String(exit.cause) });
+    try {
+      await mainRuntime.runPromise(writeMcpConfig(config));
+    } catch (e) {
+      throw new InvalidConfig({ field: "mcp_servers.json", message: String(e) });
     }
   }
 
@@ -210,7 +212,7 @@ export class McpManager {
 
   async #stopAndRemove(name: string): Promise<void> {
     const server = this.#servers.get(name);
-    if (!server) return;
+    if (!server) { return; }
     try { await server.stop(); } catch (e) { logger.warn(`[mcp] ${name} stop failed: ${String(e)}`); }
     this.#servers.delete(name);
   }

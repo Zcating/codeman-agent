@@ -14,7 +14,7 @@ function fakeConnection(handlers: {
 }
 
 describe("performHandshake", () => {
-  it("calls initialize â†?notifications/initialized â†?tools/list in order", async () => {
+  it("calls initialize â€”notifications/initialized â€”tools/list in order", async () => {
     const order: string[] = [];
     const fake = fakeConnection({
       request: async (method) => {
