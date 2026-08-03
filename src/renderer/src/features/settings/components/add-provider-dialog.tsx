@@ -205,10 +205,7 @@ export function createProviderFormDialog(): Promise<Provider | null> {
                   <label class="text-xs text-muted-foreground">Available models</label>
                   <div class="flex flex-wrap gap-1 mt-1">
                     {presetModels().map((m) => (
-                      <span
-                        key={m.id}
-                        class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-                      >
+                      <span class="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
                         {m.label}
                       </span>
                     ))}

@@ -57,7 +57,7 @@ describe("createProviderFormDialog", () => {
 
   describe("Phase 1: Tag cloud", () => {
     it("打开对话框即显示 tag 云（所有预设厂商）", async () => {
-      const promise = createProviderFormDialog();
+      void createProviderFormDialog();
       await flushPromises();
 
       expect(screen.getByTestId("add-provider-dialog")).toBeInTheDocument();
@@ -74,7 +74,7 @@ describe("createProviderFormDialog", () => {
     });
 
     it("tag 云可滚动（存在 overflow-y-auto 类）", async () => {
-      const promise = createProviderFormDialog();
+      void createProviderFormDialog();
       await flushPromises();
 
       const cloud = screen.getByTestId("provider-tag-cloud");
@@ -115,7 +115,7 @@ describe("createProviderFormDialog", () => {
 
     it("点选厂商 tag → models 清单自动带出（不可编辑，仅展示）", async () => {
       const user = userEvent.setup();
-      const promise = createProviderFormDialog();
+      void createProviderFormDialog();
       await flushPromises();
 
       await user.click(screen.getByTestId("provider-tag-deepseek"));
