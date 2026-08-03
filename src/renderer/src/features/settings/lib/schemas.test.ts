@@ -7,7 +7,6 @@ describe("settings schemas (ADR-0025 PR 4)", () => {
     const valid = {
       id: "minimax",
       label: "MiniMax",
-      enabled: true,
       apiKey: "sk-xxx",
       llm: {
         defaultModel: "claude-opus",
@@ -57,7 +56,6 @@ describe("ProviderSchema decodes camelCase fields (ADR-0047 D1)", () => {
     const camelProvider = {
       id: "minimax",
       label: "MiniMax",
-      enabled: true,
       apiKey: "sk-xxx",
       llm: {
         defaultModel: "claude-opus",

@@ -22,7 +22,6 @@ export interface ProviderLlm {
 export interface Provider {
   id: string;
   label: string;
-  enabled: boolean;
   apiKey: string;
   llm: ProviderLlm;
 }
@@ -91,7 +90,6 @@ export const mockProvider = (
   return {
     id: overrides.id ?? "minimax",
     label: overrides.label ?? "MiniMax",
-    enabled: overrides.enabled ?? true,
     apiKey: overrides.apiKey ?? "",
     llm: overrides.llm ?? {
       defaultModel: "MiniMax-M2.5-highspeed",
@@ -175,7 +173,6 @@ export const mockState = {
 const DEFAULT_MINIMAX_PROVIDER: Provider = {
   id: "minimax",
   label: "MiniMax",
-  enabled: true,
   apiKey: "",
   llm: {
     defaultModel: "MiniMax-M2.5-highspeed",
@@ -217,7 +214,6 @@ function migrateV0toV15(v0: SettingsV0): SettingsV15 {
     providers.push({
       id: llm.id,
       label: llm.label,
-      enabled: llm.enabled,
       apiKey: llm.apiKeyRef,
       llm: {
         defaultModel: llm.defaultModel ?? "auto",

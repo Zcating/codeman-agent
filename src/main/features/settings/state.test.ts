@@ -76,7 +76,6 @@ describe("SettingsState", () => {
       providers: [{
         id: "p1",
         label: "Test",
-        enabled: true,
         apiKey: "key",
         llm: {
           defaultModel: "gone",
@@ -101,7 +100,6 @@ describe("SettingsState", () => {
       providers: [{
         id: "p1",
         label: "Test",
-        enabled: true,
         apiKey: "key",
         llm: {
           defaultModel: "gone",

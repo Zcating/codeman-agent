@@ -37,7 +37,7 @@ export const ProviderApiLive = Layer.effect(
       list: () =>
         Effect.gen(function* () {
           const providers = yield* getProviders;
-          return providers.filter((p) => p.enabled);
+          return providers;
         }),
 
       get: (id) => getProvider(id),

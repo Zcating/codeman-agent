@@ -9,7 +9,6 @@ describe("buildMockDevTemplate", () => {
     expect(result).toEqual({
       id: "mock-1",
       label: "Mock",
-      enabled: true,
       apiKey: "",
       llm: {
         baseUrl: "http://127.0.0.1:50000/mock/anthropic",
@@ -25,7 +24,6 @@ describe("buildMockDevTemplate", () => {
     const result = buildMockDevTemplate("mock-foo");
     expect(result.id).toBe("mock-foo");
     expect(result.label).toBe("Mock");
-    expect(result.enabled).toBe(true);
     expect(result.apiKey).toBe("");
     expect(result.llm.baseUrl).toBe("http://127.0.0.1:50000/mock/anthropic");
     expect(result.llm.defaultModel).toBe("mock-default");
@@ -41,7 +39,6 @@ describe("buildMockDevTemplate", () => {
     expect(_provider).toBeDefined();
     expect(typeof _provider.id).toBe("string");
     expect(typeof _provider.label).toBe("string");
-    expect(typeof _provider.enabled).toBe("boolean");
     expect(typeof _provider.apiKey).toBe("string");
     expect(typeof _provider.llm).toBe("object");
   });

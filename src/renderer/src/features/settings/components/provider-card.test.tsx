@@ -2,9 +2,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, screen, waitFor } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
-import { Effect } from "effect";
-import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 
+import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 
 vi.mock("../../../shared/stores/app.store", () => {
   let providers: any[] = [];
@@ -38,11 +37,10 @@ vi.mock("../../../shared/stores/app.store", () => {
   };
 });
 
-
 const mockProvider = {
   id: "minimax",
   label: "MiniMax",
-  enabled: true,
+  comment: "Production API",
   apiKey: "test-key",
   llm: {
     defaultModel: "MiniMax-M2.5-highspeed",
@@ -52,12 +50,14 @@ const mockProvider = {
       {
         id: "MiniMax-M2.5-highspeed",
         label: "MiniMax-M2.5-highspeed",
+        contextWindow: 100000,
         deprecated: false,
         thinking: false,
       },
       {
         id: "MiniMax-M2.1-highspeed",
         label: "MiniMax-M2.1-highspeed",
+        contextWindow: 80000,
         deprecated: true,
         thinking: false,
       },
@@ -66,40 +66,43 @@ const mockProvider = {
   },
 };
 
-const _mockProviderDisabled = {
+const mockProviderNoComment = {
   id: "deepseek",
   label: "DeepSeek",
-  enabled: false,
+  comment: "",
   apiKey: "test-key",
   llm: {
     defaultModel: "deepseek-chat",
     baseUrl: "https://api.deepseek.com/anthropic",
     apiType: "anthropic-messages" as const,
-    models: [{ id: "deepseek-chat", label: "deepseek-chat", deprecated: false, thinking: false }],
+    models: [{ id: "deepseek-chat", label: "deepseek-chat", contextWindow: 64000, deprecated: false, thinking: false }],
     modelsEndpoint: "https://api.deepseek.com/models",
   },
 };
-void _mockProviderDisabled;
 
 import { ProviderCard } from "@codeman-frontend/features/settings/components/provider-card";
 
-import * as appStoreMock from "@codeman-frontend/shared/stores/app.store";
 import { _resetSettingsSaverForTest } from "@codeman-frontend/features/settings/lib/settings-saver";
 
+const renderCard = (provider = mockProvider, isExpanded = false, isDefault = false) =>
+  render(() => (
+    <ProviderCard
+      provider={provider}
+      isExpanded={isExpanded}
+      isDefault={isDefault}
+      onToggleExpand={vi.fn()}
+      onSetDefault={vi.fn()}
+      onSave={vi.fn()}
+      onCancel={vi.fn()}
+      onDelete={vi.fn()}
+    />
+  ));
 
-const renderCard = (provider = mockProvider) =>
-  render(() => <ProviderCard provider={provider} onUpdate={vi.fn()} onDelete={vi.fn()} />);
-
-const getLastSetCall = () => (appStoreMock as any).__getLastSetCall();
-const setProviders = (p: any[]) => (appStoreMock as any).__setProviders(p);
-
-
-describe("ProviderCard", () => {
+describe("ProviderCard — collapsed row", () => {
   beforeEach(() => {
     mockState.calls = [];
     mockState.resolved = undefined;
     mockState.rejected = undefined;
-    setProviders([{ ...mockProvider }]);
     vi.clearAllMocks();
   });
 
@@ -108,259 +111,324 @@ describe("ProviderCard", () => {
     _resetSettingsSaverForTest();
   });
 
-  it("renders 1 card with provider label and id", () => {
+  it("renders label · comment when comment exists", () => {
     renderCard();
-    expect(screen.getByText("MiniMax")).toBeInTheDocument();
-    expect(screen.getByText("minimax")).toBeInTheDocument(); 
+    expect(screen.getByText("MiniMax · Production API")).toBeInTheDocument();
   });
 
-  it("toggling enabled checkbox calls appStore.set and updates state", async () => {
-    const user = userEvent.setup();
-    const onUpdate = vi.fn();
-    render(() => <ProviderCard provider={mockProvider} onUpdate={onUpdate} onDelete={vi.fn()} />);
-
-    const checkbox = document.querySelector('input[type="checkbox"]') as HTMLInputElement;
-    expect(checkbox).toBeTruthy();
-    expect(checkbox.checked).toBe(true);
-
-    await user.click(checkbox);
-
-    const lastSet = getLastSetCall();
-    expect(lastSet).toBeTruthy();
-    const updatedProviders = lastSet.providers;
-    expect(updatedProviders.find((p: any) => p.id === "minimax")?.enabled).toBe(false);
-    expect(onUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "minimax", enabled: false }),
-    );
+  it("renders just label when no comment", () => {
+    renderCard(mockProviderNoComment);
+    expect(screen.getByText("DeepSeek")).toBeInTheDocument();
+    expect(screen.queryByText("DeepSeek ·")).toBeNull();
   });
 
-  it("Refresh models calls appStore.refreshProviderModels and shows success", async () => {
-    const user = userEvent.setup();
-    const mockModels = [
-      {
-        id: "model-A",
-        label: "Model A",
-        contextWindow: 100_000,
-        deprecated: false,
-        thinking: false,
-      },
-      { id: "model-B", label: "Model B", deprecated: false, thinking: false },
-    ];
-    (appStoreMock as any).appStore.refreshProviderModels.mockReturnValue(
-      Effect.succeed(mockModels),
-    );
+  it("renders model count badge", () => {
     renderCard();
-    const refreshBtn = screen.getByRole("button", { name: /refresh models/i });
-    await user.click(refreshBtn);
+    expect(screen.getByText("2 models")).toBeInTheDocument();
+  });
+
+  it("renders default star (highlighted when isDefault=true)", () => {
+    renderCard(mockProvider, false, true);
+    const starBtn = screen.getByRole("button", { name: /default provider/i });
+    expect(starBtn).toBeInTheDocument();
+    expect(starBtn).toHaveAttribute("aria-label", "Set as default provider");
+  });
+
+  it("renders delete button on hover", async () => {
+    const user = userEvent.setup();
+    renderCard();
+    const card = screen.getByTestId("provider-row");
+    await user.hover(card);
     await waitFor(() => {
-      expect(screen.getByText(/Loaded 2 model/i)).toBeInTheDocument();
-    });
-    expect((appStoreMock as any).appStore.refreshProviderModels).toHaveBeenCalledWith("minimax");
-  });
-
-  it("Refresh models failure shows error message", async () => {
-    const user = userEvent.setup();
-    (appStoreMock as any).appStore.refreshProviderModels.mockReturnValue(
-      Effect.fail({ kind: "IPC" as const, message: "fetchModels failed: HTTP 401" }),
-    );
-    renderCard();
-    const refreshBtn = screen.getByRole("button", { name: /refresh models/i });
-    await user.click(refreshBtn);
-    await waitFor(() => {
-      expect(screen.getByText(/Refresh failed.*IPC.*fetchModels failed/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /delete provider/i })).toBeVisible();
     });
   });
 
-  it("model dropdown calls appStore.set with new model", async () => {
+  it("clicking row calls onToggleExpand", async () => {
     const user = userEvent.setup();
-    const onUpdate = vi.fn();
-    render(() => <ProviderCard provider={mockProvider} onUpdate={onUpdate} onDelete={vi.fn()} />);
+    const onToggleExpand = vi.fn();
+    render(() => (
+      <ProviderCard
+        provider={mockProvider}
+        isExpanded={false}
+        isDefault={false}
+        onToggleExpand={onToggleExpand}
+        onSetDefault={vi.fn()}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    ));
+    await user.click(screen.getByTestId("provider-row"));
+    expect(onToggleExpand).toHaveBeenCalledTimes(1);
+  });
 
+  it("clicking star calls onSetDefault", async () => {
+    const user = userEvent.setup();
+    const onSetDefault = vi.fn();
+    render(() => (
+      <ProviderCard
+        provider={mockProvider}
+        isExpanded={false}
+        isDefault={false}
+        onToggleExpand={vi.fn()}
+        onSetDefault={onSetDefault}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    ));
+    await user.click(screen.getByRole("button", { name: /default provider/i }));
+    expect(onSetDefault).toHaveBeenCalledTimes(1);
+  });
+
+  it("NO enabled checkbox in collapsed row", () => {
+    renderCard();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("NO real/mock badge in collapsed row", () => {
+    renderCard();
+    expect(screen.queryByText(/real/i)).toBeNull();
+    expect(screen.queryByText(/mock/i)).toBeNull();
+  });
+});
+
+describe("ProviderCard — expanded area", () => {
+  beforeEach(() => {
+    mockState.calls = [];
+    mockState.resolved = undefined;
+    mockState.rejected = undefined;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+    _resetSettingsSaverForTest();
+  });
+
+  it("renders expanded area when isExpanded=true", () => {
+    renderCard(mockProvider, true);
+    expect(screen.getByText("基础配置")).toBeInTheDocument();
+    expect(screen.getByText("模型")).toBeInTheDocument();
+    expect(screen.getByText("危险区")).toBeInTheDocument();
+  });
+
+  it("does NOT render expanded area when isExpanded=false", () => {
+    renderCard(mockProvider, false);
+    expect(screen.queryByText("基础配置")).toBeNull();
+    expect(screen.queryByText("模型")).toBeNull();
+  });
+
+  it("renders comment / baseUrl / apiKey inputs in basic config section", () => {
+    renderCard(mockProvider, true);
+    // CodemanInput renders label but not linked via 'for', use placeholder/queryByDisplayValue
+    expect(screen.getByPlaceholderText("可选备注")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("https://api.example.com/v1")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("sk-…")).toBeInTheDocument();
+  });
+
+  it("renders test connection button", () => {
+    renderCard(mockProvider, true);
+    expect(screen.getByRole("button", { name: /测试连接/i })).toBeInTheDocument();
+  });
+
+  it("renders defaultModel dropdown with options", () => {
+    renderCard(mockProvider, true);
     const select = document.querySelector("select") as HTMLSelectElement;
     expect(select).toBeTruthy();
-    expect(select.value).toBe("MiniMax-M2.5-highspeed");
-
-    await user.selectOptions(select, "MiniMax-M2.1-highspeed");
-
-    const lastSet = getLastSetCall();
-    expect(lastSet).toBeTruthy();
-    const updatedProviders = lastSet.providers;
-    expect(updatedProviders.find((p: any) => p.id === "minimax")?.llm.defaultModel).toBe(
-      "MiniMax-M2.1-highspeed",
-    );
-    expect(onUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: "minimax",
-        llm: expect.objectContaining({ defaultModel: "MiniMax-M2.1-highspeed" }),
-      }),
-    );
+    const options = Array.from(select.querySelectorAll("option")).map((o) => o.value);
+    expect(options).toContain("MiniMax-M2.5-highspeed");
+    expect(options).toContain("MiniMax-M2.1-highspeed");
   });
 
-  it("renders LLM section with model + base_url + api key", () => {
-    renderCard();
-
-    expect(screen.getByText("LLM")).toBeInTheDocument();
-    const selects = document.querySelectorAll("select");
-    expect(selects.length).toBe(1);
+  it("renders model table with id/label/contextWindow/deprecated/thinking columns", () => {
+    renderCard(mockProvider, true);
+    expect(screen.getByText("ID")).toBeInTheDocument();
+    expect(screen.getByText("Label")).toBeInTheDocument();
+    expect(screen.getByText("Context Window")).toBeInTheDocument();
+    expect(screen.getByText("Deprecated")).toBeInTheDocument();
+    expect(screen.getByText("Thinking")).toBeInTheDocument();
+    // Model IDs appear in both the defaultModel dropdown AND the model table inputs
+    // Check that there are multiple inputs with model IDs
+    const modelInputs = document.querySelectorAll("input[type='text']");
+    expect(modelInputs.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("delete button calls appStore.deleteProvider and onDelete", async () => {
+  it("renders add model row button", () => {
+    renderCard(mockProvider, true);
+    expect(screen.getByRole("button", { name: /添加模型/i })).toBeInTheDocument();
+  });
+
+  it("renders danger zone delete button (destructive style)", () => {
+    renderCard(mockProvider, true);
+    const deleteBtn = screen.getByRole("button", { name: /删除 provider/i });
+    expect(deleteBtn).toBeInTheDocument();
+  });
+
+  it("renders Save / Cancel buttons at bottom", () => {
+    renderCard(mockProvider, true);
+    expect(screen.getByRole("button", { name: /保存/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /取消/i })).toBeInTheDocument();
+  });
+
+  it("cancel button calls onCancel", async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    render(() => (
+      <ProviderCard
+        provider={mockProvider}
+        isExpanded={true}
+        isDefault={false}
+        onToggleExpand={vi.fn()}
+        onSetDefault={vi.fn()}
+        onSave={vi.fn()}
+        onCancel={onCancel}
+        onDelete={vi.fn()}
+      />
+    ));
+    await user.click(screen.getByRole("button", { name: /取消/i }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("save button calls onSave with updated provider", async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+    render(() => (
+      <ProviderCard
+        provider={mockProvider}
+        isExpanded={true}
+        isDefault={false}
+        onToggleExpand={vi.fn()}
+        onSetDefault={vi.fn()}
+        onSave={onSave}
+        onCancel={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    ));
+    await user.click(screen.getByRole("button", { name: /保存/i }));
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const savedProvider = onSave.mock.calls[0][0];
+    expect(savedProvider.id).toBe("minimax");
+    expect(savedProvider.label).toBe("MiniMax");
+  });
+
+  it("hover delete button in danger zone calls onDelete", async () => {
     const user = userEvent.setup();
     const onDelete = vi.fn();
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    (appStoreMock as any).appStore.deleteProvider.mockReturnValue(Effect.void);
-    render(() => <ProviderCard provider={mockProvider} onUpdate={vi.fn()} onDelete={onDelete} />);
-    const deleteBtn = screen.getByRole("button", { name: /delete provider/i });
-    await user.click(deleteBtn);
-    await waitFor(() => {
-      expect((appStoreMock as any).appStore.deleteProvider).toHaveBeenCalledWith("minimax");
-    });
+    render(() => (
+      <ProviderCard
+        provider={mockProvider}
+        isExpanded={true}
+        isDefault={false}
+        onToggleExpand={vi.fn()}
+        onSetDefault={vi.fn()}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+        onDelete={onDelete}
+      />
+    ));
+    await user.click(screen.getByRole("button", { name: /删除 provider/i }));
     expect(onDelete).toHaveBeenCalledWith("minimax");
   });
+});
 
-  it("API Key input onBlur commits to appStore with updated api_key (2026-07 form pattern)", async () => {
-    const user = userEvent.setup();
-    const onUpdate = vi.fn();
-    render(() => <ProviderCard provider={mockProvider} onUpdate={onUpdate} onDelete={vi.fn()} />);
-
-    const apiKeyInputs = document.querySelectorAll('input[type="password"]');
-    expect(apiKeyInputs.length).toBe(1);
-
-    const llmApiKeyInput = apiKeyInputs[0] as HTMLInputElement;
-    await user.clear(llmApiKeyInput);
-    await user.type(llmApiKeyInput, "new-secret-key");
-    await user.tab(); 
-
-    const lastSet = getLastSetCall();
-    expect(lastSet).toBeTruthy();
-    const updatedProviders = lastSet.providers;
-    expect(updatedProviders.find((p: any) => p.id === "minimax")?.apiKey).toBe("new-secret-key");
-    expect(onUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "minimax", apiKey: "new-secret-key" }),
-    );
+describe("ProviderCard — model table editor", () => {
+  beforeEach(() => {
+    mockState.calls = [];
+    mockState.resolved = undefined;
+    mockState.rejected = undefined;
+    vi.clearAllMocks();
   });
 
-  it("no Save button appears in LLM subform section", () => {
-    renderCard();
-
-    const saveButtons = screen.queryAllByRole("button", { name: /save/i });
-    expect(saveButtons.length).toBe(0);
+  afterEach(() => {
+    cleanup();
+    _resetSettingsSaverForTest();
   });
 
-  it("Base URL input commits on blur and updates state (regression 2026-07: typing no longer writes store)", async () => {
+  it("can add a new model row", async () => {
     const user = userEvent.setup();
-    const onUpdate = vi.fn();
-    render(() => <ProviderCard provider={mockProvider} onUpdate={onUpdate} onDelete={vi.fn()} />);
-
-    const textInputs = document.querySelectorAll('input[type="text"]');
-    const baseUrlInput = textInputs[0] as HTMLInputElement;
-    expect(baseUrlInput).toBeTruthy();
-    expect(baseUrlInput.value).toBe("https://api.minimaxi.com/anthropic");
-
-    await user.clear(baseUrlInput);
-    await user.type(baseUrlInput, "https://api.example.com/v1");
-    await user.tab(); 
-
-    const lastSet = getLastSetCall();
-    expect(lastSet).toBeTruthy();
-    const updatedProviders = lastSet.providers;
-    expect(updatedProviders.find((p: any) => p.id === "minimax")?.llm.baseUrl).toBe(
-      "https://api.example.com/v1",
-    );
-    expect(onUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: "minimax",
-        llm: expect.objectContaining({ baseUrl: "https://api.example.com/v1" }),
-      }),
-    );
+    renderCard(mockProvider, true);
+    const initialRows = screen.getAllByTestId(/model-row/i);
+    await user.click(screen.getByRole("button", { name: /添加模型/i }));
+    const newRows = screen.getAllByTestId(/model-row/i);
+    expect(newRows.length).toBe(initialRows.length + 1);
   });
 
-  it("typing in Base URL input preserves focus (regression: <For> remount on each keystroke)", async () => {
+  it("can delete a model row", async () => {
     const user = userEvent.setup();
-    render(() => <ProviderCard provider={mockProvider} onUpdate={vi.fn()} onDelete={vi.fn()} />);
+    renderCard(mockProvider, true);
+    const initialRows = screen.getAllByTestId(/model-row/i);
+    const deleteButtons = screen.getAllByRole("button", { name: /删除行/i });
+    await user.click(deleteButtons[0]);
+    const newRows = screen.getAllByTestId(/model-row/i);
+    expect(newRows.length).toBe(initialRows.length - 1);
+  });
+});
 
-    const textInputs = document.querySelectorAll('input[type="text"]');
-    const baseUrlInput = textInputs[0] as HTMLInputElement;
-    expect(baseUrlInput).toBeTruthy();
-
-    baseUrlInput.focus();
-    await user.clear(baseUrlInput);
-    expect(document.activeElement).toBe(baseUrlInput);
-
-    await user.type(baseUrlInput, "abcdef");
-
-    expect(document.activeElement).toBe(baseUrlInput);
-    expect(baseUrlInput.value).toBe("abcdef");
+describe("ProviderCard — test connection", () => {
+  beforeEach(() => {
+    mockState.calls = [];
+    mockState.resolved = undefined;
+    mockState.rejected = undefined;
+    vi.clearAllMocks();
   });
 
-  it("Base URL input shows validation error on blur when invalid (no http:// prefix)", async () => {
+  afterEach(() => {
+    cleanup();
+    _resetSettingsSaverForTest();
+  });
+
+  it("test connection button is visible and clickable", async () => {
     const user = userEvent.setup();
-    render(() => <ProviderCard provider={mockProvider} onUpdate={vi.fn()} onDelete={vi.fn()} />);
+    renderCard(mockProvider, true);
+    const btn = screen.getByRole("button", { name: /测试连接/i });
+    expect(btn).toBeInTheDocument();
+    await user.click(btn);
+  });
 
-    const textInputs = document.querySelectorAll('input[type="text"]');
-    const baseUrlInput = textInputs[0] as HTMLInputElement;
-
-    await user.clear(baseUrlInput);
-    await user.type(baseUrlInput, "not-a-url");
-    await user.tab(); 
-
+  it("shows error when API returns HTTP 200 but body data is not an array", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ data: "error" }),
+    } as any);
+    renderCard(mockProvider, true);
+    await user.click(screen.getByRole("button", { name: /测试连接/i }));
     await waitFor(() => {
-      expect(
-        screen.getByText(/Base URL must start with http/i),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/模型列表为空或响应格式错误/i)).toBeInTheDocument();
     });
   });
+});
 
-  it("delete confirm=false 时不调 deleteProvider", async () => {
-    const user = userEvent.setup();
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
-    (appStoreMock as any).appStore.deleteProvider.mockReturnValue(Effect.void);
-    const onDelete = vi.fn();
-
-    render(() => <ProviderCard provider={mockProvider} onUpdate={vi.fn()} onDelete={onDelete} />);
-
-    const deleteBtn = screen.getByRole("button", { name: /delete provider/i });
-    await user.click(deleteBtn);
-
-    expect(confirmSpy).toHaveBeenCalled();
-    expect((appStoreMock as any).appStore.deleteProvider).not.toHaveBeenCalled();
-    expect(onDelete).not.toHaveBeenCalled();
-
-    confirmSpy.mockRestore();
-  });
-
-  it("delete 失败时显示 Delete failed 错误信息", async () => {
-    const user = userEvent.setup();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-    (appStoreMock as any).appStore.deleteProvider.mockReturnValue(
-      Effect.fail({ kind: "IPC" as const, message: "delete failed: provider not found" }),
-    );
-
-    render(() => <ProviderCard provider={mockProvider} onUpdate={vi.fn()} onDelete={vi.fn()} />);
-
-    const deleteBtn = screen.getByRole("button", { name: /delete provider/i });
-    await user.click(deleteBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Delete failed.*IPC.*delete failed: provider not found/i)).toBeInTheDocument();
-    });
-  });
-
-  it("llm.base_url 指向本地 mock server (http://127.0.0.1:...) → 显示 (dev) 徽标", () => {
+describe("ProviderCard — baseUrl dev badge", () => {
+  it("shows (dev) badge when baseUrl starts with http://127.0.0.1:", () => {
     const devProvider = {
       id: "mock-test",
       label: "Mock Test",
-      enabled: true,
       apiKey: "",
       llm: {
         defaultModel: "mock-default",
         baseUrl: "http://127.0.0.1:50000/mock/anthropic",
         apiType: "anthropic-messages" as const,
-        models: [{ id: "mock-default", label: "Mock", deprecated: false, thinking: false }],
+        models: [{ id: "mock-default", label: "Mock", contextWindow: 1000, deprecated: false, thinking: false }],
         modelsEndpoint: "",
       },
     };
-    render(() => <ProviderCard provider={devProvider} onUpdate={vi.fn()} onDelete={vi.fn()} />);
+    render(() => (
+      <ProviderCard
+        provider={devProvider}
+        isExpanded={false}
+        isDefault={false}
+        onToggleExpand={vi.fn()}
+        onSetDefault={vi.fn()}
+        onSave={vi.fn()}
+        onCancel={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    ));
     expect(screen.getByText("(dev)")).toBeInTheDocument();
   });
 });

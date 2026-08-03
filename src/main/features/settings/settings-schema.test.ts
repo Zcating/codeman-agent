@@ -5,13 +5,13 @@ import {
   type Settings,
 } from "./settings-schema";
 
+// V15 without enabled - ADR-0050 D4
 const V15: Settings = {
   schemaVersion: "1.5",
   providers: [
     {
       id: "minimax",
       label: "MiniMax",
-      enabled: true,
       apiKey: "sk-test",
       llm: {
         defaultModel: "MiniMax-M2.5-highspeed",
@@ -97,6 +97,37 @@ describe("T4a — src/main/settings-schema.ts", () => {
         defaultLlmProviderId: "minimax",
       } as unknown as Partial<Settings>);
       expect(r.defaultLlmProviderId).toBe("minimax");
+    });
+
+    // ADR-0050 D4: legacy enabled field should be stripped during sanitize
+    it("strips legacy enabled field from providers (ADR-0050 D4)", () => {
+      // Use type assertion to simulate legacy data with enabled field
+      const legacyWithEnabled = {
+        ...V15,
+        providers: [
+          {
+            ...V15.providers[0],
+            enabled: true as const, // legacy field that should be stripped
+          },
+        ],
+      };
+      const r = sanitize(legacyWithEnabled as unknown as Partial<Settings>);
+      expect(r.providers[0]).not.toHaveProperty("enabled");
+    });
+
+    // ADR-0050 D4: new comment field should be preserved when present
+    it("preserves comment field when present (ADR-0050 D4)", () => {
+      const withComment: Settings = {
+        ...V15,
+        providers: [
+          {
+            ...V15.providers[0],
+            comment: "my comment",
+          },
+        ],
+      };
+      const r = sanitize(withComment);
+      expect(r.providers[0].comment).toBe("my comment");
     });
   });
 

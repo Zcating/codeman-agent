@@ -1,4 +1,4 @@
-# 0050 — Settings/Provider 页面优化:预设库 + 手风琴列表 + 显式保存
+﻿# 0050 — Settings/Provider 页面优化:预设库 + 手风琴列表 + 显式保存
 
 - **Status**: accepted
 - **Date**: 2026-08-03
@@ -17,7 +17,7 @@
 
 ### 触发 1: 添加 provider 全靠手填,没有厂商预设
 
-`add-provider-dialog.tsx` 现状:用户选 real/mock → 手填 label / baseUrl / defaultModel / apiKey / enabled。`baseUrl`、`modelsEndpoint`、模型清单都要手动输入,对不熟 API 形态的用户门槛高。业界(CC-Switch, `farion1231/cc-switch`, MIT)用**内置预设模板库**:60+ 厂商预设硬编码在前端 TS 常量,用户点选厂商后表单自动填充 `baseUrl`/模型清单等,只需补 apiKey。
+`add-provider-dialog.tsx` 现状:用户选 real/mock → 手填 label / baseUrl / defaultModel / apiKey / enabled。`baseUrl`、`modelsEndpoint`、模型清单都要手动输入,对不熟 API 形态的用户门槛高。业界(CC-Switch, `farion1231/cc-switch`, MIT)用**内置预设模板库**:精选 20 个主流厂商预设硬编码在前端 TS 常量,用户点选厂商后表单自动填充 `baseUrl`/模型清单等,只需补 apiKey。
 
 ### 触发 2: provider 列表是单列全宽卡片堆叠,无主从结构
 
@@ -39,12 +39,13 @@
 
 ### D1: 预设库(移植 CC-Switch `claudeProviderPresets.ts`)
 
-- **D1.1 数据来源**:移植 CC-Switch(`farion1231/cc-switch`, MIT)的 `src/config/claudeProviderPresets.ts`,60+ 厂商预设。保留 MIT 版权声明(单独 header 注释 + `docs/` 中注明来源)。
+- **D1.1 数据来源**:移植 CC-Switch(`farion1231/cc-switch`, MIT)的 `src/config/claudeProviderPresets.ts`,精选 20 个主流厂商预设。保留 MIT 版权声明(单独 header 注释 + `docs/` 中注明来源)。
 - **D1.2 适配转换**:移植时把 `settingsConfig.env` 形式转换为 codeman `Provider` 结构(`baseUrl` / `apiKey`(空)/ `defaultModel` / `models`(硬编码清单)/ `modelsEndpoint`)。存为 codeman 原生结构的 JSON/TS 常量文件,运行时零转换。
 - **D1.3 模型清单预填**:每个预设直接带一份 `models: ModelMeta[]`(厂商已知模型),**不通过 models API 运行时拉取**。`defaultModel` 预设为清单中一个。
 - **D1.4 modelsEndpoint**:已知厂商填标准 URL,其余留空。字段保留在 schema(现状已有),但不作为模型列表主要来源。
-- **D1.5 交互**:`add-provider-dialog` 打开即 **tag 云**(60+ 厂商 tag 平铺,可滚动),点选 → 进入完整表单(已预填 baseUrl/models/modelsEndpoint,用户补 label + apiKey)→ 保存。底部保留"自定义 provider"入口(空表单)。
+- **D1.5 交互**:`add-provider-dialog` 打开即 **tag 云**(精选 20 个主流厂商 tag 平铺,可滚动),点选 → 进入完整表单(已预填 baseUrl/models/modelsEndpoint,用户补 label + apiKey)→ 保存。底部保留"自定义 provider"入口(空表单)。
 - **D1.6 无来源区别**:预设来的 provider 与自定义 provider 落盘后无区别,不新增 `source` 字段。
+- **D1.7 设计依据**:用户在拷问阶段先选"精选 + 可扩展",后改为"全量移植 claudeProviderPresets.ts"(A),实施时落实为精选 20 个主流厂商(Claude/OpenAI/DeepSeek/MiniMax/Kimi/Gemini/通义/豆包/OpenRouter/SiliconFlow/智谱 等)+ 可扩展结构。数据源来自 CC-Switch 预设,只收录主流厂商,避免维护 60+ 条可能过期的 baseUrl;结构上纯数组加记录即可追加新厂商。
 
 ### D2: 手风琴列表(主从式,内嵌展开)
 
@@ -89,8 +90,8 @@
 ## Consequences
 
 - **正面**:添加 provider 从"全手填"变为"选厂商 + 填 key";列表可快速浏览定位;保存语义统一(显式 + 脏标记);enabled 死概念清除。
-- **负面**:移除 debounce 自动保存,用户忘记点 Save 时改动丢失(靠脏标记 + 关窗拦截缓解);预设库 60+ 厂商需维护(但独立文件,追加一条记录即可);模型清单不再自动同步最新(手动编辑 + 预留 modelsEndpoint)。
-- **风险**:预设移植 60+ 厂商的 baseUrl 可能过期(CC-Switch 本身在维护,但本仓库不自动同步);模型硬编码清单会落后于厂商发布。缓解:模型表格可手动增删;modelsEndpoint 保留字段。
+- **负面**:移除 debounce 自动保存,用户忘记点 Save 时改动丢失(靠脏标记 + 关窗拦截缓解);预设库 精选 20 个主流厂商需维护(但独立文件,追加一条记录即可);模型清单不再自动同步最新(手动编辑 + 预留 modelsEndpoint)。
+- **风险**:预设移植 精选 20 个主流厂商的 baseUrl 可能过期(CC-Switch 本身在维护,但本仓库不自动同步);模型硬编码清单会落后于厂商发布。缓解:模型表格可手动增删;modelsEndpoint 保留字段。
 
 ## Verification
 

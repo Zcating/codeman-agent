@@ -103,7 +103,6 @@ describe("IPC Mock - V1.5+ Schema", () => {
 
       expect(provider.id).toBe("test");
       expect(provider.label).toBe("Test");
-      expect(provider.enabled).toBe(true);
       expect(provider.llm.apiType).toBe("anthropic-messages");
       expect(Array.isArray(provider.llm.models)).toBe(true);
     });
@@ -112,7 +111,6 @@ describe("IPC Mock - V1.5+ Schema", () => {
       const provider = mockProvider({
         id: "custom",
         label: "Custom",
-        enabled: false,
         apiKey: "",
         llm: {
           defaultModel: "custom-model",
@@ -124,7 +122,6 @@ describe("IPC Mock - V1.5+ Schema", () => {
       });
 
       expect(provider.id).toBe("custom");
-      expect(provider.enabled).toBe(false);
       expect(provider.llm.defaultModel).toBe("custom-model");
     });
   });

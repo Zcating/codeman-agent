@@ -98,7 +98,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "old-model",
@@ -141,7 +140,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "old-model",
@@ -173,7 +171,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "old-model",
@@ -210,7 +207,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "MiniMax-M2.7-highspeed",
@@ -249,7 +245,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "x",
@@ -310,7 +305,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "some-model",
@@ -371,7 +365,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "MiniMax-M2.5-highspeed",
@@ -384,7 +377,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "deepseek",
           label: "DeepSeek",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "deepseek-chat",
@@ -411,7 +403,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "deepseek",
           label: "DeepSeek",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "deepseek-chat",
@@ -452,7 +443,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "test-provider",
           label: "Test",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "ghost-model",
@@ -478,7 +468,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
           {
             id: "test-provider",
             label: "Test",
-            enabled: true,
             apiKey: "",
             llm: {
               defaultModel: "ghost-model",
@@ -505,7 +494,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "",
@@ -542,7 +530,6 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
         {
           id: "minimax",
           label: "MiniMax",
-          enabled: true,
           apiKey: "",
           llm: {
             defaultModel: "MiniMax-M2.5-highspeed",
@@ -560,7 +547,106 @@ describe("appStore (ADR-0015 V1.7+ 无 debounce)", () => {
     const exit = await Effect.runPromiseExit(appStore.deleteProvider("minimax"));
     expect(exit._tag).toBe("Success");
     const providers = (appStore.state.value as any).providers;
-    expect(providers.length).toBe(0); 
+    expect(providers.length).toBe(0);
+  });
+
+  it("deleteProvider(id) 删除默认 provider → defaultLlmProviderId 转移到剩余第一个", async () => {
+    mockState.settings = {
+      ...mockState.settings,
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          apiKey: "",
+          llm: {
+            defaultModel: "MiniMax-M2.5-highspeed",
+            baseUrl: "https://api.minimaxi.com/anthropic",
+            apiType: "anthropic-messages",
+            models: [],
+            modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          },
+        },
+        {
+          id: "deepseek",
+          label: "DeepSeek",
+          apiKey: "",
+          llm: {
+            defaultModel: "deepseek-chat",
+            baseUrl: "https://api.deepseek.com/anthropic",
+            apiType: "anthropic-messages",
+            models: [],
+            modelsEndpoint: "https://api.deepseek.com/models",
+          },
+        },
+      ],
+      defaultLlmProviderId: "minimax",
+    };
+    await Effect.runPromise(appStore.refresh());
+    const exit = await Effect.runPromiseExit(appStore.deleteProvider("minimax"));
+    expect(exit._tag).toBe("Success");
+    expect((appStore.state.value as any).defaultLlmProviderId).toBe("deepseek");
+  });
+
+  it("deleteProvider(id) 删除最后一个 provider → defaultLlmProviderId 为 null", async () => {
+    mockState.settings = {
+      ...mockState.settings,
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          apiKey: "",
+          llm: {
+            defaultModel: "MiniMax-M2.5-highspeed",
+            baseUrl: "https://api.minimaxi.com/anthropic",
+            apiType: "anthropic-messages",
+            models: [],
+            modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          },
+        },
+      ],
+      defaultLlmProviderId: "minimax",
+    };
+    await Effect.runPromise(appStore.refresh());
+    const exit = await Effect.runPromiseExit(appStore.deleteProvider("minimax"));
+    expect(exit._tag).toBe("Success");
+    expect((appStore.state.value as any).defaultLlmProviderId).toBeUndefined();
+  });
+
+  it("deleteProvider(id) 删除非默认 provider → defaultLlmProviderId 不变", async () => {
+    mockState.settings = {
+      ...mockState.settings,
+      providers: [
+        {
+          id: "minimax",
+          label: "MiniMax",
+          apiKey: "",
+          llm: {
+            defaultModel: "MiniMax-M2.5-highspeed",
+            baseUrl: "https://api.minimaxi.com/anthropic",
+            apiType: "anthropic-messages",
+            models: [],
+            modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
+          },
+        },
+        {
+          id: "deepseek",
+          label: "DeepSeek",
+          apiKey: "",
+          llm: {
+            defaultModel: "deepseek-chat",
+            baseUrl: "https://api.deepseek.com/anthropic",
+            apiType: "anthropic-messages",
+            models: [],
+            modelsEndpoint: "https://api.deepseek.com/models",
+          },
+        },
+      ],
+      defaultLlmProviderId: "deepseek",
+    };
+    await Effect.runPromise(appStore.refresh());
+    const exit = await Effect.runPromiseExit(appStore.deleteProvider("minimax"));
+    expect(exit._tag).toBe("Success");
+    expect((appStore.state.value as any).defaultLlmProviderId).toBe("deepseek");
   });
 
 
