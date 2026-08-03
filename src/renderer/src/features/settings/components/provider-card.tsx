@@ -1,272 +1,518 @@
 
-import { createSignal, Show, For } from "solid-js";
-import { Schema } from "effect";
+import { createSignal, Show, For, createMemo } from "solid-js";
 import { Effect, Exit } from "effect";
-import { createForm } from "@tanstack/solid-form";
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
-import { settingsSaver } from "@codeman-frontend/features/settings/lib/settings-saver";
-import {
-  effectSchema,
-  firstErrorMessage,
-} from "@codeman-frontend/shared/lib/effect-schema-adapter";
 import { formatAppError } from "@codeman-frontend/shared/lib/format-app-error";
 import type { Provider } from "@codeman-frontend/shared/lib/types";
+import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 import { Button } from "@codeman-frontend/shared/components/ui/button";
 import { CodemanInput } from "@codeman-frontend/shared/components/internal/codeman-input";
-import { Checkbox } from "@codeman-frontend/shared/components/ui/checkbox";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@codeman-frontend/shared/components/ui/card";
 import {
   BaseUrlSchema,
-  ModelSchema,
   ApiKeySchema,
 } from "@codeman-frontend/features/settings/lib/schemas";
+import { firstErrorMessage, effectSchema } from "@codeman-frontend/shared/lib/effect-schema-adapter";
 
 export interface ProviderCardProps {
   provider: Provider;
-  onUpdate: (provider: Provider) => void;
+  isExpanded: boolean;
+  isDefault: boolean;
+  onToggleExpand: () => void;
+  onSetDefault: () => void;
+  onSave: (provider: Provider) => void;
+  onCancel: () => void;
   onDelete: (providerId: string) => void;
 }
 
+interface ModelRow {
+  id: string;
+  label: string;
+  contextWindow: string;
+  deprecated: boolean;
+  thinking: boolean;
+}
+
+const emptyModelRow = (): ModelRow => ({
+  id: "",
+  label: "",
+  contextWindow: "",
+  deprecated: false,
+  thinking: false,
+});
+
 export function ProviderCard(props: ProviderCardProps) {
-  const [isRefreshing, setIsRefreshing] = createSignal(false);
-  const [refreshMsg, setRefreshMsg] = createSignal<string | null>(null);
+  // --- Local form state (discarded on cancel) ---
+  const [localComment, setLocalComment] = createSignal(props.provider.comment ?? "");
+  const [localBaseUrl, setLocalBaseUrl] = createSignal(props.provider.llm.baseUrl);
+  const [localApiKey, setLocalApiKey] = createSignal(props.provider.apiKey);
+  const [localDefaultModel, setLocalDefaultModel] = createSignal(props.provider.llm.defaultModel);
+  const [localModels, setLocalModels] = createSignal<ModelRow[]>(
+    props.provider.llm.models.map((m) => ({
+      id: m.id,
+      label: m.label,
+      contextWindow: m.contextWindow != null ? String(m.contextWindow) : "",
+      deprecated: m.deprecated,
+      thinking: m.thinking ?? false,
+    })),
+  );
+
+  // Validation errors
+  const [baseUrlError, setBaseUrlError] = createSignal<string | undefined>(undefined);
+  const [apiKeyError, setApiKeyError] = createSignal<string | undefined>(undefined);
+
+  // Test connection state
+  const [testStatus, setTestStatus] = createSignal<{ kind: "idle" } | { kind: "testing" } | { kind: "success" } | { kind: "error"; message: string }>({ kind: "idle" });
+  const [isTesting, setIsTesting] = createSignal(false);
+
+  // Delete confirmation
   const [isDeleting, setIsDeleting] = createSignal(false);
 
-  const form = createForm(() => ({
-    defaultValues: {
-      baseUrl: props.provider.llm.baseUrl,
-      apiKey: props.provider.apiKey,
-      model: props.provider.llm.defaultModel,
-      enabled: props.provider.enabled,
-    },
-    validators: {
-      onChange: effectSchema(
-        Schema.Struct({
-          baseUrl: BaseUrlSchema,
-          apiKey: ApiKeySchema,
-          model: ModelSchema,
-          enabled: Schema.Boolean,
-        }),
-      ),
-    },
-    onSubmit: async ({ value }) => {
-      const updated: Provider = {
-        ...props.provider,
-        enabled: value.enabled,
-        apiKey: value.apiKey,
-        llm: {
-          ...props.provider.llm,
-          baseUrl: value.baseUrl,
-          defaultModel: value.model,
-        },
-      };
-      const providers = appStore.state.value.providers!.map((p) =>
-        p.id === updated.id ? updated : p,
-      );
-      appStore.set({ providers });
-      void settingsSaver.flushNow().catch(() => {});
-      props.onUpdate(updated);
-    },
-  }));
+  // Hover state for delete button
+  const [isHovered, setIsHovered] = createSignal(false);
 
+  const labelDisplay = createMemo(() => {
+    const c = props.provider.comment;
+    return c ? `${props.provider.label} · ${c}` : props.provider.label;
+  });
 
-  const handleRefreshModels = async (): Promise<void> => {
-    setIsRefreshing(true);
-    setRefreshMsg(null);
+  const modelCount = createMemo(() => props.provider.llm.models.length);
+
+  const isDev = createMemo(() =>
+    props.provider.llm.baseUrl.startsWith("http://127.0.0.1:"),
+  );
+
+  // --- Sync local state when provider changes externally ---
+  const syncFromProvider = () => {
+    setLocalComment(props.provider.comment ?? "");
+    setLocalBaseUrl(props.provider.llm.baseUrl);
+    setLocalApiKey(props.provider.apiKey);
+    setLocalDefaultModel(props.provider.llm.defaultModel);
+    setLocalModels(
+      props.provider.llm.models.map((m) => ({
+        id: m.id,
+        label: m.label,
+        contextWindow: m.contextWindow != null ? String(m.contextWindow) : "",
+        deprecated: m.deprecated,
+        thinking: m.thinking ?? false,
+      })),
+    );
+    setTestStatus({ kind: "idle" });
+  };
+
+  // When expanded changes to true, sync from current provider (in case it changed while collapsed)
+  createMemo(() => {
+    if (props.isExpanded) {
+      syncFromProvider();
+    }
+  });
+
+  // --- Validation ---
+  const validateBaseUrl = (): boolean => {
+    const validator = effectSchema(BaseUrlSchema);
+    const result = validator["~standard"].validate(localBaseUrl()) as { issues?: Array<{ message: string }> };
+    if (!result.issues || result.issues.length === 0) {
+      setBaseUrlError(undefined);
+      return true;
+    }
+    const msg = firstErrorMessage(result.issues);
+    setBaseUrlError(msg ?? "Base URL must start with http:// or https://");
+    return false;
+  };
+
+  const validateApiKey = (): boolean => {
+    const validator = effectSchema(ApiKeySchema);
+    const result = validator["~standard"].validate(localApiKey()) as { issues?: Array<{ message: string }> };
+    if (!result.issues || result.issues.length === 0) {
+      setApiKeyError(undefined);
+      return true;
+    }
+    const msg = firstErrorMessage(result.issues);
+    setApiKeyError(msg ?? "API Key is required");
+    return false;
+  };
+
+  // --- Test connection ---
+  const handleTestConnection = async () => {
+    if (!validateBaseUrl() || !validateApiKey()) return;
+    setIsTesting(true);
+    setTestStatus({ kind: "testing" });
+    // Use refreshProviderModels to validate baseUrl + apiKey combination
+    // This calls fetchModels which makes an HTTP request with the provided credentials
     const exit = await Effect.runPromiseExit(
       appStore.refreshProviderModels(props.provider.id),
     );
+    setIsTesting(false);
     if (Exit.isSuccess(exit)) {
-      settingsSaver.scheduleSave();
-      setRefreshMsg(`Loaded ${exit.value.length} model(s)`);
+      setTestStatus({ kind: "success" });
     } else {
-      setRefreshMsg(`Refresh failed: ${formatAppError(exit.cause)}`);
+      setTestStatus({ kind: "error", message: formatAppError(exit.cause) });
     }
-    setIsRefreshing(false);
   };
 
-  const handleDelete = async (): Promise<void> => {
-    if (!confirm(`Delete provider "${props.provider.label}"?`)) {
-      return;
-    }
-    setIsDeleting(true);
-    const exit = await Effect.runPromiseExit(
-      appStore.deleteProvider(props.provider.id),
+  // --- Model table helpers ---
+  const addModelRow = () => {
+    setLocalModels((prev) => [...prev, emptyModelRow()]);
+  };
+
+  const deleteModelRow = (index: number) => {
+    setLocalModels((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateModelRow = (index: number, field: keyof ModelRow, value: string | boolean) => {
+    setLocalModels((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
     );
-    if (Exit.isSuccess(exit)) {
-      settingsSaver.scheduleSave();
-      props.onDelete(props.provider.id);
-    } else {
-      setRefreshMsg(`Delete failed: ${formatAppError(exit.cause)}`);
-    }
-    setIsDeleting(false);
   };
 
+  // --- Save ---
+  const handleSave = () => {
+    if (!validateBaseUrl()) return;
+    // apiKey can be empty
+
+    const models: ModelMeta[] = localModels()
+      .filter((r) => r.id.trim() !== "" && r.label.trim() !== "")
+      .map((r) => ({
+        id: r.id.trim(),
+        label: r.label.trim(),
+        contextWindow: r.contextWindow ? parseInt(r.contextWindow, 10) : undefined,
+        deprecated: r.deprecated,
+        thinking: r.thinking,
+      }));
+
+    let defaultModel = localDefaultModel();
+    // Enforce default model invariant
+    if (models.length === 0) {
+      defaultModel = "";
+    } else if (!models.some((m) => m.id === defaultModel)) {
+      defaultModel = models[0].id;
+    }
+
+    const updated: Provider = {
+      ...props.provider,
+      comment: localComment() || undefined,
+      apiKey: localApiKey(),
+      llm: {
+        ...props.provider.llm,
+        baseUrl: localBaseUrl(),
+        defaultModel,
+        models,
+      },
+    };
+
+    props.onSave(updated);
+  };
+
+  // --- Delete ---
+  const handleDelete = async () => {
+    if (!confirm(`Delete provider "${props.provider.label}"?`)) return;
+    setIsDeleting(true);
+    const exit = await Effect.runPromiseExit(appStore.deleteProvider(props.provider.id));
+    setIsDeleting(false);
+    if (Exit.isSuccess(exit)) {
+      props.onDelete(props.provider.id);
+    }
+  };
+
+  const testStatusColor = createMemo(() => {
+    const s = testStatus();
+    if (s.kind === "success") return "text-green-600 dark:text-green-400";
+    if (s.kind === "error") return "text-red-600 dark:text-red-400";
+    return "";
+  });
+
+  const testStatusText = createMemo(() => {
+    const s = testStatus();
+    if (s.kind === "success") return "连接成功";
+    if (s.kind === "error") return `连接失败: ${s.message}`;
+    if (s.kind === "testing") return "测试中…";
+    return null;
+  });
 
   return (
-    <Card class="p-0 overflow-hidden">
-      {}
-      <CardHeader class="flex flex-row items-center justify-between p-4 pb-3">
-        <div class="flex flex-col gap-0.5">
-          <CardTitle class="text-base font-semibold">
-            {props.provider.label}
-            <Show
-              when={props.provider.llm.baseUrl.startsWith("http://127.0.0.1:")}
-            >
+    <div class="flex flex-col gap-0">
+      {/* ===== COLLAPSED ROW ===== */}
+      <div
+        data-testid="provider-row"
+        class="flex flex-row items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors rounded-lg"
+        onClick={() => props.onToggleExpand()}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <div class="flex flex-col gap-0.5 min-w-0">
+          <div class="flex flex-row items-center gap-2">
+            <span class="text-sm font-medium truncate">{labelDisplay()}</span>
+            <Show when={isDev()}>
               <span
                 data-testid="provider-dev-badge"
-                class="ml-2 text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                class="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 shrink-0"
               >
                 (dev)
               </span>
             </Show>
-          </CardTitle>
-          <CardDescription class="text-xs font-mono text-muted-foreground">
-            {props.provider.id}
-          </CardDescription>
+          </div>
         </div>
-        <div class="flex items-center gap-2">
-          <span class="text-xs text-muted-foreground">
-            {form.useStore((s) => s.values.enabled) ? "Enabled" : "Disabled"}
+
+        <div class="flex flex-row items-center gap-3">
+          {/* Model count badge */}
+          <span class="text-xs text-muted-foreground shrink-0">
+            {modelCount()} models
           </span>
-          <form.Field name="enabled">
-            {(field) => (
-              <Checkbox
-                checked={field().state.value}
-                onChange={(e) => {
-                  field().handleChange(e.currentTarget.checked);
-                  void form.handleSubmit();
-                }}
-              />
-            )}
-          </form.Field>
+
+          {/* Default star */}
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            class={props.isDefault ? "text-yellow-500" : "text-muted-foreground"}
+            onClick={(e) => {
+              e.stopPropagation();
+              props.onSetDefault();
+            }}
+            aria-label="Set as default provider"
+            title={props.isDefault ? "默认 Provider" : "设为默认"}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill={props.isDefault ? "currentColor" : "none"}
+              stroke="currentColor"
+              stroke-width="2"
+              class="size-4"
+            >
+              <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+            </svg>
+          </Button>
+
+          {/* Hover delete button */}
+          <Show when={isHovered}>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              class="text-muted-foreground hover:text-destructive shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (confirm(`Delete provider "${props.provider.label}"?`)) {
+                  props.onDelete(props.provider.id);
+                }
+              }}
+              aria-label="Delete provider"
+              title="删除"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="size-4">
+                <polyline points="3,6 5,6 21,6" />
+                <path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6M8,6V4a2,2,0,0,1,2-2h4a2,2,0,0,1,2,2V6" />
+              </svg>
+            </Button>
+          </Show>
         </div>
-      </CardHeader>
-      <CardContent class="space-y-4 p-4 pt-0">
-        {}
-        <div class="space-y-3 rounded-md border border-border p-3">
-          <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            LLM
-          </p>
+      </div>
 
-          {}
-          <div class="flex flex-col gap-1">
-            <label class="text-xs text-muted-foreground">Model</label>
-            <form.Field
-              name="model"
-              validators={{ onBlur: effectSchema(ModelSchema) }}
-            >
-              {(field) => (
-                <select
-                  class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={field().state.value}
-                  onChange={(e) => {
-                    field().handleChange(e.currentTarget.value);
-                    void form.handleSubmit();
-                  }}
-                  onBlur={field().handleBlur}
-                  data-testid="provider-field-model"
-                >
-                  <For each={props.provider.llm.models}>
-                    {(m) => (
-                      <option value={m.id}>
-                        {m.label}
-                        {m.deprecated ? " (deprecated)" : ""}
-                      </option>
-                    )}
-                  </For>
-                </select>
-              )}
-            </form.Field>
+      {/* ===== EXPANDED EDITOR ===== */}
+      <Show when={props.isExpanded}>
+        <div class="flex flex-col gap-4 p-4 border border-t-0 rounded-b-lg bg-card">
+          {/* --- Basic config section --- */}
+          <div class="flex flex-col gap-3">
+            <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              基础配置
+            </p>
+
+            {/* Comment */}
+            <CodemanInput
+              label="备注"
+              value={localComment()}
+              onValueChange={setLocalComment}
+              placeholder="可选备注"
+            />
+
+            {/* Base URL */}
+            <CodemanInput
+              label="Base URL"
+              value={localBaseUrl()}
+              onValueChange={(v) => {
+                setLocalBaseUrl(v);
+                setBaseUrlError(undefined);
+              }}
+              onBlur={validateBaseUrl}
+              error={baseUrlError()}
+              placeholder="https://api.example.com/v1"
+            />
+
+            {/* API Key */}
+            <CodemanInput
+              label="LLM API Key"
+              type="password"
+              value={localApiKey()}
+              onValueChange={(v) => {
+                setLocalApiKey(v);
+                setApiKeyError(undefined);
+              }}
+              onBlur={validateApiKey}
+              error={apiKeyError()}
+              placeholder="sk-…"
+            />
+
+            {/* Test connection */}
+            <div class="flex flex-row items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleTestConnection}
+                disabled={isTesting()}
+              >
+                {isTesting() ? "测试中…" : "测试连接"}
+              </Button>
+              <Show when={testStatusText()}>
+                <span class={`text-xs ${testStatusColor()}`}>
+                  {testStatusText()}
+                </span>
+              </Show>
+            </div>
           </div>
 
-          {}
-          <div class="flex flex-col gap-1">
-            <label class="text-xs text-muted-foreground">Base URL</label>
-            <form.Field
-              name="baseUrl"
-              validators={{ onBlur: effectSchema(BaseUrlSchema) }}
-            >
-              {(field) => (
-                <CodemanInput
-                  type="text"
-                  value={field().state.value}
-                  onValueChange={field().handleChange}
-                  onBlur={async () => {
-                    field().handleBlur();
-                    await form.handleSubmit();
-                  }}
-                  error={firstErrorMessage(field().state.meta.errors)}
-                  placeholder="https://api.example.com/v1"
-                />
-              )}
-            </form.Field>
+          {/* --- Model section --- */}
+          <div class="flex flex-col gap-3">
+            <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              模型
+            </p>
+
+            {/* Default model dropdown */}
+            <div class="flex flex-col gap-1.5">
+              <label class="text-sm font-medium">Default Model</label>
+              <select
+                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={localDefaultModel()}
+                onChange={(e) => setLocalDefaultModel(e.currentTarget.value)}
+              >
+                <For each={localModels()}>
+                  {(m) => (
+                    <option value={m.id}>
+                      {m.label}
+                      {m.deprecated ? " (deprecated)" : ""}
+                    </option>
+                  )}
+                </For>
+              </select>
+            </div>
+
+            {/* Model table */}
+            <div class="flex flex-col gap-2 border border-border rounded-md p-3">
+              {/* Table header */}
+              <div class="grid grid-cols-[1fr_1fr_100px_80px_80px_40px] gap-2 text-xs font-medium text-muted-foreground px-1">
+                <span>ID</span>
+                <span>Label</span>
+                <span>Context Window</span>
+                <span>Deprecated</span>
+                <span>Thinking</span>
+                <span />
+              </div>
+
+              {/* Model rows */}
+              <For each={localModels()}>
+                {(row, index) => (
+                  <div
+                    data-testid={`model-row-${index()}`}
+                    class="grid grid-cols-[1fr_1fr_100px_80px_80px_40px] gap-2 items-center"
+                  >
+                    <input
+                      type="text"
+                      class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring"
+                      value={row.id}
+                      onInput={(e) => updateModelRow(index(), "id", e.currentTarget.value)}
+                      placeholder="model-id"
+                    />
+                    <input
+                      type="text"
+                      class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring"
+                      value={row.label}
+                      onInput={(e) => updateModelRow(index(), "label", e.currentTarget.value)}
+                      placeholder="Display Name"
+                    />
+                    <input
+                      type="number"
+                      class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring"
+                      value={row.contextWindow}
+                      onInput={(e) => updateModelRow(index(), "contextWindow", e.currentTarget.value)}
+                      placeholder="100000"
+                    />
+                    <div class="flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        class="size-4 rounded border-input"
+                        checked={row.deprecated}
+                        onChange={(e) => updateModelRow(index(), "deprecated", e.currentTarget.checked)}
+                      />
+                    </div>
+                    <div class="flex items-center justify-center">
+                      <input
+                        type="checkbox"
+                        class="size-4 rounded border-input"
+                        checked={row.thinking}
+                        onChange={(e) => updateModelRow(index(), "thinking", e.currentTarget.checked)}
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      class="text-muted-foreground hover:text-destructive shrink-0"
+                      onClick={() => deleteModelRow(index())}
+                      aria-label="删除行"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="size-3.5">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </Button>
+                  </div>
+                )}
+              </For>
+
+              {/* Add model row */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addModelRow}
+                class="self-start mt-1"
+              >
+                添加模型
+              </Button>
+            </div>
           </div>
 
-          {}
-          <div class="flex items-center gap-2">
+          {/* --- Danger zone --- */}
+          <div class="flex flex-col gap-3">
+            <p class="text-xs font-medium uppercase tracking-wider text-destructive">
+              危险区
+            </p>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleDelete}
+              disabled={isDeleting()}
+            >
+              {isDeleting() ? "删除中…" : "删除 provider"}
+            </Button>
+          </div>
+
+          {/* --- Bottom Save / Cancel --- */}
+          <div class="flex flex-row justify-end gap-2 pt-2 border-t">
             <Button
               variant="outline"
               size="sm"
-              onClick={handleRefreshModels}
-              disabled={isRefreshing()}
+              onClick={() => {
+                syncFromProvider();
+                props.onCancel();
+              }}
             >
-              {isRefreshing() ? "Refreshing…" : "Refresh models"}
+              取消
             </Button>
-            <Show when={refreshMsg()}>
-              <span class="text-xs text-muted-foreground">
-                {refreshMsg()}
-              </span>
-            </Show>
-          </div>
-
-          {}
-          <div class="flex flex-col gap-1">
-            <label class="text-xs text-muted-foreground">LLM API Key</label>
-            <form.Field
-              name="apiKey"
-              validators={{ onBlur: effectSchema(ApiKeySchema) }}
+            <Button
+              variant="default"
+              size="sm"
+              onClick={handleSave}
             >
-              {(field) => (
-                <CodemanInput
-                  type="password"
-                  value={field().state.value}
-                  onValueChange={(v) => {
-                    field().handleChange(v);
-                    void form.handleSubmit();
-                  }}
-                  onBlur={async () => {
-                    field().handleBlur();
-                    await form.handleSubmit();
-                  }}
-                  error={firstErrorMessage(field().state.meta.errors)}
-                  placeholder="sk-…"
-                  inputClass="flex-1"
-                />
-              )}
-            </form.Field>
+              保存
+            </Button>
           </div>
         </div>
-      </CardContent>
-
-      {}
-      <CardFooter class="flex justify-end p-4 pt-0">
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={handleDelete}
-          disabled={isDeleting()}
-        >
-          {isDeleting() ? "Deleting…" : "Delete provider"}
-        </Button>
-      </CardFooter>
-    </Card>
+      </Show>
+    </div>
   );
 }
