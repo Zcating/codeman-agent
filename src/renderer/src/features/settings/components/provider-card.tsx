@@ -1,8 +1,5 @@
 
 import { createSignal, Show, For, createMemo } from "solid-js";
-import { Effect, Exit } from "effect";
-import { appStore } from "@codeman-frontend/shared/stores/app.store";
-import { formatAppError } from "@codeman-frontend/shared/lib/format-app-error";
 import type { Provider } from "@codeman-frontend/shared/lib/types";
 import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 import { Button } from "@codeman-frontend/shared/components/ui/button";
@@ -12,6 +9,7 @@ import {
   ApiKeySchema,
 } from "@codeman-frontend/features/settings/lib/schemas";
 import { firstErrorMessage, effectSchema } from "@codeman-frontend/shared/lib/effect-schema-adapter";
+import { parseModelsApiResponse } from "@codeman-frontend/shared/lib/parse-models-api-response";
 
 export interface ProviderCardProps {
   provider: Provider;
@@ -136,16 +134,28 @@ export function ProviderCard(props: ProviderCardProps) {
     if (!validateBaseUrl() || !validateApiKey()) return;
     setIsTesting(true);
     setTestStatus({ kind: "testing" });
-    // Use refreshProviderModels to validate baseUrl + apiKey combination
-    // This calls fetchModels which makes an HTTP request with the provided credentials
-    const exit = await Effect.runPromiseExit(
-      appStore.refreshProviderModels(props.provider.id),
-    );
-    setIsTesting(false);
-    if (Exit.isSuccess(exit)) {
+    // Use localBaseUrl() and localApiKey() directly — NOT store values
+    const modelsEndpoint = `${localBaseUrl()}/v1/models`;
+    try {
+      const res = await fetch(modelsEndpoint, {
+        headers: {
+          Authorization: `Bearer ${localApiKey()}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        setTestStatus({ kind: "error", message: `HTTP ${res.status}: ${text}` });
+        return;
+      }
+      const json = await res.json();
+      parseModelsApiResponse(json); // validate response shape; throws on bad format
       setTestStatus({ kind: "success" });
-    } else {
-      setTestStatus({ kind: "error", message: formatAppError(exit.cause) });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setTestStatus({ kind: "error", message: msg });
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -206,10 +216,10 @@ export function ProviderCard(props: ProviderCardProps) {
   const handleDelete = async () => {
     if (!confirm(`Delete provider "${props.provider.label}"?`)) return;
     setIsDeleting(true);
-    const exit = await Effect.runPromiseExit(appStore.deleteProvider(props.provider.id));
-    setIsDeleting(false);
-    if (Exit.isSuccess(exit)) {
+    try {
       props.onDelete(props.provider.id);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
