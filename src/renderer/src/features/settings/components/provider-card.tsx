@@ -149,7 +149,14 @@ export function ProviderCard(props: ProviderCardProps) {
         return;
       }
       const json = await res.json();
-      parseModelsApiResponse(json); // validate response shape; throws on bad format
+      // parseModelsApiResponse never throws — it returns [] for any invalid shape.
+      // Defensively validate that the response contains a data array so we do not
+      // false-report success for { data: "error" } or similar malformed bodies.
+      parseModelsApiResponse(json);
+      if (!Array.isArray(json?.data)) {
+        setTestStatus({ kind: "error", message: "模型列表为空或响应格式错误" });
+        return;
+      }
       setTestStatus({ kind: "success" });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

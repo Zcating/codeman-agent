@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, screen, waitFor } from "@solidjs/testing-library";
 import userEvent from "@testing-library/user-event";
-import { Effect } from "effect";
+
 import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 
 vi.mock("../../../shared/stores/app.store", () => {
@@ -82,7 +82,6 @@ const mockProviderNoComment = {
 
 import { ProviderCard } from "@codeman-frontend/features/settings/components/provider-card";
 
-import * as appStoreMock from "@codeman-frontend/shared/stores/app.store";
 import { _resetSettingsSaverForTest } from "@codeman-frontend/features/settings/lib/settings-saver";
 
 const renderCard = (provider = mockProvider, isExpanded = false, isDefault = false) =>
@@ -318,7 +317,6 @@ describe("ProviderCard — expanded area", () => {
     const user = userEvent.setup();
     const onDelete = vi.fn();
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    (appStoreMock as any).appStore.deleteProvider.mockReturnValue(Effect.void);
     render(() => (
       <ProviderCard
         provider={mockProvider}
@@ -388,6 +386,20 @@ describe("ProviderCard — test connection", () => {
     const btn = screen.getByRole("button", { name: /测试连接/i });
     expect(btn).toBeInTheDocument();
     await user.click(btn);
+  });
+
+  it("shows error when API returns HTTP 200 but body data is not an array", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ data: "error" }),
+    } as any);
+    renderCard(mockProvider, true);
+    await user.click(screen.getByRole("button", { name: /测试连接/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/模型列表为空或响应格式错误/i)).toBeInTheDocument();
+    });
   });
 });
 
