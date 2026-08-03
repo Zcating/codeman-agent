@@ -17,7 +17,7 @@ import {
   renameConversation,
   listMessages,
   appendMessage,
-  searchMessages,
+  searchMessagesSafe,
   clearAllHistory,
 } from "./data.js";
 
@@ -91,11 +91,11 @@ export function registerConversationsIpc(): void {
   ipcMain.handle(
     "searchMessages",
     async (_e, args: { query: string; limit?: number }) => {
-      // FTS 失败返回 []（data.ts searchMessagesSafe 已做 try/catch）
+      // FTS 失败返回 []（searchMessagesSafe 内部 catchAll）
       return runMain(
         args.limit !== undefined
-          ? searchMessages(args.query, args.limit)
-          : searchMessages(args.query)
+          ? searchMessagesSafe(args.query, args.limit)
+          : searchMessagesSafe(args.query)
       );
     }
   );

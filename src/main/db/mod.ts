@@ -97,18 +97,74 @@ export const applyMigrationsEffect = Effect.gen(function* () {
       continue;
     }
     const sqlText = readFileSync(join(dir, f), "utf-8");
-    // 执行迁移 SQL
-    yield* sql.unsafe(sqlText).pipe(
-      Effect.as(void 0)
-    );
+    // 执行迁移 SQL（按语句拆分：better-sqlite3 prepare 仅接受单语句）
+    for (const stmt of splitSqlStatements(sqlText)) {
+      yield* sql.unsafe(stmt).pipe(Effect.as(void 0));
+    }
     // 记录迁移
     yield* sql.unsafe(
-      "INSERT INTO _migrations (name, applied_at) VALUES (?, ?)"
-    ).pipe(
-      Effect.as(void 0)
-    );
+      "INSERT INTO _migrations (name, applied_at) VALUES (?, ?)",
+      [f, Date.now()]
+    ).pipe(Effect.as(void 0));
   }
 }).pipe(Effect.flatMap(() => Effect.void));
+
+/**
+ * 将 .sql 迁移文件按语句拆分（better-sqlite3 的 prepare 仅接受单语句）。
+ * 处理: 单引号字符串（'' 转义）、-- 行注释；分号仅作语句分隔符。
+ */
+export function splitSqlStatements(sqlText: string): string[] {
+  const statements: string[] = [];
+  let current = "";
+  let inString = false;
+  let i = 0;
+  while (i < sqlText.length) {
+    const ch = sqlText[i];
+    const next = sqlText[i + 1];
+    if (inString) {
+      current += ch;
+      if (ch === "'") {
+        if (next === "'") {
+          current += next;
+          i++;
+        } else {
+          inString = false;
+        }
+      }
+      i++;
+      continue;
+    }
+    if (ch === "-" && next === "-") {
+      // 跳过行注释
+      while (i < sqlText.length && sqlText[i] !== "\n") {
+        i++;
+      }
+      continue;
+    }
+    if (ch === "'") {
+      inString = true;
+      current += ch;
+      i++;
+      continue;
+    }
+    if (ch === ";") {
+      const stmt = current.trim();
+      if (stmt.length > 0) {
+        statements.push(stmt);
+      }
+      current = "";
+      i++;
+      continue;
+    }
+    current += ch;
+    i++;
+  }
+  const tail = current.trim();
+  if (tail.length > 0) {
+    statements.push(tail);
+  }
+  return statements;
+}
 
 /**
  * MigrationsLive：在 SqliteLive 之后运行，执行迁移 + 开启 foreign_keys。

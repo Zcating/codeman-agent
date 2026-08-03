@@ -1,8 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Effect } from "effect";
+import { Cause, Effect, Exit } from "effect";
 import * as SqliteNS from "@effect/sql-sqlite-node/SqliteClient";
 
 import { listCompactionEntries, appendCompactionEntry } from "./data.js";
+
+// 构造 tagged SqlError（与真实驱动 @effect/sql-sqlite-node 抛出的 _tag 一致），
+// 使 data.ts 的 Effect.catchTag("SqlError", ...) 分支被真实触发。
+const sqlError = (message: string): Error & { _tag: "SqlError" } =>
+  Object.assign(new Error(message), { _tag: "SqlError" as const });
 
 const fake = (() => {
   const calls: Array<{ sql: string; params: readonly unknown[] }> = [];
@@ -25,11 +30,17 @@ const fake = (() => {
   };
 })();
 
+// 镜像 runtime.ts runMain 边界:runPromiseExit + Cause.squash 解包 typed error
+// （Effect.runPromise 会包 FiberFailure,无法直接断言错误形状）
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function run(effect: any): Promise<any> {
-  return Effect.runPromise(
+  const exit = await Effect.runPromiseExit(
     effect.pipe(Effect.provideService(SqliteNS.SqliteClient, fake.client as unknown as SqliteNS.SqliteClient)),
   );
+  if (Exit.isFailure(exit)) {
+    throw Cause.squash(exit.cause);
+  }
+  return exit.value;
 }
 
 beforeEach(() => { fake.calls.length = 0; });
@@ -69,7 +80,7 @@ describe("compaction data access", () => {
   });
 
   it("appendCompactionEntry maps SQL errors to Database", async () => {
-    fake.failQuery("INSERT INTO compaction_entries (id, conversation_id, summary, model, tokens_before, kind, created_at, first_kept_message_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", new Error("SQL error"));
+    fake.failQuery("INSERT INTO compaction_entries (id, conversation_id, summary, model, tokens_before, kind, created_at, first_kept_message_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", sqlError("SQL error"));
     await expect(run(appendCompactionEntry({
       conversationId: "conv-1",
       summary: "Compressed",
@@ -77,12 +88,11 @@ describe("compaction data access", () => {
       tokensBefore: 5000,
       kind: "auto",
       firstKeptMessageId: "msg-1",
-    }))).rejects.toThrow();
+    }))).rejects.toMatchObject({ _tag: "Database", message: "SQL error" });
   });
 
-  it("listCompactionEntries returns [] on SQL error (Database error)", async () => {
-    fake.failQuery("SELECT * FROM compaction_entries WHERE conversation_id = ? ORDER BY created_at ASC", new Error("DB error"));
-    // The effect fails with Database, but our fake returns Effect.fail, so the test verifies it propagates
-    await expect(run(listCompactionEntries("conv-1"))).rejects.toThrow();
+  it("listCompactionEntries maps SQL errors to Database", async () => {
+    fake.failQuery("SELECT * FROM compaction_entries WHERE conversation_id = ? ORDER BY created_at ASC", sqlError("DB error"));
+    await expect(run(listCompactionEntries("conv-1"))).rejects.toMatchObject({ _tag: "Database", message: "DB error" });
   });
 });

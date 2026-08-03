@@ -14,7 +14,7 @@ vi.mock("electron", () => ({
   app: { getPath: vi.fn(() => "/tmp") },
 }));
 
-import { applyMigrationsEffect } from "./mod.js";
+import { applyMigrationsEffect, splitSqlStatements } from "./mod.js";
 
 const fake = (() => {
   const calls: Array<{ sql: string; params: readonly unknown[] }> = [];
@@ -48,6 +48,43 @@ async function runMigrations(): Promise<void> {
 }
 
 beforeEach(() => { fake.reset(); });
+
+describe("splitSqlStatements", () => {
+  it("splits multi-statement SQL into individual statements", () => {
+    const statements = splitSqlStatements(
+      "CREATE TABLE a (id TEXT);\n\nCREATE INDEX idx ON a(id);\nCREATE VIRTUAL TABLE f USING fts5(content);"
+    );
+    expect(statements.length).toBe(3);
+    expect(statements[0]).toBe("CREATE TABLE a (id TEXT)");
+    expect(statements[1]).toBe("CREATE INDEX idx ON a(id)");
+    expect(statements[2]).toBe("CREATE VIRTUAL TABLE f USING fts5(content)");
+  });
+
+  it("keeps semicolons inside string literals intact", () => {
+    const statements = splitSqlStatements(
+      "INSERT INTO t (v) VALUES ('a;b');\nSELECT * FROM t;"
+    );
+    expect(statements.length).toBe(2);
+    expect(statements[0]).toBe("INSERT INTO t (v) VALUES ('a;b')");
+  });
+
+  it("strips -- line comments", () => {
+    const statements = splitSqlStatements(
+      "-- header comment\nCREATE TABLE a (id TEXT);\n-- trailing\n"
+    );
+    expect(statements).toEqual(["CREATE TABLE a (id TEXT)"]);
+  });
+
+  it("matches the real 0001_initial.sql statement count (4)", () => {
+    const sql = [
+      "CREATE TABLE conversations (id TEXT PRIMARY KEY, title TEXT NOT NULL);",
+      "CREATE TABLE messages (id TEXT PRIMARY KEY, conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE);",
+      "CREATE INDEX idx_messages_conv_created ON messages(conversation_id, created_at);",
+      "CREATE VIRTUAL TABLE messages_fts USING fts5(content, content='messages', content_rowid='rowid');",
+    ];
+    expect(splitSqlStatements(sql.join("\n\n")).length).toBe(4);
+  });
+});
 
 describe("applyMigrationsEffect", () => {
   it("creates _migrations table", async () => {

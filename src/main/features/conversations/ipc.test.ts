@@ -49,7 +49,7 @@ vi.mock("./data.js", () => ({
   renameConversation: mockRenameConversation,
   listMessages: mockListMessages,
   appendMessage: mockAppendMessage,
-  searchMessages: mockSearchMessages,
+  searchMessagesSafe: mockSearchMessages,
   clearAllHistory: mockClearAllHistory,
 }));
 vi.mock("../../runtime.js", () => ({
