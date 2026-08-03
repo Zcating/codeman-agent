@@ -351,24 +351,7 @@ describe("ChatView", () => {
   it("无 enabled provider 时显示空状态链接到 /settings", async () => {
     const appStoreMock = await import("@codeman-frontend/shared/stores/app.store");
     (appStoreMock as any).__setAppStoreState({
-      providers: [
-        {
-          id: "deepseek",
-          label: "DeepSeek",
-          enabled: false,
-          apiKey: "",
-          llm: {
-            defaultModel: "deepseek-chat",
-            baseUrl: "https://api.deepseek.com/anthropic",
-            apiType: "anthropic-messages",
-            models: [
-              { id: "deepseek-chat", label: "deepseek-chat", deprecated: false, thinking: false },
-            ],
-            modelsEndpoint: "https://api.deepseek.com/models",
-          },
-        },
-      ],
-      defaultLlmProviderId: "deepseek",
+      providers: [],
     });
     const { container } = render(() => <ChatView convId="conv-1" />);
     const trigger = container.querySelector('button[data-testid="provider-select-trigger"]');
