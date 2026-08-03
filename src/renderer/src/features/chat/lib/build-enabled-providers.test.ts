@@ -3,12 +3,11 @@ import { describe, it, expect } from "vitest";
 import { buildEnabledProviders } from "@codeman-frontend/features/chat/lib/build-enabled-providers";
 
 describe("buildEnabledProviders", () => {
-  it("returns array of providers where enabled && llm is true", () => {
+  it("returns array of providers with llm config", () => {
     const providers = [
       {
         id: "minimax",
         label: "MiniMax",
-        enabled: true,
         llm: {
           models: [
             { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed" },
@@ -18,7 +17,6 @@ describe("buildEnabledProviders", () => {
       {
         id: "deepseek",
         label: "DeepSeek",
-        enabled: true,
         llm: {
           models: [{ id: "deepseek-chat", label: "deepseek-chat" }],
         },
@@ -26,7 +24,6 @@ describe("buildEnabledProviders", () => {
       {
         id: "disabled",
         label: "Disabled Provider",
-        enabled: false,
         llm: {
           models: [{ id: "some-model", label: "Some Model" }],
         },
@@ -34,7 +31,6 @@ describe("buildEnabledProviders", () => {
       {
         id: "no-llm",
         label: "No LLM Config",
-        enabled: true,
         llm: undefined,
       },
     ];
@@ -50,6 +46,11 @@ describe("buildEnabledProviders", () => {
         label: "DeepSeek",
         models: [{ id: "deepseek-chat", label: "deepseek-chat" }],
       },
+      {
+        id: "disabled",
+        label: "Disabled Provider",
+        models: [{ id: "some-model", label: "Some Model" }],
+      },
     ]);
   });
 
@@ -63,7 +64,6 @@ describe("buildEnabledProviders", () => {
       {
         id: "minimax",
         label: "MiniMax",
-        enabled: true,
         llm: {
           models: [
             { id: "MiniMax-M3", label: "" },
