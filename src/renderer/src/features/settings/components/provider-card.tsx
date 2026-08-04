@@ -5,6 +5,7 @@ import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 import { Button } from "@codeman-frontend/shared/components/ui/button";
 import { CodemanInput } from "@codeman-frontend/shared/components/internal/codeman-input";
 import { CodemanCheckbox } from "@codeman-frontend/shared/components/internal/codeman-checkbox";
+import { CodemanSelect } from "@codeman-frontend/shared/components/internal/codeman-select";
 import {
   BaseUrlSchema,
   ApiKeySchema,
@@ -394,20 +395,15 @@ export function ProviderCard(props: ProviderCardProps) {
             {/* Default model dropdown */}
             <div class="flex flex-col gap-1.5">
               <label class="text-sm font-medium">Default Model</label>
-              <select
-                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              <CodemanSelect
+                options={localModels().map(m => ({
+                  label: m.label + (m.deprecated ? " (deprecated)" : ""),
+                  value: m.id,
+                }))}
                 value={localDefaultModel()}
-                onChange={(e) => setLocalDefaultModel(e.currentTarget.value)}
-              >
-                <For each={localModels()}>
-                  {(m) => (
-                    <option value={m.id}>
-                      {m.label}
-                      {m.deprecated ? " (deprecated)" : ""}
-                    </option>
-                  )}
-                </For>
-              </select>
+                onChange={setLocalDefaultModel}
+                data-testid="provider-defaultmodel"
+              />
             </div>
 
             {/* Model table */}

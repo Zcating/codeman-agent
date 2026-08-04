@@ -233,13 +233,15 @@ describe("ProviderCard — expanded area", () => {
     expect(screen.getByRole("button", { name: /测试连接/i })).toBeInTheDocument();
   });
 
-  it("renders defaultModel dropdown with options", () => {
+  it("renders defaultModel dropdown with options", async () => {
     renderCard(mockProvider, true);
-    const select = document.querySelector("select") as HTMLSelectElement;
-    expect(select).toBeTruthy();
-    const options = Array.from(select.querySelectorAll("option")).map((o) => o.value);
-    expect(options).toContain("MiniMax-M2.5-highspeed");
-    expect(options).toContain("MiniMax-M2.1-highspeed");
+    const trigger = screen.getByTestId("provider-defaultmodel-trigger");
+    expect(trigger).toBeTruthy();
+    const user = userEvent.setup();
+    await user.click(trigger);
+    const content = await screen.findByTestId("provider-defaultmodel-content");
+    expect(content.textContent).toContain("MiniMax-M2.5-highspeed");
+    expect(content.textContent).toContain("MiniMax-M2.1-highspeed");
   });
 
   it("renders model table with id/label/contextWindow/deprecated/thinking columns", () => {
@@ -512,5 +514,45 @@ describe("ProviderCard — T4 CodemanCheckbox in model table", () => {
     expect(onSave).toHaveBeenCalledTimes(1);
     const savedProvider = onSave.mock.calls[0][0];
     expect(savedProvider.llm.models[0].thinking).toBe(true);
+  });
+});
+
+describe("ProviderCard — T5 CodemanSelect for default model", () => {
+  beforeEach(() => {
+    mockState.calls = [];
+    mockState.resolved = undefined;
+    mockState.rejected = undefined;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+    _resetSettingsSaverForTest();
+  });
+
+  it("default model trigger has data-testid provider-defaultmodel", () => {
+    renderCard(mockProvider, true);
+    const trigger = screen.getByTestId("provider-defaultmodel-trigger");
+    expect(trigger).toBeInTheDocument();
+  });
+
+  it("select options contain every model id", async () => {
+    renderCard(mockProvider, true);
+    const trigger = screen.getByTestId("provider-defaultmodel-trigger");
+    const user = userEvent.setup();
+    await user.click(trigger);
+    const content = await screen.findByTestId("provider-defaultmodel-content");
+    expect(content.textContent).toContain("MiniMax-M2.5-highspeed");
+    expect(content.textContent).toContain("MiniMax-M2.1-highspeed");
+  });
+
+  it("deprecated model label has (deprecated) suffix", async () => {
+    renderCard(mockProvider, true);
+    const trigger = screen.getByTestId("provider-defaultmodel-trigger");
+    const user = userEvent.setup();
+    await user.click(trigger);
+    const content = await screen.findByTestId("provider-defaultmodel-content");
+    expect(content.textContent).toContain("MiniMax-M2.1-highspeed");
+    expect(content.textContent).toContain("(deprecated)");
   });
 });
