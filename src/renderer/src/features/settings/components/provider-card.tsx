@@ -4,6 +4,7 @@ import type { Provider } from "@codeman-frontend/shared/lib/types";
 import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 import { Button } from "@codeman-frontend/shared/components/ui/button";
 import { CodemanInput } from "@codeman-frontend/shared/components/internal/codeman-input";
+import { CodemanCheckbox } from "@codeman-frontend/shared/components/internal/codeman-checkbox";
 import {
   BaseUrlSchema,
   ApiKeySchema,
@@ -450,19 +451,17 @@ export function ProviderCard(props: ProviderCardProps) {
                       placeholder="100000"
                     />
                     <div class="flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        class="size-4 rounded border-input"
-                        checked={row.deprecated}
-                        onChange={(e) => updateModelRow(index(), "deprecated", e.currentTarget.checked)}
+                      <CodemanCheckbox
+                        value={row.deprecated}
+                        onChange={(v) => updateModelRow(index(), "deprecated", v)}
+                        data-codeman-checkbox
                       />
                     </div>
                     <div class="flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        class="size-4 rounded border-input"
-                        checked={row.thinking}
-                        onChange={(e) => updateModelRow(index(), "thinking", e.currentTarget.checked)}
+                      <CodemanCheckbox
+                        value={row.thinking}
+                        onChange={(v) => updateModelRow(index(), "thinking", v)}
+                        data-codeman-checkbox
                       />
                     </div>
                     <Button
