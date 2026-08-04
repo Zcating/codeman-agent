@@ -60,6 +60,7 @@ const SAMPLE_SUB_AGENTS: SubAgentConfig[] = [
 describe("SettingsTab", () => {
   beforeEach(() => {
     subAgentsStore._resetForTest();
+    vi.clearAllMocks();
   });
 
   it("renders list of sub-agents with name, description, model, tool count, and enabled toggle", () => {
@@ -119,5 +120,70 @@ describe("SettingsTab", () => {
     render(() => <SettingsTab />);
     expect(screen.getByTestId("empty-state")).toBeInTheDocument();
     expect(screen.getByText("No sub-agents configured.")).toBeInTheDocument();
+  });
+
+  describe("SubAgentFormDialog implementation verification", () => {
+    it("settings-tab.tsx does not contain ref bindings for form fields", () => {
+      const fs = require("fs");
+      const path = require("path");
+      const settingsTabPath = path.join(__dirname, "../settings-tab.tsx");
+      const content = fs.readFileSync(settingsTabPath, "utf-8");
+
+      // These patterns should NOT exist in the file
+      expect(content).not.toMatch(/ref=\{\s*nameField\s*\}/);
+      expect(content).not.toMatch(/ref=\{\s*descField\s*\}/);
+      expect(content).not.toMatch(/ref=\{\s*promptField\s*\}/);
+      expect(content).not.toMatch(/ref=\{\s*modelField\s*\}/);
+      expect(content).not.toMatch(/ref=\{\s*thinkingField\s*\}/);
+    });
+
+    it("settings-tab.tsx does not contain null as unknown as SubAgentFormValues cast at call sites", () => {
+      const fs = require("fs");
+      const path = require("path");
+      const settingsTabPath = path.join(__dirname, "../settings-tab.tsx");
+      const content = fs.readFileSync(settingsTabPath, "utf-8");
+
+      expect(content).not.toMatch(/null as unknown as SubAgentFormValues/);
+    });
+
+    it("settings-tab.tsx imports createForm from @tanstack/solid-form", () => {
+      const fs = require("fs");
+      const path = require("path");
+      const settingsTabPath = path.join(__dirname, "../settings-tab.tsx");
+      const content = fs.readFileSync(settingsTabPath, "utf-8");
+
+      expect(content).toMatch(/import\s+\{\s*createForm\s+\}\s+from\s+["']@tanstack\/solid-form["']/);
+    });
+
+    it("settings-tab.tsx uses CodemanInput, CodemanSelect, and CodemanCheckbox components", () => {
+      const fs = require("fs");
+      const path = require("path");
+      const settingsTabPath = path.join(__dirname, "../settings-tab.tsx");
+      const content = fs.readFileSync(settingsTabPath, "utf-8");
+
+      expect(content).toMatch(/CodemanInput/);
+      expect(content).toMatch(/CodemanSelect/);
+      expect(content).toMatch(/CodemanCheckbox/);
+    });
+
+    it("settings-tab.tsx imports effectSchema for form validation", () => {
+      const fs = require("fs");
+      const path = require("path");
+      const settingsTabPath = path.join(__dirname, "../settings-tab.tsx");
+      const content = fs.readFileSync(settingsTabPath, "utf-8");
+
+      expect(content).toMatch(/effectSchema/);
+    });
+
+    it("settings-tab.tsx uses createForm with SubAgentFormSchema validator", () => {
+      const fs = require("fs");
+      const path = require("path");
+      const settingsTabPath = path.join(__dirname, "../settings-tab.tsx");
+      const content = fs.readFileSync(settingsTabPath, "utf-8");
+
+      expect(content).toMatch(/createForm/);
+      expect(content).toMatch(/SubAgentFormSchema/);
+      expect(content).toMatch(/effectSchema\(SubAgentFormSchema\)/);
+    });
   });
 });
