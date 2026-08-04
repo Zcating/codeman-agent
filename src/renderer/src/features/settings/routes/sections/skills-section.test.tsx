@@ -1,12 +1,16 @@
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { render, screen, cleanup } from "@solidjs/testing-library";
+import { render, screen, cleanup, fireEvent } from "@solidjs/testing-library";
 import { Effect } from "effect";
 import { SkillsSection } from "@codeman-frontend/features/settings/routes/sections/skills-section";
 import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
 import { appStore, _resetAppStoreForTest } from "@codeman-frontend/shared/stores/app.store";
+
+vi.mock("@codeman-frontend/features/settings/lib/settings-saver", () => ({
+  settingsSaver: { scheduleSave: vi.fn() },
+}));
 
 vi.mock("solid-js/store", () => {
   let store: { value: unknown } = { value: null };
@@ -139,5 +143,38 @@ describe("SkillsSection — /settings/skills", () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(screen.getByText("A test skill for validation")).toBeInTheDocument();
     expect(screen.getByText(/\/Users\/test\/\.agents\/skills\/test-skill\/SKILL\.md/i)).toBeInTheDocument();
+  });
+
+  it("skill toggle checkbox is an input via data-testid", async () => {
+    _manifests = [mockSkill];
+    render(() => <SkillsSection />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const input = screen.getByTestId("skill-toggle-test-skill");
+    expect(input).toBeInstanceOf(HTMLInputElement);
+    expect((input as HTMLInputElement).type).toBe("checkbox");
+  });
+
+  it("clicking skill toggle updates appStore.enabledSkills", async () => {
+    const { settingsSaver } = await import("@codeman-frontend/features/settings/lib/settings-saver");
+    _manifests = [mockSkill];
+    render(() => <SkillsSection />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const input = screen.getByTestId("skill-toggle-test-skill") as HTMLInputElement;
+    const setSpy = vi.spyOn(appStore, "set");
+    fireEvent.click(input);
+    expect(setSpy).toHaveBeenCalled();
+    const callArg = setSpy.mock.calls[0][0];
+    expect(callArg).toHaveProperty("enabledSkills");
+    expect(Array.isArray(callArg.enabledSkills)).toBe(true);
+  });
+
+  it("clicking skill toggle triggers settingsSaver.scheduleSave", async () => {
+    const { settingsSaver } = await import("@codeman-frontend/features/settings/lib/settings-saver");
+    _manifests = [mockSkill];
+    render(() => <SkillsSection />);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const input = screen.getByTestId("skill-toggle-test-skill");
+    fireEvent.click(input);
+    expect(settingsSaver.scheduleSave).toHaveBeenCalled();
   });
 });

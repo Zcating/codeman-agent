@@ -2,6 +2,7 @@ import { Show, For, type JSX } from "solid-js";
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
 import { settingsSaver } from "@codeman-frontend/features/settings/lib/settings-saver";
 import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
+import { CodemanCheckbox } from "@codeman-frontend/shared/components/internal/codeman-checkbox";
 import { CheckCircle2, Package, XCircle } from "lucide-solid";
 
 export function SkillsSection(): JSX.Element {
@@ -58,13 +59,9 @@ export function SkillsSection(): JSX.Element {
                 class="flex items-start gap-3 rounded-lg border border-zinc-200 dark:border-zinc-700 p-3"
                 data-testid={`skill-item-${skill.name}`}
               >
-                <input
-                  type="checkbox"
-                  checked={isEnabled(skill.name)}
-                  onChange={(e) =>
-                    toggleSkill(skill.name, e.currentTarget.checked)
-                  }
-                  class="mt-0.5 rounded text-primary-500 focus:ring-primary-500 w-4 h-4"
+                <CodemanCheckbox
+                  value={isEnabled(skill.name)}
+                  onChange={(v) => toggleSkill(skill.name, v)}
                   aria-label={`Enable ${skill.name}`}
                   data-testid={`skill-toggle-${skill.name}`}
                 />
