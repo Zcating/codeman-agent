@@ -8,6 +8,47 @@ import {
   type CodemanSidebarMenuOption,
 } from "@codeman-frontend/shared/components/internal/codeman-sidebar";
 
+// Mock @ark-ui/solid/splitter to avoid "Previous size not found" errors in jsdom
+// Zag's splitter throws when collapsePanel is called without a previous size stored
+// Mock preserves data-slot and data-id attributes that tests look for, plus default style
+vi.mock("@ark-ui/solid/splitter", () => ({
+  SplitterRoot: (props: any) => {
+    const { children, ...rest } = props;
+    return (
+      <div data-slot="resizable-panel-group" {...rest}>
+        {children}
+      </div>
+    );
+  },
+  SplitterPanel: (props: any) => {
+    const { children, id, ...rest } = props;
+    return (
+      <div data-slot="resizable-panel" data-id={id} style={{ flexBasis: "256px" }} {...rest}>
+        {children}
+      </div>
+    );
+  },
+  SplitterResizeTrigger: (props: any) => {
+    const { children, ...rest } = props;
+    return (
+      <div data-slot="resizable-handle" {...rest}>
+        {children}
+      </div>
+    );
+  },
+  SplitterResizeTriggerIndicator: (props: any) => {
+    const { children, ...rest } = props;
+    return <span {...rest}>{children}</span>;
+  },
+  useSplitterContext: () => () => ({
+    collapsePanel: vi.fn(),
+    expandPanel: vi.fn(),
+    getPanelSize: vi.fn(() => 100),
+    setPanelSize: vi.fn(),
+    isCollapsed: vi.fn(() => false),
+  }),
+}));
+
 
 function makeOptions(): CodemanSidebarGroupOption[] {
   return [

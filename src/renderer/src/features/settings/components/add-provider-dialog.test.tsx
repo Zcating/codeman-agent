@@ -109,6 +109,30 @@ vi.mock("@ark-ui/solid", async () => {
   };
 });
 
+// Mock @ark-ui/solid/dialog to avoid focus-trap errors in jsdom
+// Ark's Dialog uses @zag-js/focus-trap which throws during cleanup when DOM is already removed
+// The mock preserves Portal and role='dialog' for proper cleanup detection
+vi.mock("@ark-ui/solid/dialog", async () => {
+  const actual = await vi.importActual("@ark-ui/solid/dialog");
+  return {
+    ...actual,
+    DialogRoot: (props: any) => <>{props.children}</>,
+    DialogTrigger: (props: any) => <button {...props}>{props.children}</button>,
+    DialogBackdrop: (props: any) => <>{props.children}</>,
+    DialogPositioner: (props: any) => <>{props.children}</>,
+    DialogContent: (props: any) => (
+      <div role="dialog" data-testid={props["data-testid"]} {...props}>
+        {props.children}
+      </div>
+    ),
+    DialogHeader: (props: any) => <>{props.children}</>,
+    DialogTitle: (props: any) => <>{props.children}</>,
+    DialogDescription: (props: any) => <>{props.children}</>,
+    DialogFooter: (props: any) => <>{props.children}</>,
+    DialogCloseTrigger: (props: any) => <button {...props}>{props.children}</button>,
+  };
+});
+
 async function flushPromises(): Promise<void> {
   for (let i = 0; i < 5; i++) {
     await new Promise<void>((r) => setTimeout(r, 0));
