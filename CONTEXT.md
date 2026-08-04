@@ -112,6 +112,12 @@
 - **Parallel Panel (并行面板)** — chat-view 在检测到 `delegate_task` toolCall 触发时挂载的 UI 容器，按 toolCallId 渲染 N 列 sub-agent live streaming（每列 = 一个 sub-agent 的 status badge + markdown streaming）。`tool_execution_end` 后所有列保留 + 状态变 "completed"，用户可折叠整组。per ADR-0049 D8。
 - **Sub-Agent Stream Entry (子代理流条目)** — `sub-agents-stream.store.ts` Solid store 的 entry shape：`{ toolCallId, subAgentId, subAgentName, events, status: "running" | "completed" | "error", startedAt, completedAt?, finalText?, error? }`。Key = `toolCallId`（一个 toolCall = 一个 sub-agent 流）。LRU 清理（暂定 50 条）。per ADR-0049 D7。
 
+### System Prompt (V3.1, ADR-0051)
+
+- **System Prompt 组装器 (system prompt builder)** — 纯函数 `buildSystemPrompt(sections)`（`src/features/chat/lib/build-system-prompt.ts`）把系统提示词按固定节序组装：身份段 → 工具列表 → guidelines → workspace 节 → 项目指令（AGENTS.md）→ skills 段 → 用户默认值 → cwd 页脚。调用方备料、组装器纯拼装，空节跳过。per ADR-0051。_避免_：在各调用点手写字符串拼接（chat.store / runtime / sub-agent-factory 各自拼）。主对话与子代理共用同一组装器。
+- **会话提示词覆盖 (conversation prompt override)** — `conversation.systemPrompt` 有值时整体替换组装器的内置节（身份/工具列表/guidelines/用户默认值），workspace 节、AGENTS.md、skills 段仍追加。等价于 pi 的 `customPrompt`；组装器不暴露独立 customPrompt 参数。per ADR-0051 D2。_避免_：把会话覆盖当成「追加补充指令」（那是用户默认值的语义）。
+- **项目指令 (project instructions)** — 工作区根目录的 `AGENTS.md` 内容，经 `FileApi.readFile` 读取后作为 `<project_instructions>` 段注入提示词。每会话缓存一次；缺失静默跳过；超 32KB 截断。per ADR-0051 D3。_避免_：把项目指令当 workspace 节（workspace 节只含 workspaceId 与文件工具传参规则）。
+
 ### 密钥
 
 - **API Key (API 密钥)** — Provider 的对外调用凭据，shape 为 `Provider.apiKey: string`。**明文存于 Settings JSON**（`%LocalAppData%\codeman-agent\settings.json`，由 `app.setPath('userData', '%LocalAppData%\\codeman-agent')` 锁定，per ADR-0024），与 Settings 其它字段同档；不再分 LLM / Billing 二分（ADR-0015）。LLM 调用和计费工具调端点都复用同一 key。V1 单机单用户威胁模型下接受明文；如未来需 OS 级密钥管理（keytar / Windows Credential Manager / Electron `safeStorage`）需重做 ADR-0015。_避免_：把 key 单独走 OS keychain 再走 IPC（V1.7+ 前的设计，已废止）。
