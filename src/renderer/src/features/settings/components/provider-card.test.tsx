@@ -556,3 +556,32 @@ describe("ProviderCard — T5 CodemanSelect for default model", () => {
     expect(content.textContent).toContain("(deprecated)");
   });
 });
+
+describe("ProviderCard — T6 Input primitive in model table", () => {
+  beforeEach(() => {
+    mockState.calls = [];
+    mockState.resolved = undefined;
+    mockState.rejected = undefined;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+    _resetSettingsSaverForTest();
+  });
+
+  it("id/label/contextWindow inputs have data-slot=input", () => {
+    renderCard(mockProvider, true);
+    const row = screen.getByTestId("model-row-0");
+    const inputs = row.querySelectorAll('[data-slot="input"]');
+    expect(inputs.length).toBe(3); // id, label, contextWindow
+  });
+
+  it("contextWindow input is type=number", () => {
+    renderCard(mockProvider, true);
+    const row = screen.getByTestId("model-row-0");
+    const contextWindowInput = row.querySelector('input[type="number"]');
+    expect(contextWindowInput).not.toBeNull();
+    expect(contextWindowInput).toHaveAttribute("data-slot", "input");
+  });
+});

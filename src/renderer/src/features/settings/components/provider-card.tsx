@@ -3,6 +3,7 @@ import { createSignal, Show, For, createMemo } from "solid-js";
 import type { Provider } from "@codeman-frontend/shared/lib/types";
 import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 import { Button } from "@codeman-frontend/shared/components/ui/button";
+import { Input } from "@codeman-frontend/shared/components/ui/input";
 import { CodemanInput } from "@codeman-frontend/shared/components/internal/codeman-input";
 import { CodemanCheckbox } from "@codeman-frontend/shared/components/internal/codeman-checkbox";
 import { CodemanSelect } from "@codeman-frontend/shared/components/internal/codeman-select";
@@ -425,23 +426,20 @@ export function ProviderCard(props: ProviderCardProps) {
                     data-testid={`model-row-${index()}`}
                     class="grid grid-cols-[1fr_1fr_100px_80px_80px_40px] gap-2 items-center"
                   >
-                    <input
+                    <Input
                       type="text"
-                      class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring"
                       value={row.id}
                       onInput={(e) => updateModelRow(index(), "id", e.currentTarget.value)}
                       placeholder="model-id"
                     />
-                    <input
+                    <Input
                       type="text"
-                      class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring"
                       value={row.label}
                       onInput={(e) => updateModelRow(index(), "label", e.currentTarget.value)}
                       placeholder="Display Name"
                     />
-                    <input
+                    <Input
                       type="number"
-                      class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring"
                       value={row.contextWindow}
                       onInput={(e) => updateModelRow(index(), "contextWindow", e.currentTarget.value)}
                       placeholder="100000"
