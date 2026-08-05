@@ -8,6 +8,17 @@ import {
   truncateProjectInstructions,
 } from "@codeman-frontend/features/chat/lib/workspace-project-instructions";
 
+const createMockFileApi = (overrides: Partial<{
+  readFile: (workspaceId: string, path: string) => Effect.Effect<string, NotFound>;
+}>) =>
+  Layer.succeed(FileApi, {
+    readFile: overrides.readFile ?? (() => Effect.succeed("")),
+    writeFile: () => Effect.succeed(undefined),
+    editFile: () => Effect.succeed(undefined),
+    searchFiles: () => Effect.succeed([]),
+    deleteFile: () => Effect.succeed(undefined),
+  });
+
 const SMALL_CONTENT = "This is a small AGENTS.md content.";
 const LARGE_CONTENT = "A".repeat(35_000); // > 32_000 chars
 
@@ -39,35 +50,34 @@ describe("workspace-project-instructions", () => {
 
   describe("loadProjectInstructions", () => {
     const workspaceId = "test-workspace";
-    const rootPath = "/test/root";
 
     it.effect("file exists and ≤32KB returns full content", () => {
-      const MockFileApi = Layer.succeed(FileApi, {
+      const MockFileApi = createMockFileApi({
         readFile: () => Effect.succeed(SMALL_CONTENT),
       });
       return Effect.gen(function* () {
-        const result = yield* loadProjectInstructions(workspaceId, rootPath);
+        const result = yield* loadProjectInstructions(workspaceId);
         expect(result).toBe(SMALL_CONTENT);
       }).pipe(Effect.provide(MockFileApi));
     });
 
     it.effect("file not found (NotFound) returns null", () => {
-      const MockFileApi = Layer.succeed(FileApi, {
+      const MockFileApi = createMockFileApi({
         readFile: () =>
           Effect.fail(new NotFound({ message: "AGENTS.md not found" })),
       });
       return Effect.gen(function* () {
-        const result = yield* loadProjectInstructions(workspaceId, rootPath);
+        const result = yield* loadProjectInstructions(workspaceId);
         expect(result).toBeNull();
       }).pipe(Effect.provide(MockFileApi));
     });
 
     it.effect("content >32KB is truncated with suffix", () => {
-      const MockFileApi = Layer.succeed(FileApi, {
+      const MockFileApi = createMockFileApi({
         readFile: () => Effect.succeed(LARGE_CONTENT),
       });
       return Effect.gen(function* () {
-        const result = yield* loadProjectInstructions(workspaceId, rootPath);
+        const result = yield* loadProjectInstructions(workspaceId);
         expect(result).not.toBeNull();
         expect(result!.length).toBe(32_000 + "\n\n[truncated]".length);
         expect(result!.endsWith("\n\n[truncated]")).toBe(true);
@@ -75,12 +85,12 @@ describe("workspace-project-instructions", () => {
     });
 
     it.effect("other errors return null (silent skip)", () => {
-      const MockFileApi = Layer.succeed(FileApi, {
+      const MockFileApi = createMockFileApi({
         readFile: () =>
           Effect.fail(new NotFound({ message: "some error" })),
       });
       return Effect.gen(function* () {
-        const result = yield* loadProjectInstructions(workspaceId, rootPath);
+        const result = yield* loadProjectInstructions(workspaceId);
         expect(result).toBeNull();
       }).pipe(Effect.provide(MockFileApi));
     });

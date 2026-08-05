@@ -23,7 +23,6 @@ import {
   MessageApiLive,
   CompactionApi,
   CompactionApiLive,
-  FileApi,
   FileApiLive,
 } from "@codeman-frontend/shared/apis";
 import {
@@ -411,7 +410,7 @@ export const sendMessage = Effect.fn(
     if (cs.projectInstructions === null && cs.workspaceId) {
       const workspace = workspaces$().find((w) => w.id === cs.workspaceId);
       if (workspace) {
-        const loaded = yield* loadProjectInstructions(cs.workspaceId, workspace.rootPath).pipe(
+        const loaded = yield* loadProjectInstructions(cs.workspaceId).pipe(
           Effect.provide(FileApiLive),
         );
         setStore("byId", convId, "projectInstructions", loaded);

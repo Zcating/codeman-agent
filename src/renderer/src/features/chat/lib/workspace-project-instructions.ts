@@ -1,7 +1,6 @@
 import { Effect } from "effect";
 import { FileApi } from "@codeman-frontend/shared/apis/file.api";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
-import { NotFound } from "@codeman-frontend/shared/lib/errors";
 
 const DEFAULT_MAX_CHARS = 32_000;
 const TRUNCATED_SUFFIX = "\n\n[truncated]";
@@ -29,8 +28,7 @@ export function truncateProjectInstructions(
  */
 export function loadProjectInstructions(
   workspaceId: string,
-  rootPath: string,
-): Effect.Effect<string | null, AppError> {
+): Effect.Effect<string | null, AppError, FileApi> {
   return Effect.gen(function* () {
     const svc = yield* FileApi;
     const content = yield* svc.readFile(workspaceId, "AGENTS.md");
