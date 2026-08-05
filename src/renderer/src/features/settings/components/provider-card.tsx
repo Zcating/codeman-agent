@@ -3,7 +3,10 @@ import { createSignal, Show, For, createMemo } from "solid-js";
 import type { Provider } from "@codeman-frontend/shared/lib/types";
 import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 import { Button } from "@codeman-frontend/shared/components/ui/button";
+import { Input } from "@codeman-frontend/shared/components/ui/input";
 import { CodemanInput } from "@codeman-frontend/shared/components/internal/codeman-input";
+import { CodemanCheckbox } from "@codeman-frontend/shared/components/internal/codeman-checkbox";
+import { CodemanSelect } from "@codeman-frontend/shared/components/internal/codeman-select";
 import {
   BaseUrlSchema,
   ApiKeySchema,
@@ -393,20 +396,15 @@ export function ProviderCard(props: ProviderCardProps) {
             {/* Default model dropdown */}
             <div class="flex flex-col gap-1.5">
               <label class="text-sm font-medium">Default Model</label>
-              <select
-                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              <CodemanSelect
+                options={localModels().map(m => ({
+                  label: m.label + (m.deprecated ? " (deprecated)" : ""),
+                  value: m.id,
+                }))}
                 value={localDefaultModel()}
-                onChange={(e) => setLocalDefaultModel(e.currentTarget.value)}
-              >
-                <For each={localModels()}>
-                  {(m) => (
-                    <option value={m.id}>
-                      {m.label}
-                      {m.deprecated ? " (deprecated)" : ""}
-                    </option>
-                  )}
-                </For>
-              </select>
+                onChange={setLocalDefaultModel}
+                data-testid="provider-defaultmodel"
+              />
             </div>
 
             {/* Model table */}
@@ -428,41 +426,36 @@ export function ProviderCard(props: ProviderCardProps) {
                     data-testid={`model-row-${index()}`}
                     class="grid grid-cols-[1fr_1fr_100px_80px_80px_40px] gap-2 items-center"
                   >
-                    <input
+                    <Input
                       type="text"
-                      class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring"
                       value={row.id}
                       onInput={(e) => updateModelRow(index(), "id", e.currentTarget.value)}
                       placeholder="model-id"
                     />
-                    <input
+                    <Input
                       type="text"
-                      class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring"
                       value={row.label}
                       onInput={(e) => updateModelRow(index(), "label", e.currentTarget.value)}
                       placeholder="Display Name"
                     />
-                    <input
+                    <Input
                       type="number"
-                      class="h-8 w-full rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:border-ring"
                       value={row.contextWindow}
                       onInput={(e) => updateModelRow(index(), "contextWindow", e.currentTarget.value)}
                       placeholder="100000"
                     />
                     <div class="flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        class="size-4 rounded border-input"
-                        checked={row.deprecated}
-                        onChange={(e) => updateModelRow(index(), "deprecated", e.currentTarget.checked)}
+                      <CodemanCheckbox
+                        value={row.deprecated}
+                        onChange={(v) => updateModelRow(index(), "deprecated", v)}
+                        data-codeman-checkbox
                       />
                     </div>
                     <div class="flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        class="size-4 rounded border-input"
-                        checked={row.thinking}
-                        onChange={(e) => updateModelRow(index(), "thinking", e.currentTarget.checked)}
+                      <CodemanCheckbox
+                        value={row.thinking}
+                        onChange={(v) => updateModelRow(index(), "thinking", v)}
+                        data-codeman-checkbox
                       />
                     </div>
                     <Button

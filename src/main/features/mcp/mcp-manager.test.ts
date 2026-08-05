@@ -1,5 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { Effect, Layer } from "effect";
 import { JsonRpcProtocolError, NotFound } from "../../../renderer/src/shared/lib/errors";
+
+// Mock @effect/sql-sqlite-node BEFORE importing McpManager to prevent
+// better-sqlite3 native module from loading (ABI mismatch: Electron vs system Node).
+vi.mock("@effect/sql-sqlite-node/SqliteClient", () => ({
+  SqliteClient: class FakeSqliteClient {
+    unsafe = () => Effect.succeed([]);
+  },
+  layer: () => Layer.succeed({} as any, {} as any),
+}));
+
+// Mock runtime.ts to provide a minimal runtime without DbLive
+vi.mock("../../runtime", () => ({
+  MainLive: Layer.succeed({} as any, {} as any),
+  mainRuntime: {
+    runPromise: <A>(eff: Effect<A, any, never>) => Effect.runPromise(eff),
+    runPromiseExit: <A>(eff: Effect<A, any, never>) => Effect.runPromiseExit(eff),
+  },
+}));
 
 vi.mock("electron", () => ({
   app: { getPath: vi.fn(() => "/tmp") },

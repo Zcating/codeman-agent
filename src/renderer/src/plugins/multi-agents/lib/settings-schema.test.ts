@@ -1,9 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Schema } from "effect";
-import { SubAgentConfigSchema, type SubAgentConfig } from "./sub-agent.types";
+import { SubAgentFormSchema, SubAgentFormValues } from "./settings-schema";
 
-const SAMPLE_CONFIG: SubAgentConfig = {
-  id: "agent-001" as SubAgentConfig["id"],
+const SAMPLE_FORM_VALUES: SubAgentFormValues = {
   name: "Researcher",
   description: "Web research sub-agent",
   systemPrompt: "You are a helpful research assistant.",
@@ -11,46 +10,59 @@ const SAMPLE_CONFIG: SubAgentConfig = {
   thinkingLevel: "medium",
   allowedTools: ["webfetch", "search_files"],
   enabled: true,
-  createdAt: 1234567890,
-  updatedAt: 1234567890,
 };
 
-describe("SubAgentConfig schema", () => {
-  it("decodes a valid SubAgentConfig", () => {
-    const result = Schema.decodeUnknownEither(SubAgentConfigSchema)(SAMPLE_CONFIG);
+describe("SubAgentFormSchema", () => {
+  it("parses a valid SubAgentFormValues", () => {
+    const result = Schema.decodeUnknownEither(SubAgentFormSchema)(SAMPLE_FORM_VALUES);
     expect(result._tag).toBe("Right");
     if (result._tag === "Right") {
-      expect(result.right).toEqual(SAMPLE_CONFIG);
+      expect(result.right).toEqual(SAMPLE_FORM_VALUES);
     }
   });
 
   it("round-trips through encode then decode", () => {
-    const encoded = Schema.encodeEither(SubAgentConfigSchema)(SAMPLE_CONFIG);
+    const encoded = Schema.encodeEither(SubAgentFormSchema)(SAMPLE_FORM_VALUES);
     expect(encoded._tag).toBe("Right");
     if (encoded._tag === "Right") {
-      const decoded = Schema.decodeUnknownEither(SubAgentConfigSchema)(encoded.right);
+      const decoded = Schema.decodeUnknownEither(SubAgentFormSchema)(encoded.right);
       expect(decoded._tag).toBe("Right");
       if (decoded._tag === "Right") {
-        expect(decoded.right).toEqual(SAMPLE_CONFIG);
+        expect(decoded.right).toEqual(SAMPLE_FORM_VALUES);
       }
     }
   });
 
-  it("rejects missing required fields", () => {
-    const invalid = { name: "test" } as unknown;
-    const result = Schema.decodeUnknownEither(SubAgentConfigSchema)(invalid);
+  it("rejects non-literal thinkingLevel", () => {
+    const invalid = { ...SAMPLE_FORM_VALUES, thinkingLevel: "superfast" as const };
+    const result = Schema.decodeUnknownEither(SubAgentFormSchema)(invalid);
     expect(result._tag).toBe("Left");
   });
 
-  it("rejects invalid thinkingLevel", () => {
-    const invalid = { ...SAMPLE_CONFIG, thinkingLevel: "superfast" };
-    const result = Schema.decodeUnknownEither(SubAgentConfigSchema)(invalid);
-    expect(result._tag).toBe("Left");
+  it("allowedTools accepts empty array", () => {
+    const withEmptyTools = { ...SAMPLE_FORM_VALUES, allowedTools: [] };
+    const result = Schema.decodeUnknownEither(SubAgentFormSchema)(withEmptyTools);
+    expect(result._tag).toBe("Right");
+    if (result._tag === "Right") {
+      expect(result.right.allowedTools).toEqual([]);
+    }
   });
 
-  it("rejects non-array allowedTools", () => {
-    const invalid = { ...SAMPLE_CONFIG, allowedTools: "not-an-array" };
-    const result = Schema.decodeUnknownEither(SubAgentConfigSchema)(invalid);
-    expect(result._tag).toBe("Left");
+  it("schema does not include id, createdAt, updatedAt fields", () => {
+    const invalid = {
+      ...SAMPLE_FORM_VALUES,
+      id: "agent-001",
+      createdAt: 1234567890,
+      updatedAt: 1234567890,
+    };
+    // Should still parse successfully - id/createdAt/updatedAt are ignored
+    const result = Schema.decodeUnknownEither(SubAgentFormSchema)(invalid);
+    expect(result._tag).toBe("Right");
+    if (result._tag === "Right") {
+      // These fields should not be present in the parsed result
+      expect((result.right as any).id).toBeUndefined();
+      expect((result.right as any).createdAt).toBeUndefined();
+      expect((result.right as any).updatedAt).toBeUndefined();
+    }
   });
 });

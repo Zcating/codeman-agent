@@ -1,6 +1,7 @@
 import { For, Show, createMemo, type JSX } from "solid-js";
 import { Effect } from "effect";
 import { Plus, Pencil, Trash2, Users } from "lucide-solid";
+import { createForm } from "@tanstack/solid-form";
 import { subAgentsStore } from "../stores/sub-agents.store";
 import type { SubAgentConfig, ThinkingLevel } from "../lib/sub-agent.types";
 import { Dialog } from "@codeman-frontend/shared/components/internal/codeman-dialog";
@@ -13,8 +14,15 @@ import {
 } from "@codeman-frontend/shared/components/ui/dialog";
 import { Button } from "@codeman-frontend/shared/components/ui/button";
 import { Checkbox } from "@codeman-frontend/shared/components/ui/checkbox";
+import { CodemanInput } from "@codeman-frontend/shared/components/internal/codeman-input";
+import { CodemanTextarea } from "@codeman-frontend/shared/components/internal/codeman-textarea";
+import { CodemanSelect } from "@codeman-frontend/shared/components/internal/codeman-select";
+import { CodemanCheckbox } from "@codeman-frontend/shared/components/internal/codeman-checkbox";
+import { effectSchema } from "@codeman-frontend/shared/lib/effect-schema-adapter";
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
 import { buildEnabledProviders } from "@codeman-frontend/features/chat/lib/build-enabled-providers";
+import { SubAgentFormSchema } from "../lib/settings-schema";
+import type { SubAgentFormValues } from "../lib/settings-schema";
 
 interface SubAgentRowProps {
   config: SubAgentConfig;
@@ -103,16 +111,6 @@ function SubAgentRow(props: SubAgentRowProps): JSX.Element {
   );
 }
 
-interface SubAgentFormValues {
-  name: string;
-  description: string;
-  systemPrompt: string;
-  modelId: string;
-  thinkingLevel: ThinkingLevel;
-  allowedTools: string[];
-  enabled: boolean;
-}
-
 const THINKING_LEVELS: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh"];
 
 const ALL_TOOLS = [
@@ -131,49 +129,39 @@ function SubAgentFormDialog(props: {
 }): JSX.Element {
   const isEdit = () => !!props.initialValues;
 
-  let nameVal = props.initialValues?.name ?? "";
-  let descVal = props.initialValues?.description ?? "";
-  let promptVal = props.initialValues?.systemPrompt ?? "";
-  let modelVal = props.initialValues?.modelId ?? "";
-  let thinkingVal = props.initialValues?.thinkingLevel ?? "medium";
-  let toolsVal = [...(props.initialValues?.allowedTools ?? [])];
-  let enabledVal = props.initialValues?.enabled ?? true;
-
-  // Local state for form fields
-  let nameField: HTMLInputElement | undefined;
-  let descField: HTMLInputElement | undefined;
-  let promptField: HTMLTextAreaElement | undefined;
-  let modelField: HTMLSelectElement | undefined;
-  let thinkingField: HTMLSelectElement | undefined;
-
-  const handleToolToggle = (tool: string, checked: boolean): void => {
-    if (checked) {
-      if (!toolsVal.includes(tool)) {
-        toolsVal.push(tool);
-      }
-    } else {
-      toolsVal = toolsVal.filter((t) => t !== tool);
-    }
-  };
-
-  const handleSave = (): void => {
-    const values: SubAgentFormValues = {
-      name: nameField?.value ?? nameVal,
-      description: descField?.value ?? descVal,
-      systemPrompt: promptField?.value ?? promptVal,
-      modelId: modelField?.value ?? modelVal,
-      thinkingLevel: (thinkingField?.value ?? thinkingVal) as ThinkingLevel,
-      allowedTools: toolsVal,
-      enabled: enabledVal,
-    };
-    props.onSave(values);
-  };
+  const form = createForm(() => ({
+    defaultValues: {
+      name: props.initialValues?.name ?? "",
+      description: props.initialValues?.description ?? "",
+      systemPrompt: props.initialValues?.systemPrompt ?? "",
+      modelId: props.initialValues?.modelId ?? "",
+      thinkingLevel: props.initialValues?.thinkingLevel ?? "medium",
+      allowedTools: [...(props.initialValues?.allowedTools ?? [])],
+      enabled: props.initialValues?.enabled ?? true,
+    } satisfies SubAgentFormValues,
+    validators: {
+      onChange: effectSchema(SubAgentFormSchema),
+    },
+  }));
 
   const enabledModels = createMemo(() => {
     const providers = appStore.state.value.providers ?? [];
     const enabled = buildEnabledProviders(providers);
     return enabled.flatMap((p) => p.models.map((m) => ({ provider: p.label, model: m })));
   });
+
+  const handleSave = (): void => {
+    const values: SubAgentFormValues = {
+      name: form.getFieldValue("name") ?? "",
+      description: form.getFieldValue("description") ?? "",
+      systemPrompt: form.getFieldValue("systemPrompt") ?? "",
+      modelId: form.getFieldValue("modelId") ?? "",
+      thinkingLevel: (form.getFieldValue("thinkingLevel") ?? "medium") as ThinkingLevel,
+      allowedTools: form.getFieldValue("allowedTools") ?? [],
+      enabled: form.getFieldValue("enabled") ?? true,
+    };
+    props.onSave(values);
+  };
 
   return (
     <DialogContent data-testid="sub-agent-form-dialog">
@@ -187,98 +175,115 @@ function SubAgentFormDialog(props: {
       </DialogHeader>
 
       <div class="flex flex-col gap-3 mt-4 max-h-[60vh] overflow-y-auto">
-        <div>
-          <label class="text-xs text-muted-foreground mb-1 block">Name</label>
-          <input
-            ref={nameField}
-            type="text"
-            data-testid="field-name"
-            class="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-            value={nameVal}
-          />
-        </div>
+        <form.Field name="name">
+          {(field) => (
+            <CodemanInput
+              label="Name"
+              data-testid="field-name"
+              value={field().state.value}
+              onValueChange={field().handleChange}
+            />
+          )}
+        </form.Field>
 
-        <div>
-          <label class="text-xs text-muted-foreground mb-1 block">Description</label>
-          <input
-            ref={descField}
-            type="text"
-            data-testid="field-description"
-            class="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-            value={descVal}
-          />
-        </div>
+        <form.Field name="description">
+          {(field) => (
+            <CodemanInput
+              label="Description"
+              data-testid="field-description"
+              value={field().state.value}
+              onValueChange={field().handleChange}
+            />
+          )}
+        </form.Field>
 
-        <div>
-          <label class="text-xs text-muted-foreground mb-1 block">System Prompt</label>
-          <textarea
-            ref={promptField}
-            data-testid="field-system-prompt"
-            class="flex min-h-[80px] w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 resize-y"
-            value={promptVal}
-          />
-        </div>
+        <form.Field name="systemPrompt">
+          {(field) => (
+            <CodemanTextarea
+              label="System Prompt"
+              data-testid="field-system-prompt"
+              value={field().state.value}
+              onValueChange={field().handleChange}
+              rows={6}
+            />
+          )}
+        </form.Field>
 
-        <div>
-          <label class="text-xs text-muted-foreground mb-1 block">Model</label>
-          <select
-            ref={modelField}
-            data-testid="field-model"
-            class="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-            value={modelVal}
-          >
-            <option value="">Select a model...</option>
-            <For each={enabledModels()}>
-              {(item) => (
-                <option value={item.model.id}>
-                  {item.provider} / {item.model.label}
-                </option>
-              )}
-            </For>
-          </select>
-        </div>
+        <form.Field name="modelId">
+          {(field) => (
+            <div class="space-y-1.5">
+              <label class="text-sm font-medium">Model</label>
+              <CodemanSelect
+                options={enabledModels().map((item) => ({
+                  label: `${item.provider} / ${item.model.label}`,
+                  value: item.model.id,
+                }))}
+                value={field().state.value}
+                onChange={field().handleChange}
+                placeholder="Select a model..."
+                data-testid="field-model"
+              />
+            </div>
+          )}
+        </form.Field>
 
-        <div>
-          <label class="text-xs text-muted-foreground mb-1 block">Thinking Level</label>
-          <select
-            ref={thinkingField}
-            data-testid="field-thinking-level"
-            class="flex h-8 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-            value={thinkingVal}
-          >
-            <For each={THINKING_LEVELS}>
-              {(level) => <option value={level}>{level}</option>}
-            </For>
-          </select>
-        </div>
+        <form.Field name="thinkingLevel">
+          {(field) => (
+            <div class="space-y-1.5">
+              <label class="text-sm font-medium">Thinking Level</label>
+              <CodemanSelect
+                options={THINKING_LEVELS.map((l) => ({ label: l, value: l }))}
+                value={field().state.value}
+                onChange={field().handleChange}
+                placeholder="Select thinking level..."
+                data-testid="field-thinking-level"
+              />
+            </div>
+          )}
+        </form.Field>
 
-        <div>
-          <label class="text-xs text-muted-foreground mb-1 block">Allowed Tools</label>
-          <div class="flex flex-wrap gap-2">
-            <For each={ALL_TOOLS}>
-              {(tool) => (
-                <label class="flex items-center gap-1.5 text-xs cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={toolsVal.includes(tool)}
-                    onChange={(e) => handleToolToggle(tool, e.currentTarget.checked)}
-                    data-testid={`tool-${tool}`}
-                  />
-                  <span class="font-mono text-zinc-700 dark:text-zinc-300">{tool}</span>
-                </label>
-              )}
-            </For>
-          </div>
-        </div>
+        <form.Field name="allowedTools">
+          {(field) => (
+            <div class="space-y-1.5">
+              <label class="text-xs text-muted-foreground mb-1 block">Allowed Tools</label>
+              <div class="flex flex-wrap gap-2">
+                <For each={[...ALL_TOOLS]}>
+                  {(tool) => (
+                    <label class="flex items-center gap-1.5 text-xs cursor-pointer">
+                      <CodemanCheckbox
+                        value={field().state.value.includes(tool)}
+                        onChange={(value) => {
+                          if (value) {
+                            if (!field().state.value.includes(tool)) {
+                              field().handleChange([...field().state.value, tool]);
+                            }
+                          } else {
+                            field().handleChange(field().state.value.filter((t) => t !== tool));
+                          }
+                        }}
+                        data-testid={`tool-${tool}`}
+                      />
+                      <span class="font-mono text-zinc-700 dark:text-zinc-300">{tool}</span>
+                    </label>
+                  )}
+                </For>
+              </div>
+            </div>
+          )}
+        </form.Field>
 
-        <label class="flex items-center gap-2 text-sm cursor-pointer">
-          <Checkbox
-            checked={enabledVal}
-            onChange={(e) => { enabledVal = e.currentTarget.checked; }}
-            data-testid="field-enabled"
-          />
-          <span>Enabled</span>
-        </label>
+        <form.Field name="enabled">
+          {(field) => (
+            <label class="flex items-center gap-2 text-sm cursor-pointer">
+              <CodemanCheckbox
+                value={field().state.value}
+                onChange={field().handleChange}
+                data-testid="field-enabled"
+              />
+              <span>Enabled</span>
+            </label>
+          )}
+        </form.Field>
       </div>
 
       <DialogFooter>
@@ -302,7 +307,7 @@ export function SettingsTab(): JSX.Element {
     void Dialog.show<SubAgentFormValues | null>((resolve) => (
       <SubAgentFormDialog
         onSave={(values) => resolve(values)}
-        onCancel={() => resolve(null as unknown as SubAgentFormValues)}
+        onCancel={() => resolve(null)}
       />
     )).then((result) => {
       if (!result) {return;}
@@ -327,7 +332,7 @@ export function SettingsTab(): JSX.Element {
       <SubAgentFormDialog
         initialValues={config}
         onSave={(values) => resolve(values)}
-        onCancel={() => resolve(null as unknown as SubAgentFormValues)}
+        onCancel={() => resolve(null)}
       />
     )).then((result) => {
       if (!result) {return;}

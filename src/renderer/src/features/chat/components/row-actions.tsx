@@ -1,6 +1,7 @@
 
 import { createSignal, Show, type JSX } from "solid-js";
 import { Loader2, Pencil, Trash2 } from "lucide-solid";
+import { Input } from "@codeman-frontend/shared/components/ui/input";
 
 export interface RowActionsProps {
   kind: "workspace" | "conv";
@@ -167,7 +168,7 @@ function InlineRenameInput(props: InlineRenameInputProps): JSX.Element {
   };
 
   return (
-    <input
+    <Input
       ref={handleInputRef}
       type="text"
       class="flex-1 truncate text-sm bg-transparent outline-none focus:ring-2 focus:ring-sidebar-ring rounded-md px-1"

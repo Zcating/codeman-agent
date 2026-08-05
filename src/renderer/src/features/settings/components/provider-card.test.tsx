@@ -233,13 +233,15 @@ describe("ProviderCard — expanded area", () => {
     expect(screen.getByRole("button", { name: /测试连接/i })).toBeInTheDocument();
   });
 
-  it("renders defaultModel dropdown with options", () => {
+  it("renders defaultModel dropdown with options", async () => {
     renderCard(mockProvider, true);
-    const select = document.querySelector("select") as HTMLSelectElement;
-    expect(select).toBeTruthy();
-    const options = Array.from(select.querySelectorAll("option")).map((o) => o.value);
-    expect(options).toContain("MiniMax-M2.5-highspeed");
-    expect(options).toContain("MiniMax-M2.1-highspeed");
+    const trigger = screen.getByTestId("provider-defaultmodel-trigger");
+    expect(trigger).toBeTruthy();
+    const user = userEvent.setup();
+    await user.click(trigger);
+    const content = await screen.findByTestId("provider-defaultmodel-content");
+    expect(content.textContent).toContain("MiniMax-M2.5-highspeed");
+    expect(content.textContent).toContain("MiniMax-M2.1-highspeed");
   });
 
   it("renders model table with id/label/contextWindow/deprecated/thinking columns", () => {
@@ -430,5 +432,156 @@ describe("ProviderCard — baseUrl dev badge", () => {
       />
     ));
     expect(screen.getByText("(dev)")).toBeInTheDocument();
+  });
+});
+
+describe("ProviderCard — T4 CodemanCheckbox in model table", () => {
+  beforeEach(() => {
+    mockState.calls = [];
+    mockState.resolved = undefined;
+    mockState.rejected = undefined;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+    _resetSettingsSaverForTest();
+  });
+
+  it("model rows contain data-codeman-checkbox on checkboxes", async () => {
+    renderCard(mockProvider, true);
+    const row = screen.getByTestId("model-row-0");
+    const checkboxes = row.querySelectorAll('[data-codeman-checkbox]');
+    expect(checkboxes.length).toBe(2); // deprecated + thinking
+  });
+
+  it("deprecated CodemanCheckbox two-way binding via onSave", async () => {
+    const onSave = vi.fn();
+    render(() => (
+      <ProviderCard
+        provider={mockProvider}
+        isExpanded={true}
+        isDefault={false}
+        onToggleExpand={vi.fn()}
+        onSetDefault={vi.fn()}
+        onSave={onSave}
+        onCancel={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    ));
+    const row1 = screen.getByTestId("model-row-1");
+    const deprecatedCheckbox = row1.querySelector('[data-codeman-checkbox]') as HTMLInputElement;
+    expect(deprecatedCheckbox).not.toBeNull();
+    expect(deprecatedCheckbox.checked).toBe(true);
+    const user = userEvent.setup();
+    await user.click(deprecatedCheckbox);
+    await user.click(screen.getByRole("button", { name: /保存/i }));
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const savedProvider = onSave.mock.calls[0][0];
+    const deprecatedModel = savedProvider.llm.models.find((m: any) => m.id === "MiniMax-M2.1-highspeed");
+    expect(deprecatedModel!.deprecated).toBe(false);
+  });
+
+  it("thinking CodemanCheckbox two-way binding via onSave", async () => {
+    const onSave = vi.fn();
+    const providerWithThinking = {
+      ...mockProvider,
+      llm: {
+        ...mockProvider.llm,
+        models: mockProvider.llm.models.map((m) => ({ ...m, thinking: false, deprecated: false })),
+      },
+    };
+    render(() => (
+      <ProviderCard
+        provider={providerWithThinking}
+        isExpanded={true}
+        isDefault={false}
+        onToggleExpand={vi.fn()}
+        onSetDefault={vi.fn()}
+        onSave={onSave}
+        onCancel={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    ));
+    const row0 = screen.getByTestId("model-row-0");
+    const checkboxes = row0.querySelectorAll('[data-codeman-checkbox]');
+    expect(checkboxes.length).toBe(2);
+    const thinkingCheckbox = checkboxes[1] as HTMLInputElement;
+    expect(thinkingCheckbox.checked).toBe(false);
+    const user = userEvent.setup();
+    await user.click(thinkingCheckbox);
+    await user.click(screen.getByRole("button", { name: /保存/i }));
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const savedProvider = onSave.mock.calls[0][0];
+    expect(savedProvider.llm.models[0].thinking).toBe(true);
+  });
+});
+
+describe("ProviderCard — T5 CodemanSelect for default model", () => {
+  beforeEach(() => {
+    mockState.calls = [];
+    mockState.resolved = undefined;
+    mockState.rejected = undefined;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+    _resetSettingsSaverForTest();
+  });
+
+  it("default model trigger has data-testid provider-defaultmodel", () => {
+    renderCard(mockProvider, true);
+    const trigger = screen.getByTestId("provider-defaultmodel-trigger");
+    expect(trigger).toBeInTheDocument();
+  });
+
+  it("select options contain every model id", async () => {
+    renderCard(mockProvider, true);
+    const trigger = screen.getByTestId("provider-defaultmodel-trigger");
+    const user = userEvent.setup();
+    await user.click(trigger);
+    const content = await screen.findByTestId("provider-defaultmodel-content");
+    expect(content.textContent).toContain("MiniMax-M2.5-highspeed");
+    expect(content.textContent).toContain("MiniMax-M2.1-highspeed");
+  });
+
+  it("deprecated model label has (deprecated) suffix", async () => {
+    renderCard(mockProvider, true);
+    const trigger = screen.getByTestId("provider-defaultmodel-trigger");
+    const user = userEvent.setup();
+    await user.click(trigger);
+    const content = await screen.findByTestId("provider-defaultmodel-content");
+    expect(content.textContent).toContain("MiniMax-M2.1-highspeed");
+    expect(content.textContent).toContain("(deprecated)");
+  });
+});
+
+describe("ProviderCard — T6 Input primitive in model table", () => {
+  beforeEach(() => {
+    mockState.calls = [];
+    mockState.resolved = undefined;
+    mockState.rejected = undefined;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+    _resetSettingsSaverForTest();
+  });
+
+  it("id/label/contextWindow inputs have data-slot=input", () => {
+    renderCard(mockProvider, true);
+    const row = screen.getByTestId("model-row-0");
+    const inputs = row.querySelectorAll('[data-slot="input"]');
+    expect(inputs.length).toBe(3); // id, label, contextWindow
+  });
+
+  it("contextWindow input is type=number", () => {
+    renderCard(mockProvider, true);
+    const row = screen.getByTestId("model-row-0");
+    const contextWindowInput = row.querySelector('input[type="number"]');
+    expect(contextWindowInput).not.toBeNull();
+    expect(contextWindowInput).toHaveAttribute("data-slot", "input");
   });
 });
