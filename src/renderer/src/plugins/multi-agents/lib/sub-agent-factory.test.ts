@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
+import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 import { createSubAgent } from "./sub-agent-factory";
 
 // Capture initialState passed to Agent constructor
@@ -48,6 +49,18 @@ const SAMPLE_PROVIDER: ProviderConfig = {
   tools: [],
 };
 
+const SAMPLE_SKILL: SkillManifest = {
+  name: "test-skill",
+  description: "A test skill for unit testing.",
+  source: "preinstalled" as const,
+  path: "/fake/path",
+};
+
+const SAMPLE_PROVIDER_WITH_SKILLS: ProviderConfig = {
+  ...SAMPLE_PROVIDER,
+  enabledSkills: [SAMPLE_SKILL],
+};
+
 const makeMockTool = (name: string): AgentTool => ({
   label: name,
   name,
@@ -62,10 +75,43 @@ describe("sub-agent-factory", () => {
     capturedInitialState = null;
   });
 
-  it("sets systemPrompt from config", () => {
-    const toolRegistry = new Map<string, AgentTool>();
+  it("assembles systemPrompt with identity + tools + guidelines + userDefault", () => {
+    const toolRegistry = new Map<string, AgentTool>([
+      ["webfetch", makeMockTool("webfetch")],
+      ["search_files", makeMockTool("search_files")],
+    ]);
     createSubAgent(SAMPLE_CONFIG, SAMPLE_PROVIDER, toolRegistry);
-    expect(capturedInitialState?.systemPrompt).toBe(SAMPLE_CONFIG.systemPrompt);
+    const prompt = capturedInitialState?.systemPrompt ?? "";
+    // userDefault (config.systemPrompt) at the end
+    expect(prompt).toContain(SAMPLE_CONFIG.systemPrompt);
+    // Available tools section
+    expect(prompt).toContain("## Available tools");
+    // Guidelines section
+    expect(prompt).toContain("## Guidelines");
+    // identity is present (any non-empty string)
+    expect(prompt).toBeTruthy();
+  });
+
+  it("injects <available_skills> section when baseProvider.enabledSkills is non-empty", () => {
+    const toolRegistry = new Map<string, AgentTool>();
+    createSubAgent(SAMPLE_CONFIG, SAMPLE_PROVIDER_WITH_SKILLS, toolRegistry);
+    const prompt = capturedInitialState?.systemPrompt ?? "";
+    expect(prompt).toContain("<available_skills>");
+    expect(prompt).toContain("test-skill");
+  });
+
+  it("filters tool snippets to only allowedTools", () => {
+    const toolRegistry = new Map<string, AgentTool>([
+      ["webfetch", makeMockTool("webfetch")],
+      ["search_files", makeMockTool("search_files")],
+      ["run_command", makeMockTool("run_command")],
+    ]);
+    const configWithOneTool = { ...SAMPLE_CONFIG, allowedTools: ["webfetch"] as readonly string[] };
+    createSubAgent(configWithOneTool, SAMPLE_PROVIDER, toolRegistry);
+    const prompt = capturedInitialState?.systemPrompt ?? "";
+    expect(prompt).toContain("webfetch");
+    expect(prompt).not.toContain("search_files");
+    expect(prompt).not.toContain("run_command");
   });
 
   it("sets model id from config.modelId", () => {
