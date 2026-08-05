@@ -11,6 +11,32 @@ export interface WorkspaceContext {
   rootPath: string;
 }
 
+// ── Shared constant sections (single source of truth for main chat + sub-agents) ──
+
+/** Identity string used in the main conversation system prompt */
+export const DEFAULT_IDENTITY =
+  "You are an AI coding assistant with file system and command execution capabilities.";
+
+/** Static tool snippets: 5 file tools + webfetch + run_command + _load_skill */
+export const DEFAULT_TOOL_SNIPPETS = [
+  { name: "read_file", summary: "Read a file from a workspace (UTF-8, ≤10MB)" },
+  { name: "write_file", summary: "Write content to a file in a workspace (≤10MB)" },
+  { name: "edit_file", summary: "Replace text in a file (unique match required unless replaceAll=true)" },
+  { name: "search_files", summary: "Find files in workspace by glob pattern or content substring (≤100 results)" },
+  { name: "delete_file", summary: "Move a file to the recycle bin (recoverable)" },
+  { name: "webfetch", summary: "Fetch HTTP/HTTPS URL content as text/markdown/HTML" },
+  { name: "run_command", summary: "Execute shell commands (build/test/git), returns status/exitCode/stdout/stderr" },
+  { name: "_load_skill", summary: "Load a skill's full instructions by skill name" },
+] as const satisfies readonly ToolSnippet[];
+
+/** Behavior guidelines */
+export const DEFAULT_GUIDELINES = [
+  "edit_file old_text must match exactly once unless you set replace_all=true",
+  "Files are limited to 10 MB",
+  "Binary files, .exe/.dll/.sys files, and paths outside workspaces are blocked",
+  "Only operate within user-configured workspaces",
+] as const satisfies readonly string[];
+
 export interface BuildSystemPromptSections {
   identity: string;
   staticToolSnippets: readonly ToolSnippet[];

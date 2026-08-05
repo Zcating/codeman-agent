@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { buildSystemPrompt, type BuildSystemPromptSections, type ToolSnippet, type WorkspaceContext } from "./build-system-prompt";
+import {
+  buildSystemPrompt,
+  DEFAULT_IDENTITY,
+  type BuildSystemPromptSections,
+  type ToolSnippet,
+  type WorkspaceContext,
+} from "./build-system-prompt";
 
 describe("buildSystemPrompt", () => {
   // ── helpers ─────────────────────────────────────────────────────────────────
 
-  const IDENTITY = "You are an AI assistant.";
+  const IDENTITY = DEFAULT_IDENTITY;
   const USER_DEFAULT = "Be helpful.";
 
   // ── Test 1: minimal input (identity + empty rest) → only identity section ─────
@@ -260,5 +266,63 @@ describe("buildSystemPrompt", () => {
     const testsCount = (result.match(/Write tests\./g) || []).length;
     expect(conciseCount).toBe(1);
     expect(testsCount).toBe(1);
+  });
+
+  // ── Test 9: full section ordering (ADR-0051 D1) ───────────────────────────────
+  // Order: identity < tools < guidelines < workspace段(含cwd footer) < projectInstructions < skills < userDefault
+
+  it("9. full input → sections appear in fixed order per ADR-0051 D1", () => {
+    const snippets: readonly ToolSnippet[] = [
+      { name: "read_file", summary: "Read a file." },
+    ];
+    const guidelines = ["Be concise."];
+    const skillsSection = "<available_skills>\n- Skill A\n</available_skills>";
+    const workspace: WorkspaceContext = {
+      workspaceId: "ws-order",
+      rootPath: "/test/path",
+    };
+
+    const input: BuildSystemPromptSections = {
+      identity: IDENTITY,
+      staticToolSnippets: snippets,
+      guidelines,
+      workspace,
+      projectInstructions: "Use TypeScript.",
+      skillsSection,
+      userDefault: USER_DEFAULT,
+    };
+
+    const result = buildSystemPrompt(input);
+    const sections = result.split("\n\n");
+
+    // Find section positions by first-line markers
+    const identityIdx = sections.findIndex((s) => s.startsWith(IDENTITY));
+    const toolsIdx = sections.findIndex((s) => s.startsWith("## Available tools"));
+    const guidelinesIdx = sections.findIndex((s) => s.startsWith("## Guidelines"));
+    const workspaceIdx = sections.findIndex((s) => s.startsWith("[Workspace context]"));
+    const projectInstrIdx = sections.findIndex((s) => s.startsWith("<project_instructions>"));
+    const skillsIdx = sections.findIndex((s) => s.startsWith("<available_skills>"));
+    const userDefaultIdx = sections.findIndex((s) => s === USER_DEFAULT);
+
+    // All sections present
+    expect(identityIdx).toBeGreaterThanOrEqual(0);
+    expect(toolsIdx).toBeGreaterThanOrEqual(0);
+    expect(guidelinesIdx).toBeGreaterThanOrEqual(0);
+    expect(workspaceIdx).toBeGreaterThanOrEqual(0);
+    expect(projectInstrIdx).toBeGreaterThanOrEqual(0);
+    expect(skillsIdx).toBeGreaterThanOrEqual(0);
+    expect(userDefaultIdx).toBeGreaterThanOrEqual(0);
+
+    // Correct relative ordering
+    expect(identityIdx).toBeLessThan(toolsIdx);
+    expect(toolsIdx).toBeLessThan(guidelinesIdx);
+    expect(guidelinesIdx).toBeLessThan(workspaceIdx);
+    expect(workspaceIdx).toBeLessThan(projectInstrIdx);
+    expect(projectInstrIdx).toBeLessThan(skillsIdx);
+    expect(skillsIdx).toBeLessThan(userDefaultIdx);
+
+    // cwd footer is part of workspace section (not independent)
+    const workspaceSection = sections[workspaceIdx];
+    expect(workspaceSection).toContain("Current working directory: /test/path");
   });
 });

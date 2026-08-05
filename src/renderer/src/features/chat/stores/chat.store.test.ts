@@ -1607,7 +1607,7 @@ describe("sendMessage — projectInstructions caching (ADR-0051)", () => {
         workspaceId: "ws-1", // Exists in mock WorkspaceService
       };
       setupConvState(convWithWs, []);
-      vi.spyOn(store.byId["c-ws-cache"]!.runtime, "run").mockReturnValue(Stream.fromIterable([]));
+      const runSpy = vi.spyOn(store.byId["c-ws-cache"]!.runtime, "run").mockReturnValue(Stream.fromIterable([]));
 
       // First sendMessage - should load projectInstructions
       await Effect.runPromise(sendMessage("c-ws-cache", "hello", defaultProvider));
@@ -1617,6 +1617,11 @@ describe("sendMessage — projectInstructions caching (ADR-0051)", () => {
       // Second sendMessage - should NOT load again (cached)
       await Effect.runPromise(sendMessage("c-ws-cache", "hello again", defaultProvider));
       expect(fileApiReadFileCalls.length).toBe(1); // Still 1, not 2
+
+      // Verify cached projectInstructions appears in the 2nd call's systemPrompt
+      const secondCallProvider = runSpy.mock.calls[1]![0]!.provider as ProviderConfig;
+      expect(secondCallProvider.systemPrompt).toContain("<project_instructions>");
+      expect(secondCallProvider.systemPrompt).toContain("This is the AGENTS.md content.");
 
       dispose();
     });
