@@ -49,7 +49,7 @@ const CWD_FOOTER = "Current working directory";
 export function buildSystemPrompt(s: BuildSystemPromptSections): string {
   const parts: string[] = [];
 
-  // ── conversationOverride 路径：仅追加 workspace / skills / userDefault ──
+  // ── conversationOverride 路径：workspace / projectInstructions / skills / override ──
   if (s.conversationOverride) {
     // workspace context（若有）
     if (s.workspace) {
@@ -58,6 +58,13 @@ export function buildSystemPrompt(s: BuildSystemPromptSections): string {
           `workspaceId: ${s.workspace.workspaceId}\n` +
           `${WORKSPACE_RULES}\n` +
           `${CWD_FOOTER}: ${s.workspace.rootPath}`
+      );
+    }
+
+    // projectInstructions / AGENTS.md（若有）
+    if (s.projectInstructions) {
+      parts.push(
+        `<project_instructions>\n${s.projectInstructions}\n</project_instructions>`
       );
     }
 

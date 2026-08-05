@@ -163,6 +163,33 @@ describe("buildSystemPrompt", () => {
     expect(result).toContain("Override Skill");
   });
 
+  // ── Test 6b: conversationOverride + projectInstructions → both present ─────────
+
+  it("6b. conversationOverride + projectInstructions → override and AGENTS.md both present", () => {
+    const override = "Custom system prompt from conversation.";
+    const projectInstructions = "Use TypeScript. Write tests.";
+
+    const input: BuildSystemPromptSections = {
+      identity: IDENTITY,
+      staticToolSnippets: [],
+      guidelines: [],
+      userDefault: USER_DEFAULT,
+      conversationOverride: override,
+      projectInstructions,
+    };
+
+    const result = buildSystemPrompt(input);
+
+    // override present
+    expect(result).toContain(override);
+    // AGENTS.md / projectInstructions section present
+    expect(result).toContain("<project_instructions>");
+    expect(result).toContain(projectInstructions);
+    // base sections NOT present
+    expect(result).not.toContain(IDENTITY);
+    expect(result).not.toContain(USER_DEFAULT);
+  });
+
   // ── Test 7: empty sections silently skipped ─────────────────────────────────
 
   it("7. empty sections silently skipped; no extra blank lines between present sections", () => {
