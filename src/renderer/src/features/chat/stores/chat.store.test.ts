@@ -28,6 +28,8 @@ import type { Conversation, Message, Workspace, CompactionEntry } from "@codeman
 import type { RuntimeEvent, ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
 
 
+// Track FileApi.readFile calls for projectInstructions caching test
+const fileApiReadFileCalls: Array<{ workspaceId: string; path: string }> = [];
 vi.mock("@codeman-frontend/shared/apis", async () => {
   const { Layer, Effect: E } = await import("effect");
   const {
@@ -37,6 +39,8 @@ vi.mock("@codeman-frontend/shared/apis", async () => {
     SettingsApi,
     SkillsApi,
     CompactionApi,
+    FileApi,
+    McpApi,
   } = await vi.importActual<typeof import("@codeman-frontend/shared/apis")>(
     "@codeman-frontend/shared/apis",
   );
@@ -47,6 +51,31 @@ vi.mock("@codeman-frontend/shared/apis", async () => {
     SettingsApi,
     SkillsApi,
     CompactionApi,
+    FileApi,
+    McpApi,
+    FileApiLive: Layer.succeed(FileApi, {
+      readFile: (workspaceId: string, path: string) => {
+        fileApiReadFileCalls.push({ workspaceId, path });
+        // Return AGENTS.md content for ws-1, NotFound for others
+        if (path === "AGENTS.md" && workspaceId === "ws-1") {
+          return E.succeed("# Project Instructions\nThis is the AGENTS.md content.");
+        }
+        return E.fail({ _tag: "NotFound", message: "not found" } as never);
+      },
+      writeFile: () => E.succeed(undefined),
+      editFile: () => E.succeed(undefined),
+      searchFiles: () => E.succeed([]),
+      deleteFile: () => E.succeed(undefined),
+    }),
+    McpApiLive: Layer.succeed(McpApi, {
+      listServers: () => E.succeed([]),
+      getTools: () => E.succeed([]),
+      getAllTools: () => E.succeed([]),
+      enable: () => E.succeed(undefined),
+      restart: () => E.succeed(undefined),
+      callTool: () => E.succeed({} as unknown),
+      openConfigDir: () => E.succeed(undefined),
+    }),
     MessageApiLive: Layer.succeed(MessageApi, {
       list: () => E.succeed([] as Message[]),
       append: (args: {
@@ -365,19 +394,22 @@ describe("sendMessage — G4: 调用 runtime.run({ context, provider })", () => 
       expect(runSpy).toHaveBeenCalledTimes(1);
       const opts = runSpy.mock.calls[0][0] as { context: Message[]; provider: ProviderConfig };
       expect(opts.provider).not.toBe(defaultProvider);
-      expect(opts.provider.systemPrompt).toBe(defaultProvider.systemPrompt);
+      // System prompt is now assembled via buildSystemPrompt (ADR-0051)
+      expect(opts.provider.systemPrompt).toContain("You are an AI coding assistant");
+      expect(opts.provider.systemPrompt).toContain("## Available tools");
+      expect(opts.provider.systemPrompt).toContain("## Guidelines");
       expect(opts.provider.enabledSkills).toBeDefined();
       expect(opts.context).toBeDefined();
       dispose();
     });
   });
 
-  it("sendMessage() 当 conv.workspace_id 非空时 → 在 provider.systemPrompt 注入真实 workspace_id", async () => {
+  it("sendMessage() 当 conv.workspace_id 非空但不在 workspaces$ 中 → 组装提示词（无 workspace 节）", async () => {
     await createRoot(async (dispose) => {
       const convWithWs: Conversation = {
         ...mockConv,
         id: "c-ws-fix",
-        workspaceId: "real-uuid-7c8e9f10",
+        workspaceId: "real-uuid-7c8e9f10", // Not in mock workspaces (ws-1, ws-2)
       };
       setupConvState(convWithWs, []);
       const runSpy = vi
@@ -386,24 +418,28 @@ describe("sendMessage — G4: 调用 runtime.run({ context, provider })", () => 
       await Effect.runPromise(sendMessage("c-ws-fix", "write to miniMax-workspace", defaultProvider));
       expect(runSpy).toHaveBeenCalledTimes(1);
       const opts = runSpy.mock.calls[0][0] as { provider: ProviderConfig };
-      expect(opts.provider.systemPrompt).toContain('workspaceId="real-uuid-7c8e9f10"');
-      expect(opts.provider.systemPrompt).toContain("read_file, write_file, edit_file, search_files, delete_file");
-      expect(opts.provider.systemPrompt).toContain("Do NOT infer the id from user messages");
+      // Workspace not found in workspaces$, so no workspace context section
+      expect(opts.provider.systemPrompt).not.toContain('workspaceId="real-uuid-7c8e9f10"');
+      expect(opts.provider.systemPrompt).toContain("You are an AI coding assistant");
+      expect(opts.provider.systemPrompt).toContain("## Available tools");
       dispose();
     });
   });
 
-  it("sendMessage() 当 conv.workspace_id 为空时 → 不修改 systemPrompt 但注入 enabledSkills", async () => {
+  it("sendMessage() 当 conv.workspace_id 为空时 → 组装完整提示词（无 workspace 节）", async () => {
     await createRoot(async (dispose) => {
-      setupConvState(mockConv, []); 
+      setupConvState(mockConv, []);
       const runSpy = vi
         .spyOn(store.byId["c1"]!.runtime, "run")
         .mockReturnValue(Stream.fromIterable([]));
       await Effect.runPromise(sendMessage("c1", "hello", defaultProvider));
       const opts = runSpy.mock.calls[0][0] as { provider: ProviderConfig };
-      expect(opts.provider).not.toBe(defaultProvider); 
-      expect(opts.provider.systemPrompt).toBe(defaultProvider.systemPrompt); 
-      expect(opts.provider.enabledSkills).toEqual([]); 
+      expect(opts.provider).not.toBe(defaultProvider);
+      // System prompt is assembled via buildSystemPrompt (ADR-0051)
+      expect(opts.provider.systemPrompt).toContain("You are an AI coding assistant");
+      expect(opts.provider.systemPrompt).toContain("## Available tools");
+      expect(opts.provider.systemPrompt).toContain("## Guidelines");
+      expect(opts.provider.enabledSkills).toEqual([]);
       dispose();
     });
   });
@@ -1547,11 +1583,52 @@ describe("per-conv runtime isolation — streamingMessageId per conv independenc
 
       cancel("cA");
       expect(store.byId["cA"]?.streamingMessageId).toBeNull();
-      expect(store.byId["cB"]?.streamingMessageId).toBe("stream-B"); 
+      expect(store.byId["cB"]?.streamingMessageId).toBe("stream-B");
 
       cancel("cB");
       expect(store.byId["cA"]?.streamingMessageId).toBeNull();
       expect(store.byId["cB"]?.streamingMessageId).toBeNull();
+
+      dispose();
+    });
+  });
+});
+
+describe("sendMessage — projectInstructions caching (ADR-0051)", () => {
+  beforeEach(() => {
+    fileApiReadFileCalls.length = 0;
+  });
+
+  it("首次 sendMessage 对有 workspace 的会话调用一次 FileApi.readFile，第二次不调用", async () => {
+    await createRoot(async (dispose) => {
+      const convWithWs: Conversation = {
+        ...mockConv,
+        id: "c-ws-cache",
+        workspaceId: "ws-1", // Exists in mock WorkspaceService
+      };
+      setupConvState(convWithWs, []);
+      vi.spyOn(store.byId["c-ws-cache"]!.runtime, "run").mockReturnValue(Stream.fromIterable([]));
+
+      // First sendMessage - should load projectInstructions
+      await Effect.runPromise(sendMessage("c-ws-cache", "hello", defaultProvider));
+      expect(fileApiReadFileCalls.length).toBe(1);
+      expect(fileApiReadFileCalls[0]).toEqual({ workspaceId: "ws-1", path: "AGENTS.md" });
+
+      // Second sendMessage - should NOT load again (cached)
+      await Effect.runPromise(sendMessage("c-ws-cache", "hello again", defaultProvider));
+      expect(fileApiReadFileCalls.length).toBe(1); // Still 1, not 2
+
+      dispose();
+    });
+  });
+
+  it("无 workspace 的会话不调用 FileApi.readFile", async () => {
+    await createRoot(async (dispose) => {
+      setupConvState(mockConv, []);
+      vi.spyOn(store.byId["c1"]!.runtime, "run").mockReturnValue(Stream.fromIterable([]));
+
+      await Effect.runPromise(sendMessage("c1", "hello", defaultProvider));
+      expect(fileApiReadFileCalls.length).toBe(0);
 
       dispose();
     });

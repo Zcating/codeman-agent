@@ -23,6 +23,8 @@ import {
   MessageApiLive,
   CompactionApi,
   CompactionApiLive,
+  FileApi,
+  FileApiLive,
 } from "@codeman-frontend/shared/apis";
 import {
   WorkspaceService,
@@ -38,6 +40,10 @@ import {
   CompactionCancelled,
   type PerformCompactionDeps,
 } from "@codeman-frontend/features/chat/lib/compaction";
+import { buildSystemPrompt } from "@codeman-frontend/features/chat/lib/build-system-prompt";
+import { loadProjectInstructions } from "@codeman-frontend/features/chat/lib/workspace-project-instructions";
+import { formatSkillsManifestSection } from "@codeman-frontend/plugins/skills/lib/skill-injector";
+import { mcpAllTools$ } from "@codeman-frontend/plugins/mcp/stores/store";
 
 
 export interface ConversationState {
@@ -59,6 +65,8 @@ export interface ConversationState {
     | { _tag: "compacting"; kind: "auto" | "manual" }
     | { _tag: "completed"; kind: "auto" | "manual"; entry: CompactionEntry }
     | { _tag: "failed"; kind: "auto" | "manual"; reason: string };
+  /** AGENTS.md content, loaded once per session */
+  projectInstructions: string | null;
 }
 
 
@@ -71,6 +79,32 @@ const [store, setStore] = createStore<{
 });
 
 export { store, setStore };
+
+
+// ── Constants for buildSystemPrompt (ADR-0051) ────────────────────────────────
+
+/** Hardcoded identity string used in system prompt assembly */
+const IDENTITY = "You are an AI coding assistant with file system and command execution capabilities.";
+
+/** Hardcoded static tool snippets (5 file tools + webfetch + run_command + _load_skill) */
+const STATIC_TOOL_SNIPPETS = [
+  { name: "read_file", summary: "Read a file from a workspace (UTF-8, ≤10MB)" },
+  { name: "write_file", summary: "Write content to a file in a workspace (≤10MB)" },
+  { name: "edit_file", summary: "Replace text in a file (unique match required unless replaceAll=true)" },
+  { name: "search_files", summary: "Find files in workspace by glob pattern or content substring (≤100 results)" },
+  { name: "delete_file", summary: "Move a file to the recycle bin (recoverable)" },
+  { name: "webfetch", summary: "Fetch HTTP/HTTPS URL content as text/markdown/HTML" },
+  { name: "run_command", summary: "Execute shell commands (build/test/git), returns status/exitCode/stdout/stderr" },
+  { name: "_load_skill", summary: "Load a skill's full instructions by skill name" },
+] as const;
+
+/** Hardcoded behavior guidelines */
+const GUIDELINES = [
+  "edit_file old_text must match exactly once unless you set replace_all=true",
+  "Files are limited to 10 MB",
+  "Binary files, .exe/.dll/.sys files, and paths outside workspaces are blocked",
+  "Only operate within user-configured workspaces",
+] as const;
 
 
 const [conversations, setConversationsSignal] = createSignal<ConversationState[]>([]);
@@ -110,6 +144,7 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
     runtime,
     compactionEntries: [],
     compactionStatus: { _tag: "idle" },
+    projectInstructions: null,
   };
   setStore("byId", conv.id, cs);
   setConversationsSignal(Object.values(store.byId));
@@ -372,21 +407,45 @@ export const sendMessage = Effect.fn(
       (m) => enabledNames.includes(m.name),
     );
 
-    const augmentedProvider: ProviderConfig = cs.workspaceId
-      ? {
-        ...provider,
-        workspaceId: cs.workspaceId,
-        enabledSkills,
-        systemPrompt:
-          `${provider.systemPrompt}\n\n` +
-          `[Workspace context]\n` +
-          `You are operating inside workspaceId="${cs.workspaceId}".\n` +
-          `You MUST pass this exact id as the workspaceId parameter for ALL file tools ` +
-          `(read_file, write_file, edit_file, search_files, delete_file).\n` +
-          `Do NOT infer the id from user messages, folder names, or any other context — ` +
-          `use ONLY the id given above.`,
+    // Load projectInstructions once per session if workspace exists and not yet loaded
+    if (cs.projectInstructions === null && cs.workspaceId) {
+      const workspace = workspaces$().find((w) => w.id === cs.workspaceId);
+      if (workspace) {
+        const loaded = yield* loadProjectInstructions(cs.workspaceId, workspace.rootPath).pipe(
+          Effect.provide(FileApiLive),
+        );
+        setStore("byId", convId, "projectInstructions", loaded);
       }
-      : { ...provider, enabledSkills };
+    }
+
+    // ── Dynamic tool snippets from MCP servers ───────────────────────────────
+    const dynamicToolSnippets: readonly string[] = mcpAllTools$().map((t) => t.description);
+
+    // ── Workspace context ───────────────────────────────────────────────────
+    const workspace = cs.workspaceId ? workspaces$().find((w) => w.id === cs.workspaceId) : null;
+    const workspaceSection = cs.workspaceId && workspace
+      ? { workspaceId: cs.workspaceId, rootPath: workspace.rootPath }
+      : undefined;
+
+    // ── Build system prompt via ADR-0051 assembler ──────────────────────────
+    const finalSystemPrompt = buildSystemPrompt({
+      identity: IDENTITY,
+      staticToolSnippets: STATIC_TOOL_SNIPPETS,
+      dynamicToolSnippets: dynamicToolSnippets.length > 0 ? dynamicToolSnippets : undefined,
+      guidelines: GUIDELINES,
+      workspace: workspaceSection,
+      projectInstructions: cs.projectInstructions ?? undefined,
+      skillsSection: formatSkillsManifestSection(enabledSkills),
+      userDefault: appStore.state.value.systemPrompt.default,
+      conversationOverride: cs.systemPrompt ?? undefined,
+    });
+
+    const augmentedProvider: ProviderConfig = {
+      ...provider,
+      workspaceId: cs.workspaceId || undefined,
+      enabledSkills,
+      systemPrompt: finalSystemPrompt,
+    };
 
     const stream = cs.runtime.run({ context, provider: augmentedProvider });
     yield* Stream.runForEach(stream, (evt) =>
