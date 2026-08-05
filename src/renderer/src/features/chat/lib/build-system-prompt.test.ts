@@ -81,9 +81,11 @@ describe("buildSystemPrompt", () => {
 
     const result = buildSystemPrompt(input);
 
-    expect(result).toContain("ws-123");
-    expect(result).toContain("/home/user/project");
-    // cwd footer appears after workspace section
+    // original semantics: workspaceId in quotes, all file tools named, no inference rule
+    expect(result).toContain('workspaceId="ws-123"');
+    expect(result).toContain("read_file, write_file, edit_file, search_files, delete_file");
+    expect(result).toContain("Do NOT infer the id from user messages, folder names, or any other context");
+    // cwd footer
     expect(result).toContain("Current working directory: /home/user/project");
   });
 

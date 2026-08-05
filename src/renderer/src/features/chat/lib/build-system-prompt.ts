@@ -30,13 +30,15 @@ const TOOLS_HEADING = "## Available tools";
 /** 行为指南段标题 */
 const GUIDELINES_HEADING = "## Guidelines";
 
-/** 工作区上下文段标题 */
-const WORKSPACE_HEADING = "## Workspace context";
+/** 工作区上下文段标题（沿用原版格式） */
+const WORKSPACE_HEADING = "[Workspace context]";
 
-/** 文件工具传参规则（自原 chat.store 内联段迁出） */
-const WORKSPACE_RULES =
-  "File tool arguments: use forward-slash paths (e.g. src/app.ts). " +
-  "Do not use backslashes or absolute paths unless explicitly required.";
+/** 原版 workspace 指令文本（自 chat.store.ts L382-387 迁入） */
+const WORKSPACE_CONTEXT_TEMPLATE = (
+  id: string
+) => `You are operating inside workspaceId="${id}".
+You MUST pass this exact id as the workspaceId parameter for ALL file tools (read_file, write_file, edit_file, search_files, delete_file).
+Do NOT infer the id from user messages, folder names, or any other context — use ONLY the id given above.`;
 
 /** 页脚文本 */
 const CWD_FOOTER = "Current working directory";
@@ -55,8 +57,8 @@ export function buildSystemPrompt(s: BuildSystemPromptSections): string {
     if (s.workspace) {
       parts.push(
         `${WORKSPACE_HEADING}\n` +
-          `workspaceId: ${s.workspace.workspaceId}\n` +
-          `${WORKSPACE_RULES}\n` +
+          WORKSPACE_CONTEXT_TEMPLATE(s.workspace.workspaceId) +
+          `\n` +
           `${CWD_FOOTER}: ${s.workspace.rootPath}`
       );
     }
@@ -113,8 +115,8 @@ export function buildSystemPrompt(s: BuildSystemPromptSections): string {
   if (s.workspace) {
     parts.push(
       `${WORKSPACE_HEADING}\n` +
-        `workspaceId: ${s.workspace.workspaceId}\n` +
-        `${WORKSPACE_RULES}\n` +
+        WORKSPACE_CONTEXT_TEMPLATE(s.workspace.workspaceId) +
+        `\n` +
         `${CWD_FOOTER}: ${s.workspace.rootPath}`
     );
   }
