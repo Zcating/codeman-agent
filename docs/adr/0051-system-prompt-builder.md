@@ -51,6 +51,8 @@
 
 `sub-agent-factory.ts` 改用组装器。子代理生效节：身份段 + 工具列表（按 `allowedTools` 过滤对应 snippet）+ guidelines + skills 段（`baseProvider.enabledSkills`，**顺带修复子代理缺失 skills 注入的问题**）+ `config.systemPrompt` 追加。无 workspace / 无 AGENTS.md 节（子代理无 workspace 绑定）。
 
+**恒常内容单一真源**：身份段（`DEFAULT_IDENTITY`）、工具 snippets（`DEFAULT_TOOL_SNIPPETS`，子代理派生时排除 `_load_skill`）、guidelines（`DEFAULT_GUIDELINES`）全部定义并导出在组装器模块 `build-system-prompt.ts`，主对话（chat.store）与子代理（sub-agent-factory）共用同一份——子代理 identity/guidelines 与主对话**完整对齐**（子代理同样使用 5 个 file tools，二进制拦截、workspace 边界、edit_file 唯一匹配等行为指南对其同等适用）。禁止在各调用点再写本地副本。
+
 ### D6 — 默认值统一为空串
 
 `app.store.ts` 的硬编码默认串搬入内置节（身份段 + guidelines），两处默认值统一为 `systemPrompt: { default: "", userCanEdit: true }`（renderer + main 已一致）。settings schema 结构不变。
