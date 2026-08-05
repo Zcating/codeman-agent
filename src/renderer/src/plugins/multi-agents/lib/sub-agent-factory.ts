@@ -5,6 +5,7 @@ import {
   buildSystemPrompt,
   DEFAULT_IDENTITY,
   DEFAULT_GUIDELINES,
+  DEFAULT_TOOL_SNIPPETS,
   type ToolSnippet,
 } from "@codeman-frontend/features/chat/lib/build-system-prompt";
 import { formatSkillsManifestSection } from "@codeman-frontend/plugins/skills/lib/skill-injector";
@@ -12,16 +13,10 @@ import type { SubAgentConfig } from "./sub-agent.types";
 import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
 
 // ── Tool snippets available to sub-agents (single-line summaries; delegate_task excluded) ──
-// Subset of DEFAULT_TOOL_SNIPPETS matching the original sub-agent tool set (no _load_skill)
-const SUB_AGENT_TOOL_SNIPPETS: readonly ToolSnippet[] = [
-  { name: "webfetch", summary: "Retrieve web content from URLs." },
-  { name: "search_files", summary: "Search for files in the workspace." },
-  { name: "read_file", summary: "Read a file from the filesystem." },
-  { name: "write_file", summary: "Create or overwrite a file." },
-  { name: "edit_file", summary: "Edit an existing file." },
-  { name: "delete_file", summary: "Delete a file." },
-  { name: "run_command", summary: "Execute a shell command." },
-];
+// Derived from DEFAULT_TOOL_SNIPPETS (single source of truth); _load_skill excluded since sub-agents cannot load skills
+const SUB_AGENT_TOOL_SNIPPETS: readonly ToolSnippet[] = DEFAULT_TOOL_SNIPPETS.filter(
+  (s) => s.name !== "_load_skill",
+);
 
 export type ToolRegistry = Map<string, AgentTool>;
 

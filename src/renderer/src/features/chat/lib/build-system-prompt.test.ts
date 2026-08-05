@@ -268,6 +268,52 @@ describe("buildSystemPrompt", () => {
     expect(testsCount).toBe(1);
   });
 
+  // ── Test 9b: dynamicToolSnippets ordering (ADR-0051 D1: static < dynamic < guidelines) ─
+
+  it("9b. dynamicToolSnippets appear after static, before guidelines", () => {
+    const staticSnippets: readonly ToolSnippet[] = [
+      { name: "read_file", summary: "Read a file." },
+    ];
+    const dynamicSnippets = ["<dynamic_tool_A>", "<dynamic_tool_B>"];
+    const guidelines = ["Be concise."];
+
+    const input: BuildSystemPromptSections = {
+      identity: IDENTITY,
+      staticToolSnippets: staticSnippets,
+      dynamicToolSnippets: dynamicSnippets,
+      guidelines,
+      userDefault: USER_DEFAULT,
+    };
+
+    const result = buildSystemPrompt(input);
+
+    // Both section headings present
+    const toolsHeadingIdx = result.indexOf("## Available tools");
+    const guidelinesHeadingIdx = result.indexOf("## Guidelines");
+    expect(toolsHeadingIdx).toBeGreaterThanOrEqual(0);
+    expect(guidelinesHeadingIdx).toBeGreaterThanOrEqual(0);
+
+    // Tools section before Guidelines
+    expect(toolsHeadingIdx).toBeLessThan(guidelinesHeadingIdx);
+
+    // Extract the tools section body
+    const toolsSection = result.slice(
+      toolsHeadingIdx,
+      guidelinesHeadingIdx,
+    );
+
+    // Static snippet present
+    expect(toolsSection).toContain("- read_file: Read a file.");
+    // Dynamic snippets present
+    expect(toolsSection).toContain("- <dynamic_tool_A>");
+    expect(toolsSection).toContain("- <dynamic_tool_B>");
+
+    // Static appears before dynamic (map order: static first via map, dynamic via push)
+    const staticIdx = toolsSection.indexOf("- read_file:");
+    const dynamicAIdx = toolsSection.indexOf("- <dynamic_tool_A>");
+    expect(staticIdx).toBeLessThan(dynamicAIdx);
+  });
+
   // ── Test 9: full section ordering (ADR-0051 D1) ───────────────────────────────
   // Order: identity < tools < guidelines < workspace段(含cwd footer) < projectInstructions < skills < userDefault
 
