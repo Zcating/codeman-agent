@@ -220,3 +220,45 @@ describe("executeScriptAction", () => {
     expect(result.finalText).toBe("hello\n");
   });
 });
+
+describe("executeLlmAction", () => {
+  let executeLlmAction: typeof import("./executor").executeLlmAction;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    mockListWorkspaces.mockResolvedValue([]);
+    const mod = await import("./executor");
+    executeLlmAction = mod.executeLlmAction;
+  });
+
+  it("returns timeout when LLM action does not respond within timeoutMs", async () => {
+    // Mock setTimeout to immediately trigger the timeout callback
+    let capturedTimeoutCallback: () => void;
+
+    vi.spyOn(globalThis, "setTimeout").mockImplementation(((callback: () => void, _delay: number) => {
+      capturedTimeoutCallback = callback;
+      return 0 as any;
+    }) as typeof setTimeout);
+
+    try {
+      const action = {
+        systemPrompt: "You are helpful",
+        userPrompt: "Say hello",
+        providerId: "p1",
+        modelId: "m1",
+        timeoutMs: 1000,
+      };
+
+      const resultPromise = Effect.runPromise(executeLlmAction(action, "exec-timeout-test"));
+
+      // Simulate timeout firing before IPC result arrives
+      capturedTimeoutCallback!();
+
+      const result = await resultPromise;
+      expect(result.status).toBe("timeout");
+      expect(result.error).toContain("timed out");
+    } finally {
+      vi.spyOn(globalThis, "setTimeout").mockRestore();
+    }
+  });
+});
