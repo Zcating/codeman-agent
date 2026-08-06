@@ -5,6 +5,7 @@ import { initializeSkillsManifests } from "@codeman-frontend/plugins/skills/stor
 import { initializeMcp } from "@codeman-frontend/plugins/mcp/stores/store";
 import "@codeman-frontend/plugins/multi-agents/index";
 import "@codeman-frontend/plugins/automations/index";
+import { initializeAutomations } from "@codeman-frontend/plugins/automations/index";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
 
 
@@ -29,7 +30,7 @@ const mcpDescriptor = {
 
 const automationsDescriptor = {
   id: "automations" as const,
-  initialize: Effect.void,
+  initialize: initializeAutomations(),
   route: { path: "/plugins/automations", label: "Automations" },
   sidebar: { icon: "Clock", order: 5, visible: true },
 } satisfies PluginDescriptor;
