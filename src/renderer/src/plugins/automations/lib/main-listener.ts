@@ -3,8 +3,16 @@
 // and sends back results after LLM execution
 
 import { ipcRenderer } from "electron";
+import { createSubAgent, type ToolRegistry } from "@codeman-frontend/plugins/multi-agents/lib/sub-agent-factory";
+import type { SubAgentConfig } from "@codeman-frontend/shared/lib/sub-agent-schema";
+import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
+import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 
-// Local type alias since LlmAction is defined inline in automation-types.ts
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+// LlmAction matches AutomationAction with kind === "llm" from automation-types.ts
 interface LlmAction {
   readonly kind: "llm";
   readonly systemPrompt: string;
@@ -13,10 +21,6 @@ interface LlmAction {
   readonly modelId: string;
   readonly timeoutMs: number;
 }
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 
 interface LlmResultPayload {
   executionId: string;
@@ -70,7 +74,7 @@ export function setupAutomationMainListener(): void {
 
 // ---------------------------------------------------------------------------
 // LLM execution in renderer
-// Uses direct fetch to call LLM API (simplified V1 per ADR-0053)
+// Uses createSubAgent per ADR-0049 D4 pattern (ADR-0053 SP2 fix)
 // ---------------------------------------------------------------------------
 
 interface LlmExecuteResult {
@@ -86,36 +90,39 @@ async function executeLlmInRenderer(action: LlmAction): Promise<LlmExecuteResult
     return { status: "error", error: `Provider ${action.providerId} not found` };
   }
 
-  // Build the messages
-  const messages = [
-    { role: "system" as const, content: action.systemPrompt },
-    { role: "user" as const, content: action.userPrompt },
-  ];
+  // Build synthetic SubAgentConfig for automation LLM execution (per ADR-0049 D4)
+  // Automation LLM actions are self-contained with no tools (allowedTools: [])
+  const subAgentConfig: SubAgentConfig = {
+    id: "automation-llm",
+    name: "automation-llm",
+    description: "LLM execution for automation",
+    systemPrompt: action.systemPrompt,
+    modelId: action.modelId,
+    thinkingLevel: "off",
+    allowedTools: [],
+    enabled: true,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  const toolRegistry: ToolRegistry = new Map();
 
   try {
-    const response = await fetch(providerConfig.baseUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": providerConfig.apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: action.modelId,
-        max_tokens: 4096,
-        messages,
-      }),
-    });
+    const subAgent = createSubAgent(subAgentConfig, providerConfig, toolRegistry);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await (subAgent.prompt(action.userPrompt) as any);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      return { status: "error", error: `API error ${response.status}: ${errorText}` };
+    if (result.stopReason === "error") {
+      return { status: "error", error: result.errorMessage ?? "sub-agent error" };
     }
 
-    const data = await response.json() as { content?: Array<{ type: string; text?: string }> };
-    const text = data.content?.[0]?.text ?? "";
+    const finalText = result.content
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .filter((c: any): c is { type: "text"; text: string } => c.type === "text")
+      .map((c) => c.text)
+      .join("\n");
 
-    return { status: "success", finalText: text };
+    return { status: "success", finalText };
   } catch (e) {
     const errorMessage = e instanceof Error ? e.message : String(e);
     return { status: "error", error: errorMessage };
@@ -123,17 +130,11 @@ async function executeLlmInRenderer(action: LlmAction): Promise<LlmExecuteResult
 }
 
 // ---------------------------------------------------------------------------
-// Provider config access (simplified - reads from appStore state)
+// Provider config access (reads from appStore state)
 // ---------------------------------------------------------------------------
 
-interface ProviderConfig {
-  id: string;
-  baseUrl: string;
-  apiKey: string;
-}
-
 // We need to get the provider config synchronously from the renderer state
-// This is a simplified approach - in V1 we read from the window global
+// This reads from the window global set up by preload
 function getProviderConfig(providerId: string): ProviderConfig | null {
   // Access appStore via window global (set up by preload)
   const appStore = (window as any).__appStore;
@@ -145,8 +146,12 @@ function getProviderConfig(providerId: string): ProviderConfig | null {
 
   return {
     id: provider.id,
-    baseUrl: provider.llm?.baseUrl ?? "",
+    models: (provider.llm?.models ?? []) as ModelMeta[],
     apiKey: provider.apiKey ?? "",
+    baseUrl: provider.llm?.baseUrl ?? "",
+    defaultModel: provider.llm?.defaultModel ?? "",
+    systemPrompt: "",
+    tools: [],
   };
 }
 

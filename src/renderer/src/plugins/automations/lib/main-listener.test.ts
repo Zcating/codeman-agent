@@ -12,9 +12,19 @@ vi.mock("electron", () => ({
   },
 }));
 
-// Mock fetch
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
+// Mock createSubAgent and Agent
+const mockSubscribe = vi.fn(() => () => {});
+const mockPrompt = vi.fn();
+const mockAbort = vi.fn(() => {});
+
+vi.mock("@codeman-frontend/plugins/multi-agents/lib/sub-agent-factory", () => ({
+  createSubAgent: vi.fn(() => ({
+    subscribe: mockSubscribe,
+    prompt: mockPrompt,
+    abort: mockAbort,
+  })),
+  ToolRegistry: Map,
+}));
 
 // Mock window.__appStore
 const mockAppStore = {
@@ -25,6 +35,8 @@ const mockAppStore = {
         apiKey: "test-key",
         llm: {
           baseUrl: "https://api.test.com/v1/messages",
+          defaultModel: "test-model",
+          models: [{ id: "test-model", label: "Test Model", contextWindow: 200_000, thinking: false, deprecated: false }],
         },
       },
     ],
@@ -35,7 +47,9 @@ Object.defineProperty(window, "__appStore", { value: mockAppStore, writable: tru
 describe("main-listener", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFetch.mockReset();
+    mockPrompt.mockReset();
+    mockSubscribe.mockReset();
+    mockAbort.mockReset();
     cleanupAutomationMainListener();
   });
 
@@ -69,10 +83,11 @@ describe("main-listener", () => {
       // Get the listener callback
       const listenerCallback = (ipcRenderer.on as ReturnType<typeof vi.fn>).mock.calls[0][1];
 
-      // Mock successful API response
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve({ content: [{ type: "text", text: "Hello from LLM!" }] }),
+      // Mock successful sub-agent response
+      mockPrompt.mockResolvedValue({
+        stopReason: "end_turn",
+        content: [{ type: "text", text: "Hello from LLM!" }],
+        usage: { inputTokens: 10, outputTokens: 20 },
       });
 
       // Simulate main process sending execution request
@@ -102,16 +117,17 @@ describe("main-listener", () => {
       );
     });
 
-    it("handles API errors gracefully", async () => {
+    it("handles sub-agent errors gracefully", async () => {
       setupAutomationMainListener();
 
       const listenerCallback = (ipcRenderer.on as ReturnType<typeof vi.fn>).mock.calls[0][1];
 
-      // Mock failed API response
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 401,
-        text: () => Promise.resolve("Unauthorized"),
+      // Mock sub-agent error response
+      mockPrompt.mockResolvedValue({
+        stopReason: "error",
+        errorMessage: "Model not found",
+        content: [],
+        usage: { inputTokens: 10, outputTokens: 0 },
       });
 
       const payload = {
@@ -133,18 +149,18 @@ describe("main-listener", () => {
         expect.objectContaining({
           executionId: "exec-456",
           status: "error",
-          error: expect.stringContaining("401"),
+          error: expect.stringContaining("Model not found"),
         }),
       );
     });
 
-    it("handles network errors gracefully", async () => {
+    it("handles promise rejections gracefully", async () => {
       setupAutomationMainListener();
 
       const listenerCallback = (ipcRenderer.on as ReturnType<typeof vi.fn>).mock.calls[0][1];
 
-      // Mock network error
-      mockFetch.mockRejectedValue(new Error("Network failure"));
+      // Mock promise rejection
+      mockPrompt.mockRejectedValue(new Error("Network failure"));
 
       const payload = {
         executionId: "exec-789",
