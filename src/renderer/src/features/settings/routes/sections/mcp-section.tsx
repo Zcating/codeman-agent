@@ -27,7 +27,7 @@ export function McpSection(): JSX.Element {
     <ScrollArea
       class="flex-1 min-h-0"
       data-scroll-region="true"
-      viewportClass="py-4 pl-4 pr-6"
+      viewportClass="space-y-4 py-4 pl-4 pr-6"
     >
       <McpSettingsTab />
     </ScrollArea>

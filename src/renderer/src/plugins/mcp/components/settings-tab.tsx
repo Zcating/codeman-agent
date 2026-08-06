@@ -7,6 +7,7 @@ import {
   Server,
 } from "lucide-solid";
 import { cn } from "@codeman-frontend/shared/lib/cn";
+import { Button } from "@codeman-frontend/shared/components/ui/button";
 import {
   mcpServers$,
   mcpAllTools$,
@@ -97,35 +98,35 @@ function ServerRow(props: ServerRowProps): JSX.Element {
     <li class="flex items-start gap-3 rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
       <Server class="h-5 w-5 mt-0.5 text-zinc-400 shrink-0" aria-hidden="true" />
       <div class="flex-1 min-w-0 space-y-1">
-        <div class="flex items-center justify-between gap-2 flex-wrap">
-          <div class="flex items-center gap-2">
-            <code class="text-sm font-mono font-medium text-zinc-900 dark:text-zinc-100">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 min-w-0 flex-1">
+            <code class="text-sm font-mono font-medium text-zinc-900 dark:text-zinc-100 truncate min-w-0">
               {props.server.config.name}
             </code>
             <StatusPill status={props.server.status} />
           </div>
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
+          <div class="flex items-center gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={handleRestart}
               disabled={isRestartDisabled()}
-              class="flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400 hover:text-foreground disabled:opacity-40 transition-colors"
               aria-label={`Restart ${props.server.config.name}`}
               title="Restart server"
             >
-              <RefreshCw class="h-3.5 w-3.5" aria-hidden="true" />
+              <RefreshCw aria-hidden="true" />
               <span>Restart</span>
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={handleToggle}
-              class="flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400 hover:text-foreground transition-colors"
               aria-label={`${props.server.config.enabled ? "Disable" : "Enable"} ${props.server.config.name}`}
               title={props.server.config.enabled ? "Disable server" : "Enable server"}
             >
-              <Power class="h-3.5 w-3.5" aria-hidden="true" />
+              <Power aria-hidden="true" />
               <span>{props.server.config.enabled ? "Disable" : "Enable"}</span>
-            </button>
+            </Button>
           </div>
         </div>
         <p class="text-xs text-zinc-500 dark:text-zinc-400 font-mono truncate">
@@ -158,7 +159,7 @@ export function McpSettingsTab(props: McpSettingsTabProps): JSX.Element {
   };
 
   return (
-    <section class="space-y-4">
+    <>
       <header class="flex items-center justify-between">
         <div>
           <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
@@ -168,28 +169,30 @@ export function McpSettingsTab(props: McpSettingsTabProps): JSX.Element {
             Manage Model Context Protocol servers that extend the agent's tool capabilities.
           </p>
         </div>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={handleRefresh}
-          class="flex items-center gap-1 text-sm text-zinc-600 dark:text-zinc-400 hover:text-foreground transition-colors"
           aria-label="Refresh servers list"
           data-testid="mcp-refresh"
         >
-          <RefreshCw class="h-4 w-4" aria-hidden="true" />
+          <RefreshCw aria-hidden="true" />
           <span>Refresh</span>
-        </button>
+        </Button>
       </header>
 
       <div>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           onClick={handleOpenConfigDir}
-          class="flex items-center gap-2 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
           data-testid="mcp-open-config"
         >
-          <FolderOpen class="h-4 w-4" aria-hidden="true" />
+          <FolderOpen aria-hidden="true" />
           <span>Open config file</span>
-        </button>
+        </Button>
         <p class="mt-1 text-xs text-zinc-400 dark:text-zinc-600 font-mono">
           ~/.agents/mcp_servers.json
         </p>
@@ -222,25 +225,30 @@ export function McpSettingsTab(props: McpSettingsTabProps): JSX.Element {
           <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
             Available Tools ({mcpAllTools$().length})
           </p>
-          <ul class="space-y-1" data-testid="mcp-tools-list">
+          <ul class="space-y-2" data-testid="mcp-tools-list">
             <For each={mcpAllTools$()}>
               {(tool) => (
-                <li class="flex items-start gap-2 text-xs">
-                  <code class="font-mono text-primary-600 dark:text-primary-400 shrink-0">
-                    {tool.agentName}
-                  </code>
-                  <span class="text-zinc-500 dark:text-zinc-500 truncate">
+                <li class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <code
+                      class="font-mono text-xs text-primary-600 dark:text-primary-400 truncate min-w-0 flex-1"
+                      title={tool.agentName}
+                    >
+                      {tool.agentName}
+                    </code>
+                    <span class="shrink-0 rounded bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-500 dark:text-zinc-400">
+                      {tool.serverName}
+                    </span>
+                  </div>
+                  <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-500 break-words">
                     {tool.description}
-                  </span>
-                  <span class="text-zinc-400 dark:text-zinc-600 shrink-0">
-                    ({tool.serverName})
-                  </span>
+                  </p>
                 </li>
               )}
             </For>
           </ul>
         </div>
       </Show>
-    </section>
+    </>
   );
 }

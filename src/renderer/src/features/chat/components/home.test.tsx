@@ -123,7 +123,7 @@ vi.mock("../../../shared/stores/app.store", () => ({
               apiType: "anthropic-messages" as const,
               modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
               models: [
-                { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", contextWindow: 200000, deprecated: false, thinking: false },
+                { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", contextWindow: 200000, thinking: false },
               ],
             },
           },
@@ -439,7 +439,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
           apiType: "anthropic-messages" as const,
           modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           models: [
-            { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", contextWindow: 200000, deprecated: false, thinking: false },
+            { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", contextWindow: 200000, thinking: false },
           ],
         },
       },
@@ -568,7 +568,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
           apiType: "anthropic-messages" as const,
           modelsEndpoint: "https://api.one.com/models",
           models: [
-            { id: "model-1", label: "Model One", contextWindow: 100000, deprecated: false, thinking: false },
+            { id: "model-1", label: "Model One", contextWindow: 100000, thinking: false },
           ],
         },
       },
@@ -582,7 +582,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
           apiType: "anthropic-messages" as const,
           modelsEndpoint: "https://api.two.com/models",
           models: [
-            { id: "model-2", label: "Model Two", contextWindow: 200000, deprecated: false, thinking: false },
+            { id: "model-2", label: "Model Two", contextWindow: 200000, thinking: false },
           ],
         },
       },
@@ -614,7 +614,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
           apiType: "anthropic-messages" as const,
           modelsEndpoint: "https://api.one.com/models",
           models: [
-            { id: "model-1", label: "Model One", contextWindow: 100000, deprecated: false, thinking: false },
+            { id: "model-1", label: "Model One", contextWindow: 100000, thinking: false },
           ],
         },
       },
@@ -628,7 +628,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
           apiType: "anthropic-messages" as const,
           modelsEndpoint: "https://api.two.com/models",
           models: [
-            { id: "model-2", label: "Model Two", contextWindow: 200000, deprecated: false, thinking: false },
+            { id: "model-2", label: "Model Two", contextWindow: 200000, thinking: false },
           ],
         },
       },
@@ -685,8 +685,8 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
           apiType: "anthropic-messages" as const,
           modelsEndpoint: "https://api.multi.com/models",
           models: [
-            { id: "model-first", label: "Model First", contextWindow: 100000, deprecated: false, thinking: false },
-            { id: "model-second", label: "Model Second", contextWindow: 200000, deprecated: false, thinking: false },
+            { id: "model-first", label: "Model First", contextWindow: 100000, thinking: false },
+            { id: "model-second", label: "Model Second", contextWindow: 200000, thinking: false },
           ],
         },
       },
@@ -774,7 +774,7 @@ describe("HomeAgentForm — Ctrl+Enter / Cmd+Enter send shortcut (T4.3)", () => 
           apiType: "anthropic-messages" as const,
           modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           models: [
-            { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", contextWindow: 200000, deprecated: false, thinking: false },
+            { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", contextWindow: 200000, thinking: false },
           ],
         },
       },

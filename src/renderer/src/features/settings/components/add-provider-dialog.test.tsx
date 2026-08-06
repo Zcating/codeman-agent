@@ -252,7 +252,7 @@ describe("createProviderFormDialog", () => {
       const optionIds = Array.from(
         document.querySelectorAll('li[data-value]'),
       ).map((li) => li.getAttribute("data-value"));
-      expect(optionIds).toEqual(["deepseek-v4-pro", "deepseek-v4-flash"]);
+      expect(optionIds).toEqual(["deepseek-v4-flash", "deepseek-v4-pro"]);
 
       // 选择 flash 后提交,defaultModel 跟随变化
       fireEvent.click(document.querySelector('li[data-value="deepseek-v4-flash"]')!);
@@ -354,7 +354,7 @@ describe("createProviderFormDialog", () => {
       expect(provider!.id).toMatch(/^provider-/);
       expect(provider!.label).toBe("My DeepSeek");
       expect(provider!.apiKey).toBe("sk-test-12345");
-      expect(provider!.llm.defaultModel).toBe("deepseek-v4-pro");
+      expect(provider!.llm.defaultModel).toBe("deepseek-v4-flash");
       expect(provider!.llm.baseUrl).toBe("https://api.deepseek.com/anthropic");
       expect(provider!.llm.apiType).toBe("anthropic-messages");
       expect(Array.isArray(provider!.llm.models)).toBe(true);
@@ -441,7 +441,7 @@ describe("createProviderFormDialog", () => {
         defaultModel: "fallback-model",
         baseUrl: "https://api.deepseek.com/anthropic",
         apiType: "anthropic-messages" as const,
-        models: [{ id: "fallback-model", label: "fallback-model", deprecated: false, thinking: false }],
+        models: [{ id: "fallback-model", label: "fallback-model", thinking: false }],
         modelsEndpoint: "",
       }));
 

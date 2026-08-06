@@ -171,7 +171,6 @@ vi.mock("../../../shared/stores/app.store", () => {
             {
               id: "MiniMax-M2.5-highspeed",
               label: "MiniMax-M2.5-highspeed",
-              deprecated: false,
               thinking: false,
             },
           ],
@@ -355,8 +354,8 @@ describe("ChatView", () => {
             baseUrl: "https://api.minimaxi.com/anthropic",
             apiType: "anthropic-messages",
             models: [
-              { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", deprecated: false, thinking: false },
-              { id: "MiniMax-M2.7", label: "MiniMax-M2.7", deprecated: false, thinking: false },
+              { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", thinking: false },
+              { id: "MiniMax-M2.7", label: "MiniMax-M2.7", thinking: false },
             ],
             modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           },
@@ -412,7 +411,6 @@ describe("ChatView", () => {
               {
                 id: "MiniMax-M2.5-highspeed",
                 label: "MiniMax-M2.5-highspeed",
-                deprecated: false,
                 thinking: false,
               },
             ],
@@ -471,7 +469,6 @@ describe("ChatView", () => {
               {
                 id: "MiniMax-M2.5-highspeed",
                 label: "MiniMax-M2.5-highspeed",
-                deprecated: false,
                 thinking: false,
               },
             ],
@@ -570,7 +567,6 @@ describe("ChatView", () => {
               {
                 id: "MiniMax-M2.5-highspeed",
                 label: "MiniMax-M2.5-highspeed",
-                deprecated: false,
                 thinking: false,
               },
             ],
@@ -636,7 +632,7 @@ describe("ChatView", () => {
             baseUrl: "https://api.minimaxi.com/anthropic",
             apiType: "anthropic-messages",
             models: [
-              { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", deprecated: false, thinking: false },
+              { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", thinking: false },
             ],
             modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           },
@@ -675,7 +671,7 @@ describe("ChatView", () => {
             baseUrl: "https://api.minimaxi.com/anthropic",
             apiType: "anthropic-messages",
             models: [
-              { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", deprecated: false, thinking: false },
+              { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", thinking: false },
             ],
             modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           },
@@ -713,7 +709,7 @@ describe("ChatView", () => {
             baseUrl: "https://api.minimaxi.com/anthropic",
             apiType: "anthropic-messages",
             models: [
-              { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", deprecated: false, thinking: false },
+              { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", thinking: false },
             ],
             modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           },
@@ -921,7 +917,6 @@ describe("ChatView ringInfo contextWindow three-layer lookup", () => {
               {
                 id: "MiniMax-M2.7-highspeed",
                 label: "MiniMax-M2.7-highspeed",
-                deprecated: false,
                 thinking: false,
               },
             ],
@@ -1085,7 +1080,7 @@ describe("ChatView keyboard/focus regression (seam 4)", () => {
             baseUrl: "https://api.minimaxi.com/anthropic",
             apiType: "anthropic-messages",
             models: [
-              { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", deprecated: false, thinking: false },
+              { id: "MiniMax-M2.5-highspeed", label: "MiniMax-M2.5-highspeed", thinking: false },
             ],
             modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
           },

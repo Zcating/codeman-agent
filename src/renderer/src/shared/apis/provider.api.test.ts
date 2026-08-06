@@ -22,7 +22,6 @@ const mockProvider: Provider = {
         id: "MiniMax-M2.5-highspeed",
         label: "MiniMax-M2.5-highspeed",
         contextWindow: 200000,
-        deprecated: false,
         thinking: false,
       },
     ],
@@ -72,7 +71,6 @@ const MockProviderApiLive = Layer.succeed(ProviderApi, {
           id: m.id,
           label: m.name,
           contextWindow: m.context_window,
-          deprecated: false,
           thinking: false,
         }));
       },

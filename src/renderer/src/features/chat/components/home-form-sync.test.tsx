@@ -81,7 +81,6 @@ vi.mock("../../../shared/stores/app.store", () => ({
                   id: "MiniMax-M2.5-highspeed",
                   label: "MiniMax-M2.5-highspeed",
                   contextWindow: 200000,
-                  deprecated: false,
                   thinking: false,
                 },
               ],

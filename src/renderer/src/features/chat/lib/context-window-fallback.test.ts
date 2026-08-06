@@ -3,7 +3,7 @@ import { lookupContextWindow } from "./context-window-fallback";
 import type { ModelMeta, Provider } from "@codeman-frontend/shared/lib/types";
 
 function makeModel(overrides: Partial<ModelMeta> = {}): ModelMeta {
-  return { id: "test-model", label: "Test Model", contextWindow: undefined, deprecated: false, thinking: false, ...overrides };
+  return { id: "test-model", label: "Test Model", contextWindow: undefined, thinking: false, ...overrides };
 }
 
 function makeProvider(llmOverrides: Partial<Provider["llm"]> = {}): Provider {

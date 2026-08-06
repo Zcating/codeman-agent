@@ -14,7 +14,7 @@ describe("buildMockDevTemplate", () => {
         baseUrl: "http://127.0.0.1:50000/mock/anthropic",
         defaultModel: "mock-default",
         apiType: "anthropic-messages",
-        models: [{ id: "mock-default", label: "Mock", deprecated: false, thinking: false }],
+        models: [{ id: "mock-default", label: "Mock", thinking: false }],
         modelsEndpoint: "",
       },
     } satisfies Provider);
@@ -29,7 +29,7 @@ describe("buildMockDevTemplate", () => {
     expect(result.llm.defaultModel).toBe("mock-default");
     expect(result.llm.apiType).toBe("anthropic-messages");
     expect(result.llm.models).toHaveLength(1);
-    expect(result.llm.models[0]).toEqual({ id: "mock-default", label: "Mock", deprecated: false, thinking: false });
+    expect(result.llm.models[0]).toEqual({ id: "mock-default", label: "Mock", thinking: false });
     expect(result.llm.modelsEndpoint).toBe("");
   });
 

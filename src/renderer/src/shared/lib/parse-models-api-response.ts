@@ -49,7 +49,6 @@ export function parseModelsApiResponse(response: unknown): ModelMeta[] {
       id,
       label,
       ...(contextWindow !== undefined ? { contextWindow } : {}),
-      deprecated: false,
       thinking: false,
     });
   }

@@ -84,7 +84,7 @@ export function createProviderFormDialog(): Promise<Provider | null> {
         models: presetModels().length > 0
           ? presetModels()
           : defaultModel()
-            ? [{ id: defaultModel(), label: defaultModel(), deprecated: false, thinking: false }]
+            ? [{ id: defaultModel(), label: defaultModel(), thinking: false }]
             : [],
         modelsEndpoint: modelsEndpoint(),
       };
@@ -200,7 +200,7 @@ export function createProviderFormDialog(): Promise<Provider | null> {
                     data-testid="provider-field-default-model"
                     options={presetModels().map((m) => ({
                       value: m.id,
-                      label: m.deprecated ? `${m.label} (deprecated)` : m.label,
+                      label: m.label,
                     }))}
                     value={defaultModel()}
                     onChange={setDefaultModel}

@@ -51,14 +51,12 @@ const mockProvider = {
         id: "MiniMax-M2.5-highspeed",
         label: "MiniMax-M2.5-highspeed",
         contextWindow: 100000,
-        deprecated: false,
         thinking: false,
       },
       {
         id: "MiniMax-M2.1-highspeed",
         label: "MiniMax-M2.1-highspeed",
         contextWindow: 80000,
-        deprecated: true,
         thinking: false,
       },
     ],
@@ -75,7 +73,7 @@ const mockProviderNoComment = {
     defaultModel: "deepseek-chat",
     baseUrl: "https://api.deepseek.com/anthropic",
     apiType: "anthropic-messages" as const,
-    models: [{ id: "deepseek-chat", label: "deepseek-chat", contextWindow: 64000, deprecated: false, thinking: false }],
+    models: [{ id: "deepseek-chat", label: "deepseek-chat", contextWindow: 64000, thinking: false }],
     modelsEndpoint: "https://api.deepseek.com/models",
   },
 };
@@ -211,7 +209,6 @@ describe("ProviderCard — expanded area", () => {
     renderCard(mockProvider, true);
     expect(screen.getByText("基础配置")).toBeInTheDocument();
     expect(screen.getByText("模型")).toBeInTheDocument();
-    expect(screen.getByText("危险区")).toBeInTheDocument();
   });
 
   it("does NOT render expanded area when isExpanded=false", () => {
@@ -244,12 +241,11 @@ describe("ProviderCard — expanded area", () => {
     expect(content.textContent).toContain("MiniMax-M2.1-highspeed");
   });
 
-  it("renders model table with id/label/contextWindow/deprecated/thinking columns", () => {
+  it("renders model table with id/label/contextWindow/thinking columns", () => {
     renderCard(mockProvider, true);
     expect(screen.getByText("ID")).toBeInTheDocument();
     expect(screen.getByText("Label")).toBeInTheDocument();
     expect(screen.getByText("Context Window")).toBeInTheDocument();
-    expect(screen.getByText("Deprecated")).toBeInTheDocument();
     expect(screen.getByText("Thinking")).toBeInTheDocument();
     // Model IDs appear in both the defaultModel dropdown AND the model table inputs
     // Check that there are multiple inputs with model IDs
@@ -260,12 +256,6 @@ describe("ProviderCard — expanded area", () => {
   it("renders add model row button", () => {
     renderCard(mockProvider, true);
     expect(screen.getByRole("button", { name: /添加模型/i })).toBeInTheDocument();
-  });
-
-  it("renders danger zone delete button (destructive style)", () => {
-    renderCard(mockProvider, true);
-    const deleteBtn = screen.getByRole("button", { name: /删除 provider/i });
-    expect(deleteBtn).toBeInTheDocument();
   });
 
   it("renders Save / Cancel buttons at bottom", () => {
@@ -315,14 +305,14 @@ describe("ProviderCard — expanded area", () => {
     expect(savedProvider.label).toBe("MiniMax");
   });
 
-  it("hover delete button in danger zone calls onDelete", async () => {
+  it("hover delete button on collapsed row calls onDelete", async () => {
     const user = userEvent.setup();
     const onDelete = vi.fn();
     vi.spyOn(window, "confirm").mockReturnValue(true);
     render(() => (
       <ProviderCard
         provider={mockProvider}
-        isExpanded={true}
+        isExpanded={false}
         isDefault={false}
         onToggleExpand={vi.fn()}
         onSetDefault={vi.fn()}
@@ -331,7 +321,12 @@ describe("ProviderCard — expanded area", () => {
         onDelete={onDelete}
       />
     ));
-    await user.click(screen.getByRole("button", { name: /删除 provider/i }));
+    const row = screen.getByTestId("provider-row");
+    await user.hover(row);
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /delete provider/i })).toBeVisible();
+    });
+    await user.click(screen.getByRole("button", { name: /delete provider/i }));
     expect(onDelete).toHaveBeenCalledWith("minimax");
   });
 });
@@ -415,7 +410,7 @@ describe("ProviderCard — baseUrl dev badge", () => {
         defaultModel: "mock-default",
         baseUrl: "http://127.0.0.1:50000/mock/anthropic",
         apiType: "anthropic-messages" as const,
-        models: [{ id: "mock-default", label: "Mock", contextWindow: 1000, deprecated: false, thinking: false }],
+        models: [{ id: "mock-default", label: "Mock", contextWindow: 1000, thinking: false }],
         modelsEndpoint: "",
       },
     };
@@ -452,34 +447,7 @@ describe("ProviderCard — T4 CodemanCheckbox in model table", () => {
     renderCard(mockProvider, true);
     const row = screen.getByTestId("model-row-0");
     const checkboxes = row.querySelectorAll('[data-codeman-checkbox]');
-    expect(checkboxes.length).toBe(2); // deprecated + thinking
-  });
-
-  it("deprecated CodemanCheckbox two-way binding via onSave", async () => {
-    const onSave = vi.fn();
-    render(() => (
-      <ProviderCard
-        provider={mockProvider}
-        isExpanded={true}
-        isDefault={false}
-        onToggleExpand={vi.fn()}
-        onSetDefault={vi.fn()}
-        onSave={onSave}
-        onCancel={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    ));
-    const row1 = screen.getByTestId("model-row-1");
-    const deprecatedCheckbox = row1.querySelector('[data-codeman-checkbox]') as HTMLInputElement;
-    expect(deprecatedCheckbox).not.toBeNull();
-    expect(deprecatedCheckbox.checked).toBe(true);
-    const user = userEvent.setup();
-    await user.click(deprecatedCheckbox);
-    await user.click(screen.getByRole("button", { name: /保存/i }));
-    expect(onSave).toHaveBeenCalledTimes(1);
-    const savedProvider = onSave.mock.calls[0][0];
-    const deprecatedModel = savedProvider.llm.models.find((m: any) => m.id === "MiniMax-M2.1-highspeed");
-    expect(deprecatedModel!.deprecated).toBe(false);
+    expect(checkboxes.length).toBe(1); // thinking
   });
 
   it("thinking CodemanCheckbox two-way binding via onSave", async () => {
@@ -488,7 +456,7 @@ describe("ProviderCard — T4 CodemanCheckbox in model table", () => {
       ...mockProvider,
       llm: {
         ...mockProvider.llm,
-        models: mockProvider.llm.models.map((m) => ({ ...m, thinking: false, deprecated: false })),
+        models: mockProvider.llm.models.map((m) => ({ ...m, thinking: false })),
       },
     };
     render(() => (
@@ -505,8 +473,8 @@ describe("ProviderCard — T4 CodemanCheckbox in model table", () => {
     ));
     const row0 = screen.getByTestId("model-row-0");
     const checkboxes = row0.querySelectorAll('[data-codeman-checkbox]');
-    expect(checkboxes.length).toBe(2);
-    const thinkingCheckbox = checkboxes[1] as HTMLInputElement;
+    expect(checkboxes.length).toBe(1);
+    const thinkingCheckbox = checkboxes[0] as HTMLInputElement;
     expect(thinkingCheckbox.checked).toBe(false);
     const user = userEvent.setup();
     await user.click(thinkingCheckbox);
@@ -544,16 +512,6 @@ describe("ProviderCard — T5 CodemanSelect for default model", () => {
     const content = await screen.findByTestId("provider-defaultmodel-content");
     expect(content.textContent).toContain("MiniMax-M2.5-highspeed");
     expect(content.textContent).toContain("MiniMax-M2.1-highspeed");
-  });
-
-  it("deprecated model label has (deprecated) suffix", async () => {
-    renderCard(mockProvider, true);
-    const trigger = screen.getByTestId("provider-defaultmodel-trigger");
-    const user = userEvent.setup();
-    await user.click(trigger);
-    const content = await screen.findByTestId("provider-defaultmodel-content");
-    expect(content.textContent).toContain("MiniMax-M2.1-highspeed");
-    expect(content.textContent).toContain("(deprecated)");
   });
 });
 

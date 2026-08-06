@@ -1,0 +1,257 @@
+{
+  "generatedAt": "2026-08-06",
+  "source": "https://github.com/sst/models.dev (local clone at .repos/models.dev)",
+  "providers": [
+    {
+      "id": "deepseek",
+      "label": "DeepSeek",
+      "baseUrl": "https://api.deepseek.com/anthropic",
+      "defaultModel": "deepseek-v4-flash",
+      "models": [
+        {
+          "id": "deepseek-v4-flash",
+          "label": "DeepSeek V4 Flash",
+          "contextWindow": 1000000,
+          "deprecated": false,
+          "thinking": true
+        },
+        {
+          "id": "deepseek-v4-pro",
+          "label": "DeepSeek V4 Pro",
+          "contextWindow": 1000000,
+          "deprecated": false,
+          "thinking": true
+        }
+      ],
+      "category": "cn_official",
+      "modelsEndpoint": "https://api.deepseek.com/models"
+    },
+    {
+      "id": "kimi",
+      "label": "Kimi (Moonshot)",
+      "baseUrl": "https://api.moonshot.cn/anthropic",
+      "defaultModel": "kimi-k3",
+      "models": [
+        {
+          "id": "kimi-k2-0711-preview",
+          "label": "Kimi K2 0711",
+          "contextWindow": 131072,
+          "deprecated": false,
+          "thinking": false
+        },
+        {
+          "id": "kimi-k2-0905-preview",
+          "label": "Kimi K2 0905",
+          "contextWindow": 262144,
+          "deprecated": false,
+          "thinking": false
+        },
+        {
+          "id": "kimi-k2-thinking-turbo",
+          "label": "Kimi K2 Thinking Turbo",
+          "contextWindow": 262144,
+          "deprecated": false,
+          "thinking": true
+        },
+        {
+          "id": "kimi-k2-thinking",
+          "label": "Kimi K2 Thinking",
+          "contextWindow": 262144,
+          "deprecated": false,
+          "thinking": true
+        },
+        {
+          "id": "kimi-k2-turbo-preview",
+          "label": "Kimi K2 Turbo",
+          "contextWindow": 262144,
+          "deprecated": false,
+          "thinking": false
+        },
+        {
+          "id": "kimi-k2.5",
+          "label": "Kimi K2.5",
+          "contextWindow": 262144,
+          "deprecated": false,
+          "thinking": true
+        },
+        {
+          "id": "kimi-k2.6",
+          "label": "Kimi K2.6",
+          "contextWindow": 262144,
+          "deprecated": false,
+          "thinking": true
+        },
+        {
+          "id": "kimi-k2.7-code-highspeed",
+          "label": "Kimi K2.7 Code HighSpeed",
+          "contextWindow": 262144,
+          "deprecated": false,
+          "thinking": true
+        },
+        {
+          "id": "kimi-k2.7-code",
+          "label": "Kimi K2.7 Code",
+          "contextWindow": 262144,
+          "deprecated": false,
+          "thinking": true
+        },
+        {
+          "id": "kimi-k3",
+          "label": "Kimi K3",
+          "contextWindow": 1048576,
+          "deprecated": false,
+          "thinking": true
+        }
+      ],
+      "category": "cn_official"
+    },
+    {
+      "id": "minimax",
+      "label": "MiniMax",
+      "baseUrl": "https://api.minimaxi.com/anthropic",
+      "defaultModel": "MiniMax-M3",
+      "models": [
+        {
+          "id": "MiniMax-M2.1",
+          "label": "MiniMax-M2.1",
+          "contextWindow": 204800,
+          "deprecated": false,
+          "thinking": true
+        },
+        {
+          "id": "MiniMax-M2.5-highspeed",
+          "label": "MiniMax-M2.5-highspeed",
+          "contextWindow": 204800,
+          "deprecated": false,
+          "thinking": true
+        },
+        {
+          "id": "MiniMax-M2.5",
+          "label": "MiniMax-M2.5",
+          "contextWindow": 204800,
+          "deprecated": false,
+          "thinking": true
+        },
+        {
+          "id": "MiniMax-M2.7-highspeed",
+          "label": "MiniMax-M2.7-highspeed",
+          "contextWindow": 204800,
+          "deprecated": false,
+          "thinking": true
+        },
+        {
+          "id": "MiniMax-M2.7",
+          "label": "MiniMax-M2.7",
+          "contextWindow": 204800,
+          "deprecated": false,
+          "thinking": true
+        },
+        {
+          "id": "MiniMax-M3",
+          "label": "MiniMax-M3",
+          "contextWindow": 1000000,
+          "deprecated": false,
+          "thinking": true
+        }
+      ],
+      "category": "cn_official"
+    },
+    {
+      "id": "zhipu",
+      "label": "Zhipu GLM",
+      "baseUrl": "https://open.bigmodel.cn/api/anthropic",
+      "defaultModel": "glm-5.2",
+      "models": [
+        {
+          "id": "glm-4.5-air",
+          "label": "glm-4.5-air",
+          "deprecated": false,
+          "thinking": false
+        },
+        {
+          "id": "glm-4.5-flash",
+          "label": "glm-4.5-flash",
+          "deprecated": false,
+          "thinking": false
+        },
+        {
+          "id": "glm-4.5",
+          "label": "glm-4.5",
+          "deprecated": false,
+          "thinking": false
+        },
+        {
+          "id": "glm-4.5v",
+          "label": "glm-4.5v",
+          "deprecated": false,
+          "thinking": false
+        },
+        {
+          "id": "glm-4.6",
+          "label": "glm-4.6",
+          "deprecated": false,
+          "thinking": false
+        },
+        {
+          "id": "glm-4.6v-flash",
+          "label": "glm-4.6v-flash",
+          "deprecated": false,
+          "thinking": false
+        },
+        {
+          "id": "glm-4.6v",
+          "label": "glm-4.6v",
+          "deprecated": false,
+          "thinking": false
+        },
+        {
+          "id": "glm-4.7-flash",
+          "label": "glm-4.7-flash",
+          "deprecated": false,
+          "thinking": false
+        },
+        {
+          "id": "glm-4.7-flashx",
+          "label": "glm-4.7-flashx",
+          "deprecated": false,
+          "thinking": false
+        },
+        {
+          "id": "glm-4.7",
+          "label": "glm-4.7",
+          "deprecated": false,
+          "thinking": false
+        },
+        {
+          "id": "glm-5.1",
+          "label": "GLM-5.1",
+          "contextWindow": 200000,
+          "deprecated": false,
+          "thinking": true
+        },
+        {
+          "id": "glm-5.2",
+          "label": "GLM-5.2",
+          "contextWindow": 1000000,
+          "deprecated": false,
+          "thinking": true
+        },
+        {
+          "id": "glm-5",
+          "label": "GLM-5",
+          "contextWindow": 204800,
+          "deprecated": false,
+          "thinking": true
+        },
+        {
+          "id": "glm-5v-turbo",
+          "label": "GLM-5V-Turbo",
+          "contextWindow": 200000,
+          "deprecated": false,
+          "thinking": true
+        }
+      ],
+      "category": "cn_official"
+    }
+  ]
+}

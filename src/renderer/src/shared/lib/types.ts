@@ -3,7 +3,6 @@ export interface ModelMeta {
   id: string;
   label: string;
   contextWindow?: number;
-  deprecated: boolean;
   thinking: boolean;
 }
 

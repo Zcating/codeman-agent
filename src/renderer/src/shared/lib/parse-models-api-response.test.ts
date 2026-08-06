@@ -26,13 +26,11 @@ describe("parseModelsApiResponse", () => {
       {
         id: "MiniMax-M3",
         label: "MiniMax-M3",
-        deprecated: false,
         thinking: false,
       },
       {
         id: "MiniMax-M2.7-highspeed",
         label: "MiniMax-M2.7-highspeed",
-        deprecated: false,
         thinking: false,
       },
     ]);
@@ -56,7 +54,6 @@ describe("parseModelsApiResponse", () => {
       {
         id: "gpt-4o",
         label: "GPT-4o",
-        deprecated: false,
         thinking: false,
       },
     ]);
@@ -138,13 +135,12 @@ describe("parseModelsApiResponse", () => {
       {
         id: "ok",
         label: "Real",
-        deprecated: false,
         thinking: false,
       },
     ]);
   });
 
-  it("sets deprecated=false and thinking=false on all parsed models", () => {
+  it("sets thinking=false on all parsed models", () => {
     const response = {
       data: [
         { id: "m1" },
@@ -154,7 +150,6 @@ describe("parseModelsApiResponse", () => {
     };
     const models = parseModelsApiResponse(response);
     for (const m of models) {
-      expect(m.deprecated).toBe(false);
       expect(m.thinking).toBe(false);
     }
   });

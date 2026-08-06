@@ -42,7 +42,7 @@ vi.mock("@earendil-works/pi-agent-core", () => {
 
 const mockProvider: ProviderConfig = {
     id: "test-provider",
-    models: [{ id: "m1", label: "m1", deprecated: false, thinking: false }],
+    models: [{ id: "m1", label: "m1", thinking: false }],
     apiKey: "test-key",
     baseUrl: "https://mock.local",
     defaultModel: "mock-model",
@@ -87,7 +87,7 @@ describe("createAgentRuntime()", () => {
     it("accepts ProviderConfig without apiKey (optional field)", () => {
         const cfg: ProviderConfig = {
             id: "test-id",
-            models: [{ id: "mock-model", label: "mock-model", deprecated: false, thinking: false }],
+            models: [{ id: "mock-model", label: "mock-model", thinking: false }],
             baseUrl: "https://mock.local",
             defaultModel: "mock-model",
             systemPrompt: "You are a helpful assistant.",

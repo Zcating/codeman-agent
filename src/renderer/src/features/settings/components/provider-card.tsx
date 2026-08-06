@@ -7,6 +7,7 @@ import { Input } from "@codeman-frontend/shared/components/ui/input";
 import { CodemanInput } from "@codeman-frontend/shared/components/internal/codeman-input";
 import { CodemanCheckbox } from "@codeman-frontend/shared/components/internal/codeman-checkbox";
 import { CodemanSelect } from "@codeman-frontend/shared/components/internal/codeman-select";
+import { Separator } from "@codeman-frontend/shared/components/ui/separator";
 import {
   BaseUrlSchema,
   ApiKeySchema,
@@ -29,7 +30,6 @@ interface ModelRow {
   id: string;
   label: string;
   contextWindow: string;
-  deprecated: boolean;
   thinking: boolean;
 }
 
@@ -37,7 +37,6 @@ const emptyModelRow = (): ModelRow => ({
   id: "",
   label: "",
   contextWindow: "",
-  deprecated: false,
   thinking: false,
 });
 
@@ -52,7 +51,6 @@ export function ProviderCard(props: ProviderCardProps) {
       id: m.id,
       label: m.label,
       contextWindow: m.contextWindow != null ? String(m.contextWindow) : "",
-      deprecated: m.deprecated,
       thinking: m.thinking ?? false,
     })),
   );
@@ -64,9 +62,6 @@ export function ProviderCard(props: ProviderCardProps) {
   // Test connection state
   const [testStatus, setTestStatus] = createSignal<{ kind: "idle" } | { kind: "testing" } | { kind: "success" } | { kind: "error"; message: string }>({ kind: "idle" });
   const [isTesting, setIsTesting] = createSignal(false);
-
-  // Delete confirmation
-  const [isDeleting, setIsDeleting] = createSignal(false);
 
   // Hover state for delete button
   const [isHovered, setIsHovered] = createSignal(false);
@@ -93,7 +88,6 @@ export function ProviderCard(props: ProviderCardProps) {
         id: m.id,
         label: m.label,
         contextWindow: m.contextWindow != null ? String(m.contextWindow) : "",
-        deprecated: m.deprecated,
         thinking: m.thinking ?? false,
       })),
     );
@@ -195,7 +189,6 @@ export function ProviderCard(props: ProviderCardProps) {
         id: r.id.trim(),
         label: r.label.trim(),
         contextWindow: r.contextWindow ? parseInt(r.contextWindow, 10) : undefined,
-        deprecated: r.deprecated,
         thinking: r.thinking,
       }));
 
@@ -222,17 +215,6 @@ export function ProviderCard(props: ProviderCardProps) {
     props.onSave(updated);
   };
 
-  // --- Delete ---
-  const handleDelete = async () => {
-    if (!confirm(`Delete provider "${props.provider.label}"?`)) return;
-    setIsDeleting(true);
-    try {
-      props.onDelete(props.provider.id);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   const testStatusColor = createMemo(() => {
     const s = testStatus();
     if (s.kind === "success") return "text-green-600 dark:text-green-400";
@@ -253,7 +235,7 @@ export function ProviderCard(props: ProviderCardProps) {
       {/* ===== COLLAPSED ROW ===== */}
       <div
         data-testid="provider-row"
-        class="flex flex-row items-center justify-between p-3 cursor-pointer hover:bg-muted/50 transition-colors rounded-lg"
+        class="flex flex-row items-center justify-between p-3 cursor-pointer transition-colors rounded-xl border border-zinc-200/60 dark:border-zinc-700/40 bg-card/30 backdrop-blur-sm ring-1 ring-inset ring-white/5 dark:ring-white/5 hover:bg-card/60 hover:border-zinc-300/80 dark:hover:border-zinc-600/60"
         onClick={() => props.onToggleExpand()}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -327,7 +309,7 @@ export function ProviderCard(props: ProviderCardProps) {
 
       {/* ===== EXPANDED EDITOR ===== */}
       <Show when={props.isExpanded}>
-        <div class="flex flex-col gap-4 p-4 border border-t-0 rounded-b-lg bg-card">
+        <div class="flex flex-col gap-4 p-4 rounded-xl border border-zinc-200/60 dark:border-zinc-700/40 border-t-0 bg-card/30 backdrop-blur-sm ring-1 ring-inset ring-white/5 dark:ring-white/5">
           {/* --- Basic config section --- */}
           <div class="flex flex-col gap-3">
             <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -398,7 +380,7 @@ export function ProviderCard(props: ProviderCardProps) {
               <label class="text-sm font-medium">Default Model</label>
               <CodemanSelect
                 options={localModels().map(m => ({
-                  label: m.label + (m.deprecated ? " (deprecated)" : ""),
+                  label: m.label,
                   value: m.id,
                 }))}
                 value={localDefaultModel()}
@@ -410,11 +392,10 @@ export function ProviderCard(props: ProviderCardProps) {
             {/* Model table */}
             <div class="flex flex-col gap-2 border border-border rounded-md p-3">
               {/* Table header */}
-              <div class="grid grid-cols-[1fr_1fr_100px_80px_80px_40px] gap-2 text-xs font-medium text-muted-foreground px-1">
+              <div class="grid grid-cols-[1fr_1fr_100px_80px_40px] gap-2 text-xs font-medium text-muted-foreground px-1">
                 <span>ID</span>
                 <span>Label</span>
                 <span>Context Window</span>
-                <span>Deprecated</span>
                 <span>Thinking</span>
                 <span />
               </div>
@@ -424,7 +405,7 @@ export function ProviderCard(props: ProviderCardProps) {
                 {(row, index) => (
                   <div
                     data-testid={`model-row-${index()}`}
-                    class="grid grid-cols-[1fr_1fr_100px_80px_80px_40px] gap-2 items-center"
+                    class="grid grid-cols-[1fr_1fr_100px_80px_40px] gap-2 items-center"
                   >
                     <Input
                       type="text"
@@ -444,13 +425,6 @@ export function ProviderCard(props: ProviderCardProps) {
                       onInput={(e) => updateModelRow(index(), "contextWindow", e.currentTarget.value)}
                       placeholder="100000"
                     />
-                    <div class="flex items-center justify-center">
-                      <CodemanCheckbox
-                        value={row.deprecated}
-                        onChange={(v) => updateModelRow(index(), "deprecated", v)}
-                        data-codeman-checkbox
-                      />
-                    </div>
                     <div class="flex items-center justify-center">
                       <CodemanCheckbox
                         value={row.thinking}
@@ -486,23 +460,9 @@ export function ProviderCard(props: ProviderCardProps) {
             </div>
           </div>
 
-          {/* --- Danger zone --- */}
-          <div class="flex flex-col gap-3">
-            <p class="text-xs font-medium uppercase tracking-wider text-destructive">
-              危险区
-            </p>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleDelete}
-              disabled={isDeleting()}
-            >
-              {isDeleting() ? "删除中…" : "删除 provider"}
-            </Button>
-          </div>
-
           {/* --- Bottom Save / Cancel --- */}
-          <div class="flex flex-row justify-end gap-2 pt-2 border-t">
+          <Separator />
+          <div class="flex flex-row justify-end gap-2 pt-2">
             <Button
               variant="outline"
               size="sm"

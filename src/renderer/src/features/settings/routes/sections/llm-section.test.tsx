@@ -1,6 +1,7 @@
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { render, screen, cleanup } from "@solidjs/testing-library";
+import { render, screen, cleanup, waitFor, fireEvent } from "@solidjs/testing-library";
+import userEvent from "@testing-library/user-event";
 import { Effect } from "effect";
 import { LlmSection } from "@codeman-frontend/features/settings/routes/sections/llm-section";
 import { mockState } from "@codeman-frontend/__mocks__/ipc-mock";
@@ -48,7 +49,6 @@ const mockMiniMaxProvider: Provider = {
       {
         id: "MiniMax-M2.5-highspeed",
         label: "MiniMax-M2.5-highspeed",
-        deprecated: false,
         thinking: false,
       },
     ],
@@ -69,7 +69,6 @@ const mockDeepSeekProvider: Provider = {
       {
         id: "deepseek-chat",
         label: "DeepSeek Chat",
-        deprecated: false,
         thinking: false,
       },
     ],
@@ -95,7 +94,7 @@ const baseSettings = {
   llmProviders: [],
 };
 
-describe("LlmSection — accordion + explicit save (ADR-0050 D2/D5)", () => {
+describe("LlmSection — accordion + operation auto-save", () => {
   beforeEach(async () => {
     _resetAppStoreForTest();
     _resetSettingsSaverForTest();
@@ -111,9 +110,6 @@ describe("LlmSection — accordion + explicit save (ADR-0050 D2/D5)", () => {
   });
 
   const wait = (ms = 30) => new Promise((r) => setTimeout(r, ms));
-
-  // Helper to get the Save/未保存 button
-  const getSaveButton = () => screen.getByRole("button", { name: /save|未保存/i });
 
   // ─── Accordion ────────────────────────────────────────────────────────────────
 
@@ -178,9 +174,9 @@ describe("LlmSection — accordion + explicit save (ADR-0050 D2/D5)", () => {
     expect(screen.getByText(/No providers configured/i)).toBeInTheDocument();
   });
 
-  // ─── Dirty marker ─────────────────────────────────────────────────────────────
+  // ─── Operation auto-save (no page-level Save) ────────────────────────────────
 
-  it("Save button shows dirty ring when pending changes exist", async () => {
+  it("star click immediately updates appStore.defaultLlmProviderId", async () => {
     mockState.settings = {
       ...baseSettings,
       providers: [mockMiniMaxProvider, mockDeepSeekProvider],
@@ -191,101 +187,39 @@ describe("LlmSection — accordion + explicit save (ADR-0050 D2/D5)", () => {
     render(() => <LlmSection />);
     await wait();
 
-    const saveBtn = getSaveButton();
-    // Initially clean — no dirty ring class (button says "Save")
-    expect(saveBtn.className).not.toMatch(/ring-yellow-400/);
-
-    // Set default (non-data change) → creates pending
+    // DeepSeek star button (title="设为默认"); minimax is already default
     const starButtons = screen.getAllByTitle("设为默认");
+    expect(starButtons).toHaveLength(1);
     starButtons[0].closest("button")!.click();
     await wait();
-
-    // Now dirty ring should appear (button now says "未保存")
-    const dirtyBtn = getSaveButton();
-    expect(dirtyBtn.className).toMatch(/ring-yellow-400/);
-  });
-
-  // ─── Save commits pending ─────────────────────────────────────────────────────
-
-  it("Save commits pending providers to appStore", async () => {
-    mockState.settings = {
-      ...baseSettings,
-      providers: [mockMiniMaxProvider, mockDeepSeekProvider],
-      defaultLlmProviderId: "minimax",
-    };
-    await Effect.runPromise(appStore.refresh());
-
-    render(() => <LlmSection />);
-    await wait();
-
-    // Set default to create pending state
-    const starButtons = screen.getAllByTitle("设为默认");
-    starButtons[0].closest("button")!.click();
-    await wait();
-
-    // Click the Save/未保存 button
-    const btn = getSaveButton();
-    btn.click();
-    await wait(50);
-
-    // State is clean in appStore
-    expect(appStore.state.value.providers).toHaveLength(2);
-    expect(appStore.state.value.defaultLlmProviderId).toBe("deepseek");
-  });
-
-  // ─── Set default ──────────────────────────────────────────────────────────────
-
-  it("star sets defaultLlmProviderId in pending state", async () => {
-    mockState.settings = {
-      ...baseSettings,
-      providers: [mockMiniMaxProvider, mockDeepSeekProvider],
-      defaultLlmProviderId: "minimax",
-    };
-    await Effect.runPromise(appStore.refresh());
-
-    render(() => <LlmSection />);
-    await wait();
-
-    // DeepSeek star button (title="设为默认")
-    const starButtons = screen.getAllByTitle("设为默认");
-    // minimax is already default so it has title "默认 Provider"
-    // deepseek is not default so it has title "设为默认"
-    expect(starButtons).toHaveLength(1); // only deepseek matches "设为默认"
-    starButtons[0].closest("button")!.click();
-    await wait();
-
-    // Dirty ring appears on Save button
-    const saveBtn = getSaveButton();
-    expect(saveBtn.className).toMatch(/ring-2/);
-  });
-
-  it("set default + Save updates appStore.defaultLlmProviderId", async () => {
-    mockState.settings = {
-      ...baseSettings,
-      providers: [mockMiniMaxProvider, mockDeepSeekProvider],
-      defaultLlmProviderId: "minimax",
-    };
-    await Effect.runPromise(appStore.refresh());
-
-    render(() => <LlmSection />);
-    await wait();
-
-    // Set DeepSeek as default
-    const starButtons = screen.getAllByTitle("设为默认");
-    starButtons[0].closest("button")!.click();
-    await wait();
-
-    // Save
-    const btn = getSaveButton();
-    btn.click();
-    await wait(50);
 
     expect(appStore.state.value.defaultLlmProviderId).toBe("deepseek");
   });
 
-  // ─── Delete default transfers ────────────────────────────────────────────────
+  it("card save persists directly to appStore", async () => {
+    render(() => <LlmSection />);
+    await wait();
 
-  it("deleting default provider transfers default to remaining first in pending state", async () => {
+    screen.getByTestId("provider-row").click();
+    await wait();
+    expect(screen.getByText("基础配置")).toBeInTheDocument();
+
+    // Modify Base URL
+    const input = screen.getByPlaceholderText("https://api.example.com/v1");
+    await userEvent.clear(input);
+    await userEvent.type(input, "https://new.example.com/anthropic");
+    await wait();
+
+    // Card-level save commits immediately (no page-level Save needed)
+    screen.getByRole("button", { name: /保存/i }).click();
+    await wait();
+
+    expect(appStore.state.value.providers?.[0].llm.baseUrl).toBe(
+      "https://new.example.com/anthropic",
+    );
+  });
+
+  it("deleting default provider transfers default to remaining first in appStore", async () => {
     mockState.settings = {
       ...baseSettings,
       providers: [mockMiniMaxProvider, mockDeepSeekProvider],
@@ -298,67 +232,35 @@ describe("LlmSection — accordion + explicit save (ADR-0050 D2/D5)", () => {
     render(() => <LlmSection />);
     await wait();
 
-    // Expand minimax row
+    // Hover first row to reveal delete button, then delete minimax (default)
+    // 注：jsdom + Solid mouseenter 委托在多个 ProviderCard 时会把所有行置为 hover
+    // 状态（单行场景正常），这里取第一个（minimax）即可，行为断言不受影响
     const rows = screen.getAllByTestId("provider-row");
-    rows[0].click();
-    await wait();
-
-    // Click delete in danger zone
-    const deleteBtn = screen.getByRole("button", { name: /删除 provider/i });
-    deleteBtn.click();
+    fireEvent.mouseOver(rows[0]);
+    await waitFor(() => {
+      expect(screen.getAllByRole("button", { name: /delete provider/i }).length).toBeGreaterThan(0);
+    });
+    await userEvent.click(screen.getAllByRole("button", { name: /delete provider/i })[0]);
     await wait(50);
 
-    // Save button should show dirty ring
-    const saveBtn = getSaveButton();
-    expect(saveBtn.className).toMatch(/ring-2/);
+    // Deleted from appStore immediately, default transferred to remaining first
+    expect(appStore.state.value.providers?.map((p) => p.id)).toEqual(["deepseek"]);
+    expect(appStore.state.value.defaultLlmProviderId).toBe("deepseek");
 
     vi.restoreAllMocks();
   });
 
-  // ─── Window beforeunload guard ──────────────────────────────────────────────
-
-  it("registers beforeunload listener on mount", async () => {
-    const addSpy = vi.spyOn(window, "addEventListener");
-    let capturedHandler: EventListenerOrEventListenerObject | null = null;
-    addSpy.mockImplementation((event: string, handler: EventListenerOrEventListenerObject) => {
-      if (event === "beforeunload") {capturedHandler = handler;}
-      return undefined as unknown as void;
-    });
-
-    render(() => <LlmSection />);
-    await wait();
-
-    expect(addSpy).toHaveBeenCalledWith("beforeunload", expect.any(Function));
-    expect(capturedHandler).not.toBeNull();
-
-    addSpy.mockRestore();
-  });
-
-  it("unregisters beforeunload listener on unmount", async () => {
-    const removeSpy = vi.spyOn(window, "removeEventListener");
-    removeSpy.mockImplementation(() => undefined as unknown as void);
-
-    const { unmount } = render(() => <LlmSection />);
-    await wait();
-
-    unmount();
-
-    expect(removeSpy).toHaveBeenCalledWith("beforeunload", expect.any(Function));
-
-    removeSpy.mockRestore();
-  });
-
   // ─── Buttons ─────────────────────────────────────────────────────────────────
 
-  it("renders Add provider button", async () => {
+  it("renders Add provider button in bottom bar", async () => {
     render(() => <LlmSection />);
     await wait();
     expect(screen.getByRole("button", { name: /add provider/i })).toBeInTheDocument();
   });
 
-  it("renders Save button (clean state says Save)", async () => {
+  it("does NOT render a page-level Save button", async () => {
     render(() => <LlmSection />);
     await wait();
-    expect(screen.getByRole("button", { name: /save/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /save|未保存/i })).not.toBeInTheDocument();
   });
 });

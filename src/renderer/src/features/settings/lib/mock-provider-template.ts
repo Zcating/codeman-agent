@@ -17,7 +17,7 @@ export function buildMockDevTemplate(id: string): Provider {
       defaultModel: MOCK_DEV_TEMPLATE_CONSTANTS.defaultModel,
       baseUrl: MOCK_DEV_TEMPLATE_CONSTANTS.baseUrl,
       apiType: MOCK_DEV_TEMPLATE_CONSTANTS.apiType,
-      models: [{ id: MOCK_DEV_TEMPLATE_CONSTANTS.defaultModel, label: MOCK_DEV_TEMPLATE_CONSTANTS.label, deprecated: false, thinking: false }],
+      models: [{ id: MOCK_DEV_TEMPLATE_CONSTANTS.defaultModel, label: MOCK_DEV_TEMPLATE_CONSTANTS.label, thinking: false }],
       modelsEndpoint: MOCK_DEV_TEMPLATE_CONSTANTS.modelsEndpoint,
     },
   };

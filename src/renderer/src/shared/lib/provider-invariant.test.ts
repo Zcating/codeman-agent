@@ -8,19 +8,19 @@ describe("enforceDefaultModelInvariant", () => {
     expect(enforceDefaultModelInvariant(llm).defaultModel).toBe("");
   });
   it("defaultModel in models -> unchanged", () => {
-    const llm = { defaultModel: "m1", models: [{ id: "m1", label: "m1", deprecated: false, thinking: false }] } as unknown as ProviderLlm;
+    const llm = { defaultModel: "m1", models: [{ id: "m1", label: "m1", thinking: false }] } as unknown as ProviderLlm;
     expect(enforceDefaultModelInvariant(llm).defaultModel).toBe("m1");
   });
   it("defaultModel not in models -> fallback to models[0].id", () => {
-    const llm = { defaultModel: "gone", models: [{ id: "m1", label: "m1", deprecated: false, thinking: false }, { id: "m2", label: "m2", deprecated: false, thinking: false }] } as unknown as ProviderLlm;
+    const llm = { defaultModel: "gone", models: [{ id: "m1", label: "m1", thinking: false }, { id: "m2", label: "m2", thinking: false }] } as unknown as ProviderLlm;
     expect(enforceDefaultModelInvariant(llm).defaultModel).toBe("m1");
   });
   it("multiple matches -> keep original (existence check only)", () => {
-    const llm = { defaultModel: "m1", models: [{ id: "m1", label: "a", deprecated: false, thinking: false }, { id: "m1", label: "b", deprecated: false, thinking: false }] } as unknown as ProviderLlm;
+    const llm = { defaultModel: "m1", models: [{ id: "m1", label: "a", thinking: false }, { id: "m1", label: "b", thinking: false }] } as unknown as ProviderLlm;
     expect(enforceDefaultModelInvariant(llm).defaultModel).toBe("m1");
   });
   it("explicit '' with non-empty models -> keep ''", () => {
-    const llm = { defaultModel: "", models: [{ id: "m1", label: "m1", deprecated: false, thinking: false }] } as unknown as ProviderLlm;
+    const llm = { defaultModel: "", models: [{ id: "m1", label: "m1", thinking: false }] } as unknown as ProviderLlm;
     expect(enforceDefaultModelInvariant(llm).defaultModel).toBe("");
   });
 });

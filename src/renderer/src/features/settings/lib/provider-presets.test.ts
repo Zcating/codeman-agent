@@ -1,13 +1,12 @@
 
-// Adapted from CC-Switch (https://github.com/farion1231/cc-switch), MIT License, Copyright (c) 2025 Jason Young
+// 数据来自 models.dev（scripts/extract-providers.mjs 生成 providers.json）
 
 import { describe, it, expect } from "vitest";
 import { PROVIDER_PRESETS } from "@codeman-frontend/features/settings/lib/provider-presets";
-import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 
 describe("PROVIDER_PRESETS", () => {
-  it("至少包含 15 个主流厂商预设", () => {
-    expect(PROVIDER_PRESETS.length).toBeGreaterThanOrEqual(15);
+  it("包含 4 个主流 cn_official 厂商预设", () => {
+    expect(PROVIDER_PRESETS.length).toBe(4);
   });
 
   it("每个 preset 的 id 非空且唯一", () => {
@@ -46,16 +45,17 @@ describe("PROVIDER_PRESETS", () => {
 
   it("models 中的每个 ModelMeta shape 合法 (id/label 非空, deprecated/thinking 为 boolean)", () => {
     PROVIDER_PRESETS.forEach((p) => {
-      p.models.forEach((m: ModelMeta) => {
+      p.models.forEach((m) => {
         expect(m.id).toBeTruthy();
         expect(m.label).toBeTruthy();
-        expect(typeof m.deprecated).toBe("boolean");
+        // deprecated 仅存在于 providers.json 数据源（运行时透传，类型层已移除）
+        expect(typeof (m as { deprecated?: unknown }).deprecated).toBe("boolean");
         expect(typeof m.thinking).toBe("boolean");
       });
     });
   });
 
-  it("覆盖主流 cn_official 厂商 (DeepSeek, Kimi, MiniMax, Zhipu, 豆包等)", () => {
+  it("覆盖 4 个 cn_official 厂商 (DeepSeek, Kimi, MiniMax, Zhipu)", () => {
     const cnIds = PROVIDER_PRESETS
       .filter((p) => p.category === "cn_official")
       .map((p) => p.id);
@@ -65,18 +65,13 @@ describe("PROVIDER_PRESETS", () => {
     expect(cnIds).toContain("zhipu");
   });
 
-  it("覆盖 aggregator 厂商 (OpenRouter, SiliconFlow, ModelScope 等)", () => {
-    const aggIds = PROVIDER_PRESETS
-      .filter((p) => p.category === "aggregator")
-      .map((p) => p.id);
-    expect(aggIds).toContain("openrouter");
-    expect(aggIds).toContain("siliconflow");
-  });
-
-  it("覆盖 official 厂商 (Claude)", () => {
-    const officialIds = PROVIDER_PRESETS
-      .filter((p) => p.category === "official")
-      .map((p) => p.id);
-    expect(officialIds).toContain("claude");
+  it("defaultModel 取最新主力模型", () => {
+    const byId: Record<string, string> = Object.fromEntries(
+      PROVIDER_PRESETS.map((p) => [p.id, p.defaultModel]),
+    );
+    expect(byId.deepseek).toBe("deepseek-v4-flash");
+    expect(byId.kimi).toBe("kimi-k3");
+    expect(byId.minimax).toBe("MiniMax-M3");
+    expect(byId.zhipu).toBe("glm-5.2");
   });
 });

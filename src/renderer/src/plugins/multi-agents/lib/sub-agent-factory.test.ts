@@ -39,7 +39,7 @@ const SAMPLE_CONFIG = {
 const SAMPLE_PROVIDER: ProviderConfig = {
   id: "minimax",
   models: [
-    { id: "MiniMax-M2.5-highspeed", label: "MiniMax M2.5", contextWindow: 200_000, deprecated: false, thinking: false },
+    { id: "MiniMax-M2.5-highspeed", label: "MiniMax M2.5", contextWindow: 200_000, thinking: false },
   ],
   apiKey: "test-key",
   baseUrl: "https://api.minimaxi.com/anthropic",

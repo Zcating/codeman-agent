@@ -9,6 +9,7 @@
   "compilerOptions": {
     "composite": true,
     "jsxImportSource": "solid-js",
+    "resolveJsonModule": true,
     "noFallthroughCasesInSwitch": true,
     "useDefineForClassFields": true,
     "allowImportingTsExtensions": true,

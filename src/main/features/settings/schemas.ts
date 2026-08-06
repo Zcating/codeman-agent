@@ -8,7 +8,6 @@ const ModelMetaStruct = Schema.Struct({
   id: Schema.String,
   label: Schema.String,
   contextWindow: Schema.optional(Schema.Number),
-  deprecated: Schema.optional(Schema.Boolean),
   thinking: Schema.optional(Schema.Boolean),
 });
 

@@ -23,7 +23,6 @@ export const DEFAULT_SETTINGS: Settings = {
             id: MINIMAX_DEFAULT_MODEL,
             label: MINIMAX_DEFAULT_MODEL,
             contextWindow: 200_000,
-            deprecated: false,
             thinking: false,
           },
         ],

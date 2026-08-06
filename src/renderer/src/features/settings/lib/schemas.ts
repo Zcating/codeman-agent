@@ -8,7 +8,6 @@ const ProviderLlmSchema = Schema.Struct({
     id: Schema.String,
     label: Schema.String,
     contextWindow: Schema.optional(Schema.Number),
-    deprecated: Schema.Boolean,
     thinking: Schema.optional(Schema.Boolean),
   })),
   modelsEndpoint: Schema.optional(Schema.String),

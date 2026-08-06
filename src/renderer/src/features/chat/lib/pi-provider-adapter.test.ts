@@ -4,8 +4,8 @@ import { createProviderFromConfig, findDefaultModel } from "./pi-provider-adapte
 import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 
 const models: ModelMeta[] = [
-  { id: "m1", label: "Model 1", contextWindow: 1000, deprecated: false, thinking: false },
-  { id: "m2", label: "Model 2", contextWindow: 2000, deprecated: true, thinking: true },
+  { id: "m1", label: "Model 1", contextWindow: 1000, thinking: false },
+  { id: "m2", label: "Model 2", contextWindow: 2000, thinking: true },
 ];
 
 describe("createProviderFromConfig", () => {

@@ -6,7 +6,6 @@ export interface ModelMeta {
   id: string;
   label: string;
   contextWindow?: number;
-  deprecated?: boolean;
   thinking?: boolean;
 }
 
@@ -100,7 +99,6 @@ export const mockProvider = (
           id: "MiniMax-M2.5-highspeed",
           label: "MiniMax-M2.5-highspeed",
           contextWindow: 200000,
-          deprecated: false,
           thinking: false,
         },
       ],
@@ -129,7 +127,6 @@ export const mockDeepseekProvider: Provider = mockProvider({
         id: "deepseek-chat",
         label: "deepseek-chat",
         contextWindow: 64000,
-        deprecated: false,
         thinking: false,
       },
     ],
@@ -184,7 +181,6 @@ const DEFAULT_MINIMAX_PROVIDER: Provider = {
         id: "MiniMax-M2.5-highspeed",
         label: "MiniMax-M2.5-highspeed",
         contextWindow: 200_000,
-        deprecated: false,
         thinking: false,
       },
     ],

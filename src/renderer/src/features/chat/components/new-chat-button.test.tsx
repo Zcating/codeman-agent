@@ -24,4 +24,12 @@ describe("NewChatButton", () => {
     );
     expect(onClick).toHaveBeenCalledTimes(1);
   });
+
+  it('uses the shared Button component with token-based hover (no primary-600 jump)', () => {
+    const { container } = render(() => <NewChatButton onClick={() => {}} />);
+    const btn = container.querySelector("[aria-label='新对话']") as HTMLElement;
+    expect(btn.dataset.slot).toBe('button');
+    expect(btn.className).toContain('hover:bg-primary/80');
+    expect(btn.className).not.toContain('hover:bg-primary-600');
+  });
 });

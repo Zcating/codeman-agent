@@ -1,5 +1,6 @@
 
 import { render } from "@solidjs/testing-library";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { Effect } from "effect";
 
@@ -235,17 +236,20 @@ describe("ChatSidebar (PR 2)", () => {
     expect(F.mockNavigate).not.toHaveBeenCalled();
   });
 
-  it("clicking inner Delete button in renderMenuGroup does NOT navigate (RowActions stopPropagation)", async () => {
+  it("clicking inner Delete menu item in renderMenuGroup does NOT navigate (RowActions stopPropagation)", async () => {
     render(() => <ChatSidebar />);
     F.mockNavigate.mockClear();
     const renderMenuGroup = F.capturedProps!.renderMenuGroup;
     const { container } = render(() =>
       renderMenuGroup({ label: "WS", value: "ws-navigate" }),
     );
-    const deleteBtn = container.querySelector('[aria-label="Delete WS"]') as HTMLButtonElement;
-    deleteBtn.click();
-    expect(F.mockNavigate).not.toHaveBeenCalled();
-    expect(container.querySelector('[data-state="confirming"]')).toBeTruthy();
+    const user = userEvent.setup();
+    await user.click(container.querySelector('[aria-label="更多操作"]') as HTMLButtonElement);
+    await user.click(document.querySelector("[data-testid='row-action-delete']") as HTMLElement);
+    await vi.waitFor(() => {
+      expect(F.mockDialogConfirm).toHaveBeenCalled();
+      expect(F.mockNavigate).not.toHaveBeenCalled();
+    });
   });
 
   it("currentValue comes from URL params (convId)", () => {
@@ -293,15 +297,19 @@ describe("ChatSidebar (PR 2)", () => {
   });
 
   describe("Seam 20: MenuGroup hover rename+delete via renderMenuGroup", () => {
-    it("renderMenuGroup returns JSX containing rename and delete buttons", () => {
+    it("renderMenuGroup returns JSX with more-actions trigger and rename/delete menu items", async () => {
       render(() => <ChatSidebar />);
       expect(F.capturedProps).toBeTruthy();
       const renderMenuGroup = F.capturedProps!.renderMenuGroup;
       const { container } = render(() =>
         renderMenuGroup({ label: "Test WS", value: "ws-test" }),
       );
-      expect(container.querySelector('[aria-label="Rename Test WS"]')).toBeTruthy();
-      expect(container.querySelector('[aria-label="Delete Test WS"]')).toBeTruthy();
+      const trigger = container.querySelector('[aria-label="更多操作"]');
+      expect(trigger).toBeTruthy();
+      const user = userEvent.setup();
+      await user.click(trigger as HTMLElement);
+      expect(document.querySelector("[data-testid='row-action-rename']")).toBeTruthy();
+      expect(document.querySelector("[data-testid='row-action-delete']")).toBeTruthy();
     });
 
     it("renderMenuGroup row does NOT render ConvDeleteAction (no 'Delete conversation' button)", () => {
@@ -313,7 +321,7 @@ describe("ChatSidebar (PR 2)", () => {
       expect(container.querySelector('[aria-label="Delete conversation"]')).toBeFalsy();
     });
 
-    it("renderMenuGroup delete button shows inline-confirm overlay IN PLACE — does NOT open any dialog", async () => {
+    it("renderMenuGroup delete opens confirm dialog — no inline overlay", async () => {
       render(() => <ChatSidebar />);
       const renderMenuGroup = F.capturedProps!.renderMenuGroup;
       const { container } = render(() =>
@@ -321,30 +329,33 @@ describe("ChatSidebar (PR 2)", () => {
       );
       expect(container.querySelector('[data-state="confirming"]')).toBeFalsy();
       expect(F.mockDialogConfirm).not.toHaveBeenCalled();
-      const deleteBtn = container.querySelector('[aria-label="Delete WS to Delete"]') as HTMLButtonElement;
-      deleteBtn.click();
-      expect(F.mockDialogConfirm).not.toHaveBeenCalled();
-      expect(container.querySelector('[data-state="confirming"]')).toBeTruthy();
-      expect(container.querySelector('[aria-label="确认删除"]')).toBeTruthy();
-      expect(container.querySelector('[aria-label="取消删除"]')).toBeTruthy();
-    });
-
-    it("renderMenuGroup inline-confirm '取消' button hides overlay without calling removeWorkspace", async () => {
-      render(() => <ChatSidebar />);
-      const renderMenuGroup = F.capturedProps!.renderMenuGroup;
-      const { container } = render(() =>
-        renderMenuGroup({ label: "WS to Delete", value: "ws-del" }),
-      );
-      const deleteBtn = container.querySelector('[aria-label="Delete WS to Delete"]') as HTMLButtonElement;
-      deleteBtn.click();
-      expect(container.querySelector('[data-state="confirming"]')).toBeTruthy();
-      const cancelBtn = container.querySelector('[aria-label="取消删除"]') as HTMLButtonElement;
-      expect(cancelBtn).toBeTruthy();
-      cancelBtn.click();
-      expect(F.mockRemoveWorkspace).not.toHaveBeenCalled();
+      const user = userEvent.setup();
+      await user.click(container.querySelector('[aria-label="更多操作"]') as HTMLElement);
+      await user.click(document.querySelector("[data-testid='row-action-delete']") as HTMLElement);
+      await vi.waitFor(() => {
+        expect(F.mockDialogConfirm).toHaveBeenCalledWith(
+          expect.objectContaining({ title: "删除项目", destructive: true }),
+        );
+      });
       expect(container.querySelector('[data-state="confirming"]')).toBeFalsy();
       expect(container.querySelector('[aria-label="确认删除"]')).toBeFalsy();
       expect(container.querySelector('[aria-label="取消删除"]')).toBeFalsy();
+    });
+
+    it("renderMenuGroup delete confirm=false does NOT call removeWorkspace", async () => {
+      F.mockDialogConfirm.mockResolvedValue(false);
+      render(() => <ChatSidebar />);
+      const renderMenuGroup = F.capturedProps!.renderMenuGroup;
+      const { container } = render(() =>
+        renderMenuGroup({ label: "WS to Delete", value: "ws-del" }),
+      );
+      const user = userEvent.setup();
+      await user.click(container.querySelector('[aria-label="更多操作"]') as HTMLElement);
+      await user.click(document.querySelector("[data-testid='row-action-delete']") as HTMLElement);
+      await vi.waitFor(() => {
+        expect(F.mockDialogConfirm).toHaveBeenCalled();
+        expect(F.mockRemoveWorkspace).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -530,38 +541,43 @@ describe("ChatSidebar (PR 2)", () => {
     });
 
     it("RowActions delete on conv row calls chatSidebarActions.deleteConversation with convId", async () => {
+      F.mockDialogConfirm.mockResolvedValue(true);
       render(() => <ChatSidebar />);
       const renderMenu = F.capturedProps!.renderMenu!;
       const { container } = render(() => renderMenu({ label: "Chat to Delete", value: "c-del" }));
-      const deleteBtn = container.querySelector("[aria-label='Delete conversation']") as HTMLButtonElement;
-      deleteBtn.click();
-      const confirmBtn = container.querySelector("[aria-label='确认删除']") as HTMLButtonElement;
-      confirmBtn.click();
-      expect(F.mockChatSidebarActions.deleteConversation).toHaveBeenCalledWith("c-del");
+      const user = userEvent.setup();
+      await user.click(container.querySelector('[aria-label="更多操作"]') as HTMLElement);
+      await user.click(document.querySelector("[data-testid='row-action-delete']") as HTMLElement);
+      await vi.waitFor(() => {
+        expect(F.mockChatSidebarActions.deleteConversation).toHaveBeenCalledWith("c-del");
+      });
     });
 
     it("RowActions rename on conv row calls chatSidebarActions.renameConversation with (convId, newTitle)", async () => {
       render(() => <ChatSidebar />);
       const renderMenu = F.capturedProps!.renderMenu!;
       const { container } = render(() => renderMenu({ label: "Old Chat", value: "c-ren" }));
-      const renameBtn = container.querySelector("[aria-label='Rename Old Chat']") as HTMLButtonElement;
-      renameBtn.click();
+      const user = userEvent.setup();
+      await user.click(container.querySelector('[aria-label="更多操作"]') as HTMLElement);
+      await user.click(document.querySelector("[data-testid='row-action-rename']") as HTMLElement);
       const input = container.querySelector("[aria-label='Rename input']") as HTMLInputElement;
       const { fireEvent } = await import("@solidjs/testing-library");
       fireEvent.input(input, { target: { value: "New Chat Title" } });
       fireEvent.keyDown(input, { key: "Enter" });
-      expect(F.mockChatSidebarActions.renameConversation).toHaveBeenCalledWith("c-ren", "New Chat Title");
+      await vi.waitFor(() => {
+        expect(F.mockChatSidebarActions.renameConversation).toHaveBeenCalledWith("c-ren", "New Chat Title");
+      });
     });
 
     it("deleting currently viewed conv (activated conv) navigates to home", async () => {
       F.mockParamsAccessor.mockImplementation(() => ({ convId: "c-1" }));
+      F.mockDialogConfirm.mockResolvedValue(true);
       render(() => <ChatSidebar />);
       const renderMenu = F.capturedProps!.renderMenu!;
       const { container } = render(() => renderMenu({ label: "Active Chat", value: "c-1" }));
-      const deleteBtn = container.querySelector("[aria-label='Delete conversation']") as HTMLButtonElement;
-      deleteBtn.click();
-      const confirmBtn = container.querySelector("[aria-label='确认删除']") as HTMLButtonElement;
-      confirmBtn.click();
+      const user = userEvent.setup();
+      await user.click(container.querySelector('[aria-label="更多操作"]') as HTMLElement);
+      await user.click(document.querySelector("[data-testid='row-action-delete']") as HTMLElement);
       await vi.waitFor(() => {
         expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/" });
       });
