@@ -1,10 +1,11 @@
 import type { JSX } from "solid-js";
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
 import { CodemanCheckbox } from "@codeman-frontend/shared/components/internal/codeman-checkbox";
+import { ScrollArea } from "@codeman-frontend/shared/components/ui/scrollarea";
 
 export function AppSection(): JSX.Element {
   return (
-    <section class="space-y-4">
+    <ScrollArea class="flex-1 min-h-0" data-scroll-region="true" viewportClass="space-y-4 py-4 pl-4 pr-6">
       <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
         App behavior
       </h2>
@@ -19,6 +20,6 @@ export function AppSection(): JSX.Element {
         The app starts in the taskbar. Click the window to bring it forward;
         use File → Quit to exit.
       </p>
-    </section>
+    </ScrollArea>
   );
 }

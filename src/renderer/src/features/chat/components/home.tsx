@@ -160,7 +160,7 @@ export function HomeAgentForm(): JSX.Element {
   });
 
   return (
-    <div class="flex h-full flex-col items-center justify-center px-6 py-12 overflow-y-auto">
+    <div class="flex h-full flex-col items-center justify-center px-6 py-12">
       <div class="w-full max-w-2xl space-y-6">
         <div class="text-center space-y-2">
           <h1 class="text-3xl font-semibold tracking-tight">codeman-agent</h1>
@@ -172,58 +172,57 @@ export function HomeAgentForm(): JSX.Element {
             e.preventDefault();
             void form.handleSubmit();
           }}
-          class="space-y-2"
+          class="flex flex-col rounded-2xl border border-border bg-card shadow-md"
         >
-          {}
-          <form.Field name="draft">
-            {(field) => (
-              <>
-                <label for="codex-input" class="sr-only">
-                  发条消息
-                </label>
-                <ComboTextarea
-                  id="codex-input"
-                  data-testid="codex-input"
-                  class="w-full"
-                  rows={3}
-                  value={field().state.value}
-                  onChange={(v) => field().handleChange(v)}
-                  onKeyDown={(e) => {
-                    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                      if (e.defaultPrevented) {return;}
-                      e.preventDefault();
-                      e.currentTarget.form?.requestSubmit();
-                      return;
-                    }
-                    if (e.key === "ArrowUp" && !e.defaultPrevented) {
-                      if (handleArrowUpField(field)) {
+          <div class="px-3 pt-3">
+            <form.Field name="draft">
+              {(field) => (
+                <>
+                  <label for="codex-input" class="sr-only">
+                    发条消息
+                  </label>
+                  <ComboTextarea
+                    id="codex-input"
+                    data-testid="codex-input"
+                    class="w-full"
+                    rows={3}
+                    value={field().state.value}
+                    onChange={(v) => field().handleChange(v)}
+                    onKeyDown={(e) => {
+                      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                        if (e.defaultPrevented) {return;}
                         e.preventDefault();
+                        e.currentTarget.form?.requestSubmit();
+                        return;
                       }
-                      return;
-                    }
-                    if (e.key === "ArrowDown" && !e.defaultPrevented) {
-                      if (handleArrowDownField(field)) {
-                        e.preventDefault();
+                      if (e.key === "ArrowUp" && !e.defaultPrevented) {
+                        if (handleArrowUpField(field)) {
+                          e.preventDefault();
+                        }
+                        return;
                       }
-                      return;
+                      if (e.key === "ArrowDown" && !e.defaultPrevented) {
+                        if (handleArrowDownField(field)) {
+                          e.preventDefault();
+                        }
+                        return;
+                      }
+                    }}
+                    disabled={isInputDisabled() || form.state.isSubmitting}
+                    placeholder={placeholder()}
+                    skills={enabledSkills()}
+                    error={
+                      form.state.isSubmitted
+                        ? firstErrorMessage(field().state.meta.errors)
+                        : undefined
                     }
-                  }}
-                  disabled={isInputDisabled() || form.state.isSubmitting}
-                  placeholder={placeholder()}
-                  skills={enabledSkills()}
-                  error={
-                    form.state.isSubmitted
-                      ? firstErrorMessage(field().state.meta.errors)
-                      : undefined
-                  }
-                />
-              </>
-            )}
-          </form.Field>
+                  />
+                </>
+              )}
+            </form.Field>
+          </div>
 
-          {}
-          <div class="flex items-center gap-2">
-            {}
+          <div class="flex items-center gap-2 px-3 pb-2.5 pt-1">
             <form.Field
               name="workspaceId"
               validators={{ onBlur: effectSchema(WorkspaceIdFieldSchema) }}
@@ -252,7 +251,7 @@ export function HomeAgentForm(): JSX.Element {
                           return;
                         }
                         const ws = exit.value as { id: string } | null;
-                        if (!ws) {return;} 
+                        if (!ws) {return;}
                         field().handleChange(ws.id);
                         setSelectedWorkspaceId(ws.id);
                       }}
@@ -264,7 +263,6 @@ export function HomeAgentForm(): JSX.Element {
               )}
             </form.Field>
 
-            {}
             <form.Field
               name="modelId"
               validators={{ onBlur: effectSchema(ModelIdFieldSchema) }}
@@ -294,10 +292,8 @@ export function HomeAgentForm(): JSX.Element {
                 />
               )}
             </form.Field>
-          </div>
+            <div class="flex-1" />
 
-          {}
-          <div class="flex justify-end">
             <form.Subscribe
               selector={(state) => ({
                 canSubmit: state.canSubmit,

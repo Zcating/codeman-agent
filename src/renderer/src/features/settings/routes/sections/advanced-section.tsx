@@ -1,5 +1,6 @@
 import { Show, createSignal, type JSX } from "solid-js";
 import { Trash2 } from "lucide-solid";
+import { ScrollArea } from "@codeman-frontend/shared/components/ui/scrollarea";
 import { clearAllHistoryBridge } from "@codeman-frontend/features/settings/lib/clear-all-history-bridge";
 import { logger } from "@codeman-frontend/shared/lib/logger";
 
@@ -16,7 +17,7 @@ export function AdvancedSection(): JSX.Element {
   };
 
   return (
-    <section class="space-y-4">
+    <ScrollArea class="flex-1 min-h-0" data-scroll-region="true" viewportClass="space-y-4 py-4 pl-4 pr-6">
       <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
         Privacy
       </h2>
@@ -56,6 +57,6 @@ export function AdvancedSection(): JSX.Element {
           Clear all history…
         </button>
       </Show>
-    </section>
+    </ScrollArea>
   );
 }

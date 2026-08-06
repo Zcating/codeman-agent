@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
-import { ParallelPanel } from "../parallel-panel";
-import type { SubAgentStreamEntry } from "../../stores/sub-agents-stream.store";
+import { ParallelPanel } from "./parallel-panel";
+import type { SubAgentStreamEntry } from "../stores/sub-agents-stream.store";
 
 function makeEntry(
   toolCallId: string,

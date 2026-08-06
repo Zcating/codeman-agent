@@ -1,9 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const testDataDir = mkdtempSync(join(tmpdir(), "codeman-ipc-test-"));
 
 const fakeIpcMain = { handle: vi.fn() };
 const fakeApp = {
   setLoginItemSettings: vi.fn(),
-  getPath: vi.fn().mockReturnValue("/tmp/codeman-agent-test"),
+  getPath: vi.fn().mockReturnValue(testDataDir),
 };
 const fakeDialog = { showOpenDialog: vi.fn() };
 const fakeNotification = vi.fn();
@@ -22,7 +27,7 @@ vi.mock("electron", () => ({
   shell: fakeShell,
 }));
 
-// getOrInitDatabase 已删除（db 层改用 Effect Layer）
+// db 层为 Effect Layer（DbLive），无需 mock ./db/mod
 
 vi.mock("./mcp-host", () => ({
   McpStdioServer: vi.fn().mockImplementation(function () {
@@ -141,4 +146,8 @@ describe("ipc.ts barrel", () => {
     expect(destroyed.webContents.send).not.toHaveBeenCalled();
     expect(fakeWin.webContents.send).toHaveBeenCalled();
   });
+});
+
+afterAll(() => {
+  rmSync(testDataDir, { recursive: true, force: true });
 });

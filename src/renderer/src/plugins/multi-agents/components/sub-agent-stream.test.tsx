@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
-import { SubAgentStream } from "../sub-agent-stream";
-import type { SubAgentStreamEntry } from "../../stores/sub-agents-stream.store";
+import { SubAgentStream } from "./sub-agent-stream";
+import type { SubAgentStreamEntry } from "../stores/sub-agents-stream.store";
 
 describe("SubAgentStream", () => {
   describe("status rendering", () => {

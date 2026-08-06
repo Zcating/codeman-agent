@@ -4,6 +4,7 @@ import { settingsSaver } from "@codeman-frontend/features/settings/lib/settings-
 import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
 import { CodemanCheckbox } from "@codeman-frontend/shared/components/internal/codeman-checkbox";
 import { CheckCircle2, Package, XCircle } from "lucide-solid";
+import { ScrollArea } from "@codeman-frontend/shared/components/ui/scrollarea";
 
 export function SkillsSection(): JSX.Element {
   const enabledSet = (): Set<string> =>
@@ -24,7 +25,7 @@ export function SkillsSection(): JSX.Element {
     source === "preinstalled" ? "Pre-installed" : "User";
 
   return (
-    <section class="space-y-4">
+    <ScrollArea class="flex-1 min-h-0" data-scroll-region="true" viewportClass="space-y-4 py-4 pl-4 pr-6">
       <header class="flex items-center justify-between">
         <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
           Skills
@@ -97,6 +98,6 @@ export function SkillsSection(): JSX.Element {
           </For>
         </ul>
       </Show>
-    </section>
+    </ScrollArea>
   );
 }

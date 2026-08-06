@@ -1,5 +1,6 @@
 import { For, Show, type JSX, createSignal, onMount, onCleanup } from "solid-js";
 import { Plus } from "lucide-solid";
+import { ScrollArea } from "@codeman-frontend/shared/components/ui/scrollarea";
 import { ProviderCard } from "@codeman-frontend/features/settings/components/provider-card";
 import { createProviderFormDialog } from "@codeman-frontend/features/settings/components/add-provider-dialog";
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
@@ -125,7 +126,7 @@ export function LlmSection(): JSX.Element {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <section class="space-y-4">
+    <ScrollArea class="flex-1 min-h-0" data-scroll-region="true" viewportClass="space-y-4 py-4 pl-4 pr-6">
       <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
         LLM Providers
       </h2>
@@ -179,6 +180,6 @@ export function LlmSection(): JSX.Element {
           {isDirty() ? "未保存" : "Save"}
         </button>
       </div>
-    </section>
+    </ScrollArea>
   );
 }

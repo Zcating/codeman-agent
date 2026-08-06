@@ -14,6 +14,7 @@ import {
 } from "@codeman-frontend/shared/components/ui/dialog";
 import { Button } from "@codeman-frontend/shared/components/ui/button";
 import { Checkbox } from "@codeman-frontend/shared/components/ui/checkbox";
+import { ScrollArea } from "@codeman-frontend/shared/components/ui/scrollarea";
 import { CodemanInput } from "@codeman-frontend/shared/components/internal/codeman-input";
 import { CodemanTextarea } from "@codeman-frontend/shared/components/internal/codeman-textarea";
 import { CodemanSelect } from "@codeman-frontend/shared/components/internal/codeman-select";
@@ -234,7 +235,7 @@ function SubAgentFormDialog(props: {
               <CodemanSelect
                 options={THINKING_LEVELS.map((l) => ({ label: l, value: l }))}
                 value={field().state.value}
-                onChange={field().handleChange}
+                onChange={(value) => field().handleChange(value as ThinkingLevel)}
                 placeholder="Select thinking level..."
                 data-testid="field-thinking-level"
               />
@@ -351,11 +352,11 @@ export function SettingsTab(): JSX.Element {
   };
 
   return (
-    <section class="space-y-4">
+    <ScrollArea class="flex-1 min-h-0" data-scroll-region="true" viewportClass="space-y-4 py-4 pl-4 pr-6">
       <header class="flex items-center justify-between">
         <div>
           <h2 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-            Sub-Agents
+            智能体
           </h2>
           <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
             Configure sub-agents that the main agent can delegate tasks to.
@@ -404,6 +405,6 @@ export function SettingsTab(): JSX.Element {
           </For>
         </ul>
       </Show>
-    </section>
+    </ScrollArea>
   );
 }

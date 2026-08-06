@@ -717,6 +717,41 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
       }),
     );
   });
+
+  it("卡片化: 输入区为居中浮动卡片 (form 带 rounded-2xl + shadow-md)", async () => {
+    mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockSelectedWsId.current = "ws-1";
+
+    const { container } = render(() => <HomeAgentForm />);
+
+    const card = container.querySelector("form.rounded-2xl.shadow-md");
+    expect(card).toBeTruthy();
+  });
+
+  it("卡片化: textarea 与工具行无分割线 (form 内无 border-t)", async () => {
+    mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockSelectedWsId.current = "ws-1";
+
+    const { container } = render(() => <HomeAgentForm />);
+
+    const card = container.querySelector("form.rounded-2xl");
+    expect(card).toBeTruthy();
+    // 精确匹配 border-t 类（border-transparent 等含 border-t 子串的类不算分割线）
+    expect(card!.querySelector(".border-t")).toBeNull();
+  });
+
+  it("卡片化: 发送按钮收进工具行, 与 workspace/model 同在卡片内", async () => {
+    mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
+    mockSelectedWsId.current = "ws-1";
+
+    const { container } = render(() => <HomeAgentForm />);
+
+    const card = container.querySelector("form.rounded-2xl");
+    expect(card).toBeTruthy();
+    expect(card!.querySelector('[data-testid="codex-send"]')).toBeTruthy();
+    expect(card!.querySelector('[data-testid="workspace-select-trigger"]')).toBeTruthy();
+    expect(card!.querySelector('[data-testid="llm-picker-trigger"]')).toBeTruthy();
+  });
 });
 
 

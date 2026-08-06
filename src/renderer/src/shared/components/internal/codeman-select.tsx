@@ -57,6 +57,10 @@ export const CodemanSelect: Component<CodemanSelectProps> = (props) => {
         data-testid={contentTestId}
         class="bg-background"
       >
+        {/* 空 options 时显示占位符，避免下拉区空白让用户误以为列表未加载/出错 */}
+        <Show when={props.options.length === 0}>
+          <p class="px-2.5 py-2 text-sm text-muted-foreground">无可用选项</p>
+        </Show>
         <For each={props.options}>
           {(option) => (
             <SelectItem item={option}>

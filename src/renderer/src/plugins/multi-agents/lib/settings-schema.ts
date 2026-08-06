@@ -7,7 +7,7 @@ export const SubAgentFormSchema = Schema.Struct({
   systemPrompt: Schema.String,
   modelId: Schema.String,
   thinkingLevel: ThinkingLevelSchema,
-  allowedTools: Schema.Array(Schema.String),
+  allowedTools: Schema.mutable(Schema.Array(Schema.String)),
   enabled: Schema.Boolean,
 });
 

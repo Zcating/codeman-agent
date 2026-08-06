@@ -1,12 +1,8 @@
 
-import { splitProps } from "solid-js";
+import { type ComponentProps, splitProps } from "solid-js";
 import { cn } from "@codeman-frontend/shared/lib/cn";
 
-function Card(props: {
-  size?: "default" | "sm";
-  class?: string;
-  children?: any;
-}) {
+function Card(props: ComponentProps<"div"> & { size?: "default" | "sm" }) {
   const [local, rest] = splitProps(props, ["class", "size"]);
   return (
     <div

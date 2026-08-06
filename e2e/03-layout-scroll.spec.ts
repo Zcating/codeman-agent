@@ -1,11 +1,14 @@
 
-// 03 — Layout contract: 主内容区 = 唯一滚动容器 (ADR-0039)
+// 03 — Layout contract: 页面级 ScrollArea 统一滚动模型 (ADR-0039)
 //
-// 守卫两个历史回归：
+// 守卫三个历史回归：
 //   - V2.9  (2bf2d7d): SidebarInset overflow-y-auto → chat 页双滚动条 + 工具栏滚走
 //   - V2.10 (回归):     移除后 wrapper 无滚动通道 → 非 chat 页无法滚动
+//   - 2026-08-05 契约演进: 非 chat 页面最外层统一包 shadcn ScrollArea
 //
-// 场景 A：超高设置页（6 providers）→ 内容 wrapper 是唯一活动滚动区，wheel 生效，工具栏钉住。
+// 场景 A：超高设置页（6 providers）→ 页面级 ScrollArea 是唯一活动滚动区，wheel 生效，工具栏钉住。
+//         契约演进（2026-08-05）：设置页主栏内 now 有 wrapper + 页面 ScrollArea 两个
+//         data-scroll-region，但活动滚动区是页面 ScrollArea（ViewPort），wrapper 不滚动。
 // 场景 B：chat-view（长消息）→ 消息区是唯一活动滚动区，wrapper 恰好贴合不溢出，工具栏钉住。
 //
 // wheel 走 CDP Input.dispatchMouseEvent(mouseWheel) 真实输入路径（合成
@@ -147,7 +150,7 @@ async function seedTallProviders(page: TauriPage): Promise<void> {
 test.describe("03 — Layout contract: 主内容区 = 唯一滚动容器", () => {
   test.describe.configure({ mode: "serial" });
 
-  test("A: 超高设置页 — wrapper 为唯一活动滚动区，wheel 生效，工具栏钉住", async ({ tauriEnv }) => {
+  test("A: 超高设置页 — 页面 ScrollArea 为唯一活动滚动区，wheel 生效，工具栏钉住", async ({ tauriEnv }) => {
     test.setTimeout(60_000);
     const { page } = tauriEnv;
 
@@ -157,11 +160,21 @@ test.describe("03 — Layout contract: 主内容区 = 唯一滚动容器", () =>
     await waitForActiveScrollRegion(page);
 
     const snap = await scrollContractSnapshot(page);
-    expect(snap.regionCount, "设置页主栏应只有 wrapper 一个滚动区").toBe(1);
+    expect(snap.regionCount, "设置页主栏应有两个 data-scroll-region（wrapper + 页面 ScrollArea）").toBe(2);
     expect(snap.activeCount, "恰好一个活动滚动区").toBe(1);
-    expect(snap.activeIsWrapper, "活动滚动区必须是 main-content-scroll").toBe(true);
-    expect(snap.wrapperOverflows, "wrapper 内容确实超高").toBe(true);
+    expect(snap.activeIsWrapper, "活动滚动区必须是页面 ScrollArea，不是 wrapper").toBe(false);
+    expect(snap.wrapperOverflows, "wrapper 必须恰好贴合（页面 ScrollArea 接管滚动）").toBe(false);
     expect(snap.toolbarTop, "工具栏钉在顶部").toBe(0);
+
+    // 活动滚动区必须是页面级 ScrollArea 的 Viewport（契约标记落点）
+    const activeIsViewport = await page.evaluate(() => {
+      const main =
+        document.querySelector('[data-slot="resizable-panel"][data-id="main"]') ?? document.body;
+      const regions = Array.from(main.querySelectorAll("[data-scroll-region]")) as HTMLElement[];
+      const active = regions.filter((el) => el.scrollHeight > el.clientHeight + 1);
+      return active.length === 1 && active[0]?.getAttribute("data-slot") === "scroll-area-viewport";
+    });
+    expect(activeIsViewport, "活动滚动区必须是 ScrollArea Viewport").toBe(true);
 
     const wheel = await wheelActiveRegion(page, 600);
     expect(wheel.before, "滚动前 scrollTop 应为 0").toBe(0);

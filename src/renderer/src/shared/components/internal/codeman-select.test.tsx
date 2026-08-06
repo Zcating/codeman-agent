@@ -122,6 +122,38 @@ describe("CodemanSelect", () => {
     expect(valueText?.textContent).toBe("Select an option");
   });
 
+  it("trigger placeholder variant matches ark-ui DOM state (data-placeholder-shown)", () => {
+    // 回归：占位符文字必须跟随主题。失效的 data-placeholder 变体不会匹配
+    // ark-ui 在 trigger 上设置的 data-placeholder-shown 属性，导致占位符
+    // 颜色继承 UA 默认色（不跟随应用内主题切换）。
+    render(() => (
+      <CodemanSelect
+        options={defaultOptions}
+        value={null}
+        onChange={vi.fn()}
+        placeholder="Select"
+        data-testid="test-select"
+      />
+    ));
+    const trigger = screen.getByTestId("test-select-trigger");
+    expect(trigger).toHaveClass("data-placeholder-shown:text-muted-foreground");
+  });
+
+  it("shows empty placeholder text when no options", () => {
+    // 回归：options 为空时下拉区不能空白——必须显示空占位符，
+    // 提示用户没有对应的内容（而非让用户以为列表还在加载/出错）。
+    render(() => (
+      <CodemanSelect
+        options={[]}
+        value={null}
+        onChange={vi.fn()}
+        placeholder="Select"
+        data-testid="test-select"
+      />
+    ));
+    expect(screen.getByText('无可用选项')).toBeInTheDocument();
+  });
+
   it("opens content when trigger clicked", () => {
     render(() => (
       <CodemanSelect

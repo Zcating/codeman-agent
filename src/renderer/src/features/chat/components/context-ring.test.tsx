@@ -1,7 +1,7 @@
 
 import { createSignal } from "solid-js";
 import { render, cleanup } from "@solidjs/testing-library";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ContextRing } from "@codeman-frontend/features/chat/components/context-ring";
 
 afterEach(() => cleanup());
@@ -79,5 +79,78 @@ describe("ContextRing", () => {
 
     setUsedTokens(150_000);
     expect(root()?.getAttribute("title")).toBe("73% · 150K / 200K tokens");
+  });
+});
+
+describe("ContextRing compaction integration (onCompact)", () => {
+  it("onCompact 传入时渲染可点击的用量环 trigger；未传入时保持纯展示", () => {
+    const { container } = render(() => (
+      <ContextRing
+        percentage={10}
+        usedTokens={20_000}
+        totalTokens={200_000}
+        onCompact={vi.fn()}
+      />
+    ));
+    expect(container.querySelector('[data-testid="usage-ring-trigger"]')).toBeTruthy();
+    // popover 未打开：详情与压缩按钮不渲染（无常驻按钮）
+    expect(container.querySelector('[data-testid="usage-ring-popover"]')).toBeNull();
+    expect(container.querySelector('[data-testid="compact-now-button"]')).toBeNull();
+
+    const { container: plain } = render(() => (
+      <ContextRing percentage={10} usedTokens={20_000} totalTokens={200_000} />
+    ));
+    expect(plain.querySelector('[data-testid="usage-ring-trigger"]')).toBeNull();
+    expect(plain.querySelector('[data-testid="context-ring"]')).toBeTruthy();
+  });
+
+  it("点击 trigger → popover 显示完整数字用量与「立即压缩」按钮，点击按钮调 onCompact", async () => {
+    const user = (await import("@testing-library/user-event")).default;
+    const onCompact = vi.fn();
+    const { container } = render(() => (
+      <ContextRing
+        percentage={12}
+        usedTokens={24_000}
+        totalTokens={200_000}
+        onCompact={onCompact}
+      />
+    ));
+
+    const trigger = container.querySelector('[data-testid="usage-ring-trigger"]') as HTMLButtonElement;
+    expect(trigger).toBeTruthy();
+    await user.click(trigger);
+
+    await vi.waitFor(() => {
+      expect(container.querySelector('[data-testid="usage-ring-popover"]')).toBeTruthy();
+    });
+    // 完整数字（千分位），非 K/M 缩写
+    expect(container.querySelector('[data-testid="usage-ring-popover"]')?.textContent).toContain("24,000");
+    expect(container.querySelector('[data-testid="usage-ring-popover"]')?.textContent).toContain("200,000");
+
+    const btn = container.querySelector('[data-testid="compact-now-button"]') as HTMLButtonElement;
+    expect(btn).toBeTruthy();
+    expect(btn.textContent).toContain("立即压缩");
+    await user.click(btn);
+    expect(onCompact).toHaveBeenCalledTimes(1);
+  });
+
+  it("compacting=true → popover 内显示 spinner 而非压缩按钮", async () => {
+    const user = (await import("@testing-library/user-event")).default;
+    const { container } = render(() => (
+      <ContextRing
+        percentage={50}
+        usedTokens={100_000}
+        totalTokens={200_000}
+        compacting
+        onCompact={vi.fn()}
+      />
+    ));
+
+    const trigger = container.querySelector('[data-testid="usage-ring-trigger"]') as HTMLButtonElement;
+    await user.click(trigger);
+    await vi.waitFor(() => {
+      expect(container.querySelector('[data-testid="compaction-spinner"]')).toBeTruthy();
+    });
+    expect(container.querySelector('[data-testid="compact-now-button"]')).toBeNull();
   });
 });

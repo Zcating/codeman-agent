@@ -155,7 +155,6 @@ describe("SkillsSection — /settings/skills", () => {
   });
 
   it("clicking skill toggle updates appStore.enabledSkills", async () => {
-    const { settingsSaver } = await import("@codeman-frontend/features/settings/lib/settings-saver");
     _manifests = [mockSkill];
     render(() => <SkillsSection />);
     await new Promise((resolve) => setTimeout(resolve, 10));

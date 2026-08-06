@@ -31,6 +31,13 @@ export interface ComboTextareaProps {
   onKeyDown?: (e: KeyboardEvent & { currentTarget: HTMLTextAreaElement }) => void;
 }
 
+/**
+ * 输入框融入卡片背景：去边框、去 focus ring、透明背景（cn 后者优先）。
+ * 输入框所在区域由调用方提供卡片容器（bg-card），textarea 自身不绘制边框。
+ */
+const TEXTAREA_FLAT_CLASS =
+  "border-0 focus-visible:ring-0 bg-transparent dark:bg-transparent px-1 py-1";
+
 interface TriggerState {
   slashPosition: number;
   query: string;
@@ -250,6 +257,7 @@ export function ComboTextarea(props: ComboTextareaProps): JSX.Element {
           disabled={props.disabled}
           error={props.error}
           data-testid={props["data-testid"]}
+          textareaClass={TEXTAREA_FLAT_CLASS}
           ref={(el) => {
             textareaEl = el;
             if (typeof props.ref === "function") {

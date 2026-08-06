@@ -564,14 +564,17 @@ export function CodemanSidebar(props: CodemanSidebarProps): JSX.Element {
             />
           </div>
 
-          {/* Main content — the sole scroll region of the main column (ADR-0039).
-              Wrapper 是 layout 容器（不是 ScrollArea）— 它的唯一职责是承载路由内容并
-              提供原生滚动通道（overflow-auto + flex-1 min-h-0）。消息区等真正的内容
-              区域会自己嵌套 ScrollArea，自带自定义滚动条。wrapper 不渲染自定义滚动条
-              是为了避免与内层 ScrollArea 的滚动条在右侧重叠（zag 的 ScrollBar 始终挂载）。 */}
+          {/* Main content — layout shell of the main column (ADR-0039 演进)。
+              Wrapper 是 layout 容器（不是 ScrollArea）— 不渲染自定义滚动条，
+              避免与页面内容区 ScrollArea 的滚动条在右侧重叠（zag 的 ScrollBar
+              始终挂载）。flex flex-col 让页面级 ScrollArea（flex-1 min-h-0）
+              的高度链生效：Root 被约束在 wrapper 内，Viewport 成为活动滚动区。
+              无 padding — 内容间距归内容层（页面 ScrollArea 的 viewportClass /
+              chat 消息区 p-4），与 chat 页保持一致。overflow-auto 保留作为兜底：
+              未自带滚动容器的路由内容超高时仍可原生滚动。 */}
           <Show when={props.children}>
             <div
-              class="flex-1 min-h-0 overflow-auto"
+              class="flex flex-col flex-1 min-h-0 overflow-auto"
               data-scroll-region="true"
               data-testid="main-content-scroll"
             >

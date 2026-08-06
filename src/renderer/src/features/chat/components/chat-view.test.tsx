@@ -1002,18 +1002,33 @@ describe("ChatView compaction interleaved rendering (seam 2)", () => {
   it.skip("多 entries 全部按 createdAt ASC 插入到正确位置 — requires vi.mock reactivity fix", () => {});
 });
 
-describe("ChatView compaction toolbar button (seam 3)", () => {
+describe("ChatView compaction via usage ring (seam 3)", () => {
   afterEach(() => cleanup());
 
-  it("默认: 按钮存在 + enabled + 显示 立即压缩 文案", async () => {
+  it("压缩已集成进用量环：工具行无常驻独立压缩按钮，入口为可点击的用量环", async () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
+    // popover 未打开时压缩按钮不渲染（无独立常驻按钮）
+    expect(container.querySelector('[data-testid="compact-now-button"]')).toBeNull();
+    // 用量环 trigger 是压缩入口
+    expect(container.querySelector('[data-testid="usage-ring-trigger"]')).toBeTruthy();
+  });
+
+  it("点击用量环 → popover 打开，内含「立即压缩」按钮", async () => {
+    const user = (await import("@testing-library/user-event")).default;
+    const { container } = render(() => <ChatView convId="conv-1" />);
+    const trigger = container.querySelector('[data-testid="usage-ring-trigger"]') as HTMLButtonElement;
+    expect(trigger).toBeTruthy();
+    await user.click(trigger);
+    await vi.waitFor(() => {
+      expect(container.querySelector('[data-testid="usage-ring-popover"]')).toBeTruthy();
+    });
     const btn = container.querySelector('[data-testid="compact-now-button"]') as HTMLButtonElement;
     expect(btn).toBeTruthy();
     expect(btn).not.toBeDisabled();
     expect(btn.textContent).toContain("立即压缩");
   });
 
-  it("state.compactionStatus === compacting → 按钮 disabled + 显示 spinner", async () => {
+  it("state.compactionStatus === compacting → popover 内按钮变 spinner", async () => {
     const conversationsStoreMock = await import("@codeman-frontend/features/chat/stores/chat.store");
     const mockStore = (conversationsStoreMock as unknown as {
       store: {
@@ -1025,12 +1040,16 @@ describe("ChatView compaction toolbar button (seam 3)", () => {
 
     mockStore.byId["conv-1"].compactionStatus = { _tag: "compacting", kind: "manual" };
 
+    const user = (await import("@testing-library/user-event")).default;
     const { container } = render(() => <ChatView convId="conv-1" />);
-
-    const spinner = container.querySelector('[data-testid="compaction-spinner"]');
-    expect(spinner).toBeTruthy();
-    const compactBtn = container.querySelector('[data-testid="compact-now-button"]');
-    expect(compactBtn).toBeNull(); // compact button hidden when compacting
+    const trigger = container.querySelector('[data-testid="usage-ring-trigger"]') as HTMLButtonElement;
+    await user.click(trigger);
+    await vi.waitFor(() => {
+      const spinner = container.querySelector('[data-testid="compaction-spinner"]');
+      expect(spinner).toBeTruthy();
+    });
+    // compact button hidden when compacting
+    expect(container.querySelector('[data-testid="compact-now-button"]')).toBeNull();
   });
 
   // compactNow calls Effect.runPromiseExit which requires the Effect monad.

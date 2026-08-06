@@ -5,7 +5,7 @@ import type { PluginDescriptor } from "@codeman-frontend/plugins/lib/plugin-regi
 export const multiAgentsDescriptor: PluginDescriptor = {
   id: "multi-agents",
   initialize: Effect.succeed(undefined),
-  route: { path: "/plugins/multi-agents", label: "Sub-Agents" },
+  route: { path: "/plugins/multi-agents", label: "智能体" },
   sidebar: { icon: "Users", order: 30, visible: true },
 };
 

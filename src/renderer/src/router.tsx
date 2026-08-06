@@ -14,6 +14,7 @@ import { WindowSection } from "@codeman-frontend/features/settings/routes/sectio
 import { AdvancedSection } from "@codeman-frontend/features/settings/routes/sections/advanced-section";
 import { SkillsSection } from "@codeman-frontend/features/settings/routes/sections/skills-section";
 import { McpSection } from "@codeman-frontend/features/settings/routes/sections/mcp-section";
+import { SettingsTab as MultiAgentsSettingsTab } from "@codeman-frontend/plugins/multi-agents/components/settings-tab";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -78,6 +79,12 @@ const pluginsMcpRoute = createRoute({
   component: McpSection,
 });
 
+const pluginsMultiAgentsRoute = createRoute({
+  getParentRoute: () => chatLayoutRoute,
+  path: "/plugins/multi-agents",
+  component: MultiAgentsSettingsTab,
+});
+
 
 const settingsLayoutRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -131,7 +138,7 @@ const settingsMcpRoute = createRoute({
 });
 
 export const routeTree = rootRoute.addChildren([
-  chatLayoutRoute.addChildren([homeRoute, conversationRoute, pluginsSkillsRoute, pluginsMcpRoute]),
+  chatLayoutRoute.addChildren([homeRoute, conversationRoute, pluginsSkillsRoute, pluginsMcpRoute, pluginsMultiAgentsRoute]),
   settingsLayoutRoute.addChildren([
     settingsLlmRoute,
     settingsAppRoute,

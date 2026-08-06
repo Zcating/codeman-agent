@@ -3,6 +3,7 @@ import { render } from "solid-js/web";
 import { RouterProvider } from "@tanstack/solid-router";
 import { router } from "@codeman-frontend/router";
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
+import { startThemeSync } from "@codeman-frontend/shared/stores/theme";
 import { Cause, Effect, Exit } from "effect";
 import { logger } from "@codeman-frontend/shared/lib/logger";
 import * as chatStore from "@codeman-frontend/features/chat/stores/chat.store";
@@ -20,6 +21,8 @@ function bootstrap(): void {
     logger.error("[index.tsx] #root not found — cannot mount Solid");
     return;
   }
+
+  startThemeSync();
 
   const initPromise = Effect.runPromiseExit(initializeAll());
 

@@ -11,6 +11,7 @@ import { cn } from "@codeman-frontend/shared/lib/cn";
 
 export interface ScrollAreaProps extends ArkScrollAreaRootProps {
   class?: string;
+  viewportClass?: string;
   children?: JSX.Element;
   "data-testid"?: string;
   /**
@@ -24,6 +25,7 @@ export interface ScrollAreaProps extends ArkScrollAreaRootProps {
 export function ScrollArea(props: ScrollAreaProps): JSX.Element {
   const [local, rest] = splitProps(props, [
     "class",
+    "viewportClass",
     "children",
     "data-testid",
     "data-scroll-region",
@@ -41,7 +43,7 @@ export function ScrollArea(props: ScrollAreaProps): JSX.Element {
         // 隐藏原生滚动条（zag 只注入 overflow:auto，不隐藏）：原生条与
         // 自定义 ScrollBar（position:absolute 覆盖）并排会显示两个重复
         // 滚动条。与 base-ui 参照物（styleDisableScrollbar）行为对齐。
-        class="size-full rounded-[inherit] outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        class={cn("size-full rounded-[inherit] outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", local.viewportClass)}
       >
         {local.children}
       </ArkScrollArea.Viewport>
@@ -66,6 +68,8 @@ export function ScrollBar(props: ScrollBarProps): JSX.Element {
         "!end-1",
         "data-[orientation=vertical]:h-full data-[orientation=vertical]:w-2.5 data-[orientation=vertical]:border-l data-[orientation=vertical]:border-l-transparent",
         "data-[orientation=horizontal]:h-2.5 data-[orientation=horizontal]:flex-col data-[orientation=horizontal]:border-t data-[orientation=horizontal]:border-t-transparent",
+        "data-[orientation=vertical]:not-data-[overflow-y]:hidden",
+        "data-[orientation=horizontal]:not-data-[overflow-x]:hidden",
         local.class,
       )}
       {...rest}

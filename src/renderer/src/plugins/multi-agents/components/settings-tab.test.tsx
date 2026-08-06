@@ -1,8 +1,8 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { render, screen, within } from "@solidjs/testing-library";
 import { Effect } from "effect";
-import { SettingsTab } from "../settings-tab";
-import type { SubAgentConfig } from "../../lib/sub-agent.types";
+import { SettingsTab } from "./settings-tab";
+import type { SubAgentConfig } from "../lib/sub-agent.types";
 
 // Shared mock state
 const mockState = {
@@ -11,7 +11,7 @@ const mockState = {
 };
 
 // Mock the subAgentsStore for testing
-vi.mock("../../stores/sub-agents.store", () => ({
+vi.mock("../stores/sub-agents.store", () => ({
   subAgentsStore: {
     get state() { return mockState; },
     actions: {
@@ -28,7 +28,7 @@ vi.mock("../../stores/sub-agents.store", () => ({
 }));
 
 // Re-import after mocking
-import { subAgentsStore } from "../../stores/sub-agents.store";
+import { subAgentsStore } from "../stores/sub-agents.store";
 
 const SAMPLE_SUB_AGENTS: SubAgentConfig[] = [
   {
@@ -126,7 +126,7 @@ describe("SettingsTab", () => {
     it("settings-tab.tsx does not contain ref bindings for form fields", () => {
       const fs = require("fs");
       const path = require("path");
-      const settingsTabPath = path.join(__dirname, "../settings-tab.tsx");
+      const settingsTabPath = path.join(__dirname, "./settings-tab.tsx");
       const content = fs.readFileSync(settingsTabPath, "utf-8");
 
       // These patterns should NOT exist in the file
@@ -140,7 +140,7 @@ describe("SettingsTab", () => {
     it("settings-tab.tsx does not contain null as unknown as SubAgentFormValues cast at call sites", () => {
       const fs = require("fs");
       const path = require("path");
-      const settingsTabPath = path.join(__dirname, "../settings-tab.tsx");
+      const settingsTabPath = path.join(__dirname, "./settings-tab.tsx");
       const content = fs.readFileSync(settingsTabPath, "utf-8");
 
       expect(content).not.toMatch(/null as unknown as SubAgentFormValues/);
@@ -149,7 +149,7 @@ describe("SettingsTab", () => {
     it("settings-tab.tsx imports createForm from @tanstack/solid-form", () => {
       const fs = require("fs");
       const path = require("path");
-      const settingsTabPath = path.join(__dirname, "../settings-tab.tsx");
+      const settingsTabPath = path.join(__dirname, "./settings-tab.tsx");
       const content = fs.readFileSync(settingsTabPath, "utf-8");
 
       expect(content).toMatch(/import\s+\{\s*createForm\s+\}\s+from\s+["']@tanstack\/solid-form["']/);
@@ -158,7 +158,7 @@ describe("SettingsTab", () => {
     it("settings-tab.tsx uses CodemanInput, CodemanSelect, and CodemanCheckbox components", () => {
       const fs = require("fs");
       const path = require("path");
-      const settingsTabPath = path.join(__dirname, "../settings-tab.tsx");
+      const settingsTabPath = path.join(__dirname, "./settings-tab.tsx");
       const content = fs.readFileSync(settingsTabPath, "utf-8");
 
       expect(content).toMatch(/CodemanInput/);
@@ -169,7 +169,7 @@ describe("SettingsTab", () => {
     it("settings-tab.tsx imports effectSchema for form validation", () => {
       const fs = require("fs");
       const path = require("path");
-      const settingsTabPath = path.join(__dirname, "../settings-tab.tsx");
+      const settingsTabPath = path.join(__dirname, "./settings-tab.tsx");
       const content = fs.readFileSync(settingsTabPath, "utf-8");
 
       expect(content).toMatch(/effectSchema/);
@@ -178,7 +178,7 @@ describe("SettingsTab", () => {
     it("settings-tab.tsx uses createForm with SubAgentFormSchema validator", () => {
       const fs = require("fs");
       const path = require("path");
-      const settingsTabPath = path.join(__dirname, "../settings-tab.tsx");
+      const settingsTabPath = path.join(__dirname, "./settings-tab.tsx");
       const content = fs.readFileSync(settingsTabPath, "utf-8");
 
       expect(content).toMatch(/createForm/);

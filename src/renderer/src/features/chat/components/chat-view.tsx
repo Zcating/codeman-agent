@@ -1,6 +1,6 @@
-import { createEffect, createMemo, For, Show, onMount, type JSX } from "solid-js";
+import { createEffect, createMemo, For, Show, type JSX } from "solid-js";
 import { Effect, Exit } from "effect";
-import { Square, Send, Minimize2, Loader2 } from "lucide-solid";
+import { Square, Send } from "lucide-solid";
 import { createForm } from "@tanstack/solid-form";
 import { MessageBubble } from "@codeman-frontend/features/chat/components/message-bubble";
 import { CompactionMarker } from "@codeman-frontend/features/chat/components/compaction-marker";
@@ -17,7 +17,6 @@ import { ScrollArea } from "@codeman-frontend/shared/components/ui/scrollarea";
 import { ComboTextarea } from "@codeman-frontend/features/chat/components/combo-textarea";
 import { CodemanGroupSelect } from "@codeman-frontend/shared/components/internal/codeman-group-select";
 import { codemanToast } from "@codeman-frontend/shared/components/internal/codeman-toast";
-import { startThemeSync } from "@codeman-frontend/shared/stores/theme";
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
 import { formatAppError } from "@codeman-frontend/shared/lib/format-app-error";
 import { effectSchema, firstErrorMessage } from "@codeman-frontend/shared/lib/effect-schema-adapter";
@@ -88,10 +87,6 @@ function ProviderSelect(props: {
 export function ChatView(props: { convId?: string }): JSX.Element {
   const convId = (): string | undefined => props.convId;
   let messagesEndRef: HTMLDivElement | undefined;
-
-  onMount(() => {
-    startThemeSync();
-  });
 
   const isRunning = (): boolean => {
     const id = convId();
@@ -290,171 +285,145 @@ export function ChatView(props: { convId?: string }): JSX.Element {
 
       <ParallelPanel entries={allParallelPanelEntries()} />
 
-      <form
-        class="flex flex-col gap-2 p-3 border-t border-border bg-card"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void form.handleSubmit();
-        }}
-      >
-        {}
-        <form.Field name="draft">
-          {(field) => (
-            <>
-              <label for="chat-input" class="sr-only">
-                发条消息
-              </label>
-              <ComboTextarea
-                id="chat-input"
-                class="w-full"
-                rows={3}
-                value={field().state.value}
-                onChange={(v) => field().handleChange(v)}
-                onKeyDown={(e) => {
-                  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                    if (e.defaultPrevented) {return;}
-                    e.preventDefault();
-                    e.currentTarget.form?.requestSubmit();
-                    return;
-                  }
-                  if (e.key === "ArrowUp" && !e.defaultPrevented) {
-                    if (handleArrowUpField(field)) {
-                      e.preventDefault();
+      <div class="px-3 pb-3 pt-1">
+        <form
+          class="flex flex-col rounded-2xl border border-border bg-card shadow-md"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void form.handleSubmit();
+          }}
+        >
+          <div class="px-3 pt-3">
+            <form.Field name="draft">
+              {(field) => (
+                <>
+                  <label for="chat-input" class="sr-only">
+                    发条消息
+                  </label>
+                  <ComboTextarea
+                    id="chat-input"
+                    class="w-full"
+                    rows={3}
+                    value={field().state.value}
+                    onChange={(v) => field().handleChange(v)}
+                    onKeyDown={(e) => {
+                      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                        if (e.defaultPrevented) {return;}
+                        e.preventDefault();
+                        e.currentTarget.form?.requestSubmit();
+                        return;
+                      }
+                      if (e.key === "ArrowUp" && !e.defaultPrevented) {
+                        if (handleArrowUpField(field)) {
+                          e.preventDefault();
+                        }
+                        return;
+                      }
+                      if (e.key === "ArrowDown" && !e.defaultPrevented) {
+                        if (handleArrowDownField(field)) {
+                          e.preventDefault();
+                        }
+                        return;
+                      }
+                    }}
+                    placeholder="发条消息…"
+                    disabled={isRunning() || form.state.isSubmitting}
+                    skills={enabledSkills()}
+                    error={
+                      form.state.isSubmitted
+                        ? firstErrorMessage(field().state.meta.errors)
+                        : undefined
                     }
-                    return;
-                  }
-                  if (e.key === "ArrowDown" && !e.defaultPrevented) {
-                    if (handleArrowDownField(field)) {
-                      e.preventDefault();
-                    }
-                    return;
-                  }
-                }}
-                placeholder="发条消息…"
-                disabled={isRunning() || form.state.isSubmitting}
-                skills={enabledSkills()}
-                error={
-                  form.state.isSubmitted
-                    ? firstErrorMessage(field().state.meta.errors)
-                    : undefined
-                }
-              />
-            </>
-          )}
-        </form.Field>
-
-        {}
-        <div class="flex items-center gap-2">
-          <label for="provider-select" class="text-xs text-muted-foreground whitespace-nowrap">
-            Provider
-          </label>
-          <form.Field
-            name="modelId"
-            validators={{ onBlur: effectSchema(ModelIdFieldSchema) }}
-          >
-            {(field) => (
-              <ProviderSelect
-                value={field().state.value}
-                onChange={(modelId) => {
-                  field().handleChange(modelId);
-                  const providers = appStore.state.value.providers ?? [];
-                  const provider = buildEnabledProviders(providers).find((p) =>
-                    p.models.some((m) => m.id === modelId),
-                  );
-                  if (provider) {
-                    const updatedProviders = providers.map((p) =>
-                      p.id === provider.id
-                        ? { ...p, llm: { ...p.llm, defaultModel: modelId } }
-                        : p,
-                    );
-                    appStore.set({
-                      providers: updatedProviders,
-                      defaultLlmProviderId: provider.id,
-                    });
-                    settingsSaver.scheduleSave();
-                  }
-                }}
-              />
-            )}
-          </form.Field>
-
-          <div class="flex-1" />
-
-          {}
-          <div
-            class="flex items-center gap-4"
-            data-testid="ring-send-cluster"
-          >
-            {}
-            <ContextRing
-              percentage={ringInfo().percentage}
-              usedTokens={ringInfo().used}
-              totalTokens={ringInfo().total}
-            />
-
-            {}
-            <Show
-              when={compactionStatus()._tag !== "compacting"}
-              fallback={
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled
-                  aria-label="压缩中"
-                  data-testid="compaction-spinner"
-                >
-                  <Loader2 class="h-4 w-4 animate-spin" />
-                </Button>
-              }
-            >
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleCompactNow}
-                aria-label="立即压缩上下文"
-                data-testid="compact-now-button"
-              >
-                立即压缩
-                <Minimize2 class="h-4 w-4" />
-              </Button>
-            </Show>
-
-            {}
-            <form.Subscribe
-              selector={(state) => ({
-                canSubmit: state.canSubmit,
-                isSubmitting: state.isSubmitting,
-              })}
-            >
-              {(sub) => (
-                <Show
-                  when={isRunning()}
-                  fallback={
-                    <Button
-                      type="submit"
-                      disabled={!sub().canSubmit || isRunning()}
-                      aria-label="发送消息"
-                    >
-                      {sub().isSubmitting ? "提交中…" : "发送"}
-                      <Send class="h-4 w-4" />
-                    </Button>
-                  }
-                >
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={handleCancel}
-                    aria-label="停止运行"
-                  >
-                    停止
-                    <Square class="h-4 w-4" />
-                  </Button>
-                </Show>
+                  />
+                </>
               )}
-            </form.Subscribe>
+            </form.Field>
           </div>
-        </div>
-      </form>
+
+          <div class="flex items-center gap-2 px-3 pb-2.5 pt-1">
+            <label for="provider-select" class="text-xs text-muted-foreground whitespace-nowrap">
+              Provider
+            </label>
+            <form.Field
+              name="modelId"
+              validators={{ onBlur: effectSchema(ModelIdFieldSchema) }}
+            >
+              {(field) => (
+                <ProviderSelect
+                  value={field().state.value}
+                  onChange={(modelId) => {
+                    field().handleChange(modelId);
+                    const providers = appStore.state.value.providers ?? [];
+                    const provider = buildEnabledProviders(providers).find((p) =>
+                      p.models.some((m) => m.id === modelId),
+                    );
+                    if (provider) {
+                      const updatedProviders = providers.map((p) =>
+                        p.id === provider.id
+                          ? { ...p, llm: { ...p.llm, defaultModel: modelId } }
+                          : p,
+                      );
+                      appStore.set({
+                        providers: updatedProviders,
+                        defaultLlmProviderId: provider.id,
+                      });
+                      settingsSaver.scheduleSave();
+                    }
+                  }}
+                />
+              )}
+            </form.Field>
+
+            <div class="flex-1" />
+
+            <div
+              class="flex items-center gap-4"
+              data-testid="ring-send-cluster"
+            >
+              <ContextRing
+                percentage={ringInfo().percentage}
+                usedTokens={ringInfo().used}
+                totalTokens={ringInfo().total}
+                compacting={compactionStatus()._tag === "compacting"}
+                onCompact={handleCompactNow}
+              />
+
+              <form.Subscribe
+                selector={(state) => ({
+                  canSubmit: state.canSubmit,
+                  isSubmitting: state.isSubmitting,
+                })}
+              >
+                {(sub) => (
+                  <Show
+                    when={isRunning()}
+                    fallback={
+                      <Button
+                        type="submit"
+                        disabled={!sub().canSubmit || isRunning()}
+                        aria-label="发送消息"
+                      >
+                        {sub().isSubmitting ? "提交中…" : "发送"}
+                        <Send class="h-4 w-4" />
+                      </Button>
+                    }
+                  >
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={handleCancel}
+                      aria-label="停止运行"
+                    >
+                      停止
+                      <Square class="h-4 w-4" />
+                    </Button>
+                  </Show>
+                )}
+              </form.Subscribe>
+            </div>
+          </div>
+        </form>
+      </div>
     </>
   );
 }

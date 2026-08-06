@@ -1,7 +1,12 @@
 
 import { type JSX } from "solid-js";
 import { Outlet, useLocation, useNavigate, useParams, Link } from "@tanstack/solid-router";
-import { Settings as SettingsIcon, WandSparkles, Cable } from "lucide-solid";
+import {
+  Settings as SettingsIcon,
+  WandSparkles,
+  Cable,
+  Users,
+} from "lucide-solid";
 import {
   CodemanSidebar,
   type CodemanSidebarGroupOption,
@@ -27,8 +32,10 @@ function renderPluginIcon(pluginId: string, iconName: string): JSX.Element {
       return <WandSparkles class="h-4 w-4" />;
     case "Cable":
       return <Cable class="h-4 w-4" />;
+    case "Users":
+      return <Users class="h-4 w-4" />;
     default:
-      throw new Error(`Unknown icon "${iconName}" for plugin "${pluginId}" — expected "WandSparkles" or "Cable"`);
+      throw new Error(`Unknown icon "${iconName}" for plugin "${pluginId}" — expected "WandSparkles", "Cable", or "Users"`);
   }
 }
 

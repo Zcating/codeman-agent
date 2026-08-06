@@ -15,8 +15,8 @@ vi.mock("@effect/sql-sqlite-node/SqliteClient", () => ({
 vi.mock("../../runtime", () => ({
   MainLive: Layer.succeed({} as any, {} as any),
   mainRuntime: {
-    runPromise: <A>(eff: Effect<A, any, never>) => Effect.runPromise(eff),
-    runPromiseExit: <A>(eff: Effect<A, any, never>) => Effect.runPromiseExit(eff),
+    runPromise: <A>(eff: Effect.Effect<A, any, never>) => Effect.runPromise(eff),
+    runPromiseExit: <A>(eff: Effect.Effect<A, any, never>) => Effect.runPromiseExit(eff),
   },
 }));
 
