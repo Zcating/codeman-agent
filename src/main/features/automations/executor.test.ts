@@ -192,4 +192,31 @@ describe("executeScriptAction", () => {
 
     expect(capturedOpts.cwd).toBe("/workspace/test");
   });
+
+  it("returns success when shell script executes successfully", async () => {
+    mockListWorkspaces.mockResolvedValue([{ id: "ws-1", label: "Test", rootPath: "/test" }]);
+
+    let spawnedChild: any;
+    mockSpawn.mockImplementation((_cmd: string, _args: string[], _opts: any) => {
+      spawnedChild = {
+        stdout: { on: vi.fn((_event, cb) => cb("hello\n")) },
+        stderr: { on: vi.fn() },
+        on: vi.fn((event: string, cb: (...args: any[]) => void) => {
+          if (event === "close") cb(0);
+        }),
+        kill: vi.fn(),
+      };
+      return spawnedChild;
+    });
+
+    const result = await Effect.runPromise(
+      executeScriptAction(
+        { language: "shell", source: "echo hello", workspaceId: "ws-1", timeoutMs: 300_000 },
+        "exec-shell-success",
+      ),
+    );
+
+    expect(result.status).toBe("success");
+    expect(result.finalText).toBe("hello\n");
+  });
 });
