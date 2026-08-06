@@ -129,6 +129,22 @@ describe("executeScriptAction", () => {
     executeScriptAction = mod.executeScriptAction;
   });
 
+  it("fails with InvalidConfig when language is javascript (V1 not supported)", async () => {
+    const action = {
+      kind: "script" as const,
+      language: "javascript" as const,
+      source: "console.log('hello')",
+      workspaceId: "ws-1",
+      timeoutMs: 300_000,
+    };
+
+    const result = await Effect.runPromiseExit(
+      executeScriptAction(action, "exec-js"),
+    );
+
+    expect(result._tag).toBe("Failure");
+  });
+
   it("returns error when workspace not found", async () => {
     mockListWorkspaces.mockResolvedValue([]);
 

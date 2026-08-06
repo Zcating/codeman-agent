@@ -5,7 +5,7 @@ import { BrowserWindow, ipcMain } from "electron";
 import { spawn } from "node:child_process";
 import { listWorkspaces } from "../workspaces/data.js";
 import { runMain } from "../../runtime.js";
-import { SandboxViolation, Unknown } from "../../../renderer/src/shared/lib/errors";
+import { SandboxViolation, Unknown, InvalidConfig } from "../../../renderer/src/shared/lib/errors";
 import type { AutomationRule, TriggerKind } from "../../../shared/lib/automation-types";
 
 // ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ export function executeAction(
   rule: AutomationRule,
   _triggerKind: TriggerKind,
   executionId: string,
-): Effect.Effect<ExecutionOutcome, Unknown | SandboxViolation> {
+): Effect.Effect<ExecutionOutcome, InvalidConfig | Unknown | SandboxViolation> {
   switch (rule.action.kind) {
     case "llm":
       return executeLlmAction(rule.action, executionId);
@@ -133,7 +133,12 @@ export function executeScriptAction(
     readonly timeoutMs: number;
   },
   _executionId: string,
-): Effect.Effect<ExecutionOutcome, SandboxViolation | Unknown> {
+): Effect.Effect<ExecutionOutcome, InvalidConfig | SandboxViolation | Unknown> {
+  // V1 does not support javascript script actions per ADR-0053 D10
+  if (action.language === "javascript") {
+    return Effect.fail(new InvalidConfig({ message: "V1 does not support javascript script action" }));
+  }
+
   return Effect.async((resolve) => {
     // Resolve workspace path from workspaceId via runMain to strip SqliteClient context
     runMain(listWorkspaces())
