@@ -101,6 +101,16 @@ const EXPECTED_CHANNELS = [
   "subAgents:delete",
   "subAgents:setEnabled",
   "runCommand",
+  // ADR-0053 TC — automations
+  "automations:list",
+  "automations:create",
+  "automations:update",
+  "automations:delete",
+  "automations:toggle",
+  "automations:run-now",
+  "automations:list-executions",
+  "automations:get-execution",
+  "automations:run-missed",
 ];
 
 describe("ipc.ts barrel", () => {
@@ -109,7 +119,7 @@ describe("ipc.ts barrel", () => {
     fakeWin.webContents.send.mockClear();
   });
 
-  it("registers all 46 expected ipcMain.handle channels", async () => {
+  it("registers all 55 expected ipcMain.handle channels", async () => {
     const { registerIpcHandlers } = await import("./ipc.js");
     const { McpManager } = await import("./features/mcp/mcp-manager.js");
     const { registerMcpIpcHandlers } = await import("./features/mcp/mcp-ipc.js");
