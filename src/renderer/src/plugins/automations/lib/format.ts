@@ -1,4 +1,4 @@
-import type { AutomationRule, AutomationSchedule, AutomationAction } from "@codeman-frontend/shared/lib/automation-types";
+import type { AutomationRule, AutomationSchedule, AutomationAction } from "@shared/lib/automation-types";
 
 const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 

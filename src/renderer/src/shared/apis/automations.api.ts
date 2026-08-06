@@ -4,7 +4,7 @@ import type { AppError } from "@codeman-frontend/shared/lib/errors";
 import type {
   AutomationRule,
   AutomationId,
-} from "@codeman-frontend/shared/lib/automation-types";
+} from "@shared/lib/automation-types";
 import type { AutomationExecution } from "./invoke.api";
 
 export class AutomationsApi extends Context.Tag("AutomationsApi")<

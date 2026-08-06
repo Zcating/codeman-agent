@@ -1,4 +1,4 @@
-import type { AutomationSchedule } from "@codeman-frontend/shared/lib/automation-types";
+import type { AutomationSchedule } from "@shared/lib/automation-types";
 
 /**
  * Compute the next delay in milliseconds from `now` until the next scheduled run.

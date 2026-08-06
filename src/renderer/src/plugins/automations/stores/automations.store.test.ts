@@ -9,7 +9,7 @@ import {
   _resetForTest,
 } from "./automations.store";
 import { AutomationsApi } from "@codeman-frontend/shared/apis";
-import type { AutomationRule } from "@codeman-frontend/shared/lib/automation-types";
+import type { AutomationRule } from "@shared/lib/automation-types";
 
 const makeRule = (overrides: Partial<AutomationRule> = {}): AutomationRule => ({
   id: "rule-1" as any,

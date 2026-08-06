@@ -2,7 +2,7 @@ import { type Accessor } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { Effect } from "effect";
 import { AutomationsApi, AutomationsApiLive } from "@codeman-frontend/shared/apis";
-import type { AutomationId } from "@codeman-frontend/shared/lib/automation-types";
+import type { AutomationId } from "@shared/lib/automation-types";
 import type { AutomationExecution } from "@codeman-frontend/shared/apis/invoke.api";
 
 interface ExecutionsState {

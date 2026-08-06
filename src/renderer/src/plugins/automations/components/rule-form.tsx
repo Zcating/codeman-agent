@@ -12,7 +12,7 @@ import { CodemanInput } from "@codeman-frontend/shared/components/internal/codem
 import { CodemanTextarea } from "@codeman-frontend/shared/components/internal/codeman-textarea";
 import { CodemanSelect } from "@codeman-frontend/shared/components/internal/codeman-select";
 import { CodemanCheckbox } from "@codeman-frontend/shared/components/internal/codeman-checkbox";
-import type { AutomationRule, AutomationSchedule, AutomationAction } from "@codeman-frontend/shared/lib/automation-types";
+import type { AutomationRule, AutomationSchedule, AutomationAction } from "@shared/lib/automation-types";
 
 export interface RuleFormValues {
   name: string;

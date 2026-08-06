@@ -10,7 +10,7 @@ import {
 import { RuleList } from "./rule-list";
 import { RuleFormDialog } from "./rule-form";
 import { ExecutionHistory } from "./execution-history";
-import type { AutomationRule } from "@codeman-frontend/shared/lib/automation-types";
+import type { AutomationRule } from "@shared/lib/automation-types";
 
 export function AutomationsSettingsTab(): JSX.Element {
   // Load rules on mount

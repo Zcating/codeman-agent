@@ -16,7 +16,7 @@ import type { SubAgentConfig } from "@codeman-frontend/plugins/multi-agents/lib/
 import type {
   AutomationRule,
   AutomationId,
-} from "@codeman-frontend/shared/lib/automation-types";
+} from "../shared/lib/automation-types";
 
 /** Automation execution record — mirrors SQLite automation_executions table */
 export type AutomationExecutionStatus =

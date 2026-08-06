@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { AutomationSchedule } from "@codeman-frontend/shared/lib/automation-types";
+import type { AutomationSchedule } from "@shared/lib/automation-types";
 import { computeNextDelay } from "./schedule";
 
 describe("schedule", () => {

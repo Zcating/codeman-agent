@@ -7,7 +7,7 @@ import {
   automationsRules$,
   automationsStore,
 } from "@codeman-frontend/plugins/automations/stores/automations.store";
-import type { AutomationRule } from "@codeman-frontend/shared/lib/automation-types";
+import type { AutomationRule } from "@shared/lib/automation-types";
 import { formatSchedule, formatActionKind } from "../lib/format";
 
 export interface RuleListProps {

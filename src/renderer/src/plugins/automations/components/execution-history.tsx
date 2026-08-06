@@ -8,7 +8,7 @@ import {
   executionsStore,
 } from "@codeman-frontend/plugins/automations/stores/executions.store";
 import type { AutomationExecution, AutomationExecutionStatus } from "@codeman-frontend/shared/apis/invoke.api";
-import type { AutomationId } from "@codeman-frontend/shared/lib/automation-types";
+import type { AutomationId } from "@shared/lib/automation-types";
 import { ExecutionDetailDialog } from "./execution-detail-dialog";
 
 const STATUS_CLASS: Record<AutomationExecutionStatus, string> = {
