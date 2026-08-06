@@ -17,6 +17,39 @@ import type {
   CompactionEntry,
 } from "../lib/types";
 import type { SubAgentConfig } from "@codeman-frontend/plugins/multi-agents/lib/sub-agent.types";
+import type {
+  AutomationRule,
+  AutomationId,
+} from "@codeman-frontend/shared/lib/automation-types";
+import type { TriggerKind } from "@codeman-frontend/shared/lib/automation-types";
+
+/**
+ * Automation execution record — mirrors SQLite automation_executions table.
+ * Defined here (renderer-side IPC layer) per ADR-0053 D3.
+ */
+export type AutomationExecutionStatus =
+  | "pending"
+  | "running"
+  | "success"
+  | "failure"
+  | "timeout"
+  | "skipped"
+  | "missed";
+
+export interface AutomationExecution {
+  readonly id: string;
+  readonly ruleId: AutomationId;
+  readonly status: AutomationExecutionStatus;
+  readonly triggerKind: TriggerKind;
+  readonly startedAt: number; // epoch ms
+  readonly completedAt: number | null;
+  readonly durationMs: number | null;
+  readonly finalText: string | null; // LLM action final assistant text
+  readonly exitCode: number | null; // script action exit code
+  readonly stderr: string | null;
+  readonly error: string | null;
+  readonly metadataJson: string | null;
+}
 
 export interface StreamSubscription {
   readonly onStreamChunk: (handler: (evt: unknown) => void) => () => void;
@@ -121,6 +154,21 @@ export interface CodemanApi {
   readonly subAgentsUpdate: (args: { id: string; patch: Partial<SubAgentConfig> }) => Promise<SubAgentConfig>;
   readonly subAgentsDelete: (args: { id: string }) => Promise<void>;
   readonly subAgentsSetEnabled: (args: { id: string; enabled: boolean }) => Promise<SubAgentConfig>;
+
+  // Automations (ADR-0053 D7)
+  readonly automationsList: () => Promise<readonly AutomationRule[]>;
+  readonly automationsCreate: (rule: AutomationRule) => Promise<AutomationRule>;
+  readonly automationsUpdate: (rule: AutomationRule) => Promise<AutomationRule>;
+  readonly automationsDelete: (args: { id: AutomationId }) => Promise<void>;
+  readonly automationsToggle: (args: { id: AutomationId; enabled: boolean }) => Promise<AutomationRule>;
+  readonly automationsRunNow: (args: { id: AutomationId }) => Promise<void>;
+  readonly automationsListExecutions: (args: {
+    ruleId?: AutomationId;
+    limit?: number;
+    offset?: number;
+  }) => Promise<readonly AutomationExecution[]>;
+  readonly automationsGetExecution: (args: { id: string }) => Promise<AutomationExecution>;
+  readonly automationsRunMissed: (args: { id: AutomationId }) => Promise<void>;
 }
 
 declare global {
