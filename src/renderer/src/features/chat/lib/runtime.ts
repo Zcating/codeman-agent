@@ -11,7 +11,6 @@ import { Agent, type AgentEvent, type AgentTool } from "@earendil-works/pi-agent
 import { createFileTools } from "@codeman-frontend/tools/file-ops";
 import { webfetchTool } from "@codeman-frontend/tools/webfetch";
 import { runCommandTool } from "@codeman-frontend/tools/run-command";
-import { formatSkillsManifestSection } from "@codeman-frontend/plugins/skills/lib/skill-injector";
 import { loadSkillTool } from "@codeman-frontend/plugins/skills/lib/skill-meta-tool";
 import { mcpAllTools$ } from "@codeman-frontend/plugins/mcp/stores/store";
 import type { McpToolEntry } from "@codeman-frontend/shared/lib/types";
@@ -344,14 +343,9 @@ export function createAgentRuntime(options: CreateAgentRuntimeOptions = {}): Age
           : null;
         const tools = delegateTaskTool ? [...baseTools, delegateTaskTool] : baseTools;
 
-        const skillsSection = formatSkillsManifestSection(provider.enabledSkills ?? []);
-        const finalSystemPrompt = skillsSection
-          ? `${provider.systemPrompt}\n\n${skillsSection}`
-          : provider.systemPrompt;
-
         const agent = new Agent({
           initialState: {
-            systemPrompt: finalSystemPrompt,
+            systemPrompt: provider.systemPrompt,
             model,
             thinkingLevel: "medium",
             tools,

@@ -51,14 +51,7 @@ export const defaultSettings: Settings = {
     minSize: { width: 800, height: 800 },
   },
   systemPrompt: {
-    default:
-      "You are an AI assistant with access to file system tools.\n" +
-      "\n## File Tools\n" +
-      "You have access to 5 file tools (read_file, write_file, edit_file, search_files, delete_file).\n" +
-      "Each tool requires a workspace_id parameter — only operate within user-configured workspaces.\n" +
-      "Paths outside any workspace will return a SandboxViolation error.\n" +
-      "For edit_file, your old_text must match exactly once unless you set replace_all=true.\n" +
-      "Files are limited to 10 MB. Binary files, .exe/.dll/.sys files, and paths outside workspaces are blocked.",
+    default: "",
     userCanEdit: true,
   },
   conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },

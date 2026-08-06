@@ -23,6 +23,7 @@ import {
   MessageApiLive,
   CompactionApi,
   CompactionApiLive,
+  FileApiLive,
 } from "@codeman-frontend/shared/apis";
 import {
   WorkspaceService,
@@ -38,6 +39,15 @@ import {
   CompactionCancelled,
   type PerformCompactionDeps,
 } from "@codeman-frontend/features/chat/lib/compaction";
+import {
+  buildSystemPrompt,
+  DEFAULT_IDENTITY,
+  DEFAULT_TOOL_SNIPPETS,
+  DEFAULT_GUIDELINES,
+} from "@codeman-frontend/features/chat/lib/build-system-prompt";
+import { loadProjectInstructions } from "@codeman-frontend/features/chat/lib/workspace-project-instructions";
+import { formatSkillsManifestSection } from "@codeman-frontend/plugins/skills/lib/skill-injector";
+import { mcpAllTools$ } from "@codeman-frontend/plugins/mcp/stores/store";
 
 
 export interface ConversationState {
@@ -59,6 +69,8 @@ export interface ConversationState {
     | { _tag: "compacting"; kind: "auto" | "manual" }
     | { _tag: "completed"; kind: "auto" | "manual"; entry: CompactionEntry }
     | { _tag: "failed"; kind: "auto" | "manual"; reason: string };
+  /** AGENTS.md content, loaded once per session */
+  projectInstructions: string | null;
 }
 
 
@@ -110,6 +122,7 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
     runtime,
     compactionEntries: [],
     compactionStatus: { _tag: "idle" },
+    projectInstructions: null,
   };
   setStore("byId", conv.id, cs);
   setConversationsSignal(Object.values(store.byId));
@@ -372,21 +385,44 @@ export const sendMessage = Effect.fn(
       (m) => enabledNames.includes(m.name),
     );
 
-    const augmentedProvider: ProviderConfig = cs.workspaceId
-      ? {
-        ...provider,
-        workspaceId: cs.workspaceId,
-        enabledSkills,
-        systemPrompt:
-          `${provider.systemPrompt}\n\n` +
-          `[Workspace context]\n` +
-          `You are operating inside workspaceId="${cs.workspaceId}".\n` +
-          `You MUST pass this exact id as the workspaceId parameter for ALL file tools ` +
-          `(read_file, write_file, edit_file, search_files, delete_file).\n` +
-          `Do NOT infer the id from user messages, folder names, or any other context — ` +
-          `use ONLY the id given above.`,
-      }
-      : { ...provider, enabledSkills };
+    // Workspace lookup (single call; used for both projectInstructions loading and workspaceSection)
+    const workspace = cs.workspaceId ? workspaces$().find((w) => w.id === cs.workspaceId) : null;
+
+    // Load projectInstructions once per session if workspace exists and not yet loaded
+    if (cs.projectInstructions === null && workspace) {
+      const loaded = yield* loadProjectInstructions(cs.workspaceId).pipe(
+        Effect.provide(FileApiLive),
+      );
+      setStore("byId", convId, "projectInstructions", loaded);
+    }
+
+    // ── Dynamic tool snippets from MCP servers ───────────────────────────────
+    const dynamicToolSnippets: readonly string[] = mcpAllTools$().map((t) => t.description);
+
+    // ── Workspace context ───────────────────────────────────────────────────
+    const workspaceSection = workspace
+      ? { workspaceId: cs.workspaceId, rootPath: workspace.rootPath }
+      : undefined;
+
+    // ── Build system prompt via ADR-0051 assembler ──────────────────────────
+    const finalSystemPrompt = buildSystemPrompt({
+      identity: DEFAULT_IDENTITY,
+      staticToolSnippets: DEFAULT_TOOL_SNIPPETS,
+      dynamicToolSnippets: dynamicToolSnippets.length > 0 ? dynamicToolSnippets : undefined,
+      guidelines: DEFAULT_GUIDELINES,
+      workspace: workspaceSection,
+      projectInstructions: cs.projectInstructions ?? undefined,
+      skillsSection: formatSkillsManifestSection(enabledSkills),
+      userDefault: appStore.state.value.systemPrompt.default,
+      conversationOverride: cs.systemPrompt ?? undefined,
+    });
+
+    const augmentedProvider: ProviderConfig = {
+      ...provider,
+      workspaceId: cs.workspaceId || undefined,
+      enabledSkills,
+      systemPrompt: finalSystemPrompt,
+    };
 
     const stream = cs.runtime.run({ context, provider: augmentedProvider });
     yield* Stream.runForEach(stream, (evt) =>

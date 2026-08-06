@@ -36,7 +36,6 @@ import {
   getDefaultSystemPrompt,
   getUserCanEdit,
   updateDefaultSystemPrompt,
-  resolveSystemPromptForConversation,
 } from "@codeman-frontend/features/settings/lib/system-prompt";
 
 describe("system-prompt (ADR-0015)", () => {
@@ -64,31 +63,5 @@ describe("system-prompt (ADR-0015)", () => {
   it("updateDefaultSystemPrompt writes via appStore", () => {
     updateDefaultSystemPrompt("New prompt");
     expect(getDefaultSystemPrompt()).toBe("New prompt");
-  });
-
-  it("resolveSystemPromptForConversation prefers conversation.systemPrompt", () => {
-    const conv = {
-      id: "c1",
-      title: "T",
-      systemPrompt: "Conv prompt",
-      workspaceId: "",
-      createdAt: 0,
-      updatedAt: 0,
-      archivedAt: null,
-    };
-    expect(resolveSystemPromptForConversation(conv)).toBe("Conv prompt");
-  });
-
-  it("resolveSystemPromptForConversation falls back to settings default", () => {
-    const conv = {
-      id: "c1",
-      title: "T",
-      systemPrompt: null,
-      workspaceId: "",
-      createdAt: 0,
-      updatedAt: 0,
-      archivedAt: null,
-    };
-    expect(resolveSystemPromptForConversation(conv)).toBe("You are a helpful assistant.");
   });
 });
