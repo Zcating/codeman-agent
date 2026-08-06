@@ -7,20 +7,13 @@ import { createSubAgent, type ToolRegistry } from "@codeman-frontend/plugins/mul
 import type { SubAgentConfig } from "@codeman-frontend/shared/lib/sub-agent-schema";
 import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
 import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
+import type { AutomationAction } from "@shared/lib/automation-types";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-// LlmAction matches AutomationAction with kind === "llm" from automation-types.ts
-interface LlmAction {
-  readonly kind: "llm";
-  readonly systemPrompt: string;
-  readonly userPrompt: string;
-  readonly providerId: string;
-  readonly modelId: string;
-  readonly timeoutMs: number;
-}
+type LlmAction = Extract<AutomationAction, { kind: "llm" }>;
 
 interface LlmResultPayload {
   executionId: string;
