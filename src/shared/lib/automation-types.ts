@@ -61,3 +61,34 @@ export interface AutomationRule {
  * 触发类型
  */
 export type TriggerKind = "scheduled" | "manual" | "missed-replay";
+
+/**
+ * Automation execution status — IPC type (camelCase per ADR-0026)
+ */
+export type AutomationExecutionStatus =
+  | "pending"
+  | "running"
+  | "success"
+  | "failure"
+  | "timeout"
+  | "skipped"
+  | "missed";
+
+/**
+ * Automation execution record — IPC type (camelCase per ADR-0026)
+ * Used across IPC boundary between main, preload, and renderer
+ */
+export interface AutomationExecution {
+  readonly id: string;
+  readonly ruleId: AutomationId;
+  readonly status: AutomationExecutionStatus;
+  readonly triggerKind: TriggerKind;
+  readonly startedAt: number;
+  readonly completedAt: number | null;
+  readonly durationMs: number | null;
+  readonly finalText: string | null;
+  readonly exitCode: number | null;
+  readonly stderr: string | null;
+  readonly error: string | null;
+  readonly metadataJson: string | null;
+}

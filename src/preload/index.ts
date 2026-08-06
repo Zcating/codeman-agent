@@ -16,32 +16,9 @@ import type { SubAgentConfig } from "@codeman-frontend/plugins/multi-agents/lib/
 import type {
   AutomationRule,
   AutomationId,
+  AutomationExecution,
 } from "../shared/lib/automation-types";
-
-/** Automation execution record — mirrors SQLite automation_executions table */
-export type AutomationExecutionStatus =
-  | "pending"
-  | "running"
-  | "success"
-  | "failure"
-  | "timeout"
-  | "skipped"
-  | "missed";
-
-export interface AutomationExecution {
-  readonly id: string;
-  readonly ruleId: AutomationId;
-  readonly status: AutomationExecutionStatus;
-  readonly triggerKind: "scheduled" | "manual" | "missed-replay";
-  readonly startedAt: number;
-  readonly completedAt: number | null;
-  readonly durationMs: number | null;
-  readonly finalText: string | null;
-  readonly exitCode: number | null;
-  readonly stderr: string | null;
-  readonly error: string | null;
-  readonly metadataJson: string | null;
-}
+export type { AutomationExecution } from "../shared/lib/automation-types";
 
 export interface StreamSubscription {
   readonly onStreamChunk: (handler: (evt: unknown) => void) => () => void;

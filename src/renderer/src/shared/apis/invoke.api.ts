@@ -20,36 +20,12 @@ import type { SubAgentConfig } from "@codeman-frontend/plugins/multi-agents/lib/
 import type {
   AutomationRule,
   AutomationId,
+  AutomationExecution,
+  AutomationExecutionStatus,
 } from "@shared/lib/automation-types";
-import type { TriggerKind } from "@shared/lib/automation-types";
 
-/**
- * Automation execution record — mirrors SQLite automation_executions table.
- * Defined here (renderer-side IPC layer) per ADR-0053 D3.
- */
-export type AutomationExecutionStatus =
-  | "pending"
-  | "running"
-  | "success"
-  | "failure"
-  | "timeout"
-  | "skipped"
-  | "missed";
-
-export interface AutomationExecution {
-  readonly id: string;
-  readonly ruleId: AutomationId;
-  readonly status: AutomationExecutionStatus;
-  readonly triggerKind: TriggerKind;
-  readonly startedAt: number; // epoch ms
-  readonly completedAt: number | null;
-  readonly durationMs: number | null;
-  readonly finalText: string | null; // LLM action final assistant text
-  readonly exitCode: number | null; // script action exit code
-  readonly stderr: string | null;
-  readonly error: string | null;
-  readonly metadataJson: string | null;
-}
+// Re-export for API consumers
+export type { AutomationExecution, AutomationExecutionStatus };
 
 export interface StreamSubscription {
   readonly onStreamChunk: (handler: (evt: unknown) => void) => () => void;
