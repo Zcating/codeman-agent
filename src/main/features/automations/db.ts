@@ -2,6 +2,7 @@
 import { Effect } from "effect";
 import Database from "better-sqlite3";
 import { Database as DatabaseError } from "../../../renderer/src/shared/lib/errors";
+import type { TriggerKind } from "../../../shared/lib/automation-types";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -15,8 +16,6 @@ export type AutomationExecutionStatus =
   | "timeout"
   | "skipped"
   | "missed";
-
-export type TriggerKind = "scheduled" | "manual" | "missed-replay";
 
 export interface AutomationExecution {
   readonly id: string;
