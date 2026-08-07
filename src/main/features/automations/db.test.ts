@@ -1,7 +1,56 @@
 // ADR-0053 TB — db.test.ts (DAO unit tests with in-memory SQLite)
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import Database from "better-sqlite3";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Effect } from "effect";
+
+// Mock better-sqlite3 BEFORE importing db to prevent native module loading
+// (ABI mismatch: Electron-compiled better-sqlite3 vs system Node ABI).
+vi.mock("better-sqlite3", () => {
+  // In-memory store shared across prepared statements within a test
+  const store = new Map<string, Record<string, unknown>>();
+
+  const makeStmt = () => ({
+    run: vi.fn((params?: Record<string, unknown>) => {
+      if (params?.id) store.set(params.id as string, { ...params });
+    }),
+    all: vi.fn((params?: Record<string, unknown>) => {
+      let rows = Array.from(store.values());
+      // Filter by ruleId if present
+      if (params?.ruleId !== undefined) {
+        rows = rows.filter((r) => r.rule_id === params.ruleId);
+      }
+      // Filter by status if present
+      if (params?.status !== undefined) {
+        rows = rows.filter((r) => r.status === params.status);
+      }
+      // Sort by started_at DESC (simplified: numeric sort)
+      rows.sort((a, b) => (b.started_at as number) - (a.started_at as number));
+      // Apply offset
+      const offset = (params?.offset as number) ?? 0;
+      rows = rows.slice(offset);
+      // Apply limit
+      const limit = (params?.limit as number) ?? 100;
+      rows = rows.slice(0, limit);
+      return rows;
+    }),
+    get: vi.fn((id: string) => store.get(id) ?? undefined),
+  });
+
+  class FakeDatabase {
+    prepare = vi.fn(() => makeStmt());
+    exec = vi.fn();
+    close = vi.fn();
+    transaction = vi.fn((fn: () => void) => fn());
+
+    constructor() {
+      // Reset store when new Database(":memory:") is called in beforeEach
+      store.clear();
+    }
+  }
+
+  return { default: FakeDatabase };
+});
+
+import Database from "better-sqlite3";
 import { insertExecution, updateExecutionCompletion, listExecutions, getExecution, setDatabase } from "./db";
 import type { AutomationExecution, AutomationExecutionStatus } from "./db";
 
