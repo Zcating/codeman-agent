@@ -169,6 +169,8 @@ export function splitSqlStatements(sqlText: string): string[] {
 /**
  * MigrationsLive：在 SqliteLive 之后运行，执行迁移 + 开启 foreign_keys。
  * 由 DbLive = Layer.provide(Layer.mergeAll(SqliteLive, MigrationsLive), SqliteLive) 提供 SqliteClient。
+ *
+ * Migration 0007: automation_executions — ADR-0053 D8
  */
 export const MigrationsLive = Layer.effectDiscard(
   Effect.gen(function* () {

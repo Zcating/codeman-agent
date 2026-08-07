@@ -15,6 +15,8 @@ import { ensurePreinstalledSkills } from "./features/skills/skills-host";
 import { registerSkillsIpc } from "./features/skills/ipc";
 import { McpManager } from "./features/mcp/mcp-manager";
 import { registerMcpIpcHandlers } from "./features/mcp/mcp-ipc";
+import { AutomationScheduler } from "./features/automations/scheduler";
+import { registerAutomationIpc } from "./features/automations/ipc";
 
 const WORKER = process.env.CODEMAN_TEST_WORKER ?? "";
 
@@ -146,6 +148,14 @@ app.whenReady().then(() => {
           Effect.sync(() => logger.error("[mcp] startAll failed:", Cause.pretty(cause))),
         ),
       );
+
+      // Register automation IPC handlers
+      registerAutomationIpc();
+
+      // Start automation scheduler
+      const scheduler = AutomationScheduler.getInstance();
+      yield* Effect.promise(() => scheduler.start());
+      yield* Effect.addFinalizer(() => Effect.sync(() => scheduler.stop()));
 
       mainWindow = createMainWindow();
 

@@ -13,6 +13,12 @@ import type {
   CompactionEntry,
 } from "@codeman-frontend/shared/lib/types";
 import type { SubAgentConfig } from "@codeman-frontend/plugins/multi-agents/lib/sub-agent.types";
+import type {
+  AutomationRule,
+  AutomationId,
+  AutomationExecution,
+} from "../shared/lib/automation-types";
+export type { AutomationExecution } from "../shared/lib/automation-types";
 
 export interface StreamSubscription {
   readonly onStreamChunk: (handler: (evt: unknown) => void) => () => void;
@@ -117,6 +123,21 @@ export interface CodemanApi {
   readonly subAgentsUpdate: (args: { id: string; patch: Partial<SubAgentConfig> }) => Promise<SubAgentConfig>;
   readonly subAgentsDelete: (args: { id: string }) => Promise<void>;
   readonly subAgentsSetEnabled: (args: { id: string; enabled: boolean }) => Promise<SubAgentConfig>;
+
+  // Automations
+  readonly automationsList: () => Promise<readonly AutomationRule[]>;
+  readonly automationsCreate: (rule: AutomationRule) => Promise<AutomationRule>;
+  readonly automationsUpdate: (rule: AutomationRule) => Promise<AutomationRule>;
+  readonly automationsDelete: (args: { id: AutomationId }) => Promise<void>;
+  readonly automationsToggle: (args: { id: AutomationId; enabled: boolean }) => Promise<AutomationRule>;
+  readonly automationsRunNow: (args: { id: AutomationId }) => Promise<void>;
+  readonly automationsListExecutions: (args: {
+    ruleId?: AutomationId;
+    limit?: number;
+    offset?: number;
+  }) => Promise<readonly AutomationExecution[]>;
+  readonly automationsGetExecution: (args: { id: string }) => Promise<AutomationExecution>;
+  readonly automationsRunMissed: (args: { id: AutomationId }) => Promise<void>;
 }
 
 export type CodemanApiExposed = CodemanApi &
@@ -184,6 +205,17 @@ const codeman: CodemanApiExposed = {
   subAgentsUpdate: (args) => ipcRenderer.invoke("subAgents:update", args),
   subAgentsDelete: (args) => ipcRenderer.invoke("subAgents:delete", args),
   subAgentsSetEnabled: (args) => ipcRenderer.invoke("subAgents:setEnabled", args),
+
+  // Automations (ADR-0053 D7)
+  automationsList: () => ipcRenderer.invoke("automations:list"),
+  automationsCreate: (rule) => ipcRenderer.invoke("automations:create", rule),
+  automationsUpdate: (rule) => ipcRenderer.invoke("automations:update", rule),
+  automationsDelete: (args) => ipcRenderer.invoke("automations:delete", args),
+  automationsToggle: (args) => ipcRenderer.invoke("automations:toggle", args),
+  automationsRunNow: (args) => ipcRenderer.invoke("automations:run-now", args),
+  automationsListExecutions: (args) => ipcRenderer.invoke("automations:list-executions", args),
+  automationsGetExecution: (args) => ipcRenderer.invoke("automations:get-execution", args),
+  automationsRunMissed: (args) => ipcRenderer.invoke("automations:run-missed", args),
 
   onStreamChunk: (handler) => {
     const listener = (_e: unknown, evt: unknown) => handler(evt);

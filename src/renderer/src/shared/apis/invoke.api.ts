@@ -17,6 +17,15 @@ import type {
   CompactionEntry,
 } from "../lib/types";
 import type { SubAgentConfig } from "@codeman-frontend/plugins/multi-agents/lib/sub-agent.types";
+import type {
+  AutomationRule,
+  AutomationId,
+  AutomationExecution,
+  AutomationExecutionStatus,
+} from "@shared/lib/automation-types";
+
+// Re-export for API consumers
+export type { AutomationExecution, AutomationExecutionStatus };
 
 export interface StreamSubscription {
   readonly onStreamChunk: (handler: (evt: unknown) => void) => () => void;
@@ -121,6 +130,21 @@ export interface CodemanApi {
   readonly subAgentsUpdate: (args: { id: string; patch: Partial<SubAgentConfig> }) => Promise<SubAgentConfig>;
   readonly subAgentsDelete: (args: { id: string }) => Promise<void>;
   readonly subAgentsSetEnabled: (args: { id: string; enabled: boolean }) => Promise<SubAgentConfig>;
+
+  // Automations (ADR-0053 D7)
+  readonly automationsList: () => Promise<readonly AutomationRule[]>;
+  readonly automationsCreate: (rule: AutomationRule) => Promise<AutomationRule>;
+  readonly automationsUpdate: (rule: AutomationRule) => Promise<AutomationRule>;
+  readonly automationsDelete: (args: { id: AutomationId }) => Promise<void>;
+  readonly automationsToggle: (args: { id: AutomationId; enabled: boolean }) => Promise<AutomationRule>;
+  readonly automationsRunNow: (args: { id: AutomationId }) => Promise<void>;
+  readonly automationsListExecutions: (args: {
+    ruleId?: AutomationId;
+    limit?: number;
+    offset?: number;
+  }) => Promise<readonly AutomationExecution[]>;
+  readonly automationsGetExecution: (args: { id: string }) => Promise<AutomationExecution>;
+  readonly automationsRunMissed: (args: { id: AutomationId }) => Promise<void>;
 }
 
 declare global {

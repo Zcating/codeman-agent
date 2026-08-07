@@ -16,6 +16,9 @@
     "paths": {
       "@codeman-frontend/*": [
         "./src/renderer/src/*"
+      ],
+      "@shared/lib/*": [
+        "./src/shared/lib/*"
       ]
     }
   }
