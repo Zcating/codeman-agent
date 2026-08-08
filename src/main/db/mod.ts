@@ -1,19 +1,27 @@
-
 /**
  * db/mod.ts - Effect Layer 版 db singleton
  *
  * SqliteLive: better-sqlite3 连接，提供 SqlClient + SqliteClient
  * MigrationsLive: 应用 .sql 迁移文件
  * DbLive = Layer.mergeAll(SqliteLive, MigrationsLive)
+ *
+ * PR-δ (ADR-0058): applyMigrationsEffect 内部 fs 调用改经 FileSystem service。
+ * MigrationsLive 用 Layer.provide(NodeFileSystemLive) 注入 FileSystem，
+ * R 收敛为 never，MigrationsLive 顶层不再泄漏 FileSystem 依赖。
+ *
+ * migrationsDir() 仍 sync（boot path, pre-runtime，无 service context），
+ * fileURLToPath 保留 node:url import，existsSync 保留用于 boot path 探针
+ * （见 ADR-0058 PR-δ C2）。
  */
-
 import { join, dirname } from "node:path";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { app } from "electron";
 import { Effect, Layer } from "effect";
+import { FileSystem } from "@effect/platform";
 import * as SqliteNS from "@effect/sql-sqlite-node/SqliteClient";
+import { NodeFileSystemLive } from "../lib/file-system-node.js";
 
 function dbPath(): string {
   return join(app.getPath("userData"), "codeman-agent.db");
@@ -23,6 +31,8 @@ function dbPath(): string {
  * 解析 migrations 目录路径（dev / 打包后均兼容）。
  * ESM 下使用 import.meta.url，dev 时指向 src/main/db/migrations，
  * 打包后指向 dist-electron/main/db/migrations。
+ *
+ * 保留为 sync 函数：boot path 在 runtime 建立前调用，无 service context。
  */
 function migrationsDir(): string {
   // 尝试 ESM 方式（打包后）
@@ -65,11 +75,16 @@ export const SqliteLive = SqliteNS.layer({
  * - 按文件名升序逐个执行未应用迁移
  * - 幂等：已应用的跳过
  *
+ * PR-δ: fs 调用走 FileSystem.FileSystem service。migrationsDir() 仍 sync
+ * （boot path 探针，无 service context），existsSync 保留用于"目录是否存在"
+ * 一次性检查。readdir / readFile 改为 yield* service 调用。
+ *
  * Note: 使用 SqliteClient 而非 SqlClient — 两者在 @effect/sql-sqlite-node
  * 中指向同一个底层客户端，但 SqliteClient 是更稳定的 API surface。
  */
 export const applyMigrationsEffect = Effect.gen(function* () {
   const sql = yield* SqliteNS.SqliteClient;
+  const fs = yield* FileSystem.FileSystem;
 
   // 建 _migrations 表（若不存在）
   yield* sql.unsafe(`
@@ -84,7 +99,7 @@ export const applyMigrationsEffect = Effect.gen(function* () {
   if (!existsSync(dir)) {
     return;
   }
-  const files = readdirSync(dir)
+  const files = (yield* fs.readDirectory(dir))
     .filter((f) => f.endsWith(".sql"))
     .sort();
 
@@ -96,7 +111,7 @@ export const applyMigrationsEffect = Effect.gen(function* () {
     if (applied.has(f)) {
       continue;
     }
-    const sqlText = readFileSync(join(dir, f), "utf-8");
+    const sqlText = yield* fs.readFileString(join(dir, f));
     // 执行迁移 SQL（按语句拆分：better-sqlite3 prepare 仅接受单语句）
     for (const stmt of splitSqlStatements(sqlText)) {
       yield* sql.unsafe(stmt).pipe(Effect.as(void 0));
@@ -168,23 +183,27 @@ export function splitSqlStatements(sqlText: string): string[] {
 
 /**
  * MigrationsLive：在 SqliteLive 之后运行，执行迁移 + 开启 foreign_keys。
- * 由 DbLive = Layer.provide(Layer.mergeAll(SqliteLive, MigrationsLive), SqliteLive) 提供 SqliteClient。
  *
- * Migration 0007: automation_executions — ADR-0053 D8
+ * PR-δ: applyMigrationsEffect 需要 FileSystem.FileSystem（读 migrations
+ * 目录 + 读 .sql 文件）。MigrationsLive.pipe(Layer.provide(NodeFileSystemLive))
+ * 把 FileSystem 注入内部 effect，R 收敛为 never。这样 DbLive 顶层 R 也保持
+ * never，MainLive 不需为 MigrationsLive 额外提供 FileSystem。
  */
 export const MigrationsLive = Layer.effectDiscard(
   Effect.gen(function* () {
     const sql = yield* SqliteNS.SqliteClient;
     yield* sql.unsafe("PRAGMA foreign_keys = ON");
     yield* applyMigrationsEffect;
-  })
-);
+  }),
+).pipe(Layer.provide(NodeFileSystemLive));
 
 /**
  * DbLive = Layer.provide(Layer.mergeAll(SqliteLive, MigrationsLive), SqliteLive)。
  * Layer.provide 将 SqliteLive 注入合并层上下文，使 MigrationsLive 能访问 SqliteClient。
+ * FileSystem 已由 MigrationsLive.pipe(Layer.provide(NodeFileSystemLive)) 内部注入，
+ * DbLive 顶层 R 保持 never。
  */
 export const DbLive = Layer.provide(
   Layer.mergeAll(SqliteLive, MigrationsLive),
-  SqliteLive
+  SqliteLive,
 );

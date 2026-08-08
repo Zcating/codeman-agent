@@ -3,11 +3,16 @@
  *
  * ADR-0046 D3: getWorkspaceById 移到 data.ts，handler 经 runMain 执行。
  * 删 db dep，删 better-sqlite3 import。
+ *
+ * PR-δ (ADR-0058): fs 调用全部走 FileSystem.FileSystem service。
+ * - editFile / deleteFile / readFile / writeFile handler：走
+ *   file-sandbox.ts 的 Effect-returning API（PR-β 已迁移），runMain 桥接。
+ * - searchFiles handler 内部的 searchFilesInWorkspace / walkDir 改用
+ *   runMain(Effect.gen(...)) 包装 fs 调用。
  */
-
 import { ipcMain } from "electron";
-import { readFile, unlink, readdir, stat } from "node:fs/promises";
-import { join } from "node:path";
+import * as FileSystem from "@effect/platform/FileSystem";
+import { Effect } from "effect";
 
 import { runMain } from "../../runtime.js";
 import { getWorkspaceById } from "./data.js";
@@ -19,7 +24,7 @@ import {
 import { sandboxHandler } from "../../lib/sandbox-handler.js";
 
 // ---------------------------------------------------------------------------
-// helpers（保留原有 applyEdit 等纯函数）
+// helpers（保留原有 applyEdit / matchGlob 等纯函数）
 // ---------------------------------------------------------------------------
 
 export function applyEdit(
@@ -27,7 +32,7 @@ export function applyEdit(
   oldText: string,
   newText: string,
   replaceAll: boolean,
-  path: string
+  path: string,
 ):
   | { kind: "ok"; newContent: string }
   | { kind: "notFound" | "ambiguous"; message: string } {
@@ -60,10 +65,69 @@ export function applyEdit(
   return { kind: "ok", newContent };
 }
 
+/**
+ * 递归遍历 workspace 目录，对每个文件调 visit(relPath)。
+ * 实现用 stack-based DFS；跳过 .git / node_modules / dist / dist-electron /
+ * .electron-builder-cache（与原实现一致）。
+ *
+ * 走 FileSystem service：通过 runMain 把 Effect.gen 桥接到 Promise。
+ */
+async function walkDir(
+  root: string,
+  visit: (relPath: string) => Promise<void>,
+): Promise<void> {
+  await runMain(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const skip = new Set([
+        ".git",
+        "node_modules",
+        "dist",
+        "dist-electron",
+        ".electron-builder-cache",
+      ]);
+      const stack: Array<{ abs: string; rel: string }> = [
+        { abs: root, rel: "" },
+      ];
+      while (stack.length > 0) {
+        const item = stack.pop()!;
+        const entries = yield* fs.readDirectory(item.abs).pipe(
+          Effect.catchAll(() => Effect.succeed([] as readonly string[])),
+        );
+        for (const entry of entries) {
+          if (skip.has(entry)) {
+            continue;
+          }
+          const childRel = item.rel ? `${item.rel}/${entry}` : entry;
+          // walkDir 内部不需要 Path service（relPath 是 POSIX 风格的纯字符串拼接），
+          // childAbs 仍然以 root 为基准拼接，留给下游 fs 调用。
+          const childAbs = `${root}/${childRel}`.replace(/\\/g, "/");
+          const info = yield* fs.stat(childAbs).pipe(
+            Effect.catchAll(() => Effect.succeed(null)),
+          );
+          if (info === null) {
+            continue;
+          }
+          if (info.type === "Directory") {
+            stack.push({ abs: childAbs, rel: childRel });
+          } else if (info.type === "File") {
+            // 把同步 visit 转成 Effect.then
+            yield* Effect.promise(() => visit(childRel));
+          }
+        }
+      }
+    }),
+  );
+}
+
+/**
+ * 在 workspace 内搜索匹配 glob 且（可选）包含 contentPattern 的文件。
+ * 内部 fs 操作走 FileSystem service。
+ */
 async function searchFilesInWorkspace(
   root: string,
   glob: string,
-  contentPattern: string | null
+  contentPattern: string | null,
 ): Promise<Array<{ path: string; line: number; text: string }>> {
   const results: Array<{ path: string; line: number; text: string }> = [];
   await walkDir(root, async (relPath) => {
@@ -75,7 +139,15 @@ async function searchFilesInWorkspace(
       results.push({ path: norm, line: 0, text: "" });
       return;
     }
-    const content = await readFile(join(root, relPath), "utf-8").catch(() => null);
+    const abs = `${root}/${relPath}`.replace(/\\/g, "/");
+    const content = await runMain(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        return yield* fs.readFileString(abs).pipe(
+          Effect.catchAll(() => Effect.succeed(null)),
+        );
+      }),
+    );
     if (!content) {
       return;
     }
@@ -90,45 +162,6 @@ async function searchFilesInWorkspace(
   return results;
 }
 
-async function walkDir(
-  root: string,
-  visit: (relPath: string) => Promise<void>
-): Promise<void> {
-  const skip = new Set([
-    ".git",
-    "node_modules",
-    "dist",
-    "dist-electron",
-    ".electron-builder-cache",
-  ]);
-  const stack: Array<{ abs: string; rel: string }> = [{ abs: root, rel: "" }];
-  while (stack.length > 0) {
-    const item = stack.pop()!;
-    let entries: string[];
-    try {
-      entries = await readdir(item.abs);
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      if (skip.has(entry)) {
-        continue;
-      }
-      const childRel = item.rel ? `${item.rel}/${entry}` : entry;
-      const childAbs = join(root, childRel);
-      const st = await stat(childAbs).catch(() => null);
-      if (!st) {
-        continue;
-      }
-      if (st.isDirectory()) {
-        stack.push({ abs: childAbs, rel: childRel });
-      } else if (st.isFile()) {
-        await visit(childRel);
-      }
-    }
-  }
-}
-
 function matchGlob(relPath: string, glob: string): boolean {
   const escaped = glob
     .replace(/[.+^${}()|[\]\\]/g, "\\$&")
@@ -136,7 +169,7 @@ function matchGlob(relPath: string, glob: string): boolean {
     .replace(/\*/g, "[^/]*")
     .replace(/\?/g, "[^/]");
   return new RegExp(`^${escaped.replace(/::DOUBLESTAR::/g, ".*")}$`).test(
-    relPath
+    relPath,
   );
 }
 
@@ -151,16 +184,18 @@ export function registerFileOpsIpc(): void {
       const wsId = args.workspaceId ?? "";
       const ws = await runMain(getWorkspaceById(wsId));
       return await readFileInWorkspace(ws.root_path, args.path);
-    })
+    }),
   );
 
   ipcMain.handle(
     "writeFile",
-    sandboxHandler(async (args: { workspaceId?: string; path: string; content: string }) => {
-      const wsId = args.workspaceId ?? "";
-      const ws = await runMain(getWorkspaceById(wsId));
-      await writeFileInWorkspace(ws.root_path, args.path, args.content);
-    })
+    sandboxHandler(
+      async (args: { workspaceId?: string; path: string; content: string }) => {
+        const wsId = args.workspaceId ?? "";
+        const ws = await runMain(getWorkspaceById(wsId));
+        await writeFileInWorkspace(ws.root_path, args.path, args.content);
+      },
+    ),
   );
 
   ipcMain.handle(
@@ -175,34 +210,52 @@ export function registerFileOpsIpc(): void {
       }) => {
         const wsId = args.workspaceId ?? "";
         const ws = await runMain(getWorkspaceById(wsId));
-        const abs = await validatePathInWorkspace(args.path, ws.root_path);
-        const content = await readFile(abs, "utf-8");
+        const abs = await runMain(
+          validatePathInWorkspace(args.path, ws.root_path),
+        );
+        const content = await runMain(
+          Effect.gen(function* () {
+            const fs = yield* FileSystem.FileSystem;
+            return yield* fs.readFileString(abs);
+          }),
+        );
         const result = applyEdit(
           content,
           args.oldText,
           args.newText,
           args.replaceAll ?? false,
-          args.path
+          args.path,
         );
         if (result.kind !== "ok") {
           throw new Error(result.message);
         }
-        await writeFileInWorkspace(ws.root_path, args.path, result.newContent);
-      }
-    )
+        await writeFileInWorkspace(
+          ws.root_path,
+          args.path,
+          result.newContent,
+        );
+      },
+    ),
   );
 
   ipcMain.handle(
     "searchFiles",
-    async (_e, args: { workspaceId?: string; glob: string; contentPattern?: string | null }) => {
+    async (
+      _e,
+      args: {
+        workspaceId?: string;
+        glob: string;
+        contentPattern?: string | null;
+      },
+    ) => {
       const wsId = args.workspaceId ?? "";
       const ws = await runMain(getWorkspaceById(wsId));
       return await searchFilesInWorkspace(
         ws.root_path,
         args.glob,
-        args.contentPattern ?? null
+        args.contentPattern ?? null,
       );
-    }
+    },
   );
 
   ipcMain.handle(
@@ -210,8 +263,15 @@ export function registerFileOpsIpc(): void {
     sandboxHandler(async (args: { workspaceId?: string; path: string }) => {
       const wsId = args.workspaceId ?? "";
       const ws = await runMain(getWorkspaceById(wsId));
-      const abs = await validatePathInWorkspace(args.path, ws.root_path);
-      await unlink(abs);
-    })
+      const abs = await runMain(
+        validatePathInWorkspace(args.path, ws.root_path),
+      );
+      await runMain(
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          yield* fs.remove(abs);
+        }),
+      );
+    }),
   );
 }

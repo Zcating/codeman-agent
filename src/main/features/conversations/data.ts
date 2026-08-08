@@ -11,6 +11,12 @@ import { Effect } from "effect";
 import { SqliteClient } from "@effect/sql-sqlite-node/SqliteClient";
 
 import { Database } from "../../../renderer/src/shared/lib/errors.js";
+
+/**
+ * PR-δ (ADR-0058) C3: randomUUID 包装为 Effect.sync，统一 id 生成走 Effect 通道。
+ * scrape-registry.ts / cq-data-store.ts 保留 sync 调用（D7）。
+ */
+const makeId = Effect.sync(() => randomUUID());
 import {
   toConversation,
   toMessage,
@@ -102,7 +108,7 @@ export function createConversation(
 ): Effect.Effect<Conversation, Database, SqliteClient> {
   return Effect.gen(function* () {
     const sql = yield* SqliteClient;
-    const id = randomUUID();
+    const id = yield* makeId;
     const now = Math.floor(Date.now() / 1000);
     const title = input.title ?? "";
     const workspaceId = input.workspaceId ?? "";
@@ -245,7 +251,7 @@ export function appendMessage(
 ): Effect.Effect<Message, Database, SqliteClient> {
   return Effect.gen(function* () {
     const sql = yield* SqliteClient;
-    const id = randomUUID();
+    const id = yield* makeId;
     const now = Math.floor(Date.now() / 1000);
     const convId = input.conversationId ?? "";
     const thinking = input.thinking ?? null;

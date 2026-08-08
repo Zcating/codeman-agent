@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { Effect } from "effect";
+import { Effect, Layer } from "effect";
 import * as SqliteNS from "@effect/sql-sqlite-node/SqliteClient";
 
 vi.mock("electron", () => ({
@@ -15,6 +15,7 @@ vi.mock("electron", () => ({
 }));
 
 import { applyMigrationsEffect, splitSqlStatements } from "./mod.js";
+import { NodeFileSystemLive } from "../lib/file-system-node.js";
 
 const fake = (() => {
   const calls: Array<{ sql: string; params: readonly unknown[] }> = [];
@@ -38,12 +39,17 @@ const fake = (() => {
   };
 })();
 
-// Run applyMigrationsEffect directly (includes CREATE TABLE and migrations)
+// Run applyMigrationsEffect directly (includes CREATE TABLE and migrations).
+// PR-δ: applyMigrationsEffect now requires FileSystem.FileSystem in R,
+// so we provide NodeFileSystemLive alongside the fake SqliteClient.
+const TestLayer = Layer.mergeAll(
+  Layer.succeed(SqliteNS.SqliteClient, fake.client as unknown as SqliteNS.SqliteClient),
+  NodeFileSystemLive,
+);
+
 async function runMigrations(): Promise<void> {
   await Effect.runPromise(
-    applyMigrationsEffect.pipe(
-      Effect.provideService(SqliteNS.SqliteClient, fake.client as unknown as SqliteNS.SqliteClient),
-    ),
+    applyMigrationsEffect.pipe(Effect.provide(TestLayer)),
   );
 }
 

@@ -13,6 +13,11 @@ import { SqliteClient } from "@effect/sql-sqlite-node/SqliteClient";
 import { Database } from "../../../renderer/src/shared/lib/errors.js";
 import { toWorkspace, type Workspace } from "./mappers.js";
 
+/**
+ * PR-δ (ADR-0058) C3: randomUUID 包装为 Effect.sync，统一 id 生成走 Effect 通道。
+ */
+const makeId = Effect.sync(() => randomUUID());
+
 // ---------------------------------------------------------------------------
 // listWorkspaces
 // ---------------------------------------------------------------------------
@@ -52,7 +57,7 @@ export function addWorkspace(
 ): Effect.Effect<Workspace, Error, SqliteClient> {
   return Effect.gen(function* () {
     const sql = yield* SqliteClient;
-    const id = randomUUID();
+    const id = yield* makeId;
     const now = Math.floor(Date.now() / 1000);
     const label = input.label ?? "Workspace";
     const rootPath = input.rootPath ?? "";
