@@ -1,15 +1,31 @@
-// ADR-0053 TB — automations-config (Main 端)
+/**
+ * src/main/features/automations/automations-config.ts
+ *
+ * PR-γ (ADR-0058): automations 配置文件 IO。
+ * 读/写/存在性三件套全部走 src/main/lib/json-config.ts 抽象。
+ *
+ * 行为契约（与 PR-γ 之前一致）：
+ * - 文件不存在 → 返回 {version: 1, rules: []}（默认空配置）
+ * - 文件存在但解析失败 → Effect.fail(InvalidConfig)
+ * - 文件存在但 schema 校验失败 → Effect.fail(InvalidConfig)
+ *
+ * 错误统一走 AppBackendError.InvalidConfig（来自 src/main/lib/errors.ts），
+ * 不再依赖 renderer/src/shared/lib/errors.ts（ADR-0057 D1 物理分离）。
+ */
 import { Effect, Schema } from "effect";
-import { readFile, writeFile, mkdir, access } from "node:fs/promises";
-import { join, dirname } from "node:path";
 import { app } from "electron";
-import { InvalidConfig } from "../../../renderer/src/shared/lib/errors";
+import { join } from "node:path";
+import {
+  jsonConfigExists,
+  readJsonConfig,
+  writeJsonConfig,
+} from "../../lib/json-config.js";
 import { AutomationRuleSchema } from "./automations-schema";
 import type { AutomationRule } from "../../../shared/lib/automation-types";
 
-// ---------------------------------------------------------------------------
-// Schema & Types
-// ---------------------------------------------------------------------------
+const HOME = (): string => app.getPath("home");
+export const AUTOMATIONS_CONFIG_PATH = (): string =>
+  join(HOME(), ".agents", "automations.json");
 
 const AutomationsConfigFileSchema = Schema.Struct({
   version: Schema.Literal(1),
@@ -21,87 +37,41 @@ export interface AutomationsConfigFile {
   rules: AutomationRule[];
 }
 
-// ---------------------------------------------------------------------------
-// Path
-// ---------------------------------------------------------------------------
+const DEFAULT_AUTOMATIONS_CONFIG: AutomationsConfigFile = {
+  version: 1,
+  rules: [],
+};
 
-const HOME = (): string => app.getPath("home");
-export const AUTOMATIONS_CONFIG_PATH = (): string =>
-  join(HOME(), ".agents", "automations.json");
-
-// ---------------------------------------------------------------------------
-// readAutomationsConfig
-// ---------------------------------------------------------------------------
-
-export const readAutomationsConfig = Effect.fn("readAutomationsConfig")(function* () {
-  const configPath = AUTOMATIONS_CONFIG_PATH();
-  const result = yield* Effect.async<{ raw: string; isEio: boolean }>((resolve) => {
-    readFile(configPath, "utf-8")
-      .then((raw) => resolve(Effect.succeed({ raw, isEio: false })))
-      .catch((e: NodeJS.ErrnoException) =>
-        resolve(Effect.succeed({ raw: "", isEio: e.code === "ENOENT" })),
-      );
-  });
-  if (result.isEio) {
-    return { version: 1 as const, rules: [] as AutomationRule[] };
-  }
-  const raw = result.raw;
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (e) {
-    return yield* Effect.fail(
-      new InvalidConfig({
-        field: "automations.json",
-        message: `Cannot parse automations config as JSON: ${(e as Error).message}`,
-      }),
+/**
+ * 读 automations 配置。文件不存在时返回默认空配置；解析/校验失败 → InvalidConfig。
+ * R 通道要求 FileSystem.FileSystem。
+ */
+export const readAutomationsConfig = Effect.fn("readAutomationsConfig")(
+  function* () {
+    return yield* readJsonConfig(
+      AUTOMATIONS_CONFIG_PATH(),
+      AutomationsConfigFileSchema,
+      DEFAULT_AUTOMATIONS_CONFIG,
     );
-  }
-
-  const decoded = Schema.decodeUnknownEither(AutomationsConfigFileSchema)(parsed);
-  if (decoded._tag === "Left") {
-    return yield* Effect.fail(
-      new InvalidConfig({
-        field: "automations.json",
-        message: "Automations config does not match schema",
-      }),
-    );
-  }
-  return decoded.right as AutomationsConfigFile;
-});
-
-// ---------------------------------------------------------------------------
-// writeAutomationsConfig
-// ---------------------------------------------------------------------------
-
-export const writeAutomationsConfig = Effect.fn("writeAutomationsConfig")(
-  function* (config: AutomationsConfigFile) {
-    const configPath = AUTOMATIONS_CONFIG_PATH();
-    yield* Effect.tryPromise(() =>
-      mkdir(dirname(configPath), { recursive: true })
-    ).pipe(Effect.orElseSucceed(() => undefined));
-    const json = JSON.stringify(config, null, 2);
-    yield* Effect.tryPromise({
-      try: () => writeFile(configPath, json, "utf-8"),
-      catch: (e) =>
-        new InvalidConfig({
-          field: "automations.json",
-          message: `Cannot write automations config: ${configPath} (${String(e)})`,
-        }),
-    });
   },
 );
 
-// ---------------------------------------------------------------------------
-// automationsConfigExists
-// ---------------------------------------------------------------------------
+/**
+ * 写 automations 配置（覆盖）。自动 mkdir 父目录。
+ * R 通道要求 FileSystem.FileSystem | Path.Path。
+ */
+export const writeAutomationsConfig = Effect.fn("writeAutomationsConfig")(
+  function* (config: AutomationsConfigFile) {
+    yield* writeJsonConfig(AUTOMATIONS_CONFIG_PATH(), config);
+  },
+);
 
-export async function automationsConfigExists(): Promise<boolean> {
-  try {
-    await access(AUTOMATIONS_CONFIG_PATH());
-    return true;
-  } catch {
-    return false;
-  }
-}
+/**
+ * 检查 automations 配置文件是否存在。永不 fail。
+ * R 通道要求 FileSystem.FileSystem。
+ */
+export const automationsConfigExists = Effect.fn("automationsConfigExists")(
+  function* () {
+    return yield* jsonConfigExists(AUTOMATIONS_CONFIG_PATH());
+  },
+);

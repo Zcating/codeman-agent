@@ -1,51 +1,81 @@
-// ADR-0053 TB — automations-config tests
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+/**
+ * src/main/features/automations/automations-config.test.ts
+ *
+ * PR-γ (ADR-0058): 测试走 TestLayer（NodeFileSystemLive + NodePath.layer）。
+ *
+ * 注：vi.mock 被 hoist 到所有 import 之上。引用顶层 const 即使已经声明也会
+ * 触发 vitest 的 "no top level variables inside" 安全检查。解决方案：把
+ * mock state 放进 vi.hoisted()（vitest 官方为此场景设计）。
+ */
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { Effect, Layer } from "effect";
+import * as NodePathModule from "@effect/platform-node/NodePath";
 import { rm } from "node:fs/promises";
+import { join } from "node:path";
+import { NodeFileSystemLive } from "../../lib/file-system-node.js";
+import {
+  automationsConfigExists,
+  readAutomationsConfig,
+  writeAutomationsConfig,
+} from "./automations-config.js";
 
-const fakeApp = { getPath: vi.fn() };
-vi.mock("electron", () => ({ app: fakeApp }));
+const mocks = vi.hoisted(() => {
+  const mockGetPath = vi.fn(() => "");
+  return { mockGetPath };
+});
 
-const { readAutomationsConfig, writeAutomationsConfig, automationsConfigExists } = await import("./automations-config");
+vi.mock("electron", () => ({
+  app: { getPath: mocks.mockGetPath },
+}));
+
+const TestLayer = Layer.mergeAll(NodeFileSystemLive, NodePathModule.layer);
+const runWithFs = <A, E, R>(
+  eff: Effect.Effect<A, E, R>,
+): Promise<A> =>
+  Effect.runPromise(eff.pipe(Effect.provide(TestLayer)) as Effect.Effect<A, E, never>);
+
+let tempDir = "";
+
+beforeEach(() => {
+  tempDir = join(
+    tmpdir(),
+    `codeman-automations-test-${Date.now()}-${Math.random()}`,
+  );
+  mocks.mockGetPath.mockReturnValue(tempDir);
+});
+
+afterEach(async () => {
+  try {
+    await rm(join(tempDir, ".agents"), { recursive: true, force: true });
+  } catch {
+    // ignore
+  }
+  vi.restoreAllMocks();
+});
 
 describe("automations-config", () => {
-  let tempDir: string;
-
-  beforeEach(() => {
-    tempDir = join(tmpdir(), `codeman-automations-test-${Date.now()}-${Math.random()}`);
-    fakeApp.getPath.mockReturnValue(tempDir);
-  });
-
-  afterEach(async () => {
-    try {
-      await rm(join(tempDir, ".agents"), { recursive: true, force: true });
-    } catch { /* ignore */ }
-    vi.restoreAllMocks();
-  });
-
   describe("readAutomationsConfig", () => {
     it("returns empty config when file does not exist (ENOENT fallback)", async () => {
-      const { Effect } = await import("effect");
       const configPath = join(tempDir, ".agents", "automations.json");
       try {
         await rm(configPath, { force: true });
-      } catch { /* ignore */ }
-      const result = await Effect.runPromise(readAutomationsConfig());
+      } catch {
+        // ignore
+      }
+      const result = await runWithFs(readAutomationsConfig());
       expect(result).toEqual({ version: 1, rules: [] });
     });
 
-    it("returns Left with InvalidConfig when file exists but contains invalid JSON", async () => {
-      const { Effect } = await import("effect");
+    it("rejects with InvalidConfig when file contains invalid JSON", async () => {
       const configPath = join(tempDir, ".agents", "automations.json");
       const { writeFile, mkdir } = await import("node:fs/promises");
       await mkdir(join(tempDir, ".agents"), { recursive: true });
       await writeFile(configPath, "not valid json{{{", "utf-8");
-      await expect(Effect.runPromise(readAutomationsConfig())).rejects.toThrow();
+      await expect(runWithFs(readAutomationsConfig())).rejects.toThrow();
     });
 
     it("roundtrips correctly after writeAutomationsConfig", async () => {
-      const { Effect } = await import("effect");
       const config = {
         version: 1 as const,
         rules: [
@@ -67,19 +97,17 @@ describe("automations-config", () => {
           },
         ],
       };
-      await Effect.runPromise(writeAutomationsConfig(config));
-      const readBack = await Effect.runPromise(readAutomationsConfig());
+      await runWithFs(writeAutomationsConfig(config));
+      const readBack = await runWithFs(readAutomationsConfig());
       expect(readBack).toEqual(config);
     });
   });
 
   describe("writeAutomationsConfig", () => {
     it("creates .agents directory if it does not exist (mkdir -p)", async () => {
-      const { Effect } = await import("effect");
       const config = { version: 1 as const, rules: [] };
-      // Directory does not exist yet — write should succeed
-      await Effect.runPromise(writeAutomationsConfig(config));
-      const exists = await automationsConfigExists();
+      await runWithFs(writeAutomationsConfig(config));
+      const exists = await runWithFs(automationsConfigExists());
       expect(exists).toBe(true);
     });
   });
@@ -89,15 +117,16 @@ describe("automations-config", () => {
       const configPath = join(tempDir, ".agents", "automations.json");
       try {
         await rm(configPath, { force: true });
-      } catch { /* ignore */ }
-      const result = await automationsConfigExists();
+      } catch {
+        // ignore
+      }
+      const result = await runWithFs(automationsConfigExists());
       expect(result).toBe(false);
     });
 
     it("returns true when config file exists", async () => {
-      const { Effect } = await import("effect");
-      await Effect.runPromise(writeAutomationsConfig({ version: 1 as const, rules: [] }));
-      const result = await automationsConfigExists();
+      await runWithFs(writeAutomationsConfig({ version: 1, rules: [] }));
+      const result = await runWithFs(automationsConfigExists());
       expect(result).toBe(true);
     });
   });

@@ -6,16 +6,16 @@ import { join, sep, normalize } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Cause, Effect, Exit, Scope } from "effect";
 import { logger } from "./logger";
-import { mainRuntime } from "./runtime.js";
+import { mainRuntime, MainLive } from "./runtime.js";
 import { stopMockServer } from "./features/mock-server";
 import { registerIpcHandlers } from "./ipc";
 import { loadQaTable } from "./features/mock-server/qa-loader";
 import { startMockServer } from "./features/mock-server";
 import { ensurePreinstalledSkills } from "./features/skills/skills-host";
 import { registerSkillsIpc } from "./features/skills/ipc";
-import { McpManager } from "./features/mcp/mcp-manager";
+import { createMcpManager } from "./features/mcp/mcp-manager";
 import { registerMcpIpcHandlers } from "./features/mcp/mcp-ipc";
-import { AutomationScheduler } from "./features/automations/scheduler";
+import { createAutomationScheduler } from "./features/automations/scheduler";
 import { registerAutomationIpc } from "./features/automations/ipc";
 
 const WORKER = process.env.CODEMAN_TEST_WORKER ?? "";
@@ -132,18 +132,18 @@ app.whenReady().then(() => {
 
       // ensurePreinstalledSkills:fork 出去跑,失败经 Cause 统一日志
       yield* Effect.forkScoped(
-        Effect.tryPromise(() => ensurePreinstalledSkills()).pipe(
+        ensurePreinstalledSkills().pipe(
           Effect.catchAllCause((cause) =>
             Effect.sync(() => logger.error("[skills-host] ensurePreinstalledSkills failed:", Cause.pretty(cause))),
           ),
         ),
       );
 
-      const mcpManager = new McpManager();
+      const mcpManager = createMcpManager();
       registerMcpIpcHandlers(mcpManager);
       // mcp 资源 finalizer 挂进 mainScope
       yield* Effect.addFinalizer(() => Effect.promise(() => mcpManager.stopAll()));
-      yield* Effect.tryPromise(() => mcpManager.startAll()).pipe(
+      yield* mcpManager.startAll().pipe(
         Effect.catchAllCause((cause) =>
           Effect.sync(() => logger.error("[mcp] startAll failed:", Cause.pretty(cause))),
         ),
@@ -153,8 +153,12 @@ app.whenReady().then(() => {
       registerAutomationIpc();
 
       // Start automation scheduler
-      const scheduler = AutomationScheduler.getInstance();
-      yield* Effect.promise(() => scheduler.start());
+      const scheduler = createAutomationScheduler();
+      yield* scheduler.start().pipe(
+        Effect.catchAllCause((cause) =>
+          Effect.sync(() => logger.error("[scheduler] start failed:", Cause.pretty(cause))),
+        ),
+      );
       yield* Effect.addFinalizer(() => Effect.sync(() => scheduler.stop()));
 
       mainWindow = createMainWindow();
@@ -162,6 +166,10 @@ app.whenReady().then(() => {
       // 保持 scope 存活直到 before-quit 显式 close
       yield* Effect.never;
     }).pipe(
+      // mainRuntime 已提供 MainLive，但 TS 不会从 runFork 参数类型自动
+      // 推断 R 收敛；显式 provide 让 inner Effect.gen 的 R 从
+      // FileSystem | Path | SqliteClient 收敛到 never。
+      Effect.provide(MainLive),
       Effect.scoped,
       Effect.catchAllCause((cause) =>
         Effect.sync(() => logger.error("[boot] boot sequence failed:", Cause.pretty(cause))),

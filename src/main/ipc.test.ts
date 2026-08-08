@@ -121,11 +121,11 @@ describe("ipc.ts barrel", () => {
 
   it("registers all 55 expected ipcMain.handle channels", async () => {
     const { registerIpcHandlers } = await import("./ipc.js");
-    const { McpManager } = await import("./features/mcp/mcp-manager.js");
+    const { createMcpManager } = await import("./features/mcp/mcp-manager.js");
     const { registerMcpIpcHandlers } = await import("./features/mcp/mcp-ipc.js");
     const { registerSkillsIpc } = await import("./features/skills/ipc.js");
     registerIpcHandlers({ getMainWindow: () => fakeWin as any });
-    registerMcpIpcHandlers(new McpManager());
+    registerMcpIpcHandlers(createMcpManager());
     registerSkillsIpc();
     const channels = fakeIpcMain.handle.mock.calls.map((c) => c[0]);
     expect(channels).toEqual(expect.arrayContaining(EXPECTED_CHANNELS));
