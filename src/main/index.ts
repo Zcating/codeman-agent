@@ -16,7 +16,6 @@ import { registerSkillsIpc } from "./features/skills/ipc";
 import { createMcpManager } from "./features/mcp/mcp-manager";
 import { registerMcpIpcHandlers } from "./features/mcp/mcp-ipc";
 import { createAutomationScheduler } from "./features/automations/scheduler";
-import { registerAutomationIpc } from "./features/automations/ipc";
 
 const WORKER = process.env.CODEMAN_TEST_WORKER ?? "";
 
@@ -150,8 +149,10 @@ app.whenReady().then(() => {
           ),
         );
 
-        // Register automation IPC handlers
-        registerAutomationIpc();
+        // NOTE: registerAutomationIpc() is called inside registerIpcHandlers() (per
+        // src/main/ipc.ts:32). Calling it again here caused an Electron "Attempted
+        // to register a second handler" boot failure — fixed by removing the
+        // redundant call.
 
         // Start automation scheduler
         const scheduler = createAutomationScheduler();
