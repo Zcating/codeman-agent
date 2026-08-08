@@ -124,15 +124,8 @@ const toAbsolutePath = (
 // validatePathForWrite — 写路径校验（用于 writeFileInWorkspace）
 // ---------------------------------------------------------------------------
 
-export const validatePathForWrite = (
-  inputPath: string,
-  workspaceRoot: string,
-): Effect.Effect<
-  string,
-  AppBackendErrorT,
-  FileSystem.FileSystem | Path.Path
-> =>
-  Effect.gen(function* () {
+export const validatePathForWrite = Effect.fn("validatePathForWrite")(
+  function* (inputPath: string, workspaceRoot: string) {
     const fs = yield* FileSystem.FileSystem;
     const pathSvc = yield* Path.Path;
 
@@ -178,15 +171,8 @@ export const validatePathForWrite = (
 // validatePathInWorkspace — 读路径校验（用于 readFileInWorkspace）
 // ---------------------------------------------------------------------------
 
-export const validatePathInWorkspace = (
-  inputPath: string,
-  workspaceRoot: string,
-): Effect.Effect<
-  string,
-  AppBackendErrorT,
-  FileSystem.FileSystem | Path.Path
-> =>
-  Effect.gen(function* () {
+export const validatePathInWorkspace = Effect.fn("validatePathInWorkspace")(
+  function* (inputPath: string, workspaceRoot: string) {
     const fs = yield* FileSystem.FileSystem;
     const pathSvc = yield* Path.Path;
 
@@ -227,15 +213,8 @@ export const validatePathInWorkspace = (
 // readFileInWorkspace — 读 UTF-8 内容
 // ---------------------------------------------------------------------------
 
-export const readFileInWorkspace = (
-  workspaceRoot: string,
-  inputPath: string,
-): Effect.Effect<
-  string,
-  AppBackendErrorT,
-  FileSystem.FileSystem | Path.Path
-> =>
-  Effect.gen(function* () {
+export const readFileInWorkspace = Effect.fn("readFileInWorkspace")(
+  function* (workspaceRoot: string, inputPath: string) {
     const fs = yield* FileSystem.FileSystem;
     const abs = yield* validatePathInWorkspace(inputPath, workspaceRoot);
     return yield* fs.readFileString(abs).pipe(
@@ -256,16 +235,8 @@ export const readFileInWorkspace = (
 // writeFileInWorkspace — 写 UTF-8 内容，原子写语义（tmp + rename + cleanup）
 // ---------------------------------------------------------------------------
 
-export const writeFileInWorkspace = (
-  workspaceRoot: string,
-  inputPath: string,
-  content: string,
-): Effect.Effect<
-  void,
-  AppBackendErrorT,
-  FileSystem.FileSystem | Path.Path
-> =>
-  Effect.gen(function* () {
+export const writeFileInWorkspace = Effect.fn("writeFileInWorkspace")(
+  function* (workspaceRoot: string, inputPath: string, content: string) {
     const fs = yield* FileSystem.FileSystem;
     const abs = yield* validatePathForWrite(inputPath, workspaceRoot);
 
