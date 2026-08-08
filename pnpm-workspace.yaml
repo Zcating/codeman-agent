@@ -1,5 +1,6 @@
 allowBuilds:
   "@google/genai": true
+  '@parcel/watcher': true
   better-sqlite3: false
   electron: true
   electron-winstaller: false
