@@ -46,22 +46,20 @@ function mapMsg(row: RawMsgRow): Message {
  * 列出对话。
  * @param includeArchived 是否包含已归档（默认 false）
  */
-export function listConversations(
-  includeArchived: boolean
-): Effect.Effect<Conversation[], Database, SqliteClient> {
-  return Effect.gen(function* () {
-    const sql = yield* SqliteClient;
-    const sqlText = includeArchived
-      ? "SELECT * FROM conversations"
-      : "SELECT * FROM conversations WHERE archived_at IS NULL";
-    const rows = (yield* sql.unsafe(sqlText).pipe(
-      Effect.catchTag("SqlError", (e) =>
-        Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
-      )
-    )) as RawConvRow[];
-    return rows.map(mapConv);
-  });
-}
+export const listConversations = Effect.fn("listConversations")(function* (
+  includeArchived: boolean,
+) {
+  const sql = yield* SqliteClient;
+  const sqlText = includeArchived
+    ? "SELECT * FROM conversations"
+    : "SELECT * FROM conversations WHERE archived_at IS NULL";
+  const rows = (yield* sql.unsafe(sqlText).pipe(
+    Effect.catchTag("SqlError", (e) =>
+      Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
+    )
+  )) as RawConvRow[];
+  return rows.map(mapConv);
+});
 
 // ---------------------------------------------------------------------------
 // getConversation
@@ -70,24 +68,20 @@ export function listConversations(
 /**
  * 获取单个对话，not-found 抛 plain Error（与原有语义一致）。
  */
-export function getConversation(
-  id: string
-): Effect.Effect<Conversation, Error, SqliteClient> {
-  return Effect.gen(function* () {
-    const sql = yield* SqliteClient;
-    const rows = (yield* sql
-      .unsafe("SELECT * FROM conversations WHERE id = ?", [id])
-      .pipe(
-        Effect.catchTag("SqlError", (e) =>
-          Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
-        )
-      )) as RawConvRow[];
-    if (rows.length === 0) {
-      return yield* Effect.fail(new Error(`Conversation not found: ${id}`));
-    }
-    return mapConv(rows[0]!);
-  });
-}
+export const getConversation = Effect.fn("getConversation")(function* (id: string) {
+  const sql = yield* SqliteClient;
+  const rows = (yield* sql
+    .unsafe("SELECT * FROM conversations WHERE id = ?", [id])
+    .pipe(
+      Effect.catchTag("SqlError", (e) =>
+        Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
+      )
+    )) as RawConvRow[];
+  if (rows.length === 0) {
+    return yield* Effect.fail(new Error(`Conversation not found: ${id}`));
+  }
+  return mapConv(rows[0]!);
+});
 
 // ---------------------------------------------------------------------------
 // createConversation
@@ -103,101 +97,89 @@ export interface CreateConversationInput {
  * 创建对话。
  * 返回映射后的域对象（与原有 toConversation 行为一致）。
  */
-export function createConversation(
-  input: CreateConversationInput
-): Effect.Effect<Conversation, Database, SqliteClient> {
-  return Effect.gen(function* () {
-    const sql = yield* SqliteClient;
-    const id = yield* makeId;
-    const now = Math.floor(Date.now() / 1000);
-    const title = input.title ?? "";
-    const workspaceId = input.workspaceId ?? "";
-    const systemPrompt = input.systemPrompt ?? null;
+export const createConversation = Effect.fn("createConversation")(function* (
+  input: CreateConversationInput,
+) {
+  const sql = yield* SqliteClient;
+  const id = yield* makeId;
+  const now = Math.floor(Date.now() / 1000);
+  const title = input.title ?? "";
+  const workspaceId = input.workspaceId ?? "";
+  const systemPrompt = input.systemPrompt ?? null;
 
-    yield* sql
-      .unsafe(
-        "INSERT INTO conversations (id, title, system_prompt, created_at, updated_at, archived_at, workspace_id) VALUES (?, ?, ?, ?, ?, NULL, ?)",
-        [id, title, systemPrompt, now, now, workspaceId]
+  yield* sql
+    .unsafe(
+      "INSERT INTO conversations (id, title, system_prompt, created_at, updated_at, archived_at, workspace_id) VALUES (?, ?, ?, ?, ?, NULL, ?)",
+      [id, title, systemPrompt, now, now, workspaceId]
+    )
+    .pipe(
+      Effect.catchTag("SqlError", (e) =>
+        Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
       )
-      .pipe(
-        Effect.catchTag("SqlError", (e) =>
-          Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
-        )
-      );
+    );
 
-    return mapConv({
-      id,
-      title,
-      system_prompt: systemPrompt,
-      created_at: now,
-      updated_at: now,
-      archived_at: null,
-      workspace_id: workspaceId,
-    });
+  return mapConv({
+    id,
+    title,
+    system_prompt: systemPrompt,
+    created_at: now,
+    updated_at: now,
+    archived_at: null,
+    workspace_id: workspaceId,
   });
-}
+});
 
 // ---------------------------------------------------------------------------
 // archiveConversation
 // ---------------------------------------------------------------------------
 
-export function archiveConversation(
-  id: string
-): Effect.Effect<void, Database, SqliteClient> {
-  return Effect.gen(function* () {
-    const sql = yield* SqliteClient;
-    yield* sql
-      .unsafe(
-        "UPDATE conversations SET archived_at = ? WHERE id = ?",
-        [Math.floor(Date.now() / 1000), id]
+export const archiveConversation = Effect.fn("archiveConversation")(function* (id: string) {
+  const sql = yield* SqliteClient;
+  yield* sql
+    .unsafe(
+      "UPDATE conversations SET archived_at = ? WHERE id = ?",
+      [Math.floor(Date.now() / 1000), id]
+    )
+    .pipe(
+      Effect.catchTag("SqlError", (e) =>
+        Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
       )
-      .pipe(
-        Effect.catchTag("SqlError", (e) =>
-          Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
-        )
-      );
-  });
-}
+    );
+});
 
 // ---------------------------------------------------------------------------
 // deleteConversation
 // ---------------------------------------------------------------------------
 
-export function deleteConversation(
-  id: string
-): Effect.Effect<void, Database, SqliteClient> {
-  return Effect.gen(function* () {
-    const sql = yield* SqliteClient;
-    yield* sql.unsafe("DELETE FROM conversations WHERE id = ?", [id]).pipe(
-      Effect.catchTag("SqlError", (e) =>
-        Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
-      )
-    );
-  });
-}
+export const deleteConversation = Effect.fn("deleteConversation")(function* (id: string) {
+  const sql = yield* SqliteClient;
+  yield* sql.unsafe("DELETE FROM conversations WHERE id = ?", [id]).pipe(
+    Effect.catchTag("SqlError", (e) =>
+      Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
+    )
+  );
+});
 
 // ---------------------------------------------------------------------------
 // renameConversation
 // ---------------------------------------------------------------------------
 
-export function renameConversation(
+export const renameConversation = Effect.fn("renameConversation")(function* (
   id: string,
-  title: string
-): Effect.Effect<void, Database, SqliteClient> {
-  return Effect.gen(function* () {
-    const sql = yield* SqliteClient;
-    yield* sql
-      .unsafe("UPDATE conversations SET title = ? WHERE id = ?", [
-        title,
-        id,
-      ])
-      .pipe(
-        Effect.catchTag("SqlError", (e) =>
-          Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
-        )
-      );
-  });
-}
+  title: string,
+) {
+  const sql = yield* SqliteClient;
+  yield* sql
+    .unsafe("UPDATE conversations SET title = ? WHERE id = ?", [
+      title,
+      id,
+    ])
+    .pipe(
+      Effect.catchTag("SqlError", (e) =>
+        Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
+      )
+    );
+});
 
 // ---------------------------------------------------------------------------
 // listMessages
@@ -207,27 +189,23 @@ export function renameConversation(
  * 列出某对话的所有消息。
  * @param conversationId 对话 ID，为空则返回 []
  */
-export function listMessages(
-  conversationId: string
-): Effect.Effect<Message[], Database, SqliteClient> {
+export const listMessages = Effect.fn("listMessages")(function* (conversationId: string) {
   if (!conversationId) {
-    return Effect.succeed([]);
+    return yield* Effect.succeed([]);
   }
-  return Effect.gen(function* () {
-    const sql = yield* SqliteClient;
-    const rows = (yield* sql
-      .unsafe(
-        "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
-        [conversationId]
+  const sql = yield* SqliteClient;
+  const rows = (yield* sql
+    .unsafe(
+      "SELECT * FROM messages WHERE conversation_id = ? ORDER BY created_at ASC",
+      [conversationId]
+    )
+    .pipe(
+      Effect.catchTag("SqlError", (e) =>
+        Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
       )
-      .pipe(
-        Effect.catchTag("SqlError", (e) =>
-          Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
-        )
-      )) as RawMsgRow[];
-    return rows.map(mapMsg);
-  });
-}
+    )) as RawMsgRow[];
+  return rows.map(mapMsg);
+});
 
 // ---------------------------------------------------------------------------
 // appendMessage
@@ -246,54 +224,50 @@ export interface AppendMessageInput {
 /**
  * 追加消息到对话。
  */
-export function appendMessage(
-  input: AppendMessageInput
-): Effect.Effect<Message, Database, SqliteClient> {
-  return Effect.gen(function* () {
-    const sql = yield* SqliteClient;
-    const id = yield* makeId;
-    const now = Math.floor(Date.now() / 1000);
-    const convId = input.conversationId ?? "";
-    const thinking = input.thinking ?? null;
-    const toolCalls = input.toolCalls ?? null;
-    const toolResults = input.toolResults ?? null;
+export const appendMessage = Effect.fn("appendMessage")(function* (input: AppendMessageInput) {
+  const sql = yield* SqliteClient;
+  const id = yield* makeId;
+  const now = Math.floor(Date.now() / 1000);
+  const convId = input.conversationId ?? "";
+  const thinking = input.thinking ?? null;
+  const toolCalls = input.toolCalls ?? null;
+  const toolResults = input.toolResults ?? null;
 
-    yield* sql
-      .unsafe(
-        "INSERT INTO messages (id, conversation_id, role, content, thinking, tool_calls, tool_results, model, input_tokens, output_tokens, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)",
-        [
-          id,
-          convId,
-          input.role,
-          input.content,
-          thinking,
-          toolCalls,
-          toolResults,
-          input.model ?? null,
-          now,
-        ]
+  yield* sql
+    .unsafe(
+      "INSERT INTO messages (id, conversation_id, role, content, thinking, tool_calls, tool_results, model, input_tokens, output_tokens, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)",
+      [
+        id,
+        convId,
+        input.role,
+        input.content,
+        thinking,
+        toolCalls,
+        toolResults,
+        input.model ?? null,
+        now,
+      ]
+    )
+    .pipe(
+      Effect.catchTag("SqlError", (e) =>
+        Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
       )
-      .pipe(
-        Effect.catchTag("SqlError", (e) =>
-          Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
-        )
-      );
+    );
 
-    return mapMsg({
-      id,
-      conversation_id: convId,
-      role: input.role,
-      content: input.content,
-      thinking,
-      tool_calls: toolCalls,
-      tool_results: toolResults,
-      model: input.model ?? null,
-      input_tokens: null,
-      output_tokens: null,
-      created_at: now,
-    });
+  return mapMsg({
+    id,
+    conversation_id: convId,
+    role: input.role,
+    content: input.content,
+    thinking,
+    tool_calls: toolCalls,
+    tool_results: toolResults,
+    model: input.model ?? null,
+    input_tokens: null,
+    output_tokens: null,
+    created_at: now,
   });
-}
+});
 
 // ---------------------------------------------------------------------------
 // searchMessages
@@ -303,44 +277,40 @@ export function appendMessage(
  * FTS 全文搜索。
  * FTS 语法错误时返回 []（try/catch 语义与原有 ipc.ts 一致）。
  */
-export function searchMessages(
+export const searchMessages = Effect.fn("searchMessages")(function* (
   query: string,
-  limit: number = 20
-): Effect.Effect<Message[], Database, SqliteClient> {
-  return Effect.gen(function* () {
-    const sql = yield* SqliteClient;
-    const rows = (yield* sql
-      .unsafe(
-        "SELECT m.* FROM messages m JOIN messages_fts f ON m.rowid = f.rowid WHERE messages_fts MATCH ? ORDER BY rank LIMIT ?",
-        [query, limit]
+  limit: number = 20,
+) {
+  const sql = yield* SqliteClient;
+  const rows = (yield* sql
+    .unsafe(
+      "SELECT m.* FROM messages m JOIN messages_fts f ON m.rowid = f.rowid WHERE messages_fts MATCH ? ORDER BY rank LIMIT ?",
+      [query, limit]
+    )
+    .pipe(
+      Effect.catchTag("SqlError", (e) =>
+        Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
       )
-      .pipe(
-        Effect.catchTag("SqlError", (e) =>
-          Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
-        )
-      )) as RawMsgRow[];
-    return rows.map(mapMsg);
-  });
-}
+    )) as RawMsgRow[];
+  return rows.map(mapMsg);
+});
 
 /**
  * 带 try/catch 的 FTS 搜索版本：FTS 失败时返回 []。
  */
-export function searchMessagesSafe(
+export const searchMessagesSafe = Effect.fn("searchMessagesSafe")(function* (
   query: string,
-  limit: number = 20
-): Effect.Effect<Message[], never, SqliteClient> {
-  return Effect.gen(function* () {
-    const sql = yield* SqliteClient;
-    const rows = (yield* sql
-      .unsafe(
-        "SELECT m.* FROM messages m JOIN messages_fts f ON m.rowid = f.rowid WHERE messages_fts MATCH ? ORDER BY rank LIMIT ?",
-        [query, limit]
-      )
-      .pipe(Effect.catchAll(() => Effect.succeed([])))) as RawMsgRow[];
-    return rows.map(mapMsg);
-  });
-}
+  limit: number = 20,
+) {
+  const sql = yield* SqliteClient;
+  const rows = (yield* sql
+    .unsafe(
+      "SELECT m.* FROM messages m JOIN messages_fts f ON m.rowid = f.rowid WHERE messages_fts MATCH ? ORDER BY rank LIMIT ?",
+      [query, limit]
+    )
+    .pipe(Effect.catchAll(() => Effect.succeed([])))) as RawMsgRow[];
+  return rows.map(mapMsg);
+});
 
 // ---------------------------------------------------------------------------
 // clearAllHistory
@@ -349,13 +319,11 @@ export function searchMessagesSafe(
 /**
  * 清空所有对话（DELETE FROM conversations）。
  */
-export function clearAllHistory(): Effect.Effect<void, Database, SqliteClient> {
-  return Effect.gen(function* () {
-    const sql = yield* SqliteClient;
-    yield* sql.unsafe("DELETE FROM conversations").pipe(
-      Effect.catchTag("SqlError", (e) =>
-        Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
-      )
-    );
-  });
-}
+export const clearAllHistory = Effect.fn("clearAllHistory")(function* () {
+  const sql = yield* SqliteClient;
+  yield* sql.unsafe("DELETE FROM conversations").pipe(
+    Effect.catchTag("SqlError", (e) =>
+      Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
+    )
+  );
+});
