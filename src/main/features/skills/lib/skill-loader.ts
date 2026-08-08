@@ -62,7 +62,7 @@ function detectSource(skillDir: string): SkillSource {
  * ENOENT 视为空目录（应用首次启动时 skills 目录可能尚未创建）。
  * R 通道要求 FileSystem.FileSystem | Path.Path。
  */
-export const scanSkillsDir = Effect.fn(function* (skillsDir: string) {
+export const scanSkillsDir = Effect.fn("scanSkillsDir")(function* (skillsDir: string) {
   const fs = yield* FileSystem.FileSystem;
   const pathSvc = yield* Path.Path;
 
@@ -120,7 +120,7 @@ export const scanSkillsDir = Effect.fn(function* (skillsDir: string) {
  * 不存在时抛 AppBackendError.NotFound（IPC 透传后 kind === "NotFound"）。
  * R 通道要求 FileSystem.FileSystem | Path.Path。
  */
-export const loadSkillContent = Effect.fn(function* (
+export const loadSkillContent = Effect.fn("loadSkillContent")(function* (
   skillsDir: string,
   skillName: string,
 ) {
