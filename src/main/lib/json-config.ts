@@ -73,12 +73,8 @@ const mapPlatformError = (
  *
  * R 通道要求 `FileSystem.FileSystem`（不需要 Path；路径由调用方提供绝对路径）。
  */
-export const readJsonConfig = <T>(
-  path: string,
-  schema: Schema.Schema<T>,
-  defaultValue: T,
-): Effect.Effect<T, AppBackendErrorT, FileSystem.FileSystem> =>
-  Effect.gen(function* () {
+export const readJsonConfig = Effect.fn("readJsonConfig")(
+  function* <T>(path: string, schema: Schema.Schema<T>, defaultValue: T) {
     const fs = yield* FileSystem.FileSystem;
     const raw = yield* fs.readFileString(path).pipe(
       Effect.catchAll((e) =>
@@ -111,7 +107,8 @@ export const readJsonConfig = <T>(
       );
     }
     return decoded.right;
-  });
+  },
+);
 
 // ---------------------------------------------------------------------------
 // writeJsonConfig
@@ -129,11 +126,8 @@ export const readJsonConfig = <T>(
  *
  * R 通道要求 `FileSystem.FileSystem | Path.Path`（Path 用于 dirname 计算父目录）。
  */
-export const writeJsonConfig = (
-  path: string,
-  value: unknown,
-): Effect.Effect<void, AppBackendErrorT, FileSystem.FileSystem | Path.Path> =>
-  Effect.gen(function* () {
+export const writeJsonConfig = Effect.fn("writeJsonConfig")(
+  function* (path: string, value: unknown) {
     const fs = yield* FileSystem.FileSystem;
     const pathSvc = yield* Path.Path;
     yield* fs
@@ -147,7 +141,8 @@ export const writeJsonConfig = (
         }),
       ),
     );
-  });
+  },
+);
 
 // ---------------------------------------------------------------------------
 // jsonConfigExists
@@ -158,10 +153,9 @@ export const writeJsonConfig = (
  *
  * R 通道要求 `FileSystem.FileSystem`。
  */
-export const jsonConfigExists = (
-  path: string,
-): Effect.Effect<boolean, never, FileSystem.FileSystem> =>
-  Effect.gen(function* () {
+export const jsonConfigExists = Effect.fn("jsonConfigExists")(
+  function* (path: string) {
     const fs = yield* FileSystem.FileSystem;
     return yield* fs.exists(path).pipe(Effect.orElseSucceed(() => false));
-  });
+  },
+);
