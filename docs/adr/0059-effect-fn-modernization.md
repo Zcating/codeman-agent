@@ -223,7 +223,7 @@ src/main/features/conversations/data.ts   (11 处)
 src/main/features/workspaces/data.ts      (4 处)
 src/main/features/compaction/data.ts      (2 处)
 src/main/features/file-ops/data.ts        (1 处)
-src/main/db/mod.ts                        (2 处,L125 拆 pipe)
+src/main/db/mod.ts                        (2 处 — PRESERVED, 见 D9)
 src/main/features/file-ops/ipc.ts         (4 处)
 ```
 
@@ -259,6 +259,30 @@ src/main/features/automations/scheduler.ts           (1 处,如未在 #7 一起)
 src/main/index.ts                                    (1 处)
 src/main/features/file-ops/data.ts                   (1 处,如未在 #4 一起)
 ```
+
+### D9 — db/mod.ts 反候选(commit #4 deletion test 不通过,scope 修订)
+
+**实施后修订(2026-08-08,commit #12 落地)**:`src/main/db/mod.ts` 的 2 处 `Effect.gen(function* () { ... })` 在 commit #4 实施时**未迁移**,原因如下。
+
+**位置**:
+- `applyMigrationsEffect`(`src/main/db/mod.ts` ~L77-100):被 `Layer.effect(MigrationsLive, ...)` 作为 input,需要直接 `Effect<...>`
+- `MigrationsLive` inner generator:被 `Layer.effectDiscard(...)` 作为 input,需要直接 `Effect<...>`
+
+**deletion test 不通过的根因**:
+- `Effect.fn("name")(function* () {...})` 是 **named factory**:返回 `() => Effect<...>`,不是 `Effect<...>` 直接
+- `Layer.effectDiscard` / `Layer.effect` 的 TypeScript signature 期望 `Effect<...>`,不是函数
+- 直接把 `Effect.fn(...)` 喂给 Layer 会触发 TS 编译错误(实测 commit #4 触发 4 处 TS error)
+- 强行 wrap 后,要么改 Layer 类型(`Layer.effectEffect` 接受 thunk,但与全 codebase 现有 pattern 不一致),要么调用方 `Layer.effectDiscard(Effect.fn("name")(...)())` 二次调用(引入额外间接层,违反简单优先)
+- **结论**:删除 `Effect.gen` 会破坏 Layer 契约,wrap 会引入 TS 错误,deletion test 不通过 → **反候选**
+
+**保留形态**:
+- `applyMigrationsEffect = Effect.gen(function* () { ... })` 保持 `Effect.gen`(返回 `Effect<...>` 直接)
+- `MigrationsLive = Layer.effectDiscard(Effect.gen(function* () { ... }))` 保持 `Effect.gen`
+- 两处的 effect 名字进不了 Effect tracer(没有命名 trace),但 trace 在 Layer 边界外由 `DbLive` 的命名承担,实际可观测性不受影响
+
+**与 ADR-0046 D3 的关系**:D3 引入 `Layer.effectDiscard` + `SqliteClient.layer({...})` 模式,db/mod.ts 是这一模式的承载点。本 D9 是 D3 的**继承性约束**——**不**修订 D3,**只**记录 db/mod.ts 因 D3 的 Layer API 选择而成为反候选。
+
+**对未来的警告**:任何"全面 Effect.fn 化"的 review,如果建议 wrap db/mod.ts,必须引用本 D9,否则 review 不可信。
 
 ## Considered Options(高层)
 
