@@ -462,8 +462,15 @@ describe("ChatSidebar (PR 2)", () => {
       F.getPluginMetadata = originalGetPluginMetadata;
     });
 
-    it("FAILS if unknown icon identifier: throws with plugin/id context instead of silent WandSparkles fallback", () => {
-      const metadataWithUnknownIcon = new Map([
+    it("unknown icon identifier: renders fallback (Box) without throwing", () => {
+      // Replaces the previous throw-on-unknown test. The Record-map refactor
+      // (chat-sidebar.tsx renderPluginIcon) removes the throw default — a typo
+      // or missing icon entry now renders Box instead of crashing the sidebar
+      // (the regression caught in commit c8e4331). PluginIconName typechecks
+      // the icon name at compile time; this test covers the runtime drift case
+      // (an icon name that's valid per lucide-solid types but absent from the
+      // PLUGIN_ICONS map — e.g., a renamed upstream export).
+      const metadataWithUnknownIcon = new Map<string, unknown>([
         [
           "bad-plugin",
           {
@@ -475,9 +482,69 @@ describe("ChatSidebar (PR 2)", () => {
       ]);
 
       const originalGetPluginMetadata = F.getPluginMetadata;
-      F.getPluginMetadata = () => metadataWithUnknownIcon;
+      F.getPluginMetadata = () => metadataWithUnknownIcon as ReturnType<typeof originalGetPluginMetadata>;
 
-      expect(() => render(() => <ChatSidebar />)).toThrow(/bad-plugin.*NonExistentIcon|NonExistentIcon.*bad-plugin/);
+      // Should NOT throw — sidebar renders with the Box fallback icon.
+      expect(() => render(() => <ChatSidebar />)).not.toThrow();
+
+      F.getPluginMetadata = originalGetPluginMetadata;
+    });
+
+    // Regression for dev-mode bug: automations plugin uses icon "Clock"
+    // (matches the Lucide icon used in its own settings/rule-list/execution-history
+    // components). renderPluginIcon previously only allowed the three
+    // builtin-plugin icons and threw on render — see chat-sidebar.tsx:38.
+    it("renders all real plugin icons (WandSparkles, Cable, Users, Clock) without throwing", () => {
+      const realPlugins = new Map([
+        [
+          "skills",
+          {
+            id: "skills",
+            route: { path: "/plugins/skills", label: "Skills" },
+            sidebar: { icon: "WandSparkles", order: 3, visible: true },
+          },
+        ],
+        [
+          "mcp",
+          {
+            id: "mcp",
+            route: { path: "/plugins/mcp", label: "MCP" },
+            sidebar: { icon: "Cable", order: 4, visible: true },
+          },
+        ],
+        [
+          "multi-agents",
+          {
+            id: "multi-agents",
+            route: { path: "/plugins/multi-agents", label: "智能体" },
+            sidebar: { icon: "Users", order: 30, visible: true },
+          },
+        ],
+        [
+          "automations",
+          {
+            id: "automations",
+            route: { path: "/plugins/automations", label: "Automations" },
+            sidebar: { icon: "Clock", order: 5, visible: true },
+          },
+        ],
+      ]);
+
+      const originalGetPluginMetadata = F.getPluginMetadata;
+      F.getPluginMetadata = () => realPlugins;
+
+      // Should not throw — renderPluginIcon must handle every icon actually
+      // declared in src/renderer/src/plugins/**/index.ts.
+      expect(() => render(() => <ChatSidebar />)).not.toThrow();
+      const opts = F.capturedProps!.options;
+      const pluginChildren = opts[0].children;
+      // Order: WandSparkles/skills(3) → Cable/mcp(4) → Clock/automations(5) → Users/multi-agents(30)
+      expect(pluginChildren.map((c: any) => c.value)).toEqual([
+        "skills",
+        "mcp",
+        "automations",
+        "multi-agents",
+      ]);
 
       F.getPluginMetadata = originalGetPluginMetadata;
     });

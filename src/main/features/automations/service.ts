@@ -75,192 +75,191 @@ function writeConfigSafe(config: { version: 1; rules: AutomationRule[] }) {
 // listRules
 // ---------------------------------------------------------------------------
 
-export const listRules = (): Effect.Effect<
+export const listRules: () => Effect.Effect<
   readonly AutomationRule[],
   never,
   FileSystem.FileSystem
-> =>
-  Effect.gen(function* () {
-    const config = yield* readConfigSafe();
-    return config.rules;
-  });
+> = Effect.fn("listRules")(function* () {
+  const config = yield* readConfigSafe();
+  return config.rules;
+});
 
 // ---------------------------------------------------------------------------
 // createRule
 // ---------------------------------------------------------------------------
 
-export const createRule = (
+export const createRule: (
   rule: AutomationRule,
-): Effect.Effect<
+) => Effect.Effect<
   AutomationRule,
   never,
   FileSystem.FileSystem | Path.Path
-> =>
-  Effect.gen(function* () {
-    const config = yield* readConfigSafe();
-    const newRules = [...config.rules, rule];
-    yield* writeConfigSafe({ version: 1 as const, rules: newRules });
-    return rule;
-  });
+> = Effect.fn("createRule")(function* (rule: AutomationRule) {
+  const config = yield* readConfigSafe();
+  const newRules = [...config.rules, rule];
+  yield* writeConfigSafe({ version: 1 as const, rules: newRules });
+  return rule;
+});
 
 // ---------------------------------------------------------------------------
 // updateRule
 // ---------------------------------------------------------------------------
 
-export const updateRule = (
+export const updateRule: (
   rule: AutomationRule,
-): Effect.Effect<
+) => Effect.Effect<
   AutomationRule,
   AppBackendError,
   FileSystem.FileSystem | Path.Path
-> =>
-  Effect.gen(function* () {
-    const config = yield* readConfigSafe();
-    const idx = config.rules.findIndex((r) => r.id === rule.id);
-    if (idx === -1) {
-      return yield* Effect.fail(
-        new NotFound({ message: `Rule ${rule.id} not found` }),
-      );
-    }
-    const newRules = [...config.rules];
-    newRules[idx] = rule;
-    yield* writeConfigSafe({ version: 1 as const, rules: newRules });
-    return rule;
-  });
+> = Effect.fn("updateRule")(function* (rule: AutomationRule) {
+  const config = yield* readConfigSafe();
+  const idx = config.rules.findIndex((r) => r.id === rule.id);
+  if (idx === -1) {
+    return yield* Effect.fail(
+      new NotFound({ message: `Rule ${rule.id} not found` }),
+    );
+  }
+  const newRules = [...config.rules];
+  newRules[idx] = rule;
+  yield* writeConfigSafe({ version: 1 as const, rules: newRules });
+  return rule;
+});
 
 // ---------------------------------------------------------------------------
 // deleteRule
 // ---------------------------------------------------------------------------
 
-export const deleteRule = (
+export const deleteRule: (
   id: AutomationId,
-): Effect.Effect<
+) => Effect.Effect<
   void,
   AppBackendError,
   FileSystem.FileSystem | Path.Path
-> =>
-  Effect.gen(function* () {
-    const config = yield* readConfigSafe();
-    const idx = config.rules.findIndex((r) => r.id === id);
-    if (idx === -1) {
-      return yield* Effect.fail(
-        new NotFound({ message: `Rule ${id} not found` }),
-      );
-    }
-    const newRules = config.rules.filter((r) => r.id !== id);
-    yield* writeConfigSafe({ version: 1 as const, rules: newRules });
-  });
+> = Effect.fn("deleteRule")(function* (id: AutomationId) {
+  const config = yield* readConfigSafe();
+  const idx = config.rules.findIndex((r) => r.id === id);
+  if (idx === -1) {
+    return yield* Effect.fail(
+      new NotFound({ message: `Rule ${id} not found` }),
+    );
+  }
+  const newRules = config.rules.filter((r) => r.id !== id);
+  yield* writeConfigSafe({ version: 1 as const, rules: newRules });
+});
 
 // ---------------------------------------------------------------------------
 // toggleRule
 // ---------------------------------------------------------------------------
 
-export const toggleRule = (
+export const toggleRule: (
   id: AutomationId,
   enabled: boolean,
-): Effect.Effect<
+) => Effect.Effect<
   AutomationRule,
   AppBackendError,
   FileSystem.FileSystem | Path.Path
-> =>
-  Effect.gen(function* () {
-    const config = yield* readConfigSafe();
-    const idx = config.rules.findIndex((r) => r.id === id);
-    if (idx === -1) {
-      return yield* Effect.fail(
-        new NotFound({ message: `Rule ${id} not found` }),
-      );
-    }
-    const updatedRule = {
-      ...config.rules[idx],
-      enabled,
-      updatedAt: Date.now(),
-    };
-    const newRules = [...config.rules];
-    newRules[idx] = updatedRule;
-    yield* writeConfigSafe({ version: 1 as const, rules: newRules });
-    return updatedRule;
-  });
+> = Effect.fn("toggleRule")(function* (
+  id: AutomationId,
+  enabled: boolean,
+) {
+  const config = yield* readConfigSafe();
+  const idx = config.rules.findIndex((r) => r.id === id);
+  if (idx === -1) {
+    return yield* Effect.fail(
+      new NotFound({ message: `Rule ${id} not found` }),
+    );
+  }
+  const updatedRule = {
+    ...config.rules[idx],
+    enabled,
+    updatedAt: Date.now(),
+  };
+  const newRules = [...config.rules];
+  newRules[idx] = updatedRule;
+  yield* writeConfigSafe({ version: 1 as const, rules: newRules });
+  return updatedRule;
+});
 
 // ---------------------------------------------------------------------------
 // runNow — trigger immediate execution via scheduler
 // ---------------------------------------------------------------------------
 
-export const runNow = (
+export const runNow: (
   id: AutomationId,
-): Effect.Effect<
+) => Effect.Effect<
   void,
   AppBackendError,
   SqliteNS.SqliteClient | FileSystem.FileSystem
-> =>
-  Effect.gen(function* () {
-    const config = yield* readConfigSafe();
-    if (!config.rules.find((r) => r.id === id)) {
-      return yield* Effect.fail(
-        new NotFound({ message: `Rule ${id} not found` }),
-      );
-    }
-    const scheduler = getScheduler();
-    yield* Effect.promise(() => scheduler.runNow(id, "manual"));
-  });
+> = Effect.fn("runNow")(function* (id: AutomationId) {
+  const config = yield* readConfigSafe();
+  if (!config.rules.find((r) => r.id === id)) {
+    return yield* Effect.fail(
+      new NotFound({ message: `Rule ${id} not found` }),
+    );
+  }
+  const scheduler = getScheduler();
+  yield* Effect.promise(() => scheduler.runNow(id, "manual"));
+});
 
 // ---------------------------------------------------------------------------
 // runMissed
 // ---------------------------------------------------------------------------
 
-export const runMissed = (
+export const runMissed: (
   id: AutomationId,
-): Effect.Effect<
+) => Effect.Effect<
   void,
   AppBackendError,
   SqliteNS.SqliteClient | FileSystem.FileSystem
-> =>
-  Effect.gen(function* () {
-    const config = yield* readConfigSafe();
-    if (!config.rules.find((r) => r.id === id)) {
-      return yield* Effect.fail(
-        new NotFound({ message: `Rule ${id} not found` }),
-      );
-    }
-    const scheduler = getScheduler();
-    yield* Effect.promise(() => scheduler.runNow(id, "missed-replay"));
-  });
+> = Effect.fn("runMissed")(function* (id: AutomationId) {
+  const config = yield* readConfigSafe();
+  if (!config.rules.find((r) => r.id === id)) {
+    return yield* Effect.fail(
+      new NotFound({ message: `Rule ${id} not found` }),
+    );
+  }
+  const scheduler = getScheduler();
+  yield* Effect.promise(() => scheduler.runNow(id, "missed-replay"));
+});
 
 // ---------------------------------------------------------------------------
 // listExecutions
 // ---------------------------------------------------------------------------
 
-export const listExecutions = (args: {
+export const listExecutions: (args: {
   readonly ruleId?: AutomationId;
   readonly status?: AutomationExecutionStatus;
   readonly limit?: number;
   readonly offset?: number;
-}): Effect.Effect<readonly AutomationExecution[], never, SqliteNS.SqliteClient> =>
-  Effect.gen(function* () {
-    return yield* listExecutionsDb(args).pipe(
-      Effect.catchAll(() => Effect.succeed([] as AutomationExecution[])),
-    );
-  });
+}) => Effect.Effect<readonly AutomationExecution[], never, SqliteNS.SqliteClient> = Effect.fn("listExecutions")(function* (args: {
+  readonly ruleId?: AutomationId;
+  readonly status?: AutomationExecutionStatus;
+  readonly limit?: number;
+  readonly offset?: number;
+}) {
+  return yield* listExecutionsDb(args).pipe(
+    Effect.catchAll(() => Effect.succeed([] as AutomationExecution[])),
+  );
+});
 
 // ---------------------------------------------------------------------------
 // getExecution
 // ---------------------------------------------------------------------------
 
-export const getExecution = (
+export const getExecution: (
   id: string,
-): Effect.Effect<
+) => Effect.Effect<
   AutomationExecution,
   AppBackendError,
   SqliteNS.SqliteClient
-> =>
-  Effect.gen(function* () {
-    const execution = yield* getExecutionDb(id).pipe(
-      Effect.catchAll(() => Effect.succeed(null)),
+> = Effect.fn("getExecution")(function* (id: string) {
+  const execution = yield* getExecutionDb(id).pipe(
+    Effect.catchAll(() => Effect.succeed(null)),
+  );
+  if (!execution) {
+    return yield* Effect.fail(
+      new NotFound({ message: `Execution ${id} not found` }),
     );
-    if (!execution) {
-      return yield* Effect.fail(
-        new NotFound({ message: `Execution ${id} not found` }),
-      );
-    }
-    return execution;
-  });
+  }
+  return execution;
+});

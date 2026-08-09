@@ -92,3 +92,30 @@ export interface AutomationExecution {
   readonly error: string | null;
   readonly metadataJson: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// ADR-0060 — payload shapes for the automations LLM bridge (main ↔ renderer).
+// Wire contract lives in shared so preload (src/preload/index.ts) and the
+// renderer-side type mirror (src/renderer/src/shared/apis/invoke.api.ts) both
+// derive from one source of truth.
+//
+// Renderer only ever produces "success" | "error"; the wider union is what
+// main's executor.ts accepts (timeout via the pendingLlmExecutions Map,
+// failure via the runMain error path).
+// ---------------------------------------------------------------------------
+
+export type LlmActionPayload = Extract<AutomationAction, { kind: "llm" }>;
+
+export interface LlmExecuteRequest {
+  readonly executionId: string;
+  readonly action: LlmActionPayload;
+}
+
+export type LlmResultStatus = "success" | "failure" | "timeout" | "error";
+
+export interface LlmResultPayload {
+  readonly executionId: string;
+  readonly status: LlmResultStatus;
+  readonly finalText?: string;
+  readonly error?: string;
+}

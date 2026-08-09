@@ -22,14 +22,14 @@ const makeSuccessDescriptor = (): PluginDescriptor => ({
   id: SuccessPluginId,
   initialize: Effect.succeed(undefined),
   route: { path: "/success", label: "Success" },
-  sidebar: { icon: "check", order: 1, visible: true },
+  sidebar: { icon: "Check", order: 1, visible: true },
 });
 
 const makeFailDescriptor = (error: AppError): PluginDescriptor => ({
   id: FailPluginId,
   initialize: Effect.fail(error),
   route: { path: "/fail", label: "Fail" },
-  sidebar: { icon: "x", order: 2, visible: true },
+  sidebar: { icon: "X", order: 2, visible: true },
 });
 
 
@@ -91,7 +91,7 @@ describe("plugin registry", () => {
             expect(plugin?.status).toBe("initializing");
           }),
           route: { path: "/test", label: "Test" },
-          sidebar: { icon: "test", order: 0, visible: true },
+          sidebar: { icon: "TestTube", order: 0, visible: true },
         });
 
         yield* initializeAll();
@@ -154,7 +154,7 @@ describe("plugin registry", () => {
             executionCount++;
           }),
           route: { path: "/idempotent", label: "Idempotent" },
-          sidebar: { icon: "repeat", order: 0, visible: true },
+          sidebar: { icon: "Repeat", order: 0, visible: true },
         });
 
         yield* initializeAll();
@@ -275,7 +275,7 @@ describe("plugin registry", () => {
             order.push("parallel-1-end");
           }),
           route: { path: "/p1", label: "P1" },
-          sidebar: { icon: "1", order: 1, visible: true },
+          sidebar: { icon: "Zap", order: 1, visible: true },
         });
 
         pluginRegistry._registerForTest({
@@ -287,7 +287,7 @@ describe("plugin registry", () => {
             order.push("parallel-2-end");
           }),
           route: { path: "/p2", label: "P2" },
-          sidebar: { icon: "2", order: 2, visible: true },
+          sidebar: { icon: "Bot", order: 2, visible: true },
         });
 
         yield* initializeAll();
@@ -367,7 +367,7 @@ describe("plugin registry", () => {
             yield* Effect.sleep(10);
           }),
           route: { path: "/blocking", label: "Blocking" },
-          sidebar: { icon: "block", order: 0, visible: true },
+          sidebar: { icon: "Blocks", order: 0, visible: true },
         });
 
         yield* initializeAll();
@@ -390,7 +390,7 @@ describe("plugin registry", () => {
             }
           }),
           route: { path: "/freeze", label: "Freeze" },
-          sidebar: { icon: "f", order: 0, visible: true },
+          sidebar: { icon: "FastForward", order: 0, visible: true },
         });
 
         yield* initializeAll();
@@ -434,7 +434,7 @@ describe("plugin registry", () => {
           id: "replaceable-plugin",
           initialize: countingInitialize,
           route: { path: "/replace", label: "Replace" },
-          sidebar: { icon: "r", order: 0, visible: true },
+          sidebar: { icon: "Rocket", order: 0, visible: true },
         });
 
         yield* initializeAll();
@@ -449,7 +449,7 @@ describe("plugin registry", () => {
           id: "replaceable-plugin",
           initialize: newInitialize,
           route: { path: "/replace", label: "Replace" },
-          sidebar: { icon: "r", order: 0, visible: true },
+          sidebar: { icon: "Rocket", order: 0, visible: true },
         });
 
         yield* initializeAll();

@@ -23,36 +23,34 @@ import {
  * 列出某对话的压缩记录，按创建时间升序。
  * @param conversationId 对话 ID，为空则返回 []
  */
-export function listCompactionEntries(
-  conversationId: string
-): Effect.Effect<CompactionEntry[], Database, SqliteClient> {
+export const listCompactionEntries = Effect.fn("listCompactionEntries")(function* (
+  conversationId: string,
+) {
   if (!conversationId) {
-    return Effect.succeed([]);
+    return yield* Effect.succeed([]);
   }
-  return Effect.gen(function* () {
-    const sql = yield* SqliteClient;
-    const rows = (yield* sql
-      .unsafe(
-        "SELECT * FROM compaction_entries WHERE conversation_id = ? ORDER BY created_at ASC",
-        [conversationId]
+  const sql = yield* SqliteClient;
+  const rows = (yield* sql
+    .unsafe(
+      "SELECT * FROM compaction_entries WHERE conversation_id = ? ORDER BY created_at ASC",
+      [conversationId]
+    )
+    .pipe(
+      Effect.catchTag("SqlError", (e) =>
+        Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
       )
-      .pipe(
-        Effect.catchTag("SqlError", (e) =>
-          Effect.fail(new Database({ message: e.message, cause: String(e.cause) }))
-        )
-      )) as Array<{
-      id: string;
-      conversation_id: string;
-      summary: string;
-      model: string;
-      tokens_before: number;
-      kind: string;
-      created_at: number;
-      first_kept_message_id: string;
-    }>;
-    return rows.map(toCompactionEntry);
-  });
-}
+    )) as Array<{
+    id: string;
+    conversation_id: string;
+    summary: string;
+    model: string;
+    tokens_before: number;
+    kind: string;
+    created_at: number;
+    first_kept_message_id: string;
+  }>;
+  return rows.map(toCompactionEntry);
+});
 
 // ---------------------------------------------------------------------------
 // appendCompactionEntry
@@ -71,42 +69,40 @@ export interface AppendCompactionEntryInput {
  * 追加压缩记录。
  * SQL 错误映射为 Database AppError（保留既有 wrap 语义）。
  */
-export function appendCompactionEntry(
-  input: AppendCompactionEntryInput
-): Effect.Effect<CompactionEntry, Database, SqliteClient> {
-  return Effect.gen(function* () {
-    const sql = yield* SqliteClient;
-    const id = crypto.randomUUID();
-    const now = Date.now();
-    const convId = input.conversationId ?? "";
+export const appendCompactionEntry = Effect.fn("appendCompactionEntry")(function* (
+  input: AppendCompactionEntryInput,
+) {
+  const sql = yield* SqliteClient;
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  const convId = input.conversationId ?? "";
 
-    const entry: CompactionEntry = {
-      id,
-      conversationId: convId,
-      summary: input.summary,
-      model: input.model,
-      tokensBefore: input.tokensBefore,
-      kind: input.kind,
-      createdAt: now,
-      firstKeptMessageId: input.firstKeptMessageId,
-    };
+  const entry: CompactionEntry = {
+    id,
+    conversationId: convId,
+    summary: input.summary,
+    model: input.model,
+    tokensBefore: input.tokensBefore,
+    kind: input.kind,
+    createdAt: now,
+    firstKeptMessageId: input.firstKeptMessageId,
+  };
 
-    yield* sql
-      .unsafe(
-        "INSERT INTO compaction_entries (id, conversation_id, summary, model, tokens_before, kind, created_at, first_kept_message_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        fromCompactionEntry(entry)
-      )
-      .pipe(
-        Effect.catchTag("SqlError", (e) =>
-          Effect.fail(
-            new Database({
-              message: e.message,
-              cause: String(e.cause),
-            })
-          )
+  yield* sql
+    .unsafe(
+      "INSERT INTO compaction_entries (id, conversation_id, summary, model, tokens_before, kind, created_at, first_kept_message_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      fromCompactionEntry(entry)
+    )
+    .pipe(
+      Effect.catchTag("SqlError", (e) =>
+        Effect.fail(
+          new Database({
+            message: e.message,
+            cause: String(e.cause),
+          })
         )
-      );
+      )
+    );
 
-    return entry;
-  });
-}
+  return entry;
+});

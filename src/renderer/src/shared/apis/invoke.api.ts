@@ -22,10 +22,21 @@ import type {
   AutomationId,
   AutomationExecution,
   AutomationExecutionStatus,
+  LlmActionPayload,
+  LlmExecuteRequest,
+  LlmResultPayload,
+  LlmResultStatus,
 } from "@shared/lib/automation-types";
 
 // Re-export for API consumers
-export type { AutomationExecution, AutomationExecutionStatus };
+export type {
+  AutomationExecution,
+  AutomationExecutionStatus,
+  LlmActionPayload,
+  LlmExecuteRequest,
+  LlmResultStatus,
+  LlmResultPayload,
+};
 
 export interface StreamSubscription {
   readonly onStreamChunk: (handler: (evt: unknown) => void) => () => void;
@@ -145,16 +156,28 @@ export interface CodemanApi {
   }) => Promise<readonly AutomationExecution[]>;
   readonly automationsGetExecution: (args: { id: string }) => Promise<AutomationExecution>;
   readonly automationsRunMissed: (args: { id: AutomationId }) => Promise<void>;
+
+  // ADR-0060 — bridge subscription for main→renderer LLM execution requests.
+  // See `src/preload/index.ts` for the same shape; renderer must not import `electron` directly.
+  readonly automationsExecuteLlm: (
+    handler: (request: LlmExecuteRequest) => void | Promise<void>,
+  ) => () => void;
+
+  // ADR-0060 — fire-and-forget back-channel for renderer→main LLM result.
+  readonly automationsSendLlmResult: (payload: LlmResultPayload) => void;
 }
 
 declare global {
-  var codeman: (CodemanApi & StreamSubscription) | undefined;
+  // Preload (src/preload/index.ts) always installs this via contextBridge.exposeInMainWorld.
+  // jsdom test env installs via src/renderer/src/__mocks__/ipc-mock.ts. Non-browser contexts
+  // (SSR / pure-node) guard via `typeof window === "undefined"` at the call site.
+  var codeman: CodemanApi & StreamSubscription;
 }
 
 function getApi(): CodemanApi & StreamSubscription {
-  if (typeof window === "undefined" || !window.codeman) {
+  if (typeof window === "undefined") {
     throw new Error(
-      "[invoke.api.ts] window.codeman not available — preload not loaded?",
+      "[invoke.api.ts] not in browser context — preload bridge unreachable",
     );
   }
   return window.codeman;

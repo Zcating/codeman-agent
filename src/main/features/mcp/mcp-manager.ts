@@ -149,8 +149,7 @@ export const createMcpManager = (): McpManager => {
   };
 
   return {
-    startAll: () =>
-      Effect.gen(function* () {
+    startAll: Effect.fn("startAll")(function* () {
         if (started) {
           return;
         }
@@ -226,8 +225,7 @@ export const createMcpManager = (): McpManager => {
       started = false;
     },
 
-    restart: (name) =>
-      Effect.gen(function* () {
+    restart: Effect.fn("restart")(function* (name) {
         const config = yield* readMcpConfig().pipe(
           Effect.mapError(
             (e) =>
@@ -320,8 +318,7 @@ export const createMcpManager = (): McpManager => {
       return server.listTools();
     },
 
-    setEnabled: (name, enabled) =>
-      Effect.gen(function* () {
+    setEnabled: Effect.fn("setEnabled")(function* (name, enabled) {
         const config = yield* readMcpConfig().pipe(
           Effect.mapError(
             (e) =>

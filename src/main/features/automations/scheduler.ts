@@ -284,38 +284,37 @@ export const createAutomationScheduler = (): AutomationScheduler => {
   };
 
   return {
-    start: () =>
-      Effect.gen(function* () {
-        const config = yield* readAutomationsConfig();
-        const now = Date.now();
+    start: Effect.fn("start")(function* () {
+      const config = yield* readAutomationsConfig();
+      const now = Date.now();
 
-        for (const rule of config.rules) {
-          ruleCache.set(rule.id, rule);
-          if (!rule.enabled) {
-            continue;
-          }
-
-          const lastExec = yield* listExecutions({
-            ruleId: rule.id,
-            limit: 1,
-          }).pipe(Effect.catchAll(() => Effect.succeed([])));
-          let lastCompleted = 0;
-          if (lastExec.length > 0) {
-            const exec = lastExec[0];
-            if (exec.completed_at != null) {
-              lastCompleted = exec.completed_at;
-              lastCompletedAt.set(rule.id, lastCompleted);
-            }
-          }
-
-          const period = getPeriodMs(rule.schedule);
-          if (lastCompleted > 0 && now > lastCompleted + period) {
-            enqueue(rule.id, "missed-replay");
-          }
-
-          scheduleNext(rule.id, rule.schedule, now);
+      for (const rule of config.rules) {
+        ruleCache.set(rule.id, rule);
+        if (!rule.enabled) {
+          continue;
         }
-      }),
+
+        const lastExec = yield* listExecutions({
+          ruleId: rule.id,
+          limit: 1,
+        }).pipe(Effect.catchAll(() => Effect.succeed([])));
+        let lastCompleted = 0;
+        if (lastExec.length > 0) {
+          const exec = lastExec[0];
+          if (exec.completed_at != null) {
+            lastCompleted = exec.completed_at;
+            lastCompletedAt.set(rule.id, lastCompleted);
+          }
+        }
+
+        const period = getPeriodMs(rule.schedule);
+        if (lastCompleted > 0 && now > lastCompleted + period) {
+          enqueue(rule.id, "missed-replay");
+        }
+
+        scheduleNext(rule.id, rule.schedule, now);
+      }
+    }),
 
     stop: () => {
       for (const timer of timers.values()) {

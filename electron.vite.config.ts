@@ -67,13 +67,25 @@ export default defineConfig({
       // `failed to resolve rolldownOptions.input value: "index.html"`, and
       // skips pre-bundling — which leaves Solid + pi-ai un-bundled in dev
       // and the renderer renders a blank page.
-      rollupOptions: { input: { index: r("src/renderer/index.html") } },
+      rollupOptions: {
+        input: { index: r("src/renderer/index.html") },
+        // Externalize electron — renderer is browser context, has no `__dirname`,
+        // pre-bundling electron would trigger `__dirname is not defined` at runtime.
+        // main-listener.ts imports `electron` for historical reasons (ADR-0053 TC);
+        // runtime guard makes it a no-op in browser. Architectural fix (move listener
+        // to preload + window.codeman bridge) tracked separately.
+        external: ["electron"],
+      },
     },
     plugins: [solid(), tailwindcss()],
     resolve: {
       // alias must stay absolute — Vite's resolve.alias is a full path
       // substitution, not a root-relative one.
       alias: [{ find: "@codeman-frontend", replacement: r("src/renderer/src") }],
+    },
+    optimizeDeps: {
+      // Skip electron in dev mode pre-bundling — same root cause as build external.
+      exclude: ["electron"],
     },
     server: { port: 1420, strictPort: true, host: "127.0.0.1" },
   },

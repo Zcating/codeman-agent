@@ -34,17 +34,20 @@ function candidateSeedPaths(): string[] {
 }
 
 // 辅助：读取并 normalize QA 文件，失败时返回 CandidateFailed
-function readQaFile(path: string): Effect.Effect<QaEntry[], { _tag: "CandidateFailed"; path: string }> {
-  return Effect.gen(function* () {
-    const fs = require("node:fs") as typeof import("node:fs");
-    const raw = yield* Effect.try(() => fs.readFileSync(path, "utf-8"));
-    const parsed = yield* Effect.try(() => JSON.parse(raw) as unknown);
-    if (!Array.isArray(parsed)) {
-      return yield* Effect.fail({ _tag: "CandidateFailed", path });
-    }
-    return normalizeQaEntries(parsed);
-  }).pipe(Effect.mapError(() => ({ _tag: "CandidateFailed", path })));
-}
+const readQaFile = (path: string) =>
+  Effect.fn("readQaFile")(
+    function* (path: string) {
+      const fs = require("node:fs") as typeof import("node:fs");
+      const raw = yield* Effect.try(() => fs.readFileSync(path, "utf-8"));
+      const parsed = yield* Effect.try(() => JSON.parse(raw) as unknown);
+      if (!Array.isArray(parsed)) {
+        return yield* Effect.fail({ _tag: "CandidateFailed", path });
+      }
+      return normalizeQaEntries(parsed);
+    },
+    (eff: Effect.Effect<QaEntry[], unknown>, path: string) =>
+      eff.pipe(Effect.mapError(() => ({ _tag: "CandidateFailed", path }))),
+  )(path);
 
 export function loadQaTable(): QaEntry[] {
   if (cache !== null) {
@@ -56,28 +59,32 @@ export function loadQaTable(): QaEntry[] {
   // candidates 失败静默（逐个 try，所有失败落入 fallback）
   // fallback 返回空表并 warn "no dev seed found"
 
-  const envEffect = Effect.gen(function* () {
-    const envPath = process.env["CODEMAN_TEST_QA_TABLE"];
-    if (!envPath) {
-      return yield* Effect.fail("skip" as const);
-    }
-    const fs = require("node:fs") as typeof import("node:fs");
-    const raw = yield* Effect.try(() => fs.readFileSync(envPath, "utf-8"));
-    const parsed = yield* Effect.try(() => JSON.parse(raw) as unknown);
-    if (!Array.isArray(parsed)) {
-      return yield* Effect.fail("skip" as const);
-    }
-    const entries = normalizeQaEntries(parsed);
-    logger.info(`loaded from CODEMAN_TEST_QA_TABLE=${envPath} (${entries.length} entries)`);
-    return entries;
-  }).pipe(
-    Effect.catchAll((e) => {
-      // env 失败: warn 并返回 "skip" 以落入下一个
-      logger.warn(
-        `failed to read CODEMAN_TEST_QA_TABLE: ${e instanceof Error ? e.message : String(e)}`,
-      );
-      return Effect.fail("skip" as const);
-    }),
+  const envEffect = Effect.fn("loadQaTable.envEffect")(
+    function* () {
+      const envPath = process.env["CODEMAN_TEST_QA_TABLE"];
+      if (!envPath) {
+        return yield* Effect.fail("skip" as const);
+      }
+      const fs = require("node:fs") as typeof import("node:fs");
+      const raw = yield* Effect.try(() => fs.readFileSync(envPath, "utf-8"));
+      const parsed = yield* Effect.try(() => JSON.parse(raw) as unknown);
+      if (!Array.isArray(parsed)) {
+        return yield* Effect.fail("skip" as const);
+      }
+      const entries = normalizeQaEntries(parsed);
+      logger.info(`loaded from CODEMAN_TEST_QA_TABLE=${envPath} (${entries.length} entries)`);
+      return entries;
+    },
+    (eff) =>
+      eff.pipe(
+        Effect.catchAll((e) => {
+          // env 失败: warn 并返回 "skip" 以落入下一个
+          logger.warn(
+            `failed to read CODEMAN_TEST_QA_TABLE: ${e instanceof Error ? e.message : String(e)}`,
+          );
+          return Effect.fail("skip" as const);
+        }),
+      ),
   );
 
   const isDev = process.env["NODE_ENV"] !== "production" || !!process.env["VITE_DEV_SERVER_URL"];
@@ -95,7 +102,10 @@ export function loadQaTable(): QaEntry[] {
       )
     : Effect.fail("skip" as const);
 
-  const fallbackEffect = Effect.gen(function* () {
+  // 链式回退: env 失败则试 candidates，candidates 全部失败则用 fallback
+  const chain = Effect.orElse(envEffect(), () => candidatesEffect);
+
+  const fallbackEffect = Effect.fn("loadQaTable.fallbackEffect")(function* () {
     if (isDev) {
       logger.warn(
         `no dev seed found. Tried: ${candidateSeedPaths().join(", ")}. ` +
@@ -105,11 +115,8 @@ export function loadQaTable(): QaEntry[] {
     return [] as QaEntry[];
   });
 
-  // 链式回退: env 失败则试 candidates，candidates 全部失败则用 fallback
-  const chain = Effect.orElse(envEffect, () => candidatesEffect);
-
   const result = Effect.runSync(
-    Effect.firstSuccessOf([chain, fallbackEffect]).pipe(Effect.orDie),
+    Effect.firstSuccessOf([chain, fallbackEffect()]).pipe(Effect.orDie),
   );
 
   cache = result;

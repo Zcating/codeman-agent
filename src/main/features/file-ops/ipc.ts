@@ -77,7 +77,7 @@ async function walkDir(
   visit: (relPath: string) => Promise<void>,
 ): Promise<void> {
   await runMain(
-    Effect.gen(function* () {
+    Effect.fn("fileOps.walkDir")(function* () {
       const fs = yield* FileSystem.FileSystem;
       const skip = new Set([
         ".git",
@@ -141,7 +141,7 @@ async function searchFilesInWorkspace(
     }
     const abs = `${root}/${relPath}`.replace(/\\/g, "/");
     const content = await runMain(
-      Effect.gen(function* () {
+      Effect.fn("fileOps.searchFilesInWorkspace.readFile")(function* () {
         const fs = yield* FileSystem.FileSystem;
         return yield* fs.readFileString(abs).pipe(
           Effect.catchAll(() => Effect.succeed(null)),
@@ -214,7 +214,7 @@ export function registerFileOpsIpc(): void {
           validatePathInWorkspace(args.path, ws.root_path),
         );
         const content = await runMain(
-          Effect.gen(function* () {
+          Effect.fn("fileOps.editFile.readFile")(function* () {
             const fs = yield* FileSystem.FileSystem;
             return yield* fs.readFileString(abs);
           }),
@@ -267,7 +267,7 @@ export function registerFileOpsIpc(): void {
         validatePathInWorkspace(args.path, ws.root_path),
       );
       await runMain(
-        Effect.gen(function* () {
+        Effect.fn("fileOps.deleteFile.remove")(function* () {
           const fs = yield* FileSystem.FileSystem;
           yield* fs.remove(abs);
         }),

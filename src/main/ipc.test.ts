@@ -132,6 +132,28 @@ describe("ipc.ts barrel", () => {
     expect(channels.length).toBe(EXPECTED_CHANNELS.length);
   });
 
+  it("registers all automation channels via registerIpcHandlers (boot must not re-register)", async () => {
+    // Regression for boot crash: "Attempted to register a second handler for 'automations:list'".
+    // registerIpcHandlers() is the SINGLE source of truth for automations:* channels.
+    // boot (src/main/index.ts) must NOT call registerAutomationIpc() separately.
+    const seen: string[] = [];
+    fakeIpcMain.handle.mockImplementation((channel: string) => {
+      seen.push(channel);
+    });
+
+    const { registerIpcHandlers } = await import("./ipc.js");
+    registerIpcHandlers({ getMainWindow: () => fakeWin as any });
+
+    const automationChannels = EXPECTED_CHANNELS.filter((c) => c.startsWith("automations:"));
+    expect(automationChannels.length).toBeGreaterThan(0); // sanity: the ADR-0053 channels exist
+    for (const ch of automationChannels) {
+      expect(seen).toContain(ch);
+    }
+
+    // Restore default mock for other tests
+    fakeIpcMain.handle.mockReset();
+  });
+
   it("emitStreamChunk forwards event to first window", async () => {
     const { emitStreamChunk } = await import("./ipc.js");
     emitStreamChunk({ kind: "token", content: "hi" });
