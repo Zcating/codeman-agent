@@ -10,8 +10,8 @@ import { createSubAgent, type ToolRegistry } from "@codeman-frontend/plugins/mul
 import type { SubAgentConfig } from "@codeman-frontend/shared/lib/sub-agent-schema";
 import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
 import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
-import type { AutomationAction } from "@shared/lib/automation-types";
 import type {
+  LlmActionPayload,
   LlmExecuteRequest,
   LlmResultPayload,
 } from "@codeman-frontend/shared/apis";
@@ -20,7 +20,9 @@ import type {
 // Types
 // ---------------------------------------------------------------------------
 
-type LlmAction = Extract<AutomationAction, { kind: "llm" }>;
+// LlmActionPayload (defined in @shared/lib/automation-types) is the wire
+// shape for "the llm variant of an AutomationAction". Use it directly instead
+// of defining a second Extract<...> alias here.
 
 interface LlmExecuteResult {
   readonly status: "success" | "failure" | "error";
@@ -37,7 +39,7 @@ interface LlmExecuteResult {
  * Pure: depends only on `createSubAgent` (mocked in tests) and
  * `getProviderConfig()` (reads `window.__appStore`).
  */
-export async function executeLlmInRenderer(action: LlmAction): Promise<LlmExecuteResult> {
+export async function executeLlmInRenderer(action: LlmActionPayload): Promise<LlmExecuteResult> {
   const providerConfig = getProviderConfig(action.providerId);
   if (!providerConfig) {
     return { status: "error", error: `Provider ${action.providerId} not found` };
