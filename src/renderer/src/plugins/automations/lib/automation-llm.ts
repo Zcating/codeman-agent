@@ -25,7 +25,7 @@ import type {
 // of defining a second Extract<...> alias here.
 
 interface LlmExecuteResult {
-  readonly status: "success" | "failure" | "error";
+  readonly status: "success" | "error";
   readonly finalText?: string;
   readonly error?: string;
 }
