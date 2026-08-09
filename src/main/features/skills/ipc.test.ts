@@ -11,16 +11,24 @@
  * returned directly to the renderer. Electron's structured clone algorithm
  * refuses to copy it, surfacing as "An object could not be cloned".
  *
- * Fix: wrap with `runMain(...)` (mirrors the pattern in
- * src/main/features/automations/ipc.ts + workspaces/ipc.ts).
+ * Fix: route through the registerEffectHandler helper
+ * (src/main/lib/ipc-handler.ts). The bug class — `await someEffect()` —
+ * is structurally easy to write; the helper enforces fn must return Effect
+ * and routes through runMain before handing the resolved value to Electron's
+ * structured-clone layer.
  *
- * These tests assert the handler's resolved value is a plain cloneable value
- * (array for skillsScan, string for skillsLoad), NOT the Effect description.
+ * Layered test strategy:
+ *  - This file locks the call-site pattern (does the handler pass the
+ *    Effect to runMain?) — mocks runMain with Effect.runPromise, asserts
+ *    runMain is called with an Effect AND the resolved value is cloneable.
+ *  - src/main/runtime.test.ts locks the real runMain / MainLive path
+ *    (does the runtime actually resolve Effects with the expected
+ *    service stack?).
+ *  - Combined: a regression in either layer is caught.
  *
- * The mocks below isolate the IPC contract (call site pattern) from runtime
- * concerns (better-sqlite3 ABI mismatch in CI, full MainLive layer setup):
- * - listSkills / readSkillFile return trivial R=never Effects (no fs/path needed)
- * - runMain just runs the Effect synchronously via runPromise
+ * Mocks below isolate from better-sqlite3 ABI mismatch in CI:
+ * - listSkills / readSkillFile return trivial R=never Effects
+ * - runMain is mocked to call Effect.runPromise directly
  */
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 import { Effect } from "effect";
@@ -47,22 +55,24 @@ vi.mock("./skills-host.js", () => ({
   ),
 }));
 
-// Mock runMain to skip the real MainLive runtime (better-sqlite3 ABI mismatch
-// in this CI env would otherwise abort the handler). The contract under test
-// is "does the handler pass the Effect to runMain?" — which runPromise
-// faithfully verifies for any R=never Effect.
+// Track call args + run any Effect passed in. The contract under test is
+// "the handler passes the Effect to runMain" — verified by the call-arg
+// assertion below. Effect.runPromise suffices for the resolved-value type
+// assertion; the real runMain / MainLive path is locked in runtime.test.ts.
+const runMainMock = vi.fn((eff: Effect.Effect<unknown, unknown, never>) =>
+  Effect.runPromise(eff),
+);
 vi.mock("../../runtime.js", () => ({
-  runMain: vi.fn((eff: Effect.Effect<unknown, unknown, never>) =>
-    Effect.runPromise(eff),
-  ),
+  runMain: runMainMock,
 }));
 
 describe("skills/ipc.ts", () => {
   beforeEach(() => {
     fakeIpcMain.handle.mockClear();
+    runMainMock.mockClear();
   });
 
-  it("skillsScan handler returns a plain array (cloneable), not an Effect description", async () => {
+  it("skillsScan handler passes the listSkills() Effect to runMain, not await it", async () => {
     const { registerSkillsIpc } = await import("./ipc.js");
     registerSkillsIpc();
 
@@ -72,13 +82,16 @@ describe("skills/ipc.ts", () => {
 
     const result = await handler({});
 
-    // Tightest assertion: the resolved value must be a plain array.
-    // Before fix: result is the Effect description object (Array.isArray = false).
-    // After fix:  result is SkillManifest[] (Array.isArray = true).
+    // Layer 1: call-site pattern — handler routed through runMain.
+    expect(runMainMock).toHaveBeenCalledTimes(1);
+    expect(Effect.isEffect(runMainMock.mock.calls[0][0])).toBe(true);
+
+    // Layer 2: cloneable resolution — result is a plain array, NOT the
+    // Effect description (which would have Array.isArray === false).
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it("skillsLoad handler returns a plain string (cloneable), not an Effect description", async () => {
+  it("skillsLoad handler passes the readSkillFile() Effect to runMain, not await it", async () => {
     const { registerSkillsIpc } = await import("./ipc.js");
     registerSkillsIpc();
 
@@ -91,8 +104,11 @@ describe("skills/ipc.ts", () => {
 
     const result = await handler({}, { name: "test-skill" });
 
-    // Before fix: result is the Effect description (typeof === "object", not string).
-    // After fix:  result is the resolved string.
+    // Layer 1: call-site pattern — handler routed through runMain.
+    expect(runMainMock).toHaveBeenCalledTimes(1);
+    expect(Effect.isEffect(runMainMock.mock.calls[0][0])).toBe(true);
+
+    // Layer 2: cloneable resolution — result is a plain string.
     expect(typeof result).toBe("string");
     expect(result).toContain("test-skill");
   });
