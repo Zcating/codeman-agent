@@ -8,6 +8,7 @@ import type { SubAgentConfig } from "@codeman-frontend/shared/lib/sub-agent-sche
 import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
 import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 import type { AutomationAction } from "@shared/lib/automation-types";
+import { logger } from "@codeman-frontend/shared/lib/logger";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,6 +36,16 @@ let listenerSetup = false;
 
 export function setupAutomationMainListener(): void {
   if (listenerSetup) return;
+
+  // Runtime guard: renderer is browser context, `ipcRenderer` is undefined unless
+  // electron is loaded (it's not, per ADR-0053 architectural intent). Without this
+  // guard, plugin initialization throws "Cannot read properties of undefined".
+  // TODO: move this listener into src/preload/index.ts and expose via window.codeman
+  // — renderer-side `ipcRenderer.on(...)` is structurally wrong.
+  if (typeof ipcRenderer === "undefined") {
+    logger.warn("[automations] ipcRenderer unavailable in renderer context; LLM execution listener skipped");
+    return;
+  }
   listenerSetup = true;
 
   // Listen for LLM execution requests from main process
