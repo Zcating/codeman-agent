@@ -22,30 +22,21 @@ import type {
   AutomationId,
   AutomationExecution,
   AutomationExecutionStatus,
-  AutomationAction,
+  LlmActionPayload,
+  LlmExecuteRequest,
+  LlmResultPayload,
+  LlmResultStatus,
 } from "@shared/lib/automation-types";
 
 // Re-export for API consumers
-export type { AutomationExecution, AutomationExecutionStatus};
-
-// ADR-0060 — payload shapes for the automations LLM bridge.
-// Mirrors `src/preload/index.ts` so renderer-side `window.codeman`
-// is fully typed against the same shape.
-export type LlmActionPayload = Extract<AutomationAction, { kind: "llm" }>;
-
-export interface LlmExecuteRequest {
-  readonly executionId: string;
-  readonly action: LlmActionPayload;
-}
-
-export type LlmResultStatus = "success" | "failure" | "timeout" | "error";
-
-export interface LlmResultPayload {
-  readonly executionId: string;
-  readonly status: LlmResultStatus;
-  readonly finalText?: string;
-  readonly error?: string;
-}
+export type {
+  AutomationExecution,
+  AutomationExecutionStatus,
+  LlmActionPayload,
+  LlmExecuteRequest,
+  LlmResultStatus,
+  LlmResultPayload,
+};
 
 export interface StreamSubscription {
   readonly onStreamChunk: (handler: (evt: unknown) => void) => () => void;

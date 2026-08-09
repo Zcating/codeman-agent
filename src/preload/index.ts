@@ -17,28 +17,16 @@ import type {
   AutomationRule,
   AutomationId,
   AutomationExecution,
-  AutomationAction,
+  LlmExecuteRequest,
+  LlmResultPayload,
 } from "../shared/lib/automation-types";
-export type { AutomationExecution } from "../shared/lib/automation-types";
-
-// ADR-0060 — payload shapes for the automations LLM bridge.
-// Renderer subscribes to `automations:execute-llm` via `automationsExecuteLlm`,
-// runs the LLM call locally, and posts the result back via `automationsSendLlmResult`.
-export type LlmActionPayload = Extract<AutomationAction, { kind: "llm" }>;
-
-export interface LlmExecuteRequest {
-  readonly executionId: string;
-  readonly action: LlmActionPayload;
-}
-
-export type LlmResultStatus = "success" | "failure" | "timeout" | "error";
-
-export interface LlmResultPayload {
-  readonly executionId: string;
-  readonly status: LlmResultStatus;
-  readonly finalText?: string;
-  readonly error?: string;
-}
+export type {
+  AutomationExecution,
+  LlmActionPayload,
+  LlmExecuteRequest,
+  LlmResultStatus,
+  LlmResultPayload,
+} from "../shared/lib/automation-types";
 
 export interface StreamSubscription {
   readonly onStreamChunk: (handler: (evt: unknown) => void) => () => void;
