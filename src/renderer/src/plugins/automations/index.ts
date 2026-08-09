@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { setupAutomationMainListener } from "./lib/main-listener";
+import { setupAutomationMainListener } from "./lib/automation-llm";
 
 export { automationsRules$, automationsLoading$, automationsError$, automationsStore } from "./stores/automations.store";
 export { executions$, executionsLoading$, executionsStore } from "./stores/executions.store";
