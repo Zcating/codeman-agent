@@ -463,7 +463,11 @@ describe("ChatSidebar (PR 2)", () => {
     });
 
     it("FAILS if unknown icon identifier: throws with plugin/id context instead of silent WandSparkles fallback", () => {
-      const metadataWithUnknownIcon = new Map([
+      // Cast bypasses PluginIconName — this test asserts the *runtime* throw
+      // for a deliberately invalid icon name. The new PluginIconName type
+      // would otherwise reject "NonExistentIcon" at compile time. Followed
+      // up in the renderPluginIcon Record-map refactor (Group E-2).
+      const metadataWithUnknownIcon = new Map<string, unknown>([
         [
           "bad-plugin",
           {
@@ -475,7 +479,7 @@ describe("ChatSidebar (PR 2)", () => {
       ]);
 
       const originalGetPluginMetadata = F.getPluginMetadata;
-      F.getPluginMetadata = () => metadataWithUnknownIcon;
+      F.getPluginMetadata = () => metadataWithUnknownIcon as ReturnType<typeof originalGetPluginMetadata>;
 
       expect(() => render(() => <ChatSidebar />)).toThrow(/bad-plugin.*NonExistentIcon|NonExistentIcon.*bad-plugin/);
 

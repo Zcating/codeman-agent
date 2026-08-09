@@ -11,8 +11,20 @@ export interface PluginRouteMetadata {
   readonly label: string;
 }
 
+/**
+ * PluginIconName — union of all valid Lucide icon names.
+ *
+ * Derives from `typeof import("lucide-solid")` so any new icon added to
+ * lucide-solid is automatically allowed. Forces compile-time safety on
+ * plugin descriptors: a typo'd icon name (`"Clokc"`) or a removed icon
+ * fails typecheck instead of crashing the sidebar render with
+ * "Unknown icon for plugin" — see chat-sidebar.tsx renderPluginIcon
+ * (the regression caught in commit c8e4331).
+ */
+export type PluginIconName = keyof typeof import("lucide-solid");
+
 export interface PluginSidebarMetadata {
-  readonly icon: string;
+  readonly icon: PluginIconName;
   readonly order: number;
   readonly visible: boolean;
 }
