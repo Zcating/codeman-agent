@@ -462,11 +462,14 @@ describe("ChatSidebar (PR 2)", () => {
       F.getPluginMetadata = originalGetPluginMetadata;
     });
 
-    it("FAILS if unknown icon identifier: throws with plugin/id context instead of silent WandSparkles fallback", () => {
-      // Cast bypasses PluginIconName — this test asserts the *runtime* throw
-      // for a deliberately invalid icon name. The new PluginIconName type
-      // would otherwise reject "NonExistentIcon" at compile time. Followed
-      // up in the renderPluginIcon Record-map refactor (Group E-2).
+    it("unknown icon identifier: renders fallback (Box) without throwing", () => {
+      // Replaces the previous throw-on-unknown test. The Record-map refactor
+      // (chat-sidebar.tsx renderPluginIcon) removes the throw default — a typo
+      // or missing icon entry now renders Box instead of crashing the sidebar
+      // (the regression caught in commit c8e4331). PluginIconName typechecks
+      // the icon name at compile time; this test covers the runtime drift case
+      // (an icon name that's valid per lucide-solid types but absent from the
+      // PLUGIN_ICONS map — e.g., a renamed upstream export).
       const metadataWithUnknownIcon = new Map<string, unknown>([
         [
           "bad-plugin",
@@ -481,7 +484,8 @@ describe("ChatSidebar (PR 2)", () => {
       const originalGetPluginMetadata = F.getPluginMetadata;
       F.getPluginMetadata = () => metadataWithUnknownIcon as ReturnType<typeof originalGetPluginMetadata>;
 
-      expect(() => render(() => <ChatSidebar />)).toThrow(/bad-plugin.*NonExistentIcon|NonExistentIcon.*bad-plugin/);
+      // Should NOT throw — sidebar renders with the Box fallback icon.
+      expect(() => render(() => <ChatSidebar />)).not.toThrow();
 
       F.getPluginMetadata = originalGetPluginMetadata;
     });

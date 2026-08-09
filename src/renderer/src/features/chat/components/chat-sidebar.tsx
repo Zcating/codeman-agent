@@ -1,8 +1,9 @@
 
-import { type JSX } from "solid-js";
+import { type JSX, type Component } from "solid-js";
 import { Outlet, useLocation, useNavigate, useParams, Link } from "@tanstack/solid-router";
 import {
   Settings as SettingsIcon,
+  Box,
   WandSparkles,
   Cable,
   Users,
@@ -26,20 +27,33 @@ import { chatSidebarActions } from "@codeman-frontend/features/chat/lib/chat-sid
 import { RowActions } from "@codeman-frontend/features/chat/components/row-actions";
 import { NewChatButton } from "@codeman-frontend/features/chat/components/new-chat-button";
 import { getPluginMetadata } from "@codeman-frontend/plugins";
+import type { PluginIconName } from "@codeman-frontend/plugins/lib/plugin-registry";
 
-function renderPluginIcon(pluginId: string, iconName: string): JSX.Element {
-  switch (iconName) {
-    case "WandSparkles":
-      return <WandSparkles class="h-4 w-4" />;
-    case "Cable":
-      return <Cable class="h-4 w-4" />;
-    case "Users":
-      return <Users class="h-4 w-4" />;
-    case "Clock":
-      return <Clock class="h-4 w-4" />;
-    default:
-      throw new Error(`Unknown icon "${iconName}" for plugin "${pluginId}" — expected "WandSparkles", "Cable", "Users", or "Clock"`);
+// Per-plugin icons explicitly listed so the sidebar's static analysis
+// (extractUsedIcons / tree-shake) knows which icons the build needs.
+// TypeScript enforces these are real lucide-solid exports via PluginIconName.
+const PLUGIN_ICONS = {
+  WandSparkles,
+  Cable,
+  Users,
+  Clock,
+} satisfies Partial<Record<string, Component<{ class?: string }>>>;
+
+function renderPluginIcon(
+  _pluginId: string,
+  iconName: PluginIconName,
+): JSX.Element {
+  // Static lookup against the explicit list above. PluginIconName constrains
+  // iconName to a valid lucide-solid export, so any name not in PLUGIN_ICONS
+  // is a typing/build drift (e.g., an icon renamed upstream). Fall back to
+  // Box rather than throw — the previous throw-on-unknown pattern converted
+  // a config typo into a hard sidebar crash (the regression caught in
+  // commit c8e4331).
+  const Icon = PLUGIN_ICONS[iconName];
+  if (!Icon) {
+    return <Box class="h-4 w-4" />;
   }
+  return <Icon class="h-4 w-4" />;
 }
 
 
