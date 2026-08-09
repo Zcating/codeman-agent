@@ -136,11 +136,6 @@ export async function handleAutomationLlm(request: LlmExecuteRequest): Promise<v
     payload = { executionId, status: "error", error: errorMessage };
   }
 
-  if (!window.codeman) {
-    // Bridge unavailable — render must always ship this surface in production,
-    // so the only realistic case is a test that didn't install the mock.
-    return;
-  }
   window.codeman.automationsSendLlmResult(payload);
 }
 
@@ -153,7 +148,6 @@ let subscription: (() => void) | null = null;
 
 export function setupAutomationMainListener(): void {
   if (subscription) return;
-  if (!window.codeman) return;
   subscription = window.codeman.automationsExecuteLlm(handleAutomationLlm);
 }
 

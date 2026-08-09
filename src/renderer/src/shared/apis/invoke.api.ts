@@ -177,13 +177,16 @@ export interface CodemanApi {
 }
 
 declare global {
-  var codeman: (CodemanApi & StreamSubscription) | undefined;
+  // Preload (src/preload/index.ts) always installs this via contextBridge.exposeInMainWorld.
+  // jsdom test env installs via src/renderer/src/__mocks__/ipc-mock.ts. Non-browser contexts
+  // (SSR / pure-node) guard via `typeof window === "undefined"` at the call site.
+  var codeman: CodemanApi & StreamSubscription;
 }
 
 function getApi(): CodemanApi & StreamSubscription {
-  if (typeof window === "undefined" || !window.codeman) {
+  if (typeof window === "undefined") {
     throw new Error(
-      "[invoke.api.ts] window.codeman not available — preload not loaded?",
+      "[invoke.api.ts] not in browser context — preload bridge unreachable",
     );
   }
   return window.codeman;
