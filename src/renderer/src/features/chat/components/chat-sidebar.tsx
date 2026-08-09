@@ -6,6 +6,7 @@ import {
   WandSparkles,
   Cable,
   Users,
+  Clock,
 } from "lucide-solid";
 import {
   CodemanSidebar,
@@ -34,8 +35,10 @@ function renderPluginIcon(pluginId: string, iconName: string): JSX.Element {
       return <Cable class="h-4 w-4" />;
     case "Users":
       return <Users class="h-4 w-4" />;
+    case "Clock":
+      return <Clock class="h-4 w-4" />;
     default:
-      throw new Error(`Unknown icon "${iconName}" for plugin "${pluginId}" — expected "WandSparkles", "Cable", or "Users"`);
+      throw new Error(`Unknown icon "${iconName}" for plugin "${pluginId}" — expected "WandSparkles", "Cable", "Users", or "Clock"`);
   }
 }
 

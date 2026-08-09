@@ -481,6 +481,65 @@ describe("ChatSidebar (PR 2)", () => {
 
       F.getPluginMetadata = originalGetPluginMetadata;
     });
+
+    // Regression for dev-mode bug: automations plugin uses icon "Clock"
+    // (matches the Lucide icon used in its own settings/rule-list/execution-history
+    // components). renderPluginIcon previously only allowed the three
+    // builtin-plugin icons and threw on render — see chat-sidebar.tsx:38.
+    it("renders all real plugin icons (WandSparkles, Cable, Users, Clock) without throwing", () => {
+      const realPlugins = new Map([
+        [
+          "skills",
+          {
+            id: "skills",
+            route: { path: "/plugins/skills", label: "Skills" },
+            sidebar: { icon: "WandSparkles", order: 3, visible: true },
+          },
+        ],
+        [
+          "mcp",
+          {
+            id: "mcp",
+            route: { path: "/plugins/mcp", label: "MCP" },
+            sidebar: { icon: "Cable", order: 4, visible: true },
+          },
+        ],
+        [
+          "multi-agents",
+          {
+            id: "multi-agents",
+            route: { path: "/plugins/multi-agents", label: "智能体" },
+            sidebar: { icon: "Users", order: 30, visible: true },
+          },
+        ],
+        [
+          "automations",
+          {
+            id: "automations",
+            route: { path: "/plugins/automations", label: "Automations" },
+            sidebar: { icon: "Clock", order: 5, visible: true },
+          },
+        ],
+      ]);
+
+      const originalGetPluginMetadata = F.getPluginMetadata;
+      F.getPluginMetadata = () => realPlugins;
+
+      // Should not throw — renderPluginIcon must handle every icon actually
+      // declared in src/renderer/src/plugins/**/index.ts.
+      expect(() => render(() => <ChatSidebar />)).not.toThrow();
+      const opts = F.capturedProps!.options;
+      const pluginChildren = opts[0].children;
+      // Order: WandSparkles/skills(3) → Cable/mcp(4) → Clock/automations(5) → Users/multi-agents(30)
+      expect(pluginChildren.map((c: any) => c.value)).toEqual([
+        "skills",
+        "mcp",
+        "automations",
+        "multi-agents",
+      ]);
+
+      F.getPluginMetadata = originalGetPluginMetadata;
+    });
   });
 
   describe("Seam T8: RowActions integration", () => {
