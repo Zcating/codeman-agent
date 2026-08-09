@@ -17,8 +17,28 @@ import type {
   AutomationRule,
   AutomationId,
   AutomationExecution,
+  AutomationAction,
 } from "../shared/lib/automation-types";
 export type { AutomationExecution } from "../shared/lib/automation-types";
+
+// ADR-0060 — payload shapes for the automations LLM bridge.
+// Renderer subscribes to `automations:execute-llm` via `automationsExecuteLlm`,
+// runs the LLM call locally, and posts the result back via `automationsSendLlmResult`.
+export type LlmActionPayload = Extract<AutomationAction, { kind: "llm" }>;
+
+export interface LlmExecuteRequest {
+  readonly executionId: string;
+  readonly action: LlmActionPayload;
+}
+
+export type LlmResultStatus = "success" | "failure" | "timeout" | "error";
+
+export interface LlmResultPayload {
+  readonly executionId: string;
+  readonly status: LlmResultStatus;
+  readonly finalText?: string;
+  readonly error?: string;
+}
 
 export interface StreamSubscription {
   readonly onStreamChunk: (handler: (evt: unknown) => void) => () => void;
@@ -138,6 +158,17 @@ export interface CodemanApi {
   }) => Promise<readonly AutomationExecution[]>;
   readonly automationsGetExecution: (args: { id: string }) => Promise<AutomationExecution>;
   readonly automationsRunMissed: (args: { id: AutomationId }) => Promise<void>;
+
+  // ADR-0060 — bridge subscription for main→renderer LLM execution requests.
+  // Renderer-side listener cannot import `electron` directly (browser context
+  // has no `ipcRenderer`); this bridge mirrors `onStreamChunk` semantics.
+  readonly automationsExecuteLlm: (
+    handler: (request: LlmExecuteRequest) => void | Promise<void>,
+  ) => () => void;
+
+  // ADR-0060 — fire-and-forget back-channel for renderer→main LLM result.
+  // Main side awaits this on `automations:execute-llm-result` (see executor.ts).
+  readonly automationsSendLlmResult: (payload: LlmResultPayload) => void;
 }
 
 export type CodemanApiExposed = CodemanApi &
@@ -216,6 +247,25 @@ const codeman: CodemanApiExposed = {
   automationsListExecutions: (args) => ipcRenderer.invoke("automations:list-executions", args),
   automationsGetExecution: (args) => ipcRenderer.invoke("automations:get-execution", args),
   automationsRunMissed: (args) => ipcRenderer.invoke("automations:run-missed", args),
+
+  // ADR-0060 — preload owns the IPC subscription so renderer never imports `electron`.
+  // Wraps handler in ipcRenderer's listener signature and returns an unsubscribe fn
+  // for parity with `onStreamChunk` (cleanup pattern, idempotent re-subscribe safe).
+  automationsExecuteLlm: (handler) => {
+    const listener = (_e: unknown, request: LlmExecuteRequest) => {
+      // Swallow handler rejections — main has its own timeout + pending map,
+      // renderer errors are best-effort reported via sendLlmResult.
+      void Promise.resolve(handler(request)).catch(() => {});
+    };
+    ipcRenderer.on("automations:execute-llm", listener);
+    return () => {
+      ipcRenderer.off("automations:execute-llm", listener);
+    };
+  },
+
+  automationsSendLlmResult: (payload) => {
+    ipcRenderer.send("automations:execute-llm-result", payload);
+  },
 
   onStreamChunk: (handler) => {
     const listener = (_e: unknown, evt: unknown) => handler(evt);

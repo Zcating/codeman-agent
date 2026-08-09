@@ -22,10 +22,30 @@ import type {
   AutomationId,
   AutomationExecution,
   AutomationExecutionStatus,
+  AutomationAction,
 } from "@shared/lib/automation-types";
 
 // Re-export for API consumers
-export type { AutomationExecution, AutomationExecutionStatus };
+export type { AutomationExecution, AutomationExecutionStatus};
+
+// ADR-0060 — payload shapes for the automations LLM bridge.
+// Mirrors `src/preload/index.ts` so renderer-side `window.codeman`
+// is fully typed against the same shape.
+export type LlmActionPayload = Extract<AutomationAction, { kind: "llm" }>;
+
+export interface LlmExecuteRequest {
+  readonly executionId: string;
+  readonly action: LlmActionPayload;
+}
+
+export type LlmResultStatus = "success" | "failure" | "timeout" | "error";
+
+export interface LlmResultPayload {
+  readonly executionId: string;
+  readonly status: LlmResultStatus;
+  readonly finalText?: string;
+  readonly error?: string;
+}
 
 export interface StreamSubscription {
   readonly onStreamChunk: (handler: (evt: unknown) => void) => () => void;
@@ -145,6 +165,15 @@ export interface CodemanApi {
   }) => Promise<readonly AutomationExecution[]>;
   readonly automationsGetExecution: (args: { id: string }) => Promise<AutomationExecution>;
   readonly automationsRunMissed: (args: { id: AutomationId }) => Promise<void>;
+
+  // ADR-0060 — bridge subscription for main→renderer LLM execution requests.
+  // See `src/preload/index.ts` for the same shape; renderer must not import `electron` directly.
+  readonly automationsExecuteLlm: (
+    handler: (request: LlmExecuteRequest) => void | Promise<void>,
+  ) => () => void;
+
+  // ADR-0060 — fire-and-forget back-channel for renderer→main LLM result.
+  readonly automationsSendLlmResult: (payload: LlmResultPayload) => void;
 }
 
 declare global {
