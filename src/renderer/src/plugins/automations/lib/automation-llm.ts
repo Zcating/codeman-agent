@@ -92,13 +92,17 @@ export function getProviderConfig(providerId: string): ProviderConfig | null {
   // Access appStore via window global (set up by preload)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const appStore = (window as any).__appStore;
-  if (!appStore) return null;
+  if (!appStore) {
+    return null;
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const settings = appStore.value;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const provider = settings.providers?.find((p: any) => p.id === providerId);
-  if (!provider) return null;
+  if (!provider) {
+    return null;
+  }
 
   return {
     id: provider.id,
@@ -149,7 +153,9 @@ export async function handleAutomationLlm(request: LlmExecuteRequest): Promise<v
 let subscription: (() => void) | null = null;
 
 export function setupAutomationMainListener(): void {
-  if (subscription) return;
+  if (subscription) {
+    return;
+  }
   subscription = window.codeman.automationsExecuteLlm(handleAutomationLlm);
 }
 

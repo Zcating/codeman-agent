@@ -51,7 +51,9 @@ const mockSubscription = vi.fn((handler) => {
   bridgeHandlers.push(handler);
   return () => {
     const idx = bridgeHandlers.indexOf(handler);
-    if (idx !== -1) bridgeHandlers.splice(idx, 1);
+    if (idx !== -1) {
+      bridgeHandlers.splice(idx, 1);
+    }
   };
 });
 const mockSendResult = vi.fn();
