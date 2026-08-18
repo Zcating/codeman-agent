@@ -3,8 +3,8 @@ import { Effect, Exit } from "effect";
 import { Square, Send } from "lucide-solid";
 import { createForm } from "@tanstack/solid-form";
 import { MessageBubble } from "@codeman-frontend/features/chat/components/message-bubble";
-import { CompactionMarker } from "@codeman-frontend/features/chat/components/compaction-marker";
-import { store, sendMessage, cancel, compactNow } from "@codeman-frontend/features/chat/stores/chat.store";
+import { store, sendMessage, cancel } from "@codeman-frontend/features/chat/stores/chat.store";
+import { doCompact, type DoCompactDeps } from "@codeman-frontend/features/chat/lib/compaction";
 import { ParallelPanel } from "@codeman-frontend/plugins/multi-agents/components/parallel-panel";
 import { subAgentsStreamStore } from "@codeman-frontend/plugins/multi-agents/stores/sub-agents-stream.store";
 import {
@@ -100,59 +100,6 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     return store.byId[id]?.messages ?? [];
   };
 
-  const compactionEntries = () => {
-    const id = convId();
-    if (!id) { return []; }
-    return store.byId[id]?.compactionEntries ?? [];
-  };
-
-  const compactionStatus = () => {
-    const id = convId();
-    if (!id) { return { _tag: "idle" } as const; }
-    return store.byId[id]?.compactionStatus ?? { _tag: "idle" };
-  };
-
-  type InterleavedItem =
-    | { _tag: "message"; message: (ReturnType<typeof currentMessages>[number]) }
-    | { _tag: "compaction"; entry: (ReturnType<typeof compactionEntries>[number]) };
-
-  const interleavedItems = (): InterleavedItem[] => {
-    const msgs = currentMessages();
-    const entries = compactionEntries();
-    const result: InterleavedItem[] = [];
-    let msgIdx = 0;
-    let entryIdx = 0;
-
-    while (msgIdx < msgs.length || entryIdx < entries.length) {
-      const nextMsg = msgs[msgIdx];
-      const nextEntry = entries[entryIdx];
-
-      if (!nextMsg) {
-        // All messages consumed, append remaining entries
-        while (entryIdx < entries.length) {
-          result.push({ _tag: "compaction", entry: entries[entryIdx++] });
-        }
-        break;
-      }
-      if (!nextEntry) {
-        // All entries consumed, append remaining messages
-        while (msgIdx < msgs.length) {
-          result.push({ _tag: "message", message: msgs[msgIdx++] });
-        }
-        break;
-      }
-
-      if (nextMsg.createdAt <= nextEntry.createdAt) {
-        result.push({ _tag: "message", message: nextMsg });
-        msgIdx++;
-      } else {
-        result.push({ _tag: "compaction", entry: nextEntry });
-        entryIdx++;
-      }
-    }
-    return result;
-  };
-
   const ringInfo = createMemo(() => {
     const providers = appStore.state.value.providers ?? [];
     const pid = appStore.state.value.defaultLlmProviderId;
@@ -197,14 +144,6 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     if (err) { codemanToast.error(err); }
   });
 
-  // Show toast when compaction fails
-  createEffect(() => {
-    const status = compactionStatus();
-    if (status._tag === "failed") {
-      codemanToast.error(status.reason);
-    }
-  });
-
   const form = createForm(() => ({
     defaultValues: {
       draft: "",
@@ -234,7 +173,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
       form.reset({ draft: "", modelId: value.modelId });
       recordInputEntry(text);
 
-      void Effect.runPromiseExit(sendMessage(id, text, provider)).then((exit) => {
+      void Effect.runPromiseExit(sendMessage(id, text, provider, "medium" as const)).then((exit) => {
         if (Exit.isFailure(exit)) {
           codemanToast.error(formatAppError(exit.cause));
         }
@@ -251,9 +190,41 @@ export function ChatView(props: { convId?: string }): JSX.Element {
   const handleCompactNow = () => {
     const id = convId();
     if (!id) { return; }
-    void Effect.runPromiseExit(compactNow(id)).then((exit) => {
-      if (Exit.isFailure(exit)) {
-        codemanToast.error(String(exit.cause));
+    const cs = store.byId[id];
+    if (!cs) { return; }
+    const settings = appStore.state.value;
+    const providerId = settings.defaultLlmProviderId;
+    const providerConfig = (settings.providers ?? []).find((p) => p.id === providerId);
+    const model = providerConfig?.llm?.defaultModel ?? "auto";
+    const contextWindow = providerConfig?.llm?.contextWindow ?? 128000;
+    const messages = cs.messages;
+    const budget = contextWindow - 16384;
+
+    const compactDeps: DoCompactDeps = {
+      callSummarize: async (_prompt: string) => {
+        codemanToast.error("手动压缩暂未实现");
+        return { ok: false, reason: "not_implemented" };
+      },
+      writeSuccessPair: async () => {},
+    };
+
+    void doCompact(
+      id,
+      {
+        conversationId: id,
+        model,
+        messages,
+        budget,
+        tailTurns: settings.compaction?.tailTurns ?? 10,
+        previousSummary: null,
+        auto: false,
+        contextWindow,
+        reserveTokens: 16384,
+      },
+      compactDeps,
+    ).then((result) => {
+      if ("reason" in result) {
+        codemanToast.error(`压缩失败: ${result.reason}`);
       }
     });
   };
@@ -273,11 +244,8 @@ export function ChatView(props: { convId?: string }): JSX.Element {
     <>
       <ScrollArea class="flex-1 min-h-0" data-scroll-region="true">
         <div class="p-4 space-y-3">
-          <For each={interleavedItems()}>
-            {(item) =>
-              item._tag === "message"
-                ? <MessageBubble message={item.message} />
-                : <CompactionMarker entry={item.entry} />}
+          <For each={currentMessages()}>
+            {(message) => <MessageBubble message={message} />}
           </For>
           <div ref={messagesEndRef} />
         </div>
@@ -384,7 +352,6 @@ export function ChatView(props: { convId?: string }): JSX.Element {
                 percentage={ringInfo().percentage}
                 usedTokens={ringInfo().used}
                 totalTokens={ringInfo().total}
-                compacting={compactionStatus()._tag === "compacting"}
                 onCompact={handleCompactNow}
               />
 
