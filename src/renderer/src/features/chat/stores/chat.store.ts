@@ -3,7 +3,7 @@ import { createSignal, type Accessor } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 
 import { Effect, Stream } from "effect";
-import type { Conversation, Message, SkillManifest, Workspace, CompactionEntry } from "@codeman-frontend/shared/lib/types";
+import type { Conversation, Message, SkillManifest, Workspace } from "@codeman-frontend/shared/lib/types";
 import { logger } from "@codeman-frontend/shared/lib/logger";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
 import {
@@ -12,17 +12,11 @@ import {
   type RuntimeEvent,
   type ProviderConfig,
 } from "@codeman-frontend/features/chat/lib/runtime";
-import { toPiMessages } from "@codeman-frontend/features/chat/lib/runtime-to-pi-messages";
-import { generateSummary } from "@earendil-works/pi-agent-core";
-import { createModels } from "@earendil-works/pi-ai";
-import { createProviderFromConfig, findDefaultModel } from "@codeman-frontend/features/chat/lib/pi-provider-adapter";
 import {
   ConversationApi,
   ConversationApiLive,
   MessageApi,
   MessageApiLive,
-  CompactionApi,
-  CompactionApiLive,
   FileApiLive,
 } from "@codeman-frontend/shared/apis";
 import {
@@ -33,12 +27,11 @@ import { deriveLabelFromPath } from "@codeman-frontend/shared/lib/derive-label-f
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
 import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
 import {
-  shouldTriggerAutoCompaction,
-  performCompaction,
-  CompactionFailed,
-  CompactionCancelled,
-  type PerformCompactionDeps,
+  doCompact,
+  pruneOldToolOutputs,
+  type DoCompactDeps,
 } from "@codeman-frontend/features/chat/lib/compaction";
+import type { ThinkingLevel } from "@codeman-frontend/shared/lib/sub-agent-schema";
 import {
   buildSystemPrompt,
   DEFAULT_IDENTITY,
@@ -63,12 +56,7 @@ export interface ConversationState {
   isAgentActive: boolean;
   lastError: string | null;
   runtime: AgentRuntime;
-  compactionEntries: CompactionEntry[];
-  compactionStatus:
-    | { _tag: "idle" }
-    | { _tag: "compacting"; kind: "auto" | "manual" }
-    | { _tag: "completed"; kind: "auto" | "manual"; entry: CompactionEntry }
-    | { _tag: "failed"; kind: "auto" | "manual"; reason: string };
+
   /** AGENTS.md content, loaded once per session */
   projectInstructions: string | null;
 }
@@ -101,12 +89,7 @@ export function setSelectedWorkspaceId(id: string | null): void {
 
 
 export function setupConvState(conv: Conversation, history: Message[]): ConversationState {
-  const runtime = createAgentRuntime({
-    getState: () => ({
-      conversationId: conv.id,
-      compactionEntries: store.byId[conv.id]?.compactionEntries ?? [],
-    }),
-  });
+  const runtime = createAgentRuntime({});
   const cs: ConversationState = {
     id: conv.id,
     title: conv.title,
@@ -120,188 +103,13 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
     isAgentActive: false,
     lastError: null,
     runtime,
-    compactionEntries: [],
-    compactionStatus: { _tag: "idle" },
     projectInstructions: null,
   };
   setStore("byId", conv.id, cs);
   setConversationsSignal(Object.values(store.byId));
 
-  // Load compaction entries asynchronously — do not block conv initialization
-  const loadEffect = CompactionApi.pipe(
-    Effect.flatMap((api) => api.list(conv.id)),
-    Effect.catchTag("Database", () => {
-      return Effect.succeed([] as CompactionEntry[]);
-    }),
-  );
-
-  void Effect.runPromise(loadEffect.pipe(Effect.provide(CompactionApiLive))).then(
-    (entries) => {
-      if (!store.byId[conv.id]) return;
-      const sorted = [...entries].sort((a, b) => a.createdAt - b.createdAt);
-      setStore("byId", conv.id, "compactionEntries", sorted);
-    },
-    (err) => {
-      logger.error("[chat.store] loadCompactEntries failed:", err);
-    },
-  );
-
   return cs;
 }
-
-
-// Hard-coded defaults per ADR-0025 — T3 reads from settings, T4 wires the UI
-const COMPACTION_ENABLED = true;
-const COMPACTION_RESERVE_TOKENS = 16384;
-const COMPACTION_CONTEXT_WINDOW = 128000; // fallback
-
-
-function estimateTokens(_text: string): number {
-  // Simple estimation: ~4 chars per token
-  return Math.ceil(_text.length / 4);
-}
-
-
-const doCompaction = Effect.fn(
-  function* (convId: string, kind: "auto" | "manual") {
-    const cs = store.byId[convId];
-    if (!cs) {
-      return;
-    }
-
-    // Set status to compacting
-    setStore("byId", convId, "compactionStatus", { _tag: "compacting", kind });
-
-    const deps: PerformCompactionDeps = {
-      summarize: async ({ previousSummary: _previousSummary }) => {
-        // Build model from the default provider
-        const settings = appStore.state.value;
-        const providerId = settings.defaultLlmProviderId ?? "";
-        const appProvider = settings.providers?.find((p) => p.id === providerId);
-        if (!appProvider) {
-          throw new CompactionFailed({ reason: "no_provider" });
-        }
-        if (!appProvider.apiKey) {
-          throw new CompactionFailed({ reason: "no_api_key" });
-        }
-        if (appProvider.llm.models.length === 0) {
-          throw new CompactionFailed({ reason: "no_models" });
-        }
-
-        const piProvider = createProviderFromConfig({
-          id: appProvider.id,
-          name: appProvider.label,
-          baseUrl: appProvider.llm.baseUrl,
-          apiKey: appProvider.apiKey,
-          models: appProvider.llm.models,
-          modelsEndpoint: appProvider.llm.modelsEndpoint,
-        });
-        const model = findDefaultModel(piProvider, appProvider.llm.defaultModel);
-
-        // Build a Models collection with the current provider
-        const models = createModels();
-        models.setProvider(piProvider);
-
-        // Convert Message[] to AgentMessage[] using toPiMessages
-        const piMessages = toPiMessages(allMessages, model);
-
-        const result = await generateSummary(
-          piMessages,
-          models,
-          model,
-          COMPACTION_RESERVE_TOKENS,
-          undefined,
-          undefined,
-          _previousSummary ?? undefined,
-          undefined,
-        );
-
-        if (!result.ok) {
-          throw new CompactionFailed({ reason: "summarize" });
-        }
-        return result.value;
-      },
-      estimateTokens,
-      sanitize: (text) => text,
-      appendEntry: async (entry) => {
-        // Use Effect.runPromise to call CompactionApi.append
-        const effect = CompactionApi.pipe(
-          Effect.flatMap((api) =>
-            api.append({
-              conversationId: entry.conversationId,
-              summary: entry.summary,
-              model: entry.model,
-              tokensBefore: entry.tokensBefore,
-              kind: entry.kind,
-              firstKeptMessageId: entry.firstKeptMessageId,
-            }),
-          ),
-          Effect.provide(CompactionApiLive),
-        );
-        return Effect.runPromise(effect);
-      },
-    };
-
-    const allMessages = store.byId[convId]!.messages;
-    if (allMessages.length === 0) {
-      throw new CompactionFailed({ reason: "empty_context" });
-    }
-    const messageStrings = allMessages.map(
-      (m) => `${m.role}: ${m.content}`,
-    );
-
-    const lastEntry = [...cs.compactionEntries].sort(
-      (a, b) => b.createdAt - a.createdAt,
-    )[0];
-    const previousSummary = lastEntry?.summary ?? null;
-
-    const firstKeptMessageId = allMessages[allMessages.length - 1]!.id;
-
-    try {
-      const entry = yield* performCompaction(deps, {
-        conversationId: convId,
-        model: "compaction-model",
-        messages: messageStrings,
-        previousSummary,
-        kind,
-        firstKeptMessageId,
-      });
-
-      // Append entry to state
-      setStore("byId", convId, "compactionEntries", (entries) => [
-        ...entries,
-        entry,
-      ]);
-      setStore("byId", convId, "compactionStatus", {
-        _tag: "completed",
-        kind,
-        entry,
-      });
-    } catch (err) {
-      if (err instanceof CompactionCancelled) {
-        setStore("byId", convId, "compactionStatus", { _tag: "idle" });
-      } else {
-        const reason =
-          err instanceof CompactionFailed
-            ? err.reason
-            : String(err);
-        setStore("byId", convId, "compactionStatus", {
-          _tag: "failed",
-          kind,
-          reason,
-        });
-      }
-      throw err;
-    }
-  },
-);
-
-
-export const compactNow = Effect.fn(
-  function* (convId: string) {
-    yield* doCompaction(convId, "manual");
-  },
-);
 
 
 const persistUserMessage = Effect.fn(
@@ -334,7 +142,7 @@ const persistAssistantMessage = Effect.fn(
 
 
 export const sendMessage = Effect.fn(
-  function* (convId: string, content: string, provider: ProviderConfig) {
+  function* (convId: string, content: string, provider: ProviderConfig, _thinkingLevel?: ThinkingLevel) {
     const cs = store.byId[convId];
     if (!cs) {
       return;
@@ -356,27 +164,50 @@ export const sendMessage = Effect.fn(
     setStore("byId", convId, "messages", (msgs) => [...msgs, userMsg]);
     yield* persistUserMessage(userMsg);
 
-    const context = [...store.byId[convId]!.messages];
+    const settings = appStore.state.value;
+    const convState = store.byId[convId];
+    if (!convState) return;
 
-    // Auto-compaction trigger: check threshold before running
-    if (COMPACTION_ENABLED) {
-      const estimatedTokens = estimateTokens(context.map((m) => m.content).join("\n"));
-      const shouldCompact = shouldTriggerAutoCompaction({
-        enabled: COMPACTION_ENABLED,
-        contextWindow: COMPACTION_CONTEXT_WINDOW,
-        reserveTokens: COMPACTION_RESERVE_TOKENS,
-        estimatedTokens,
-      });
-
-      if (shouldCompact) {
-        try {
-          yield* doCompaction(convId, "auto");
-        } catch {
-          // CompactionFailed or CompactionCancelled — error state already set
-          return;
-        }
+    if (settings.compaction.prune) {
+      const pruned = pruneOldToolOutputs(convState.messages);
+      if (pruned.prunedCount > 0) {
+        setStore("byId", convId, "messages", () => [...pruned.messages]);
+        logger.info(`[chat.store] pruned ${pruned.prunedCount} tool outputs, freed ~${pruned.freedTokens} tokens`);
       }
     }
+
+    if (settings.compaction.enabled) {
+      const providerConfig = settings.providers?.find((p) => p.id === settings.defaultLlmProviderId);
+      const contextWindow = providerConfig?.llm?.contextWindow ?? 128000;
+      const model = providerConfig?.llm?.defaultModel ?? "claude";
+      const messages = convState.messages;
+      const budget = contextWindow - settings.compaction.reserveTokens;
+
+      const compactDeps: DoCompactDeps = {
+        callSummarize: async (_prompt: string) => ({ ok: false, reason: "not_implemented" }),
+        writeSuccessPair: async () => {},
+      };
+
+      const compactResult = yield* Effect.tryPromise(() =>
+        doCompact(convId, {
+          conversationId: convId,
+          model,
+          messages,
+          budget,
+          tailTurns: settings.compaction.tailTurns,
+          previousSummary: null,
+          auto: true,
+          contextWindow,
+          reserveTokens: settings.compaction.reserveTokens,
+        }, compactDeps),
+      );
+
+      if ("reason" in compactResult) {
+        logger.info("[chat.store] auto-compaction skipped:", compactResult.reason);
+      }
+    }
+
+    const context = transformContextForLlm(store.byId[convId]!.messages);
 
     setStore("byId", convId, "isAgentActive", true);
 
@@ -602,27 +433,6 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       setStore("byId", convId, "lastError", evt.error.message);
       setConversationsSignal(Object.values(store.byId));
       break;
-    case "compactionStarted":
-      setStore("byId", convId, "compactionStatus", { _tag: "compacting", kind: "auto" });
-      break;
-    case "compactionCompleted":
-      setStore("byId", convId, "compactionEntries", (entries) => [
-        ...entries,
-        evt.entry,
-      ]);
-      setStore("byId", convId, "compactionStatus", {
-        _tag: "completed",
-        kind: evt.entry.kind,
-        entry: evt.entry,
-      });
-      break;
-    case "compactionFailed":
-      setStore("byId", convId, "compactionStatus", {
-        _tag: "failed",
-        kind: "auto",
-        reason: evt.reason,
-      });
-      break;
   }
 }
 
@@ -766,3 +576,47 @@ export const renameWorkspace = Effect.fn(
   },
   Effect.provide(WorkspaceServiceLive),
 );
+
+function transformContextForLlm(messages: readonly Message[]): Message[] {
+  if (messages.length === 0) return messages.slice();
+
+  let lastSummary: string | undefined;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]!;
+    const parts = m.parts ?? [];
+    const compactionPart = parts.find((p) => p.kind === "compaction");
+    if (compactionPart && compactionPart.kind === "compaction") {
+      lastSummary = compactionPart.summary;
+    }
+    if (
+      m.role === "assistant" &&
+      m.mode === "compaction" &&
+      m.summary === true &&
+      !m.error &&
+      m.content.length > 0
+    ) {
+      lastSummary = m.content;
+    }
+    if (lastSummary) break;
+  }
+
+  if (!lastSummary) return messages.slice();
+
+  const summaryMsg: Message = {
+    id: "synthetic-summary-" + Date.now(),
+    conversationId: messages[0]?.conversationId ?? "",
+    role: "assistant",
+    content: lastSummary,
+    thinking: null,
+    toolCalls: null,
+    toolResults: null,
+    model: null,
+    inputTokens: null,
+    outputTokens: null,
+    createdAt: Date.now(),
+    mode: "compaction",
+    summary: true,
+  };
+
+  return [summaryMsg, ...messages.slice()];
+}
