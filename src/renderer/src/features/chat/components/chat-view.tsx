@@ -1,4 +1,4 @@
-import { createEffect, createMemo, For, Show, type JSX } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Show, type JSX } from "solid-js";
 import { Effect, Exit } from "effect";
 import { Square, Send } from "lucide-solid";
 import { createForm } from "@tanstack/solid-form";
@@ -37,6 +37,8 @@ import {
 import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 import { invoke } from "@codeman-frontend/shared/apis/invoke.api";
+import { subAgentsStore } from "@codeman-frontend/plugins/multi-agents/stores/sub-agents.store";
+import type { ThinkingLevel } from "@codeman-frontend/shared/lib/sub-agent-schema";
 
 
 function ProviderSelect(props: {
@@ -89,6 +91,28 @@ function ProviderSelect(props: {
 export function ChatView(props: { convId?: string }): JSX.Element {
   const convId = (): string | undefined => props.convId;
   let messagesEndRef: HTMLDivElement | undefined;
+
+  const [thinkingLevel, setThinkingLevel] = createSignal<ThinkingLevel>("medium");
+
+  createEffect(() => {
+    const agentId = subAgentsStore.selectedId();
+    if (agentId) {
+      const agent = subAgentsStore.state.byId[agentId];
+      if (agent?.thinkingLevel) {
+        setThinkingLevel(agent.thinkingLevel);
+      }
+    } else {
+      setThinkingLevel("medium");
+    }
+  });
+
+  const showThinkingSelector = createMemo(() => {
+    const providers = appStore.state.value.providers ?? [];
+    const pid = appStore.state.value.defaultLlmProviderId;
+    const provider = providers.find((p) => p.id === pid);
+    const model = provider?.llm?.models?.find((m) => m.id === provider?.llm?.defaultModel);
+    return model?.thinking === true;
+  });
 
   const isRunning = (): boolean => {
     const id = convId();
@@ -175,7 +199,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
       form.reset({ draft: "", modelId: value.modelId });
       recordInputEntry(text);
 
-      void Effect.runPromiseExit(sendMessage(id, text, provider, "medium" as const)).then((exit) => {
+      void Effect.runPromiseExit(sendMessage(id, text, provider, thinkingLevel())).then((exit) => {
         if (Exit.isFailure(exit)) {
           codemanToast.error(formatAppError(exit.cause));
         }
@@ -356,6 +380,23 @@ export function ChatView(props: { convId?: string }): JSX.Element {
                 />
               )}
             </form.Field>
+
+            <Show when={showThinkingSelector()}>
+              <label for="thinking-level-selector" class="text-xs text-muted-foreground whitespace-nowrap">
+                Thinking
+              </label>
+              <select
+                id="thinking-level-selector"
+                data-testid="thinking-level-selector"
+                value={thinkingLevel()}
+                onChange={(e) => setThinkingLevel(e.currentTarget.value as ThinkingLevel)}
+                class="text-xs rounded border border-border bg-card px-1 py-0.5"
+              >
+                {(["off", "minimal", "low", "medium", "high", "xhigh"] as const).map((level) => (
+                  <option value={level}>{level}</option>
+                ))}
+              </select>
+            </Show>
 
             <div class="flex-1" />
 
