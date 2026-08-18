@@ -8,6 +8,5 @@ export * from "./file.api";
 export * from "./skills.api";
 export * from "./mcp.api";
 export * from "./webfetch.api";
-export * from "./compaction.api";
 export * from "./sub-agents.api";
 export * from "./automations.api";

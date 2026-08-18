@@ -10,7 +10,6 @@ import type {
   McpServerInfo,
   McpTool,
   McpToolEntry,
-  CompactionEntry,
 } from "@codeman-frontend/shared/lib/types";
 import type { SubAgentConfig } from "@codeman-frontend/plugins/multi-agents/lib/sub-agent.types";
 import type {
@@ -114,17 +113,6 @@ export interface CodemanApi {
   // Run command
   readonly runCommand: (args: { command: string; cwd?: string; timeoutMs?: number }) => Promise<unknown>;
 
-  // Compaction
-  readonly compactionList: (args: { conversationId?: string }) => Promise<CompactionEntry[]>;
-  readonly compactionAppend: (args: {
-    conversationId?: string;
-    summary: string;
-    model: string;
-    tokensBefore: number;
-    kind: "auto" | "manual";
-    firstKeptMessageId: string;
-  }) => Promise<CompactionEntry>;
-
   // Sub-Agents
   readonly subAgentsList: () => Promise<readonly SubAgentConfig[]>;
   readonly subAgentsAdd: (config: SubAgentConfig) => Promise<SubAgentConfig>;
@@ -215,9 +203,6 @@ const codeman: CodemanApiExposed = {
   webfetch: (args) => ipcRenderer.invoke("webfetch:fetch", args),
 
   runCommand: (args) => ipcRenderer.invoke("runCommand", args),
-
-  compactionList: (args) => ipcRenderer.invoke("compaction:list", args),
-  compactionAppend: (args) => ipcRenderer.invoke("compaction:append", args),
 
   subAgentsList: () => ipcRenderer.invoke("subAgents:list"),
   subAgentsAdd: (config) => ipcRenderer.invoke("subAgents:add", config),

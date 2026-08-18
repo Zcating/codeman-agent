@@ -91,8 +91,6 @@ const EXPECTED_CHANNELS = [
   "mcp:restart",
   "mcp:call-tool",
   "mcp:open-config-dir",
-  "compaction:list",
-  "compaction:append",
   "skillsScan",
   "skillsLoad",
   "subAgents:list",
@@ -119,7 +117,7 @@ describe("ipc.ts barrel", () => {
     fakeWin.webContents.send.mockClear();
   });
 
-  it("registers all 55 expected ipcMain.handle channels", async () => {
+  it("registers all 53 expected ipcMain.handle channels", async () => {
     const { registerIpcHandlers } = await import("./ipc.js");
     const { createMcpManager } = await import("./features/mcp/mcp-manager.js");
     const { registerMcpIpcHandlers } = await import("./features/mcp/mcp-ipc.js");
