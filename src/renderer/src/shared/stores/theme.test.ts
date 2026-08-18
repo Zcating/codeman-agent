@@ -18,6 +18,7 @@ vi.mock("@codeman-frontend/shared/apis", () => ({
     },
     systemPrompt: { default: "", userCanEdit: true },
     conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
+    compaction: { enabled: true, reserveTokens: 16384, prune: true, preserveRecentTokens: 2000, tailTurns: 2 },
   }),
 }));
 

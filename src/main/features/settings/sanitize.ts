@@ -7,6 +7,12 @@ const MIN_SIZE_WIDTH = 100;
 const MIN_SIZE_HEIGHT = 100;
 const MIN_AUTO_ARCHIVE_DAYS = 1;
 const MIN_MAX_HISTORY = 10;
+const MIN_RESERVE_TOKENS = 0;
+const MAX_RESERVE_TOKENS = 100_000;
+const MIN_PRESERVE_RECENT_TOKENS = 0;
+const MAX_PRESERVE_RECENT_TOKENS = 50_000;
+const MIN_TAIL_TURNS = 0;
+const MAX_TAIL_TURNS = 20;
 
 
 export function sanitize(input: Partial<Settings>): Settings {
@@ -52,6 +58,18 @@ export function sanitize(input: Partial<Settings>): Settings {
 
   const rawSubAgents = safe.subAgents ?? DEFAULT_SETTINGS.subAgents;
 
+  const mergedCompaction = {
+    ...DEFAULT_SETTINGS.compaction,
+    ...(safe.compaction ?? {}),
+  };
+
+  const clampedCompaction = {
+    ...mergedCompaction,
+    reserveTokens: Math.max(MIN_RESERVE_TOKENS, Math.min(MAX_RESERVE_TOKENS, mergedCompaction.reserveTokens | 0)),
+    preserveRecentTokens: Math.max(MIN_PRESERVE_RECENT_TOKENS, Math.min(MAX_PRESERVE_RECENT_TOKENS, mergedCompaction.preserveRecentTokens | 0)),
+    tailTurns: Math.max(MIN_TAIL_TURNS, Math.min(MAX_TAIL_TURNS, mergedCompaction.tailTurns | 0)),
+  };
+
   const clampedMinSize = {
     width: Math.max(MIN_SIZE_WIDTH, mergedWindow.minSize.width | 0),
     height: Math.max(MIN_SIZE_HEIGHT, mergedWindow.minSize.height | 0),
@@ -77,5 +95,6 @@ export function sanitize(input: Partial<Settings>): Settings {
     systemPrompt: rawSystemPrompt,
     conversations: clampedConversations,
     subAgents: rawSubAgents,
+    compaction: clampedCompaction,
   };
 }

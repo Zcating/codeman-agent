@@ -56,6 +56,7 @@ export const defaultSettings: Settings = {
   },
   conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
   llmProviders: [],
+  compaction: { enabled: true, reserveTokens: 16384, prune: true, preserveRecentTokens: 2000, tailTurns: 2 },
 };
 
 const [settings, setSettings] = createStore<{ value: Settings }>({

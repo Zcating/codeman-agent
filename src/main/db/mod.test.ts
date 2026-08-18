@@ -107,6 +107,9 @@ describe("applyMigrationsEffect", () => {
       { name: "0003_workspaces.sql" },
       { name: "0004_messages_thinking.sql" },
       { name: "0005_compaction_entries.sql" },
+      { name: "0006_drop_compaction_entries.sql" },
+      { name: "0007_automation_executions.sql" },
+      { name: "0008_message_parts_json.sql" },
     ]);
     await runMigrations();
     // INSERT INTO _migrations should NOT be called when all are already applied
