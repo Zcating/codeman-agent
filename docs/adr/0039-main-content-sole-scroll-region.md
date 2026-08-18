@@ -2,7 +2,7 @@
 
 **Status**: accepted · **Date**: 2026-08-02 · **Revised**: 2026-08-05（页面级 ScrollArea 化，见 D1/D2/D3/D5 修订）
 
-**Scope**: `src/renderer/src/shared/components/ui/scrollarea.tsx` (已有 shadcn 移植，增 `data-scroll-region` 透传 + `viewportClass` 透传) + `src/renderer/src/shared/components/ui/scrollarea.test.tsx` (新增，契约测试) + `src/renderer/src/shared/lib/scroll-region.ts` (新增，断言模块) + `src/renderer/src/shared/lib/scroll-region.test.ts` (新增) + `src/renderer/src/shared/components/internal/codeman-sidebar.tsx` (内容 wrapper → flex 布局壳) + `src/renderer/src/features/chat/components/chat-view.tsx` (消息区 → ScrollArea) + 全部非 chat 页面（settings 4 section / skills / mcp / multi-agents / home / clearquest → 页面最外层 ScrollArea） + `e2e/03-layout-scroll.spec.ts` (新增，e2e 守卫) + CONTEXT.md (词条)
+**Scope**: `src/renderer/src/shared/components/ui/scrollarea.tsx` (已有 shadcn 移植，增 `data-scroll-region` 透传 + `viewportClass` 透传) + `src/renderer/src/shared/components/ui/scrollarea.test.tsx` (新增，契约测试) + `src/renderer/src/shared/lib/scroll-region.ts` (新增，断言模块) + `src/renderer/src/shared/lib/scroll-region.test.ts` (新增) + `src/renderer/src/shared/components/internal/codeman-sidebar.tsx` (内容 wrapper → flex 布局壳) + `src/renderer/src/features/chat/components/chat-view.tsx` (消息区 → ScrollArea) + 全部非 chat 页面（settings 4 section / skills / mcp / multi-agents / home → 页面最外层 ScrollArea） + `e2e/03-layout-scroll.spec.ts` (新增，e2e 守卫) + CONTEXT.md (词条)
 
 **Related**: ADR-0033 (shadcn sidebar 重写 — SidebarInset / ResizablePanel 两栏壳), 提交 `2bf2d7d` (V2.9 fix)、`5df8bbf` (V2.10 辅助)、`e39e434` (V2.10 fix)
 
@@ -26,7 +26,7 @@
       └─ 内容 wrapper（flex flex-col flex-1 min-h-0 overflow-auto p-3）— 纯布局壳
           └─ 路由内容：页面级 ScrollArea（class="flex-1 min-h-0" data-scroll-region）是活动滚动区
              ├─ 非 chat 路由：页面最外层直接是 ScrollArea（settings section 等以
-             │   viewportClass="space-y-4" 直接替换原 <section>；home/clearquest 同理）
+             │   viewportClass="space-y-4" 直接替换原 <section>；home 同理）
              └─ chat 路由：conversation-route h-full overflow-hidden 恰好贴合
                 → wrapper 无溢出，ChatView 消息区 ScrollArea 的 Viewport 成为活动滚动区
 ```
@@ -50,7 +50,7 @@
 
 **三个消费方**（真实消费方 justify 这条 seam）：
 - `codeman-sidebar.tsx` 内容 wrapper → `<div class="flex flex-col flex-1 min-h-0 overflow-auto" data-scroll-region="true" data-testid="main-content-scroll">`（**布局壳，div，不是 ScrollArea**——不渲染自定义滚动条，避免与页面 ScrollArea 的 ScrollBar 在右侧重叠；`flex flex-col` 支撑页面 ScrollArea 的高度链，无 padding（内容间距归内容层），`overflow-auto` 是未自带滚动容器的兜底通道）
-- 非 chat 页面（settings 4 section / skills / mcp / multi-agents / home / clearquest）→ 页面最外层 `<ScrollArea class="flex-1 min-h-0" data-scroll-region="true" viewportClass="space-y-4 py-4 pl-4 pr-6">`（`viewportClass` 把内容间距与 padding 落到 Viewport——Root 的子元素含 Scrollbar/Corner，间距类放 Root 会污染滚动条布局；`pr-6` 为右侧悬浮的 ScrollBar 留位，内容与滚动条保持 ~10px 间距）；clearquest 例外：header 钉住，ScrollArea 只包内容区
+- 非 chat 页面（settings 4 section / skills / mcp / multi-agents / home）→ 页面最外层 `<ScrollArea class="flex-1 min-h-0" data-scroll-region="true" viewportClass="space-y-4 py-4 pl-4 pr-6">`（`viewportClass` 把内容间距与 padding 落到 Viewport——Root 的子元素含 Scrollbar/Corner，间距类放 Root 会污染滚动条布局；`pr-6` 为右侧悬浮的 ScrollBar 留位，内容与滚动条保持 ~10px 间距）
 - `chat-view.tsx` 消息区 → `<ScrollArea class="flex-1 min-h-0" data-scroll-region="true">`（内容 `p-4 space-y-3` 下沉到内层 div；真正的内容区域，溢出时显示自定义滚动条 — `!end-1` 让 ScrollBar 离右侧 4px，覆盖 zag 注入的 `insetInlineEnd:0`）
 
 **ScrollBar 可见性**：无溢出（scrollHeight ≤ clientHeight）时隐藏。zag 只在溢出时渲染 `data-overflow-y/x` 属性（`dataAttr(guard) = guard ? "" : undefined`），ScrollBar 组件带 `data-[orientation=vertical]:not-data-[overflow-y]:hidden` + `data-[orientation=horizontal]:not-data-[overflow-x]:hidden`，属性缺失即 `display:none`——内容不满一屏时不再显示空滚动条轨道（替代旧「常驻显示」外观）。
