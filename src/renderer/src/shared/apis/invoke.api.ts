@@ -122,6 +122,11 @@ export interface CodemanApi {
 
   // Run command
   readonly runCommand: (args: { command: string; cwd?: string; timeoutMs?: number }) => Promise<unknown>;
+  readonly runCommandAssess: (args: { command: string; cwd?: string }) => Promise<{ risk: any; requestID?: string }>;
+  readonly runCommandExecute: (args: { command: string; cwd?: string; timeoutMs?: number }) => Promise<unknown>;
+  readonly runCommandReply: (args: { requestID: string; reply: "once" | "always" | "reject" }) => Promise<{ ok: boolean }>;
+  readonly onPermissionAsked: (handler: (request: any) => void) => () => void;
+  readonly onPermissionReplied: (handler: (payload: any) => void) => () => void;
 
   // Sub-Agents
   readonly subAgentsList: () => Promise<readonly SubAgentConfig[]>;

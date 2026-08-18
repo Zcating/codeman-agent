@@ -386,6 +386,18 @@ const commandHandlers: Record<IPCCommand, (args?: IPCArgs) => unknown> = {
   runCommand(_args?: IPCArgs): unknown {
     return mockState.resolved;
   },
+
+  runCommandAssess(_args?: IPCArgs): unknown {
+    return { risk: { kind: "low", reasons: [] }, requestID: undefined };
+  },
+
+  runCommandExecute(_args?: IPCArgs): unknown {
+    return mockState.resolved;
+  },
+
+  runCommandReply(_args?: IPCArgs): unknown {
+    return { ok: true };
+  },
 };
 
 
@@ -464,6 +476,9 @@ function buildCodemanMock(): Record<string, unknown> {
     mcpOpenConfigDir: { cmd: "mcp:open-config-dir" },
     webfetch: { cmd: "webfetch:fetch" },
     runCommand: { cmd: "runCommand" },
+    runCommandAssess: { cmd: "runCommandAssess" },
+    runCommandExecute: { cmd: "runCommandExecute" },
+    runCommandReply: { cmd: "runCommandReply" },
   };
 
   const codeman: Record<string, unknown> = {};
@@ -480,6 +495,8 @@ function buildCodemanMock(): Record<string, unknown> {
   // capture is set up locally in automation-llm.test.ts.
   codeman.automationsExecuteLlm = () => () => {};
   codeman.automationsSendLlmResult = () => {};
+  codeman.onPermissionAsked = () => () => {};
+  codeman.onPermissionReplied = () => () => {};
   return codeman;
 }
 
