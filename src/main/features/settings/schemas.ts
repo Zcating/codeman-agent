@@ -33,6 +33,14 @@ const ProviderStruct = Schema.Struct({
   billing: Schema.optional(ProviderBillingStruct),
 });
 
+const CompactionSettingsStruct = Schema.Struct({
+  enabled: Schema.Boolean,
+  reserveTokens: Schema.Number,
+  prune: Schema.Boolean,
+  preserveRecentTokens: Schema.Number,
+  tailTurns: Schema.Number,
+});
+
 export const SettingStruct = Schema.Struct({
   schemaVersion: Schema.Literal("1.5"),
   providers: Schema.Array(ProviderStruct),
@@ -56,6 +64,7 @@ export const SettingStruct = Schema.Struct({
   }),
   enabledSkills: Schema.optional(Schema.Array(Schema.String)),
   subAgents: Schema.optional(Schema.Array(SubAgentConfigStruct)),
+  compaction: CompactionSettingsStruct,
 });
 
 

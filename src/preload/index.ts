@@ -10,7 +10,6 @@ import type {
   McpServerInfo,
   McpTool,
   McpToolEntry,
-  CompactionEntry,
 } from "@codeman-frontend/shared/lib/types";
 import type { SubAgentConfig } from "@codeman-frontend/plugins/multi-agents/lib/sub-agent.types";
 import type {
@@ -113,17 +112,11 @@ export interface CodemanApi {
 
   // Run command
   readonly runCommand: (args: { command: string; cwd?: string; timeoutMs?: number }) => Promise<unknown>;
-
-  // Compaction
-  readonly compactionList: (args: { conversationId?: string }) => Promise<CompactionEntry[]>;
-  readonly compactionAppend: (args: {
-    conversationId?: string;
-    summary: string;
-    model: string;
-    tokensBefore: number;
-    kind: "auto" | "manual";
-    firstKeptMessageId: string;
-  }) => Promise<CompactionEntry>;
+  readonly runCommandAssess: (args: { command: string; cwd?: string }) => Promise<{ risk: any; requestID?: string }>;
+  readonly runCommandExecute: (args: { command: string; cwd?: string; timeoutMs?: number }) => Promise<unknown>;
+  readonly runCommandReply: (args: { requestID: string; reply: "once" | "always" | "reject" }) => Promise<{ ok: boolean }>;
+  readonly onPermissionAsked: (handler: (request: any) => void) => () => void;
+  readonly onPermissionReplied: (handler: (payload: any) => void) => () => void;
 
   // Sub-Agents
   readonly subAgentsList: () => Promise<readonly SubAgentConfig[]>;
@@ -216,8 +209,19 @@ const codeman: CodemanApiExposed = {
 
   runCommand: (args) => ipcRenderer.invoke("runCommand", args),
 
-  compactionList: (args) => ipcRenderer.invoke("compaction:list", args),
-  compactionAppend: (args) => ipcRenderer.invoke("compaction:append", args),
+  runCommandAssess: (args) => ipcRenderer.invoke("runCommandAssess", args),
+  runCommandExecute: (args) => ipcRenderer.invoke("runCommandExecute", args),
+  runCommandReply: (args) => ipcRenderer.invoke("runCommandReply", args),
+  onPermissionAsked: (handler) => {
+    const listener = (_e: unknown, payload: unknown) => handler(payload);
+    ipcRenderer.on("runCommand:permission:asked", listener);
+    return () => ipcRenderer.off("runCommand:permission:asked", listener);
+  },
+  onPermissionReplied: (handler) => {
+    const listener = (_e: unknown, payload: unknown) => handler(payload);
+    ipcRenderer.on("runCommand:permission:replied", listener);
+    return () => ipcRenderer.off("runCommand:permission:replied", listener);
+  },
 
   subAgentsList: () => ipcRenderer.invoke("subAgents:list"),
   subAgentsAdd: (config) => ipcRenderer.invoke("subAgents:add", config),

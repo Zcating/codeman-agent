@@ -45,4 +45,5 @@ export const DEFAULT_SETTINGS: Settings = {
   conversations: { autoArchiveAfterDays: 30, maxHistory: 1000 },
   enabledSkills: ["commit-helper", "code-review", "explain-error", "summarize"],
   subAgents: [],
+  compaction: { enabled: true, reserveTokens: 16384, prune: true, preserveRecentTokens: 2000, tailTurns: 2 },
 };

@@ -50,3 +50,15 @@ export async function useMockProvider(page: TauriPage): Promise<void> {
     }
   });
 }
+
+export async function setMockProviderBehavior(
+  page: TauriPage,
+  behavior: { mode: "normal" | "fail" },
+): Promise<void> {
+  await page.evaluate((b) => {
+    const w = window as unknown as {
+      __mockServerBehavior?: { mode: "normal" | "fail" };
+    };
+    w.__mockServerBehavior = b;
+  }, behavior);
+}

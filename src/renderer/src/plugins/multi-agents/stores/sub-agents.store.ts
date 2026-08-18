@@ -1,3 +1,4 @@
+import { createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { Effect } from "effect";
 import { SubAgentsApi, SubAgentsApiLive } from "@codeman-frontend/shared/apis";
@@ -9,6 +10,7 @@ interface SubAgentsState {
 }
 
 const [state, setState] = createStore<SubAgentsState>({ byId: {}, allIds: [] });
+const [selectedSubAgentId, setSelectedSubAgentId] = createSignal<string | null>(null);
 
 function populateFromList(list: readonly SubAgentConfig[]): void {
   const byId: Record<string, SubAgentConfig> = {};
@@ -22,6 +24,8 @@ function populateFromList(list: readonly SubAgentConfig[]): void {
 
 export const subAgentsStore = {
   state,
+  selectedId: selectedSubAgentId,
+  select: setSelectedSubAgentId,
 
   effects: {
     load: () =>

@@ -28,28 +28,48 @@ export const runCommandTool: AgentTool<typeof params, RunCommandResult | AppErro
     "Default timeout 5 minutes (max 30 minutes). High-risk commands trigger a confirmation dialog.",
   parameters: params,
   execute: async (_toolCallId, args) => {
-    const effect = Effect.gen(function* () {
-      return yield* invoke<RunCommandResult>("runCommand", args as { command: string; cwd?: string; timeoutMs?: number });
-    });
-    const exit = await Effect.runPromiseExit(effect);
-    if (Exit.isFailure(exit)) {
-      const cause = exit.cause;
-      const err: AppError =
-        cause._tag === "Fail"
-          ? (cause.error as AppError)
-          : new Unknown({ message: String(cause) });
-      return {
-        content: [{ type: "text" as const, text: `Error (${err._tag}): ${"message" in err ? err.message : JSON.stringify(err)}` }],
-        details: err,
-      };
+    const assess = await Effect.runPromiseExit(invoke<{ risk: any; requestID?: string }>("runCommandAssess" as any, args as { command: string; cwd?: string }));
+    if (Exit.isFailure(assess)) {
+      const err: AppError = assess.cause._tag === "Fail" ? assess.cause.error as AppError : new Unknown({ message: String(assess.cause) });
+      return { content: [{ type: "text" as const, text: `Error (${err._tag}): ${"message" in err ? err.message : JSON.stringify(err)}` }], details: err };
     }
-    const r = exit.value;
-    const text = match(r.status)
-      .with("ok", () => `Exit code: ${r.exitCode}\nDuration: ${r.durationMs}ms\n--- STDOUT ---\n${r.stdout ?? ""}\n--- STDERR ---\n${r.stderr ?? ""}`)
-      .with("cancelled", () => `Cancelled\n--- partial STDOUT ---\n${r.partialOutput?.stdout ?? ""}\n--- partial STDERR ---\n${r.partialOutput?.stderr ?? ""}`)
-      .with("timeout", () => `Timed out\n--- partial STDOUT ---\n${r.partialOutput?.stdout ?? ""}\n--- partial STDERR ---\n${r.partialOutput?.stderr ?? ""}`)
-      .with("error", () => `Error: ${r.error?.kind ?? "Unknown"} — ${r.error?.message ?? ""}${r.error?.exitCode !== undefined ? ` (exit ${r.error.exitCode})` : ""}`)
+    const r = assess.value;
+    if (r.risk?.kind === "high" && r.requestID) {
+      const decision = await new Promise<"once" | "always" | "reject">((resolve) => {
+        const unsub = window.codeman.onPermissionReplied((p: any) => {
+          if (p.requestID === r.requestID) {
+            unsub();
+            resolve(p.reply);
+          }
+        });
+      });
+      if (decision === "reject") {
+        return { content: [{ type: "text" as const, text: "Error (PermissionDenied): 用户拒绝执行" }], details: new Unknown({ message: "用户拒绝执行" }) };
+      }
+      const exec = await Effect.runPromiseExit(invoke<RunCommandResult>("runCommandExecute" as any, args as { command: string; cwd?: string; timeoutMs?: number }));
+      if (Exit.isFailure(exec)) {
+        const err: AppError = exec.cause._tag === "Fail" ? exec.cause.error as AppError : new Unknown({ message: String(exec.cause) });
+        return { content: [{ type: "text" as const, text: `Error (${err._tag}): ${"message" in err ? err.message : JSON.stringify(err)}` }], details: err };
+      }
+      const text = match(exec.value.status)
+        .with("ok", () => `Exit code: ${exec.value.exitCode}\nDuration: ${exec.value.durationMs}ms\n--- STDOUT ---\n${exec.value.stdout ?? ""}\n--- STDERR ---\n${exec.value.stderr ?? ""}`)
+        .with("cancelled", () => `Cancelled\n--- partial STDOUT ---\n${exec.value.partialOutput?.stdout ?? ""}\n--- partial STDERR ---\n${exec.value.partialOutput?.stderr ?? ""}`)
+        .with("timeout", () => `Timed out\n--- partial STDOUT ---\n${exec.value.partialOutput?.stdout ?? ""}\n--- partial STDERR ---\n${exec.value.partialOutput?.stderr ?? ""}`)
+        .with("error", () => `Error: ${exec.value.error?.kind ?? "Unknown"} — ${exec.value.error?.message ?? ""}${exec.value.error?.exitCode !== undefined ? ` (exit ${exec.value.error.exitCode})` : ""}`)
+        .otherwise(() => `Error: Unknown status`);
+      return { content: [{ type: "text" as const, text }], details: exec.value };
+    }
+    const exec = await Effect.runPromiseExit(invoke<RunCommandResult>("runCommandExecute" as any, args as { command: string; cwd?: string; timeoutMs?: number }));
+    if (Exit.isFailure(exec)) {
+      const err: AppError = exec.cause._tag === "Fail" ? exec.cause.error as AppError : new Unknown({ message: String(exec.cause) });
+      return { content: [{ type: "text" as const, text: `Error (${err._tag}): ${"message" in err ? err.message : JSON.stringify(err)}` }], details: err };
+    }
+    const text = match(exec.value.status)
+      .with("ok", () => `Exit code: ${exec.value.exitCode}\nDuration: ${exec.value.durationMs}ms\n--- STDOUT ---\n${exec.value.stdout ?? ""}\n--- STDERR ---\n${exec.value.stderr ?? ""}`)
+      .with("cancelled", () => `Cancelled\n--- partial STDOUT ---\n${exec.value.partialOutput?.stdout ?? ""}\n--- partial STDERR ---\n${exec.value.partialOutput?.stderr ?? ""}`)
+      .with("timeout", () => `Timed out\n--- partial STDOUT ---\n${exec.value.partialOutput?.stdout ?? ""}\n--- partial STDERR ---\n${exec.value.partialOutput?.stderr ?? ""}`)
+      .with("error", () => `Error: ${exec.value.error?.kind ?? "Unknown"} — ${exec.value.error?.message ?? ""}${exec.value.error?.exitCode !== undefined ? ` (exit ${exec.value.error.exitCode})` : ""}`)
       .otherwise(() => `Error: Unknown status`);
-    return { content: [{ type: "text" as const, text }], details: r };
+    return { content: [{ type: "text" as const, text }], details: exec.value };
   },
 };

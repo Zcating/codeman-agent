@@ -14,7 +14,6 @@ import type {
   McpServerInfo,
   McpTool,
   McpToolEntry,
-  CompactionEntry,
 } from "../lib/types";
 import type { SubAgentConfig } from "@codeman-frontend/plugins/multi-agents/lib/sub-agent.types";
 import type {
@@ -123,17 +122,11 @@ export interface CodemanApi {
 
   // Run command
   readonly runCommand: (args: { command: string; cwd?: string; timeoutMs?: number }) => Promise<unknown>;
-
-  // Compaction
-  readonly compactionList: (args: { conversationId?: string }) => Promise<CompactionEntry[]>;
-  readonly compactionAppend: (args: {
-    conversationId?: string;
-    summary: string;
-    model: string;
-    tokensBefore: number;
-    kind: "auto" | "manual";
-    firstKeptMessageId: string;
-  }) => Promise<CompactionEntry>;
+  readonly runCommandAssess: (args: { command: string; cwd?: string }) => Promise<{ risk: any; requestID?: string }>;
+  readonly runCommandExecute: (args: { command: string; cwd?: string; timeoutMs?: number }) => Promise<unknown>;
+  readonly runCommandReply: (args: { requestID: string; reply: "once" | "always" | "reject" }) => Promise<{ ok: boolean }>;
+  readonly onPermissionAsked: (handler: (request: any) => void) => () => void;
+  readonly onPermissionReplied: (handler: (payload: any) => void) => () => void;
 
   // Sub-Agents
   readonly subAgentsList: () => Promise<readonly SubAgentConfig[]>;

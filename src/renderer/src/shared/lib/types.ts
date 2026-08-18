@@ -35,6 +35,7 @@ export interface Settings {
   conversations: ConversationSettings;
   enabledSkills?: string[];
   llmProviders: LLMProvider[];
+  compaction: CompactionSettings;
 }
 
 
@@ -97,6 +98,11 @@ export interface Message {
   inputTokens: number | null;
   outputTokens: number | null;
   createdAt: number;
+  parts?: MessagePart[];
+  finish?: "stop" | "error";
+  mode?: "compaction";
+  summary?: boolean;
+  error?: string;
 }
 export interface ToolCall {
   id: string;
@@ -182,4 +188,24 @@ export interface CompactionEntry {
   kind: "auto" | "manual";
   createdAt: number;
   firstKeptMessageId: string;
+}
+
+export type ToolPartState =
+  | { status: "pending" }
+  | { status: "running"; startedAt: number }
+  | { status: "completed"; result: unknown }
+  | { status: "error"; error: string };
+
+export type MessagePart =
+  | { kind: "text"; content: string }
+  | { kind: "reasoning"; content: string }
+  | { kind: "tool"; toolCallId: string; name: string; state: ToolPartState }
+  | { kind: "compaction"; summary: string; tokensSaved: number };
+
+export interface CompactionSettings {
+  enabled: boolean;
+  reserveTokens: number;
+  prune: boolean;
+  preserveRecentTokens: number;
+  tailTurns: number;
 }

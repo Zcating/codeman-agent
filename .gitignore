@@ -54,6 +54,7 @@ lcov.info
 # AI
 .opencode/
 .omo/
+.sisyphus/
 .agents/
 .claude/
 .playwright-mcp/

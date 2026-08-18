@@ -1,45 +1,31 @@
-import { Effect } from "effect";
-import type { CompactionEntry } from "./types";
-import type { Message } from "@codeman-frontend/shared/lib/types";
-import { CompactionFailed } from "./errors";
+import type { Message, MessagePart } from "@codeman-frontend/shared/lib/types";
 
-export function applyCompactionToContext(params: {
-  entries: CompactionEntry[];
-  agentMessages: Message[];
-}): Effect.Effect<Message[], CompactionFailed> {
-  const { entries, agentMessages } = params;
+export interface ApplyCompactionInput {
+  readonly messages: readonly Message[];
+  readonly summary: string;
+  readonly tailStartId: string;
+}
 
-  if (entries.length === 0) {
-    return Effect.succeed([...agentMessages]);
+export function applyCompactionToContext(input: ApplyCompactionInput): readonly MessagePart[] {
+  const { messages, summary, tailStartId } = input;
+  if (messages.length === 0) return [];
+  const idx = messages.findIndex((m) => m.id === tailStartId);
+  if (idx === -1) return messages.flatMap((m) => m.parts ?? []);
+
+  const summaryPart: MessagePart = {
+    kind: "text",
+    content: `[Previous conversation summary]\n\n${summary}`,
+    synthetic: true,
+  } as MessagePart;
+
+  const tailParts: MessagePart[] = [];
+  for (let i = idx; i < messages.length; i++) {
+    const parts = messages[i]!.parts ?? [];
+    for (const p of parts) {
+      if (p.kind === "compaction") continue;
+      tailParts.push(p);
+    }
   }
 
-  // Sort entries by createdAt ASC and take the last one (latest)
-  const sorted = [...entries].sort((a, b) => a.createdAt - b.createdAt);
-  const latest = sorted[sorted.length - 1]!;
-
-  // Build synthetic summary message
-  const summaryMsg: Message = {
-    id: `compaction-${latest.id}`,
-    conversationId: latest.conversationId,
-    role: "system",
-    content: latest.summary,
-    thinking: null,
-    toolCalls: null,
-    toolResults: null,
-    model: latest.model,
-    inputTokens: null,
-    outputTokens: null,
-    createdAt: latest.createdAt,
-  };
-
-  // Find index of firstKeptMessageId
-  const keptIdx = agentMessages.findIndex(
-    (m) => m.id === latest.firstKeptMessageId,
-  );
-
-  if (keptIdx === -1) {
-    return Effect.fail(new CompactionFailed({ reason: "stale_entry" }));
-  }
-
-  return Effect.succeed([summaryMsg, ...agentMessages.slice(keptIdx)]);
+  return [summaryPart, ...tailParts];
 }

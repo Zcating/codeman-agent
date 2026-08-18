@@ -1,7 +1,6 @@
 export { ChatView } from "@codeman-frontend/features/chat/components/chat-view";
 export { MessageBubble } from "@codeman-frontend/features/chat/components/message-bubble";
 export { ToolCallCard } from "@codeman-frontend/features/chat/components/tool-call-card";
-export { CompactionMarker } from "@codeman-frontend/features/chat/components/compaction-marker";
 
 export {
   createAgentRuntime,
