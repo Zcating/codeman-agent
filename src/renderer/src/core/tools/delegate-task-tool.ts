@@ -1,8 +1,8 @@
 import { Schema } from "effect";
 import type { AgentTool, AgentEvent } from "@earendil-works/pi-agent-core";
-import type { SubAgentConfig, SubAgentId } from "@codeman-frontend/plugins/multi-agents/lib/sub-agent.types";
-import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
-import { createSubAgent } from "@codeman-frontend/plugins/multi-agents/lib/sub-agent-factory";
+import type { SubAgentConfig, SubAgentId } from "@codeman-frontend/shared/lib/sub-agent-schema";
+import type { ProviderConfig } from "@codeman-frontend/core/llm/runtime";
+import { createSubAgent } from "@codeman-frontend/features/multi-agents/lib/sub-agent-factory";
 import { toToolParameters } from "@codeman-frontend/shared/lib/tool-schema";
 
 export type ToolRegistry = Map<string, AgentTool>;

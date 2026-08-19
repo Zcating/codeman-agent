@@ -14,7 +14,7 @@ import type { LlmExecuteRequest } from "@codeman-frontend/shared/apis";
 const mockPrompt = vi.fn();
 const mockAbort = vi.fn(() => {});
 
-vi.mock("@codeman-frontend/plugins/multi-agents/lib/sub-agent-factory", () => ({
+vi.mock("@codeman-frontend/features/multi-agents/lib/sub-agent-factory", () => ({
   createSubAgent: vi.fn(() => ({
     subscribe: vi.fn(() => () => {}),
     prompt: mockPrompt,

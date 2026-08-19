@@ -25,7 +25,7 @@ import {
   type ConversationState,
 } from "@codeman-frontend/features/chat/stores/chat.store";
 import type { Conversation, Message, Workspace } from "@codeman-frontend/shared/lib/types";
-import type { RuntimeEvent, ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
+import type { RuntimeEvent, ProviderConfig } from "@codeman-frontend/core/llm/runtime";
 
 
 // Track FileApi.readFile calls for projectInstructions caching test
@@ -208,10 +208,21 @@ vi.mock("../../../shared/lib/workspace-service", async () => {
 });
 
 
-vi.mock("../lib/runtime", () => ({
+vi.mock("@codeman-frontend/core/llm/runtime", () => ({
   createAgentRuntime: () => ({
     run: () => Stream.fromIterable([]),
     cancel: () => { },
+    toolTypes: [],
+    snippets: [
+      { name: "read_file", summary: "Read a file from a workspace (UTF-8, ≤10MB)" },
+      { name: "write_file", summary: "Write content to a file in a workspace (≤10MB)" },
+      { name: "edit_file", summary: "Replace text in a file (unique match required unless replaceAll=true)" },
+      { name: "search_files", summary: "Find files in workspace by glob pattern or content substring (≤100 results)" },
+      { name: "delete_file", summary: "Move a file to the recycle bin (recoverable)" },
+      { name: "webfetch", summary: "Fetch HTTP/HTTPS URL content as text/markdown/HTML" },
+      { name: "run_command", summary: "Execute shell commands (build/test/git), returns status/exitCode/stdout/stderr" },
+      { name: "_load_skill", summary: "Load a skill's full instructions by skill name" },
+    ],
   }),
 }));
 

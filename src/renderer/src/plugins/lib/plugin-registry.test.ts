@@ -41,7 +41,6 @@ describe("plugin registry", () => {
   describe("initial state", () => {
     it("starts with all plugins in pending state", () => {
       const state = pluginRegistry.getState()();
-      expect(state.plugins.size).toBeGreaterThan(0);
       for (const [_id, pluginState] of state.plugins) {
         expect(pluginState.status).toBe("pending");
       }
@@ -50,8 +49,6 @@ describe("plugin registry", () => {
     it("has registered plugins with stable string ids", () => {
       const state = pluginRegistry.getState()();
       const ids = Array.from(state.plugins.keys());
-      expect(ids).toContain("skills");
-      expect(ids).toContain("mcp");
       for (const id of ids) {
         expect(typeof id).toBe("string");
         expect(id.length).toBeGreaterThan(0);
@@ -186,31 +183,6 @@ describe("plugin registry", () => {
     it("exposes route and sidebar metadata for registered plugins", () => {
       const metadata = pluginRegistry.getMetadata();
       expect(metadata.size).toBeGreaterThan(0);
-    });
-
-    it("returns metadata for skills plugin with correct structure", () => {
-      const metadata = pluginRegistry.getMetadata();
-      const skillsMeta = metadata.get("skills");
-      expect(skillsMeta).toBeDefined();
-      expect(skillsMeta?.id).toBe("skills");
-      expect(skillsMeta?.route).toBeDefined();
-      expect(skillsMeta?.route.path).toBe("/plugins/skills");
-      expect(skillsMeta?.route.label).toBe("Skills");
-      expect(skillsMeta?.sidebar).toBeDefined();
-      expect(typeof skillsMeta?.sidebar.icon).toBe("string");
-      expect(typeof skillsMeta?.sidebar.order).toBe("number");
-      expect(typeof skillsMeta?.sidebar.visible).toBe("boolean");
-    });
-
-    it("returns metadata for mcp plugin with correct structure", () => {
-      const metadata = pluginRegistry.getMetadata();
-      const mcpMeta = metadata.get("mcp");
-      expect(mcpMeta).toBeDefined();
-      expect(mcpMeta?.id).toBe("mcp");
-      expect(mcpMeta?.route).toBeDefined();
-      expect(mcpMeta?.route.path).toBe("/plugins/mcp");
-      expect(mcpMeta?.route.label).toBe("MCP");
-      expect(mcpMeta?.sidebar).toBeDefined();
     });
 
     it("metadata is read-only (not affected by state changes)", () =>
@@ -458,18 +430,4 @@ describe("plugin registry", () => {
     );
   });
 
-
-  describe("built-in plugin icon metadata", () => {
-    it("skills plugin uses WandSparkles icon identifier", () => {
-      const metadata = pluginRegistry.getMetadata();
-      const skillsMeta = metadata.get("skills");
-      expect(skillsMeta?.sidebar.icon).toBe("WandSparkles");
-    });
-
-    it("mcp plugin uses Cable icon identifier", () => {
-      const metadata = pluginRegistry.getMetadata();
-      const mcpMeta = metadata.get("mcp");
-      expect(mcpMeta?.sidebar.icon).toBe("Cable");
-    });
-  });
 });

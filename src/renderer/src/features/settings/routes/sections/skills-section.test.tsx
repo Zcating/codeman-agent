@@ -39,7 +39,7 @@ vi.mock("solid-js/store", () => {
 });
 
 let _manifests: SkillManifest[] = [];
-vi.mock("@codeman-frontend/plugins/skills/stores/skills.store", () => {
+vi.mock("@codeman-frontend/features/skills/stores/skills.store", () => {
   return {
     skillsManifests$: () => _manifests,
     setManifests: (next: SkillManifest[]) => { _manifests = next; },

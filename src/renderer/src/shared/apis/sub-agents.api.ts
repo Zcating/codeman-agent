@@ -1,7 +1,7 @@
 import { Effect, Layer, Context } from "effect";
 import { invoke } from "./invoke.api";
 import type { AppError } from "@codeman-frontend/shared/lib/errors";
-import type { SubAgentConfig } from "@codeman-frontend/plugins/multi-agents/lib/sub-agent.types";
+import type { SubAgentConfig } from "@codeman-frontend/shared/lib/sub-agent-schema";
 
 export class SubAgentsApi extends Context.Tag("SubAgentsApi")<
   SubAgentsApi,

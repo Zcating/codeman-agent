@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from "vitest";
-import { buildEnabledProviders } from "@codeman-frontend/features/chat/lib/build-enabled-providers";
+import { buildEnabledProviders } from "@codeman-frontend/core/llm/build-enabled-providers";
 
 describe("buildEnabledProviders", () => {
   it("returns array of providers with llm config", () => {

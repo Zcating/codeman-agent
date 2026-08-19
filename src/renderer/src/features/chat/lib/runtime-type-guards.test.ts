@@ -6,7 +6,7 @@ import {
     isThinkingBlock,
     isToolCallBlock,
     contentOf,
-} from "@codeman-frontend/features/chat/lib/runtime-type-guards";
+} from "@codeman-frontend/core/llm/runtime-type-guards";
 
 describe("isAssistantMessage", () => {
     it("accepts AssistantMessage with role === assistant", () => {

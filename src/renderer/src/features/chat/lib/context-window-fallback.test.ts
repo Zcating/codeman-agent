@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { lookupContextWindow } from "./context-window-fallback";
+import { lookupContextWindow } from "@codeman-frontend/core/llm/context-window-fallback";
 import type { ModelMeta, Provider } from "@codeman-frontend/shared/lib/types";
 
 function makeModel(overrides: Partial<ModelMeta> = {}): ModelMeta {

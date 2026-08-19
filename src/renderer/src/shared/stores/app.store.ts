@@ -13,7 +13,7 @@ import {
   SettingsApiLive,
 } from "@codeman-frontend/shared/apis";
 import { WorkspaceService, WorkspaceServiceLive } from "@codeman-frontend/shared/lib/workspace-service";
-import { lookupContextWindow } from "@codeman-frontend/features/chat/lib/context-window-fallback";
+import { lookupContextWindow } from "@codeman-frontend/core/llm/context-window-fallback";
 import { enforceDefaultModelInvariant } from "@codeman-frontend/shared/lib/provider-invariant";
 const DEFAULT_MINIMAX_PROVIDER: Provider = {
   id: "minimax",

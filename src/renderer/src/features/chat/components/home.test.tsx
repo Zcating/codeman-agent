@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, fireEvent, waitFor } from "@solidjs/testing-library";
 import { Effect } from "effect";
 import { HomeAgentForm } from "@codeman-frontend/features/chat/components/home";
-import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
+import type { ProviderConfig } from "@codeman-frontend/core/llm/runtime";
 import { createConversation, sendMessage, addWorkspace as addWorkspaceFromStore } from "@codeman-frontend/features/chat/stores/chat.store";
 
 

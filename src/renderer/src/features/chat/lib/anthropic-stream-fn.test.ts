@@ -1,6 +1,6 @@
 
 import { describe, it, expect, vi } from "vitest";
-import { anthropicStream } from "./anthropic-stream-fn";
+import { anthropicStream } from "@codeman-frontend/core/llm/anthropic-stream-fn";
 
 const { fakeApi } = vi.hoisted(() => ({
   fakeApi: {

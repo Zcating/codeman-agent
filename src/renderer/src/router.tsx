@@ -14,7 +14,7 @@ import { WindowSection } from "@codeman-frontend/features/settings/routes/sectio
 import { AdvancedSection } from "@codeman-frontend/features/settings/routes/sections/advanced-section";
 import { SkillsSection } from "@codeman-frontend/features/settings/routes/sections/skills-section";
 import { McpSection } from "@codeman-frontend/features/settings/routes/sections/mcp-section";
-import { SettingsTab as MultiAgentsSettingsTab } from "@codeman-frontend/plugins/multi-agents/components/settings-tab";
+import { SettingsTab as MultiAgentsSettingsTab } from "@codeman-frontend/features/multi-agents/components/settings-tab";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -67,22 +67,46 @@ const conversationRoute = createRoute({
   component: ConversationRoute,
 });
 
+const toolsSkillsRoute = createRoute({
+  getParentRoute: () => chatLayoutRoute,
+  path: "/tools/skills",
+  component: SkillsSection,
+});
+
+const toolsMcpRoute = createRoute({
+  getParentRoute: () => chatLayoutRoute,
+  path: "/tools/mcp",
+  component: McpSection,
+});
+
+const toolsMultiAgentsRoute = createRoute({
+  getParentRoute: () => chatLayoutRoute,
+  path: "/tools/multi-agents",
+  component: MultiAgentsSettingsTab,
+});
+
 const pluginsSkillsRoute = createRoute({
   getParentRoute: () => chatLayoutRoute,
   path: "/plugins/skills",
-  component: SkillsSection,
+  beforeLoad: () => {
+    throw redirect({ to: "/tools/skills", replace: true });
+  },
 });
 
 const pluginsMcpRoute = createRoute({
   getParentRoute: () => chatLayoutRoute,
   path: "/plugins/mcp",
-  component: McpSection,
+  beforeLoad: () => {
+    throw redirect({ to: "/tools/mcp", replace: true });
+  },
 });
 
 const pluginsMultiAgentsRoute = createRoute({
   getParentRoute: () => chatLayoutRoute,
   path: "/plugins/multi-agents",
-  component: MultiAgentsSettingsTab,
+  beforeLoad: () => {
+    throw redirect({ to: "/tools/multi-agents", replace: true });
+  },
 });
 
 
@@ -125,7 +149,7 @@ const settingsSkillsRoute = createRoute({
   getParentRoute: () => settingsLayoutRoute,
   path: "skills",
   beforeLoad: () => {
-    throw redirect({ to: "/plugins/skills", replace: false });
+    throw redirect({ to: "/tools/skills", replace: false });
   },
 });
 
@@ -133,12 +157,12 @@ const settingsMcpRoute = createRoute({
   getParentRoute: () => settingsLayoutRoute,
   path: "mcp",
   beforeLoad: () => {
-    throw redirect({ to: "/plugins/mcp", replace: false });
+    throw redirect({ to: "/tools/mcp", replace: false });
   },
 });
 
 export const routeTree = rootRoute.addChildren([
-  chatLayoutRoute.addChildren([homeRoute, conversationRoute, pluginsSkillsRoute, pluginsMcpRoute, pluginsMultiAgentsRoute]),
+  chatLayoutRoute.addChildren([homeRoute, conversationRoute, toolsSkillsRoute, toolsMcpRoute, toolsMultiAgentsRoute, pluginsSkillsRoute, pluginsMcpRoute, pluginsMultiAgentsRoute]),
   settingsLayoutRoute.addChildren([
     settingsLlmRoute,
     settingsAppRoute,

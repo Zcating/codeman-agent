@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { validateProvider } from "@codeman-frontend/features/chat/lib/runtime-validate-provider";
-import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
+import { validateProvider } from "@codeman-frontend/core/llm/runtime-validate-provider";
+import type { ProviderConfig } from "@codeman-frontend/core/llm/runtime";
 
 const makeProvider = (overrides: Partial<ProviderConfig> = {}): ProviderConfig => ({
   id: "test-id",

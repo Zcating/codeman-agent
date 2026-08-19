@@ -1,8 +1,8 @@
 import { type JSX, onMount } from "solid-js";
 import { Effect, Exit } from "effect";
 import { ScrollArea } from "@codeman-frontend/shared/components/ui/scrollarea";
-import { McpSettingsTab } from "@codeman-frontend/plugins/mcp/components/settings-tab";
-import { refresh } from "@codeman-frontend/plugins/mcp/stores/store";
+import { McpSettingsTab } from "@codeman-frontend/features/mcp/components/settings-tab";
+import { refresh } from "@codeman-frontend/features/mcp/stores/store";
 import { codemanToast } from "@codeman-frontend/shared/components/internal/codeman-toast";
 
 export function McpSection(): JSX.Element {

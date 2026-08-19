@@ -5,7 +5,7 @@ import {
   type BuildSystemPromptSections,
   type ToolSnippet,
   type WorkspaceContext,
-} from "./build-system-prompt";
+} from "@codeman-frontend/core/llm/build-system-prompt";
 
 describe("buildSystemPrompt", () => {
   // ── helpers ─────────────────────────────────────────────────────────────────

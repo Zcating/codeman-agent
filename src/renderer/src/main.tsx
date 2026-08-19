@@ -4,14 +4,15 @@ import { RouterProvider } from "@tanstack/solid-router";
 import { router } from "@codeman-frontend/router";
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
 import { startThemeSync } from "@codeman-frontend/shared/stores/theme";
-import { Cause, Effect, Exit } from "effect";
+import { Effect, Exit } from "effect";
 import { logger } from "@codeman-frontend/shared/lib/logger";
 import * as chatStore from "@codeman-frontend/features/chat/stores/chat.store";
 import { ToasterMount } from "@codeman-frontend/shared/components/internal/codeman-toast";
 
-import "@codeman-frontend/plugins";
-
-import { initializeAll } from "@codeman-frontend/plugins";
+import { initializeSkillsManifests } from "@codeman-frontend/features/skills/stores/skills.store";
+import { initializeMcp } from "@codeman-frontend/features/mcp/stores/store";
+import "@codeman-frontend/plugins/automations/index";
+import { initializeAutomations } from "@codeman-frontend/plugins/automations/index";
 import { formatAppError } from "@codeman-frontend/shared/lib/format-app-error";
 
 
@@ -24,7 +25,13 @@ function bootstrap(): void {
 
   startThemeSync();
 
-  const initPromise = Effect.runPromiseExit(initializeAll());
+  const initPromise = Effect.runPromiseExit(
+    Effect.all([
+      initializeSkillsManifests(),
+      initializeMcp(),
+      initializeAutomations(),
+    ]),
+  );
 
   type WindowWithAppStore = {
     __appStore?: {
@@ -65,16 +72,6 @@ function bootstrap(): void {
         "[index.tsx] plugin initialization unexpectedly failed:",
         formatAppError(exit.cause),
       );
-    } else {
-      const result = exit.value;
-      if (result.failures.size > 0) {
-        for (const [pluginId, error] of result.failures) {
-          logger.warn(
-            `[index.tsx] plugin "${pluginId}" initialization failed:`,
-            formatAppError(Cause.fail(error)),
-          );
-        }
-      }
     }
 
     render(() => (

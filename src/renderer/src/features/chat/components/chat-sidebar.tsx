@@ -28,10 +28,10 @@ import { RowActions } from "@codeman-frontend/features/chat/components/row-actio
 import { NewChatButton } from "@codeman-frontend/features/chat/components/new-chat-button";
 import { getPluginMetadata } from "@codeman-frontend/plugins";
 import type { PluginIconName } from "@codeman-frontend/plugins/lib/plugin-registry";
+import { skillsManifest } from "@codeman-frontend/features/skills";
+import { mcpManifest } from "@codeman-frontend/features/mcp";
+import { multiAgentsManifest } from "@codeman-frontend/features/multi-agents";
 
-// Per-plugin icons explicitly listed so the sidebar's static analysis
-// (extractUsedIcons / tree-shake) knows which icons the build needs.
-// TypeScript enforces these are real lucide-solid exports via PluginIconName.
 const PLUGIN_ICONS = {
   WandSparkles,
   Cable,
@@ -43,12 +43,6 @@ function renderPluginIcon(
   _pluginId: string,
   iconName: PluginIconName,
 ): JSX.Element {
-  // Static lookup against the explicit list above. PluginIconName constrains
-  // iconName to a valid lucide-solid export, so any name not in PLUGIN_ICONS
-  // is a typing/build drift (e.g., an icon renamed upstream). Fall back to
-  // Box rather than throw — the previous throw-on-unknown pattern converted
-  // a config typo into a hard sidebar crash (the regression caught in
-  // commit c8e4331).
   const Icon = PLUGIN_ICONS[iconName];
   if (!Icon) {
     return <Box class="h-4 w-4" />;
@@ -70,7 +64,14 @@ export function ChatSidebar(): JSX.Element {
   const wsList = (): Workspace[] => workspaces$() ?? [];
 
 
+  const toolItems = [skillsManifest, mcpManifest, multiAgentsManifest];
+
   const handleSelectConv = (id: string): void => {
+    const toolItem = toolItems.find((t) => t.id === id);
+    if (toolItem) {
+      navigate({ to: toolItem.path });
+      return;
+    }
     const metadata = getPluginMetadata();
     const pluginMeta = metadata.get(id);
     if (pluginMeta) {
@@ -131,6 +132,22 @@ export function ChatSidebar(): JSX.Element {
 
   const options = (): CodemanSidebarGroupOption[] => {
     const metadata = getPluginMetadata();
+
+    const toolsGroupChildren = toolItems.map(
+      (tool): CodemanSidebarMenuOption => ({
+        label: tool.label,
+        value: tool.id,
+        icon: renderPluginIcon(tool.id, tool.icon as PluginIconName),
+        forceSubMenu: true,
+      }),
+    );
+
+    const toolsGroup: CodemanSidebarGroupOption = {
+      label: "工具",
+      value: "tools",
+      children: toolsGroupChildren,
+    };
+
     const pluginChildren = Array.from(metadata.values())
       .filter((plugin) => plugin.sidebar.visible)
       .sort((a, b) => a.sidebar.order - b.sidebar.order)
@@ -150,7 +167,7 @@ export function ChatSidebar(): JSX.Element {
     };
 
     if (wsList().length === 0) {
-      return [pluginGroup];
+      return [toolsGroup, pluginGroup];
     }
 
     const projectGroup: CodemanSidebarGroupOption = {
@@ -170,7 +187,7 @@ export function ChatSidebar(): JSX.Element {
       })),
     };
 
-    return [pluginGroup, projectGroup];
+    return [toolsGroup, pluginGroup, projectGroup];
   };
 
   const renderMenuGroup = (item: CodemanSidebarMenuGroupOption): JSX.Element => (
@@ -198,7 +215,10 @@ export function ChatSidebar(): JSX.Element {
   const isActive = (value: string | undefined): boolean => {
     if (!value) return false;
     const pathname = currentPathname();
-    if (pathname.startsWith("/plugins")) {
+    if (pathname.startsWith("/tools")) {
+      return pathname.includes(value);
+    }
+    if (pathname.startsWith("/plugins") || pathname.startsWith("/settings")) {
       return pathname.includes(value);
     }
     return value === selectedConvId();

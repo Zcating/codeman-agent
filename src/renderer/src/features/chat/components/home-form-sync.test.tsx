@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, cleanup, waitFor } from "@solidjs/testing-library";
 import { HomeAgentForm } from "@codeman-frontend/features/chat/components/home";
-import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
+import type { ProviderConfig } from "@codeman-frontend/core/llm/runtime";
 
 
 const signalHandles = vi.hoisted(() => ({

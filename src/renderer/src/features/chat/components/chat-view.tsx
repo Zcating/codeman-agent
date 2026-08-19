@@ -6,13 +6,13 @@ import { MessageBubble } from "@codeman-frontend/features/chat/components/messag
 import { PermissionBar } from "@codeman-frontend/features/chat/components/permission-bar";
 import { store, sendMessage, cancel, pendingPermissions$, addPendingPermission, resolvePendingPermission, setConvModel } from "@codeman-frontend/features/chat/stores/chat.store";
 import { doCompact, type DoCompactDeps } from "@codeman-frontend/features/chat/lib/compaction";
-import { ParallelPanel } from "@codeman-frontend/plugins/multi-agents/components/parallel-panel";
-import { subAgentsStreamStore } from "@codeman-frontend/plugins/multi-agents/stores/sub-agents-stream.store";
+import { ParallelPanel } from "@codeman-frontend/features/multi-agents/components/parallel-panel";
+import { subAgentsStreamStore } from "@codeman-frontend/features/multi-agents/stores/sub-agents-stream.store";
 import {
   ContextRing,
   computeUsedTokensEst,
 } from "@codeman-frontend/features/chat/components/context-ring";
-import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
+import type { ProviderConfig } from "@codeman-frontend/core/llm/runtime";
 import { Button } from "@codeman-frontend/shared/components/ui/button";
 import { ScrollArea } from "@codeman-frontend/shared/components/ui/scrollarea";
 import { ComboTextarea } from "@codeman-frontend/features/chat/components/combo-textarea";
@@ -21,8 +21,8 @@ import { codemanToast } from "@codeman-frontend/shared/components/internal/codem
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
 import { formatAppError } from "@codeman-frontend/shared/lib/format-app-error";
 import { effectSchema, firstErrorMessage } from "@codeman-frontend/shared/lib/effect-schema-adapter";
-import { buildEnabledProviders } from "@codeman-frontend/features/chat/lib/build-enabled-providers";
-import { lookupContextWindow } from "@codeman-frontend/features/chat/lib/context-window-fallback";
+import { buildEnabledProviders } from "@codeman-frontend/core/llm/build-enabled-providers";
+import { lookupContextWindow } from "@codeman-frontend/core/llm/context-window-fallback";
 import {
   handleArrowUpField,
   handleArrowDownField,
@@ -32,11 +32,11 @@ import {
   ModelIdFieldSchema,
   ChatViewFormSchema,
   type ChatViewFormValue,
-} from "@codeman-frontend/features/chat/lib/schemas";
-import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
+} from "@codeman-frontend/core/llm/schemas";
+import { skillsManifests$ } from "@codeman-frontend/features/skills/stores/skills.store";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 import { invoke } from "@codeman-frontend/shared/apis/invoke.api";
-import { subAgentsStore } from "@codeman-frontend/plugins/multi-agents/stores/sub-agents.store";
+import { subAgentsStore } from "@codeman-frontend/features/multi-agents/stores/sub-agents.store";
 import type { ThinkingLevel } from "@codeman-frontend/shared/lib/sub-agent-schema";
 
 

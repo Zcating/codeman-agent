@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractToolErrorText } from "@codeman-frontend/features/chat/lib/runtime-tool-error";
+import { extractToolErrorText } from "@codeman-frontend/core/llm/runtime-tool-error";
 
 describe("extractToolErrorText", () => {
     it("returns text from AgentToolResult with single text block", () => {

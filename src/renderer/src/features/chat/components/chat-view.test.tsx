@@ -233,15 +233,15 @@ vi.mock("../../../shared/components/internal/codeman-toast", () => ({
   ToasterMount: () => null,
 }));
 
-vi.mock(import("@codeman-frontend/features/chat/lib/runtime"), async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../lib/runtime")>();
+vi.mock(import("@codeman-frontend/core/llm/runtime"), async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@codeman-frontend/core/llm/runtime")>();
   return {
     ...actual,
     AgentRuntime: { of: vi.fn() } as never,
   };
 });
 
-vi.mock("@codeman-frontend/plugins/multi-agents/stores/sub-agents-stream.store", () => {
+vi.mock("@codeman-frontend/features/multi-agents/stores/sub-agents-stream.store", () => {
   let byToolCall: Record<string, unknown> = {};
   return {
     subAgentsStreamStore: {
@@ -265,7 +265,7 @@ vi.mock("@codeman-frontend/plugins/multi-agents/stores/sub-agents-stream.store",
   };
 });
 
-vi.mock("@codeman-frontend/plugins/multi-agents/components/parallel-panel", () => ({
+vi.mock("@codeman-frontend/features/multi-agents/components/parallel-panel", () => ({
   ParallelPanel: (props: { entries: unknown[] }) =>
     props.entries.length > 0
       ? <div data-testid="parallel-panel">ParallelPanel({props.entries.length})</div>
@@ -1111,7 +1111,7 @@ describe("ChatView parallel-panel ", () => {
   });
 
   it("ParallelPanel NOT rendered when subAgentsStreamStore is empty", async () => {
-    const { subAgentsStreamStore } = await import("@codeman-frontend/plugins/multi-agents/stores/sub-agents-stream.store");
+    const { subAgentsStreamStore } = await import("@codeman-frontend/features/multi-agents/stores/sub-agents-stream.store");
     // Reset store to empty
     subAgentsStreamStore.actions._resetForTest();
     const { container } = render(() => <ChatView convId="conv-1" />);
@@ -1120,7 +1120,7 @@ describe("ChatView parallel-panel ", () => {
   });
 
   it("ParallelPanel rendered when subAgentsStreamStore has delegate_task entries", async () => {
-    const { subAgentsStreamStore } = await import("@codeman-frontend/plugins/multi-agents/stores/sub-agents-stream.store");
+    const { subAgentsStreamStore } = await import("@codeman-frontend/features/multi-agents/stores/sub-agents-stream.store");
     // Simulate a delegate_task entry in the store
     subAgentsStreamStore.actions._resetForTest();
     subAgentsStreamStore.actions.recordStart("tc-delegate-1", "agent-001", "Researcher");
@@ -1131,7 +1131,7 @@ describe("ChatView parallel-panel ", () => {
   });
 
   it("ParallelPanel shows correct count when multiple delegate_task entries exist", async () => {
-    const { subAgentsStreamStore } = await import("@codeman-frontend/plugins/multi-agents/stores/sub-agents-stream.store");
+    const { subAgentsStreamStore } = await import("@codeman-frontend/features/multi-agents/stores/sub-agents-stream.store");
     subAgentsStreamStore.actions._resetForTest();
     subAgentsStreamStore.actions.recordStart("tc-delegate-1", "agent-001", "Researcher");
     subAgentsStreamStore.actions.recordStart("tc-delegate-2", "agent-002", "Coder");

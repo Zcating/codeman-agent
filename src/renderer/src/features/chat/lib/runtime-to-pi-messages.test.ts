@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toPiMessages } from "@codeman-frontend/features/chat/lib/runtime-to-pi-messages";
+import { toPiMessages } from "@codeman-frontend/core/llm/runtime-to-pi-messages";
 import type { Message } from "@codeman-frontend/shared/lib/types";
 import type {
   AssistantMessage,

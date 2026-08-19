@@ -11,7 +11,7 @@ import type {
   McpTool,
   McpToolEntry,
 } from "@codeman-frontend/shared/lib/types";
-import type { SubAgentConfig } from "@codeman-frontend/plugins/multi-agents/lib/sub-agent.types";
+import type { SubAgentConfig } from "@codeman-frontend/shared/lib/sub-agent-schema";
 import type {
   AutomationRule,
   AutomationId,

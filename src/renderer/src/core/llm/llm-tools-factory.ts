@@ -10,22 +10,25 @@ import {
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { McpToolEntry } from "@codeman-frontend/shared/lib/types";
 import type { SubAgentConfig } from "@codeman-frontend/shared/lib/sub-agent-schema";
-import type { SubAgentId } from "@codeman-frontend/plugins/multi-agents/lib/sub-agent.types";
+import type { SubAgentId } from "@codeman-frontend/shared/lib/sub-agent-schema";
 import type { AgentEvent } from "@earendil-works/pi-agent-core";
-import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
+import type { ProviderConfig } from "@codeman-frontend/core/llm/runtime";
 import type { ToolType } from "@codeman-frontend/core/tools/tool-type";
+import { deriveToolSnippets } from "./build-tool-snippets";
+import type { ToolSnippet } from "@codeman-frontend/core/llm/build-system-prompt";
 
 export interface BuildToolSetDeps {
-  readonly workspaceId: string;
-  readonly mcpEntries: readonly McpToolEntry[];
-  readonly enabledSubAgents: readonly SubAgentConfig[];
-  readonly baseProvider: ProviderConfig;
-  readonly onSubAgentEvent: (event: AgentEvent, toolCallId: string, subAgentId: SubAgentId) => void;
+  readonly workspaceId?: string;
+  readonly mcpEntries?: readonly McpToolEntry[];
+  readonly enabledSubAgents?: readonly SubAgentConfig[];
+  readonly baseProvider?: ProviderConfig;
+  readonly onSubAgentEvent?: (event: AgentEvent, toolCallId: string, subAgentId: SubAgentId) => void;
 }
 
 export interface ToolSet {
   readonly tools: AgentTool[];
   readonly toolTypes: readonly ToolType[];
+  readonly snippets: readonly ToolSnippet[];
 }
 
 export interface ComputeToolTypesDeps {
@@ -55,23 +58,26 @@ export function computeToolTypes(deps: ComputeToolTypesDeps): readonly ToolType[
 function buildToolTypeAgents(
   deps: BuildToolSetDeps,
 ): AgentTool[] {
+  const workspaceId = deps.workspaceId ?? "";
   const baseTools: AgentTool[] = [
-    ...createFileTools(deps.workspaceId),
+    ...createFileTools(workspaceId),
     webfetchTool,
     runCommandTool,
     loadSkillTool,
   ];
 
-  if (deps.mcpEntries.length > 0) {
-    baseTools.push(...buildMcpTools(deps.mcpEntries));
+  const mcpEntries = deps.mcpEntries ?? [];
+  if (mcpEntries.length > 0) {
+    baseTools.push(...buildMcpTools(mcpEntries));
   }
 
   const toolRegistry: ToolRegistry = new Map(baseTools.map((t) => [t.name, t]));
 
-  if (deps.enabledSubAgents.length > 0) {
+  const enabledSubAgents = deps.enabledSubAgents ?? [];
+  if (enabledSubAgents.length > 0 && deps.baseProvider && deps.onSubAgentEvent) {
     baseTools.push(
       buildDelegateTaskTool(
-        deps.enabledSubAgents,
+        enabledSubAgents,
         deps.baseProvider,
         toolRegistry,
         deps.onSubAgentEvent,
@@ -83,8 +89,11 @@ function buildToolTypeAgents(
 }
 
 export function buildToolSet(deps: BuildToolSetDeps): ToolSet {
-  const toolTypes = computeToolTypes(deps);
+  const mcpEntries = deps.mcpEntries ?? [];
+  const enabledSubAgents = deps.enabledSubAgents ?? [];
+  const toolTypes = computeToolTypes({ mcpEntries, enabledSubAgents });
   const tools = buildToolTypeAgents(deps);
+  const snippets = deriveToolSnippets(tools);
 
-  return { tools, toolTypes };
+  return { tools, toolTypes, snippets };
 }

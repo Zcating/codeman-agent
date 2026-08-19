@@ -23,8 +23,8 @@ import {
   homeSelectedProviderId$,
   homeSelectedModelId$,
 } from "@codeman-frontend/features/chat/stores/chat.store";
-import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
-import { buildEnabledProviders } from "@codeman-frontend/features/chat/lib/build-enabled-providers";
+import type { ProviderConfig } from "@codeman-frontend/core/llm/runtime";
+import { buildEnabledProviders } from "@codeman-frontend/core/llm/build-enabled-providers";
 import {
   handleArrowUpField,
   handleArrowDownField,
@@ -35,8 +35,8 @@ import {
   WorkspaceIdFieldSchema,
   HomeFormSchema,
   type HomeFormValue,
-} from "@codeman-frontend/features/chat/lib/schemas";
-import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
+} from "@codeman-frontend/core/llm/schemas";
+import { skillsManifests$ } from "@codeman-frontend/features/skills/stores/skills.store";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
 function LlmPicker(props: {

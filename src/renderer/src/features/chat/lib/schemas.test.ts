@@ -8,7 +8,7 @@ import {
   WorkspaceIdFieldSchema,
   HomeFormSchema,
   ChatViewFormSchema,
-} from "@codeman-frontend/features/chat/lib/schemas";
+} from "@codeman-frontend/core/llm/schemas";
 
 describe("chat schemas (ADR-0025 PR 4)", () => {
   it("ConversationIdSchema: brand round-trip", () => {

@@ -11,7 +11,7 @@ import {
   type AgentRuntime,
   type RuntimeEvent,
   type ProviderConfig,
-} from "@codeman-frontend/features/chat/lib/runtime";
+} from "@codeman-frontend/core/llm/runtime";
 import {
   ConversationApi,
   ConversationApiLive,
@@ -25,7 +25,7 @@ import {
 } from "@codeman-frontend/shared/lib/workspace-service";
 import { deriveLabelFromPath } from "@codeman-frontend/shared/lib/derive-label-from-path";
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
-import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
+import { skillsManifests$ } from "@codeman-frontend/features/skills/stores/skills.store";
 import {
   doCompact,
   pruneOldToolOutputs,
@@ -35,12 +35,11 @@ import type { ThinkingLevel } from "@codeman-frontend/shared/lib/sub-agent-schem
 import {
   buildSystemPrompt,
   DEFAULT_IDENTITY,
-  DEFAULT_TOOL_SNIPPETS,
   DEFAULT_GUIDELINES,
-} from "@codeman-frontend/features/chat/lib/build-system-prompt";
+} from "@codeman-frontend/core/llm/build-system-prompt";
 import { loadProjectInstructions } from "@codeman-frontend/features/chat/lib/workspace-project-instructions";
-import { formatSkillsManifestSection } from "@codeman-frontend/plugins/skills/lib/skill-injector";
-import { mcpAllTools$ } from "@codeman-frontend/plugins/mcp/stores/store";
+import { formatSkillsManifestSection } from "@codeman-frontend/features/skills/lib/skill-injector";
+import { mcpAllTools$ } from "@codeman-frontend/features/mcp/stores/store";
 import type { PermissionRequest } from "@codeman-frontend/features/chat/components/permission-bar";
 
 
@@ -270,7 +269,7 @@ export const sendMessage = Effect.fn(
 
     const finalSystemPrompt = buildSystemPrompt({
       identity: DEFAULT_IDENTITY,
-      staticToolSnippets: DEFAULT_TOOL_SNIPPETS,
+      staticToolSnippets: cs.runtime.snippets,
       dynamicToolSnippets: dynamicToolSnippets.length > 0 ? dynamicToolSnippets : undefined,
       guidelines: DEFAULT_GUIDELINES,
       workspace: workspaceSection,

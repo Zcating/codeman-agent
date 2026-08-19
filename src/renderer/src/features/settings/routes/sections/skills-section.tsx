@@ -1,7 +1,7 @@
 import { Show, For, type JSX } from "solid-js";
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
 import { settingsSaver } from "@codeman-frontend/features/settings/lib/settings-saver";
-import { skillsManifests$ } from "@codeman-frontend/plugins/skills/stores/skills.store";
+import { skillsManifests$ } from "@codeman-frontend/features/skills/stores/skills.store";
 import { CodemanCheckbox } from "@codeman-frontend/shared/components/internal/codeman-checkbox";
 import { CheckCircle2, Package, XCircle } from "lucide-solid";
 import { ScrollArea } from "@codeman-frontend/shared/components/ui/scrollarea";

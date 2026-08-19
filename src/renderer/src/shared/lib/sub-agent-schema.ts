@@ -36,3 +36,5 @@ export const SubAgentConfigSchema: Schema.Schema<SubAgentConfig> = Schema.Struct
   createdAt: Schema.Number,
   updatedAt: Schema.Number,
 });
+
+export type SubAgentId = string;

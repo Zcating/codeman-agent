@@ -8,7 +8,7 @@ export {
   type RuntimeEvent,
   type ProviderConfig,
   type RunOptions,
-} from "@codeman-frontend/features/chat/lib/runtime";
+} from "@codeman-frontend/core/llm/runtime";
 
 export * as chatStore from "@codeman-frontend/features/chat/stores/chat.store";
 

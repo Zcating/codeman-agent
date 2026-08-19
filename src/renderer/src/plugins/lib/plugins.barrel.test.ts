@@ -4,22 +4,8 @@ import { Effect } from "effect";
 import {
   getRegistryState,
   getPluginMetadata,
-  initializeAll,
   type PluginDescriptor,
 } from "@codeman-frontend/plugins";
-
-
-const EXPECTED_SKILLS_DESCRIPTOR = {
-  id: "skills" as const,
-  route: { path: "/plugins/skills", label: "Skills" },
-  sidebar: { icon: "WandSparkles", order: 3, visible: true },
-} as const;
-
-const EXPECTED_MCP_DESCRIPTOR = {
-  id: "mcp" as const,
-  route: { path: "/plugins/mcp", label: "MCP" },
-  sidebar: { icon: "Cable", order: 4, visible: true },
-} as const;
 
 
 describe("plugins barrel", () => {
@@ -37,12 +23,6 @@ describe("plugins barrel", () => {
       expect(metadata instanceof Map).toBe(true);
     });
 
-    it("re-exports initializeAll from registry core", () => {
-      const effect = initializeAll();
-      expect(effect).toBeDefined();
-      expect(typeof effect).toBe("object");
-    });
-
     it("re-exports PluginDescriptor type", () => {
       const descriptor: PluginDescriptor = {
         id: "test",
@@ -54,110 +34,55 @@ describe("plugins barrel", () => {
     });
   });
 
-  describe("skills descriptor registration", () => {
-    it("skills plugin is registered in the registry", () => {
+  describe("automations descriptor registration", () => {
+    it("automations plugin is registered in the registry", () => {
       const state = getRegistryState()();
-      expect(state.plugins.has("skills")).toBe(true);
+      expect(state.plugins.has("automations")).toBe(true);
     });
 
-    it("skills descriptor has exact route metadata", () => {
+    it("automations descriptor has correct route metadata", () => {
       const metadata = getPluginMetadata();
-      const skillsMeta = metadata.get("skills");
-      expect(skillsMeta).toBeDefined();
-      expect(skillsMeta?.route.path).toBe(EXPECTED_SKILLS_DESCRIPTOR.route.path);
-      expect(skillsMeta?.route.label).toBe(EXPECTED_SKILLS_DESCRIPTOR.route.label);
+      const automationsMeta = metadata.get("automations");
+      expect(automationsMeta).toBeDefined();
+      expect(automationsMeta?.route.path).toBe("/plugins/automations");
+      expect(automationsMeta?.route.label).toBe("Automations");
     });
 
-    it("skills descriptor has exact sidebar metadata", () => {
+    it("automations descriptor has correct sidebar metadata", () => {
       const metadata = getPluginMetadata();
-      const skillsMeta = metadata.get("skills");
-      expect(skillsMeta).toBeDefined();
-      expect(skillsMeta?.sidebar.icon).toBe(EXPECTED_SKILLS_DESCRIPTOR.sidebar.icon);
-      expect(skillsMeta?.sidebar.order).toBe(EXPECTED_SKILLS_DESCRIPTOR.sidebar.order);
-      expect(skillsMeta?.sidebar.visible).toBe(EXPECTED_SKILLS_DESCRIPTOR.sidebar.visible);
+      const automationsMeta = metadata.get("automations");
+      expect(automationsMeta).toBeDefined();
+      expect(automationsMeta?.sidebar.icon).toBe("Clock");
+      expect(automationsMeta?.sidebar.order).toBe(5);
+      expect(automationsMeta?.sidebar.visible).toBe(true);
     });
 
-    it("skills initialize effect is typed as Effect<void, AppError>", () => {
+    it("automations initialize effect is typed as Effect<void, AppError>", () => {
       const state = getRegistryState()();
-      const skillsPlugin = state.plugins.get("skills");
-      expect(skillsPlugin).toBeDefined();
-      expect(skillsPlugin?.status).toBe("pending");
+      const automationsPlugin = state.plugins.get("automations");
+      expect(automationsPlugin).toBeDefined();
+      expect(automationsPlugin?.status).toBe("pending");
     });
   });
 
-  describe("mcp descriptor registration", () => {
-    it("mcp plugin is registered in the registry", () => {
+  describe("skills and mcp moved to features (not in registry)", () => {
+    it("skills is NOT registered in the registry (moved to features)", () => {
       const state = getRegistryState()();
-      expect(state.plugins.has("mcp")).toBe(true);
+      expect(state.plugins.has("skills")).toBe(false);
     });
 
-    it("mcp descriptor has exact route metadata", () => {
-      const metadata = getPluginMetadata();
-      const mcpMeta = metadata.get("mcp");
-      expect(mcpMeta).toBeDefined();
-      expect(mcpMeta?.route.path).toBe(EXPECTED_MCP_DESCRIPTOR.route.path);
-      expect(mcpMeta?.route.label).toBe(EXPECTED_MCP_DESCRIPTOR.route.label);
-    });
-
-    it("mcp descriptor has exact sidebar metadata", () => {
-      const metadata = getPluginMetadata();
-      const mcpMeta = metadata.get("mcp");
-      expect(mcpMeta).toBeDefined();
-      expect(mcpMeta?.sidebar.icon).toBe(EXPECTED_MCP_DESCRIPTOR.sidebar.icon);
-      expect(mcpMeta?.sidebar.order).toBe(EXPECTED_MCP_DESCRIPTOR.sidebar.order);
-      expect(mcpMeta?.sidebar.visible).toBe(EXPECTED_MCP_DESCRIPTOR.sidebar.visible);
-    });
-
-    it("mcp initialize effect is typed as Effect<void, AppError>", () => {
+    it("mcp is NOT registered in the registry (moved to features)", () => {
       const state = getRegistryState()();
-      const mcpPlugin = state.plugins.get("mcp");
-      expect(mcpPlugin).toBeDefined();
-      expect(mcpPlugin?.status).toBe("pending");
+      expect(state.plugins.has("mcp")).toBe(false);
     });
-  });
-
-  describe("initialization effects", () => {
-    it.effect("skills initialize effect can execute successfully", () =>
-      Effect.gen(function* () {
-        const state = getRegistryState()();
-        const plugin = state.plugins.get("skills");
-        expect(plugin).toBeDefined();
-        if (plugin && plugin.status === "pending") {
-          const result = yield* initializeAll();
-          expect(result.ok).toBe(true);
-        }
-      }),
-    );
-
-    it.effect("mcp initialize effect can execute successfully", () =>
-      Effect.gen(function* () {
-        const state = getRegistryState()();
-        const plugin = state.plugins.get("mcp");
-        expect(plugin).toBeDefined();
-        if (plugin && plugin.status === "pending") {
-          const result = yield* initializeAll();
-          expect(result.ok).toBe(true);
-        }
-      }),
-    );
-
-    it.effect("initializeAll captures failures without blocking other plugins", () =>
-      Effect.gen(function* () {
-        const result = yield* initializeAll();
-        expect(result.ok).toBe(true);
-        expect(result.failures instanceof Map).toBe(true);
-      }),
-    );
   });
 
   describe("idempotent registration", () => {
-    it("no duplicate registration on repeated import — both plugins present", () => {
+    it("no duplicate registration on repeated import — automations present once", () => {
       const state = getRegistryState()();
       const pluginIds = Array.from(state.plugins.keys());
-      const skillsCount = pluginIds.filter((id) => id === "skills").length;
-      const mcpCount = pluginIds.filter((id) => id === "mcp").length;
-      expect(skillsCount).toBe(1);
-      expect(mcpCount).toBe(1);
+      const automationsCount = pluginIds.filter((id) => id === "automations").length;
+      expect(automationsCount).toBe(1);
     });
   });
 });

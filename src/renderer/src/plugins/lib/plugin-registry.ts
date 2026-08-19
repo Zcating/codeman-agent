@@ -74,27 +74,6 @@ class PluginRegistryImpl {
   private _stateSignal = createSignal<RegistryState>({ plugins: new Map() });
 
   constructor() {
-    this.registerBuiltin({
-      id: "skills",
-      initialize: Effect.void,
-      route: { path: "/plugins/skills", label: "Skills" },
-      sidebar: { icon: "WandSparkles", order: 3, visible: true },
-    });
-    this.registerBuiltin({
-      id: "mcp",
-      initialize: Effect.void,
-      route: { path: "/plugins/mcp", label: "MCP" },
-      sidebar: { icon: "Cable", order: 4, visible: true },
-    });
-  }
-
-  private registerBuiltin(descriptor: PluginDescriptor): void {
-    const pendingState: PluginState = Object.freeze({ status: "pending" });
-    this.plugins.set(descriptor.id, {
-      descriptor,
-      state: pendingState,
-    });
-    this.notifyStateChange();
   }
 
   registerPlugin(descriptor: PluginDescriptor): void {

@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from "vitest";
-import { createProviderFromConfig, findDefaultModel } from "./pi-provider-adapter";
+import { createProviderFromConfig, findDefaultModel } from "@codeman-frontend/core/llm/pi-provider-adapter";
 import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 
 const models: ModelMeta[] = [
