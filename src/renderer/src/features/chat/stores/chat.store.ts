@@ -60,6 +60,10 @@ export interface ConversationState {
 
   /** AGENTS.md content, loaded once per session */
   projectInstructions: string | null;
+
+  /** Session-level provider/model selection (transient, not persisted). null = use global settings default. */
+  sessionProviderId?: string | null;
+  sessionModelId?: string | null;
 }
 
 
@@ -122,6 +126,25 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
 }
 
 
+export function setConvModel(convId: string, providerId: string | null, modelId: string | null): void {
+  if (!store.byId[convId]) { return; }
+  setStore("byId", convId, "sessionProviderId", providerId);
+  setStore("byId", convId, "sessionModelId", modelId);
+}
+
+
+const [homeSelectedProviderId, setHomeSelectedProviderIdSignal] = createSignal<string | null>(null);
+export const homeSelectedProviderId$: Accessor<string | null> = homeSelectedProviderId;
+
+const [homeSelectedModelId, setHomeSelectedModelIdSignal] = createSignal<string | null>(null);
+export const homeSelectedModelId$: Accessor<string | null> = homeSelectedModelId;
+
+export function selectHomeModel(providerId: string, modelId: string): void {
+  setHomeSelectedProviderIdSignal(providerId);
+  setHomeSelectedModelIdSignal(modelId);
+}
+
+
 const persistUserMessage = Effect.fn(
   function* (msg: Message) {
     const svc = yield* MessageApi;
@@ -152,7 +175,7 @@ const persistAssistantMessage = Effect.fn(
 
 
 export const sendMessage = Effect.fn(
-  function* (convId: string, content: string, provider: ProviderConfig, _thinkingLevel?: ThinkingLevel) {
+  function* (convId: string, content: string, provider: ProviderConfig, thinkingLevel?: ThinkingLevel) {
     const cs = store.byId[convId];
     if (!cs) {
       return;
@@ -176,7 +199,12 @@ export const sendMessage = Effect.fn(
 
     const settings = appStore.state.value;
     const convState = store.byId[convId];
-    if (!convState) return;
+    if (!convState) { return; }
+
+    const sessionProviderId = convState.sessionProviderId ?? settings.defaultLlmProviderId;
+    const sessionModelId = convState.sessionModelId ?? provider.defaultModel;
+    const sessionProviders = settings.providers ?? [];
+    const sessionProviderConfig = sessionProviders.find((p) => p.id === sessionProviderId);
 
     if (settings.compaction.prune) {
       const pruned = pruneOldToolOutputs(convState.messages);
@@ -187,9 +215,8 @@ export const sendMessage = Effect.fn(
     }
 
     if (settings.compaction.enabled) {
-      const providerConfig = settings.providers?.find((p) => p.id === settings.defaultLlmProviderId);
-      const contextWindow = providerConfig?.llm?.contextWindow ?? 128000;
-      const model = providerConfig?.llm?.defaultModel ?? "claude";
+      const contextWindow = sessionProviderConfig?.llm?.contextWindow ?? 128000;
+      const model = sessionModelId;
       const messages = convState.messages;
       const budget = contextWindow - settings.compaction.reserveTokens;
 
@@ -226,10 +253,8 @@ export const sendMessage = Effect.fn(
       (m) => enabledNames.includes(m.name),
     );
 
-    // Workspace lookup (single call; used for both projectInstructions loading and workspaceSection)
     const workspace = cs.workspaceId ? workspaces$().find((w) => w.id === cs.workspaceId) : null;
 
-    // Load projectInstructions once per session if workspace exists and not yet loaded
     if (cs.projectInstructions === null && workspace) {
       const loaded = yield* loadProjectInstructions(cs.workspaceId).pipe(
         Effect.provide(FileApiLive),
@@ -237,15 +262,12 @@ export const sendMessage = Effect.fn(
       setStore("byId", convId, "projectInstructions", loaded);
     }
 
-    // ── Dynamic tool snippets from MCP servers ───────────────────────────────
     const dynamicToolSnippets: readonly string[] = mcpAllTools$().map((t) => t.description);
 
-    // ── Workspace context ───────────────────────────────────────────────────
     const workspaceSection = workspace
       ? { workspaceId: cs.workspaceId, rootPath: workspace.rootPath }
       : undefined;
 
-    // ── Build system prompt via ADR-0051 assembler ──────────────────────────
     const finalSystemPrompt = buildSystemPrompt({
       identity: DEFAULT_IDENTITY,
       staticToolSnippets: DEFAULT_TOOL_SNIPPETS,
@@ -260,12 +282,14 @@ export const sendMessage = Effect.fn(
 
     const augmentedProvider: ProviderConfig = {
       ...provider,
+      id: sessionProviderId ?? provider.id,
+      defaultModel: sessionModelId,
       workspaceId: cs.workspaceId || undefined,
       enabledSkills,
       systemPrompt: finalSystemPrompt,
     };
 
-    const stream = cs.runtime.run({ context, provider: augmentedProvider });
+    const stream = cs.runtime.run({ context, provider: augmentedProvider, thinkingLevel });
     yield* Stream.runForEach(stream, (evt) =>
       Effect.sync(() => handleEvent(convId, evt)),
     ).pipe(Effect.scoped);

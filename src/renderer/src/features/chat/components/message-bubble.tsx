@@ -51,7 +51,16 @@ export function MessageBubble(props: { message: Message }) {
   });
 
   return (
-    <Show when={!isHidden()}>
+    <Show when={!isHidden()} fallback={
+      <div class="my-3 flex items-center gap-2" data-testid="compaction-marker">
+        <hr class="flex-1 border-border" />
+        <span class="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">
+          <Zap class="h-3 w-3" aria-hidden="true" />
+          上下文压缩
+        </span>
+        <hr class="flex-1 border-border" />
+      </div>
+    }>
       <div class={`mb-3 flex w-full ${role() === "user" ? "justify-end" : "justify-start"}`}>
         <Show when={role() === "user"}>
           <div

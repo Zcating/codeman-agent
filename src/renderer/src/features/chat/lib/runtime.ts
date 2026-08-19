@@ -6,6 +6,7 @@ import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 import { logger } from "@codeman-frontend/shared/lib/logger";
 import { anthropicStream } from "./anthropic-stream-fn";
 import { createProviderFromConfig, findDefaultModel } from "./pi-provider-adapter";
+import type { ThinkingLevel } from "@codeman-frontend/shared/lib/sub-agent-schema";
 import { Agent, type AgentEvent, type AgentTool } from "@earendil-works/pi-agent-core";
 import { createFileTools } from "@codeman-frontend/tools/file-ops";
 import { webfetchTool } from "@codeman-frontend/tools/webfetch";
@@ -105,6 +106,7 @@ export interface ProviderConfig {
 export interface RunOptions {
   context: Message[];
   provider: ProviderConfig;
+  thinkingLevel?: ThinkingLevel;
 }
 
 export interface CreateAgentRuntimeOptions {}
@@ -279,7 +281,7 @@ export function createAgentRuntime(_options: CreateAgentRuntimeOptions = {}): Ag
   let currentAgent: Agent | null = null;
 
   return {
-    run({ context, provider }: RunOptions): Stream.Stream<RuntimeEvent, never, never> {
+    run({ context, provider, thinkingLevel }: RunOptions): Stream.Stream<RuntimeEvent, never, never> {
       return Stream.async<RuntimeEvent, never>((emit) => {
         const validation = validateProvider(provider);
         if (!validation.ok) {
@@ -333,7 +335,7 @@ export function createAgentRuntime(_options: CreateAgentRuntimeOptions = {}): Ag
           initialState: {
             systemPrompt: provider.systemPrompt,
             model,
-            thinkingLevel: "medium",
+            thinkingLevel: thinkingLevel ?? "medium",
             tools,
             messages: toPiMessages(context, model),
           },
