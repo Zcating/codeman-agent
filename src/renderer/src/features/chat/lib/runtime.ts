@@ -1,5 +1,5 @@
 
-import { Effect, Exit, Stream } from "effect";
+import { Effect, Stream } from "effect";
 import { match } from "ts-pattern";
 import type { Message, ModelMeta } from "@codeman-frontend/shared/lib/types";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
@@ -7,14 +7,10 @@ import { logger } from "@codeman-frontend/shared/lib/logger";
 import { anthropicStream } from "./anthropic-stream-fn";
 import { createProviderFromConfig, findDefaultModel } from "./pi-provider-adapter";
 import type { ThinkingLevel } from "@codeman-frontend/shared/lib/sub-agent-schema";
-import { Agent, type AgentEvent, type AgentTool } from "@earendil-works/pi-agent-core";
-import { createFileTools } from "@codeman-frontend/tools/file-ops";
-import { webfetchTool } from "@codeman-frontend/tools/webfetch";
-import { runCommandTool } from "@codeman-frontend/tools/run-command";
-import { loadSkillTool } from "@codeman-frontend/plugins/skills/lib/skill-meta-tool";
+import { Agent, type AgentEvent } from "@earendil-works/pi-agent-core";
+import { buildToolSet, computeToolTypes } from "@codeman-frontend/core/llm/llm-tools-factory";
+import type { ToolType } from "@codeman-frontend/core/tools/tool-type";
 import { mcpAllTools$ } from "@codeman-frontend/plugins/mcp/stores/store";
-import type { McpToolEntry } from "@codeman-frontend/shared/lib/types";
-import { McpApi, McpApiLive } from "@codeman-frontend/shared/apis";
 import {
   isTextBlock,
   isThinkingBlock,
@@ -24,55 +20,8 @@ import {
 import { validateProvider } from "@codeman-frontend/features/chat/lib/runtime-validate-provider";
 import { extractToolErrorText } from "@codeman-frontend/features/chat/lib/runtime-tool-error";
 import { toPiMessages } from "@codeman-frontend/features/chat/lib/runtime-to-pi-messages";
-import { AppError } from "@codeman-frontend/shared/lib/errors";
-import type { TSchema } from "@sinclair/typebox";
 import { subAgentsStore } from "@codeman-frontend/plugins/multi-agents/stores/sub-agents.store";
-import { buildDelegateTaskTool } from "@codeman-frontend/plugins/multi-agents/lib/delegate-task-tool";
 import { subAgentsStreamStore } from "@codeman-frontend/plugins/multi-agents/stores/sub-agents-stream.store";
-
-
-function buildMcpTools(entries: readonly McpToolEntry[]): AgentTool<TSchema, unknown>[] {
-  return entries.map((entry) => ({
-    label: entry.agentName,
-    name: entry.agentName,
-    description: entry.description,
-    parameters: entry.inputSchema as TSchema,
-    execute: async (_toolCallId: string, args: unknown): Promise<{ content: Array<{ type: "text"; text: string }>; details: unknown }> => {
-      const callToolEffect = Effect.gen(function* () {
-        const svc = yield* McpApi;
-        return yield* svc.callTool(entry.serverName, entry.toolName, args as Record<string, unknown>);
-      }).pipe(Effect.provide(McpApiLive));
-
-      const exit = await Effect.runPromiseExit(callToolEffect);
-      if (Exit.isFailure(exit)) {
-        const cause = exit.cause;
-        const err: AppError =
-          cause._tag === "Fail"
-            ? (cause.error as AppError)
-            : ({ _tag: "Unknown", message: String(cause) } as AppError);
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `MCP tool error (${err._tag}): ${"message" in err ? err.message : JSON.stringify(err)}`,
-            },
-          ],
-          details: err,
-        };
-      }
-      const result = exit.value as { content: Array<{ type: string; text?: string;[k: string]: unknown }> };
-      return {
-        content: result.content.map((block) => {
-          if (block.type === "text" && block.text !== undefined) {
-            return { type: "text" as const, text: block.text };
-          }
-          return { type: "text" as const, text: JSON.stringify(block) };
-        }),
-        details: result,
-      };
-    },
-  }));
-}
 
 
 export type RuntimeEvent =
@@ -114,6 +63,7 @@ export interface CreateAgentRuntimeOptions {}
 export interface AgentRuntime {
   run(opts: RunOptions): Stream.Stream<RuntimeEvent, never, never>;
   cancel(): void;
+  readonly toolTypes: readonly ToolType[];
 }
 
 
@@ -280,7 +230,14 @@ function handleAgentEnd(
 export function createAgentRuntime(_options: CreateAgentRuntimeOptions = {}): AgentRuntime {
   let currentAgent: Agent | null = null;
 
+  const toolTypes = computeToolTypes({
+    mcpEntries: mcpAllTools$(),
+    enabledSubAgents: Object.values(subAgentsStore.state.byId).filter((s) => s.enabled),
+  });
+
   return {
+    toolTypes,
+
     run({ context, provider, thinkingLevel }: RunOptions): Stream.Stream<RuntimeEvent, never, never> {
       return Stream.async<RuntimeEvent, never>((emit) => {
         const validation = validateProvider(provider);
@@ -299,16 +256,6 @@ export function createAgentRuntime(_options: CreateAgentRuntimeOptions = {}): Ag
         });
         const model = findDefaultModel(piProvider, provider.defaultModel);
 
-        const fileTools = createFileTools(provider.workspaceId);
-        const mcpTools = buildMcpTools(mcpAllTools$());
-        const baseTools = [...fileTools, webfetchTool, runCommandTool, ...mcpTools, loadSkillTool];
-
-        // Build tool registry Map for delegate_task tool (sub-agents can use run_command per)
-        const toolRegistry = new Map<string, AgentTool>(
-          baseTools.map((t) => [t.name, t]),
-        );
-
-        // Conditionally add delegate_task tool if there are enabled sub-agents
         const enabledSubAgents = Object.values(subAgentsStore.state.byId).filter((s) => s.enabled);
         const onStreamEvent = (event: AgentEvent, toolCallId: string, subAgentId: string): void => {
           if (event.type === "agent_start") {
@@ -326,17 +273,20 @@ export function createAgentRuntime(_options: CreateAgentRuntimeOptions = {}): Ag
             }
           }
         };
-        const delegateTaskTool = enabledSubAgents.length > 0
-          ? buildDelegateTaskTool(enabledSubAgents, provider, toolRegistry, onStreamEvent)
-          : null;
-        const tools = delegateTaskTool ? [...baseTools, delegateTaskTool] : baseTools;
+        const { tools: builtTools } = buildToolSet({
+          workspaceId: provider.workspaceId ?? "",
+          mcpEntries: mcpAllTools$(),
+          enabledSubAgents,
+          baseProvider: provider,
+          onSubAgentEvent: onStreamEvent,
+        });
 
         const agent = new Agent({
           initialState: {
             systemPrompt: provider.systemPrompt,
             model,
             thinkingLevel: thinkingLevel ?? "medium",
-            tools,
+            tools: builtTools,
             messages: toPiMessages(context, model),
           },
           streamFn: anthropicStream,
