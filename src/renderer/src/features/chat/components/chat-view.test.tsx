@@ -156,6 +156,10 @@ vi.mock("../stores/chat.store", () => ({
   pendingPermissions$: vi.fn(() => [] as unknown[]),
   addPendingPermission: vi.fn(),
   resolvePendingPermission: vi.fn(),
+  setConvModel: vi.fn(),
+  homeSelectedProviderId$: vi.fn(() => null),
+  homeSelectedModelId$: vi.fn(() => null),
+  selectHomeModel: vi.fn(),
 }));
 
 vi.mock("../../../shared/stores/app.store", () => {
@@ -344,8 +348,9 @@ describe("ChatView", () => {
   it.skip("切换 provider 触发 appStore.set + settingsSaver.scheduleSave", async () => {
   });
 
-  it("Bug: 选择非首项模型 MiniMax-M2.7 后，llm.defaultModel 应为 MiniMax-M2.7（不弹回首项）", async () => {
+  it("Bug: 选择非首项模型 MiniMax-M2.7 后，setConvModel 应被调 (per CHANGELOG 8e96ea4, 不写全局 settings)", async () => {
     const { appStore } = await import("@codeman-frontend/shared/stores/app.store");
+    const chatStore = await import("../stores/chat.store");
     appStore.set({
       providers: [
         {
@@ -377,8 +382,9 @@ describe("ChatView", () => {
     expect(m27Option).toBeTruthy();
     m27Option.click();
 
+    expect(chatStore.setConvModel).toHaveBeenCalledWith("conv-1", "minimax", "MiniMax-M2.7");
     const minimaxProvider = appStore.state.value.providers?.find((p) => p.id === "minimax");
-    expect(minimaxProvider?.llm?.defaultModel).toBe("MiniMax-M2.7");
+    expect(minimaxProvider?.llm?.defaultModel).toBe("MiniMax-M2.5-highspeed");
   });
 
   it("无 enabled provider 时显示空状态链接到 /settings", async () => {

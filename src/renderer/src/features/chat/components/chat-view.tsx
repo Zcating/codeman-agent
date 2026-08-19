@@ -4,7 +4,7 @@ import { Square, Send } from "lucide-solid";
 import { createForm } from "@tanstack/solid-form";
 import { MessageBubble } from "@codeman-frontend/features/chat/components/message-bubble";
 import { PermissionBar } from "@codeman-frontend/features/chat/components/permission-bar";
-import { store, sendMessage, cancel, pendingPermissions$, addPendingPermission, resolvePendingPermission } from "@codeman-frontend/features/chat/stores/chat.store";
+import { store, sendMessage, cancel, pendingPermissions$, addPendingPermission, resolvePendingPermission, setConvModel } from "@codeman-frontend/features/chat/stores/chat.store";
 import { doCompact, type DoCompactDeps } from "@codeman-frontend/features/chat/lib/compaction";
 import { ParallelPanel } from "@codeman-frontend/plugins/multi-agents/components/parallel-panel";
 import { subAgentsStreamStore } from "@codeman-frontend/plugins/multi-agents/stores/sub-agents-stream.store";
@@ -21,7 +21,6 @@ import { codemanToast } from "@codeman-frontend/shared/components/internal/codem
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
 import { formatAppError } from "@codeman-frontend/shared/lib/format-app-error";
 import { effectSchema, firstErrorMessage } from "@codeman-frontend/shared/lib/effect-schema-adapter";
-import { settingsSaver } from "@codeman-frontend/features/settings/lib/settings-saver";
 import { buildEnabledProviders } from "@codeman-frontend/features/chat/lib/build-enabled-providers";
 import { lookupContextWindow } from "@codeman-frontend/features/chat/lib/context-window-fallback";
 import {
@@ -93,6 +92,8 @@ export function ChatView(props: { convId?: string }): JSX.Element {
   let messagesEndRef: HTMLDivElement | undefined;
 
   const [thinkingLevel, setThinkingLevel] = createSignal<ThinkingLevel>("medium");
+
+  const [compacting, setCompacting] = createSignal(false);
 
   createEffect(() => {
     const agentId = subAgentsStore.selectedId();
@@ -216,6 +217,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
   const handleCompactNow = () => {
     const id = convId();
     if (!id) { return; }
+    if (compacting() || isRunning()) { return; }
     const cs = store.byId[id];
     if (!cs) { return; }
     const settings = appStore.state.value;
@@ -234,6 +236,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
       writeSuccessPair: async () => {},
     };
 
+    setCompacting(true);
     void doCompact(
       id,
       {
@@ -252,6 +255,8 @@ export function ChatView(props: { convId?: string }): JSX.Element {
       if ("reason" in result) {
         codemanToast.error(`压缩失败: ${result.reason}`);
       }
+    }).finally(() => {
+      setCompacting(false);
     });
   };
 
@@ -365,16 +370,8 @@ export function ChatView(props: { convId?: string }): JSX.Element {
                       p.models.some((m) => m.id === modelId),
                     );
                     if (provider) {
-                      const updatedProviders = providers.map((p) =>
-                        p.id === provider.id
-                          ? { ...p, llm: { ...p.llm, defaultModel: modelId } }
-                          : p,
-                      );
-                      appStore.set({
-                        providers: updatedProviders,
-                        defaultLlmProviderId: provider.id,
-                      });
-                      settingsSaver.scheduleSave();
+                      const id = convId();
+                      if (id) { setConvModel(id, provider.id, modelId); }
                     }
                   }}
                 />
@@ -408,6 +405,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
                 percentage={ringInfo().percentage}
                 usedTokens={ringInfo().used}
                 totalTokens={ringInfo().total}
+                compacting={compacting()}
                 onCompact={handleCompactNow}
               />
 

@@ -16,7 +16,7 @@ ADR-0039 D4 (2026-08-01) 锁定 main-side 域模块布局规则:
 > 模块位置: `src/main/features/<domain>/ipc.ts`
 > 所有 6 个 register 函数位于 `src/main/features/<domain>/ipc.ts`,与 webfetch 既有 `src/main/features/webfetch/` 结构对齐。
 
-执行 ADR-0039 + ADR-0040 + ADR-0041 之后,main-side features 一览:
+执行 ADR-0039 + ADR-0041 之后,main-side features 一览:
 
 ```
 src/main/features/

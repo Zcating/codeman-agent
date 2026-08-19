@@ -19,10 +19,12 @@ import {
   addWorkspace,
   createConversation,
   sendMessage,
+  selectHomeModel,
+  homeSelectedProviderId$,
+  homeSelectedModelId$,
 } from "@codeman-frontend/features/chat/stores/chat.store";
 import type { ProviderConfig } from "@codeman-frontend/features/chat/lib/runtime";
 import { buildEnabledProviders } from "@codeman-frontend/features/chat/lib/build-enabled-providers";
-import { settingsSaver } from "@codeman-frontend/features/settings/lib/settings-saver";
 import {
   handleArrowUpField,
   handleArrowDownField,
@@ -105,14 +107,14 @@ export function HomeAgentForm(): JSX.Element {
       const text = value.draft.trim();
       const wsId = value.workspaceId;
 
-      const providerId = appStore.state.value.defaultLlmProviderId;
+      const providerId = homeSelectedProviderId$() ?? appStore.state.value.defaultLlmProviderId;
       const providerConfig = appStore.state.value.providers?.find((p) => p.id === providerId);
       const provider: ProviderConfig = {
         id: providerConfig?.id ?? "",
         models: providerConfig?.llm?.models ?? [],
         apiKey: providerConfig?.apiKey,
         baseUrl: providerConfig?.llm?.baseUrl ?? "",
-        defaultModel: providerConfig?.llm?.defaultModel ?? "auto",
+        defaultModel: homeSelectedModelId$() ?? providerConfig?.llm?.defaultModel ?? "auto",
         systemPrompt: appStore.state.value.systemPrompt?.default ?? "",
         tools: [],
       };
@@ -165,6 +167,49 @@ export function HomeAgentForm(): JSX.Element {
         <div class="text-center space-y-2">
           <h1 class="text-3xl font-semibold tracking-tight">codeman-agent</h1>
           <p class="text-sm text-muted-foreground">选个 workspace,开始新对话</p>
+        </div>
+
+        <div class="flex items-center gap-2 rounded-2xl border border-border bg-card px-3 py-2 shadow-md">
+          <span class="text-xs font-medium text-muted-foreground whitespace-nowrap">当前工作区</span>
+          <form.Field
+            name="workspaceId"
+            validators={{ onBlur: effectSchema(WorkspaceIdFieldSchema) }}
+          >
+            {(field) => (
+              <div class="w-[200px]">
+                <CodemanSelect
+                  options={workspaces().map((w) => ({ label: w.label, value: w.id }))}
+                  value={field().state.value}
+                  onChange={(id) => {
+                    field().handleChange(id);
+                    setSelectedWorkspaceId(id);
+                  }}
+                  placeholder="Select a workspace…"
+                  disabled={false}
+                  data-testid="workspace-select"
+                >
+                  <button
+                    type="button"
+                    data-testid="workspace-select-add-btn"
+                    class="w-full px-3 py-2 text-left text-sm hover:bg-accent"
+                    onClick={async () => {
+                      const exit = await Effect.runPromiseExit(addWorkspace());
+                      if (Exit.isFailure(exit)) {
+                        codemanToast.error(formatAppError(exit.cause));
+                        return;
+                      }
+                      const ws = exit.value as { id: string } | null;
+                      if (!ws) {return;}
+                      field().handleChange(ws.id);
+                      setSelectedWorkspaceId(ws.id);
+                    }}
+                  >
+                    + Add new workspace…
+                  </button>
+                </CodemanSelect>
+              </div>
+            )}
+          </form.Field>
         </div>
 
         <form
@@ -224,46 +269,6 @@ export function HomeAgentForm(): JSX.Element {
 
           <div class="flex items-center gap-2 px-3 pb-2.5 pt-1">
             <form.Field
-              name="workspaceId"
-              validators={{ onBlur: effectSchema(WorkspaceIdFieldSchema) }}
-            >
-              {(field) => (
-                <div class="w-[200px]">
-                  <CodemanSelect
-                    options={workspaces().map((w) => ({ label: w.label, value: w.id }))}
-                    value={field().state.value}
-                    onChange={(id) => {
-                      field().handleChange(id);
-                      setSelectedWorkspaceId(id);
-                    }}
-                    placeholder="Select a workspace…"
-                    disabled={false}
-                    data-testid="workspace-select"
-                  >
-                    <button
-                      type="button"
-                      data-testid="workspace-select-add-btn"
-                      class="w-full px-3 py-2 text-left text-sm hover:bg-accent"
-                      onClick={async () => {
-                        const exit = await Effect.runPromiseExit(addWorkspace());
-                        if (Exit.isFailure(exit)) {
-                          codemanToast.error(formatAppError(exit.cause));
-                          return;
-                        }
-                        const ws = exit.value as { id: string } | null;
-                        if (!ws) {return;}
-                        field().handleChange(ws.id);
-                        setSelectedWorkspaceId(ws.id);
-                      }}
-                    >
-                      + Add new workspace…
-                    </button>
-                  </CodemanSelect>
-                </div>
-              )}
-            </form.Field>
-
-            <form.Field
               name="modelId"
               validators={{ onBlur: effectSchema(ModelIdFieldSchema) }}
             >
@@ -277,16 +282,7 @@ export function HomeAgentForm(): JSX.Element {
                       p.models.some((m) => m.id === modelId),
                     );
                     if (provider) {
-                      const updatedProviders = providers.map((p) =>
-                        p.id === provider.id
-                          ? { ...p, llm: { ...p.llm, defaultModel: modelId } }
-                          : p,
-                      );
-                      appStore.set({
-                        providers: updatedProviders,
-                        defaultLlmProviderId: provider.id,
-                      });
-                      settingsSaver.scheduleSave();
+                      selectHomeModel(provider.id, modelId);
                     }
                   }}
                 />

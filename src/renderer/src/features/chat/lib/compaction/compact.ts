@@ -30,6 +30,7 @@ export interface CompactError {
 
 export interface DoCompactDeps {
   readonly callSummarize: (prompt: string) => Promise<{ ok: true; summary: string } | { ok: false; reason: string }>;
+  readonly callSummarizeStream?: (prompt: string, onChunk: (chunk: string) => void) => Promise<{ ok: true; summary: string } | { ok: false; reason: string }>;
   readonly writeSuccessPair: (args: {
     conversationId: string;
     summary: string;
@@ -38,6 +39,7 @@ export interface DoCompactDeps {
     tokensBefore: number;
     kind: "auto" | "manual";
   }) => Promise<void>;
+  readonly writeStreamingSummary?: (args: { conversationId: string; delta: string; morph: boolean }) => void;
 }
 
 function findLastSummary(messages: readonly Message[]): string | null {
@@ -87,7 +89,14 @@ export async function doCompact(
   const buildPromptInput: BuildPromptInput = { previousSummary, messages: messagesToSummarize };
   const prompt = buildPrompt(buildPromptInput);
 
-  const summarizeResult = await deps.callSummarize(prompt);
+  let summarizeResult: { ok: true; summary: string } | { ok: false; reason: string };
+  if (deps.callSummarizeStream && deps.writeStreamingSummary) {
+    summarizeResult = await deps.callSummarizeStream(prompt, (delta) => {
+      deps.writeStreamingSummary!({ conversationId: convId, delta, morph: true });
+    });
+  } else {
+    summarizeResult = await deps.callSummarize(prompt);
+  }
   if (!summarizeResult.ok) {
     return { reason: summarizeResult.reason as CompactError["reason"] };
   }

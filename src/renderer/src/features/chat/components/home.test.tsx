@@ -160,6 +160,10 @@ vi.mock("../stores/chat.store", () => {
     cancel: vi.fn(),
     loadConversations: vi.fn(),
     clearActiveConversation: vi.fn(),
+    homeSelectedProviderId$: vi.fn<() => string | null>(() => null),
+    homeSelectedModelId$: vi.fn<() => string | null>(() => null),
+    selectHomeModel: vi.fn(),
+    setConvModel: vi.fn(),
   };
 });
 
@@ -450,7 +454,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
     cleanup();
   });
 
-  it("T4.2.1: 新布局 — textarea 在 workspace picker 之前 (DOM 顺序)", async () => {
+  it("T4.2.1: 新布局 — workspace picker 上移到 textarea 之上 (per CHANGELOG 6333b8c)", async () => {
     mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
 
     const { container } = render(() => <HomeAgentForm />);
@@ -463,8 +467,8 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
 
     const allChildren = Array.from(container.querySelectorAll("[data-testid]"));
     const textareaIdx = allChildren.findIndex(el => el.getAttribute("data-testid") === "codex-input");
-    const wsTriggerIdx = allChildren.findIndex(el => el.getAttribute("data-testid") === "workspace-select-trigger");
-    expect(textareaIdx).toBeLessThan(wsTriggerIdx);
+    const wsIdx = allChildren.findIndex(el => el.getAttribute("data-testid") === "workspace-select-trigger");
+    expect(wsIdx).toBeLessThan(textareaIdx);
   });
 
   it("T4.2.2: workspace picker 200px 固定宽度", async () => {
@@ -600,9 +604,9 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
     expect(options.length).toBe(2);
   });
 
-  it("T4.2.8: LLM picker 选中 → 写 defaultLlmProviderId + scheduleSave", async () => {
+  it("T4.2.8: LLM picker 选中 → selectHomeModel (per CHANGELOG 8e96ea4)", async () => {
     const { appStore } = await import("@codeman-frontend/shared/stores/app.store");
-    const { settingsSaver } = await import("@codeman-frontend/features/settings/lib/settings-saver");
+    const chatStore = await import("../stores/chat.store");
     appStore.state.value.providers = [
       {
         id: "provider-1",
@@ -644,18 +648,9 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
     expect(model2Option).toBeTruthy();
     fireEvent.click(model2Option);
 
-    expect(appStore.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        defaultLlmProviderId: "provider-2",
-        providers: expect.arrayContaining([
-          expect.objectContaining({
-            id: "provider-2",
-            llm: expect.objectContaining({ defaultModel: "model-2" }),
-          }),
-        ]),
-      }),
-    );
-    expect(settingsSaver.scheduleSave).toHaveBeenCalledTimes(1);
+    expect(chatStore.selectHomeModel).toHaveBeenCalledTimes(1);
+    expect(chatStore.selectHomeModel).toHaveBeenCalledWith("provider-2", "model-2");
+    expect(appStore.set).not.toHaveBeenCalled();
   });
 
   it("currentModelId() fallback when no provider ID matches", () => {
@@ -671,9 +666,9 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
     expect(modelOption).toBeTruthy();
   });
 
-  it("T4.2.9: LLM picker 点击同 provider 非首项模型 → 写 provider.llm.defaultModel + defaultLlmProviderId", async () => {
+  it("T4.2.9: LLM picker 点击同 provider 非首项模型 → selectHomeModel (不写全局 settings, per CHANGELOG 8e96ea4)", async () => {
     const { appStore } = await import("@codeman-frontend/shared/stores/app.store");
-    const { settingsSaver } = await import("@codeman-frontend/features/settings/lib/settings-saver");
+    const chatStore = await import("../stores/chat.store");
     appStore.state.value.providers = [
       {
         id: "provider-multi",
@@ -702,20 +697,9 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
     expect(secondModelOption).toBeTruthy();
     fireEvent.click(secondModelOption);
 
-    expect(settingsSaver.scheduleSave).toHaveBeenCalledTimes(1);
-
-    expect(appStore.set).toHaveBeenCalledTimes(1);
-    expect(appStore.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        defaultLlmProviderId: "provider-multi",
-        providers: expect.arrayContaining([
-          expect.objectContaining({
-            id: "provider-multi",
-            llm: expect.objectContaining({ defaultModel: "model-second" }),
-          }),
-        ]),
-      }),
-    );
+    expect(chatStore.selectHomeModel).toHaveBeenCalledTimes(1);
+    expect(chatStore.selectHomeModel).toHaveBeenCalledWith("provider-multi", "model-second");
+    expect(appStore.set).not.toHaveBeenCalled();
   });
 
   it("卡片化: 输入区为居中浮动卡片 (form 带 rounded-2xl + shadow-md)", async () => {
@@ -740,17 +724,21 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
     expect(card!.querySelector(".border-t")).toBeNull();
   });
 
-  it("卡片化: 发送按钮收进工具行, 与 workspace/model 同在卡片内", async () => {
+  it("布局: form 内有 textarea + Send + LLM picker; workspace selector 上移到独立上下文卡片 (per CHANGELOG 6333b8c)", async () => {
     mockWorkspaces.current.push({ id: "ws-1", label: "Project A", rootPath: "C:\\a" });
     mockSelectedWsId.current = "ws-1";
 
     const { container } = render(() => <HomeAgentForm />);
 
-    const card = container.querySelector("form.rounded-2xl");
-    expect(card).toBeTruthy();
-    expect(card!.querySelector('[data-testid="codex-send"]')).toBeTruthy();
-    expect(card!.querySelector('[data-testid="workspace-select-trigger"]')).toBeTruthy();
-    expect(card!.querySelector('[data-testid="llm-picker-trigger"]')).toBeTruthy();
+    const form = container.querySelector("form.rounded-2xl");
+    expect(form).toBeTruthy();
+    expect(form!.querySelector('[data-testid="codex-send"]')).toBeTruthy();
+    expect(form!.querySelector('[data-testid="llm-picker-trigger"]')).toBeTruthy();
+    expect(form!.querySelector('[data-testid="workspace-select-trigger"]')).toBeNull();
+
+    const workspaceTrigger = container.querySelector('[data-testid="workspace-select-trigger"]');
+    expect(workspaceTrigger).toBeTruthy();
+    expect(workspaceTrigger!.closest("form")).toBeNull();
   });
 });
 

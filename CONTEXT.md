@@ -61,6 +61,13 @@
 
 - **`tools/` 目录 (6+1 白名单)** — `src/renderer/src/tools/<name>/` 顶层目录（与 `features/` 同级），存放 LLM-facing AgentTool 定义。每个 `<name>/` 根级仅允许 `index.ts`（barrel）+ `AGENTS.md`。ADR-0010 原 5+1 白名单（5 个 feature 子目录 + 1 个 shared），ADR-0038 扩展为 6+1（新增 `tools/`）。当前成员：`file-ops/`（5 个文件工具，从 `features/file-tools` 迁入）、`webfetch/`（网页抓取工具）。_避免_：放到 `features/<feature>/tools/`（已在 ADR-0010 被合并到 `lib/`）；`tools/` 下嵌套子目录（扁平约束）。
 
+### Permission (ADR-0077)
+
+- **PermissionService (权限服务)** — main 端 Effect Service（`src/main/features/permission/`），从 `runCommand` 模块内部抽出。暴露 `ask/reply/list` 三个抽象（per [ADR-0077](./adr/0077-run-command-permission-inline-dock.md) D1）。ask 接收 rule 评估结果并 await 用户决策；reply 接收用户 3 选 1 决议（once / always / reject）；list 返回当前 pending 请求快照。替代 V1 的 OS `dialog.showMessageBox` 跳出 chat 上下文的弹窗。
+- **Permission Request (权限请求)** — main 端 `PermissionService.ask()` 创建的 pending entry，shape：`{ requestID, info, deferred }`。`info` 描述待评估命令上下文（command / cwd / risk level）；`deferred` 是 Effect Deferred 句柄，本条 ask 阻塞至 reply 触发。per ADR-0077 D5。
+- **Permission Decision (权限决策)** — 用户在 chat-view inline dock 上对单条 pending 的 3 选 1 决议：`once`（本条放行）/ `always`（本条放行 + 写 session-scoped `approved: Map<permission, Rule[]>` 内存 allow 规则，不持久化）/ `reject`（拒绝 + 链式拒绝同 session 其它 pending → 工具返回 `PermissionDenied`）。per ADR-0077 D1 / D6 / D7。
+- **Permission Inline Dock (权限内联决策栏)** — `<PermissionBar>`（`src/renderer/src/features/chat/components/permission-bar.tsx`），覆盖 chat-view 输入框区 3 选 1 横向布局（拒绝 / 总是允许 / 允许一次）。当 `pendingPermissions` 非空时挂载，渲染首个 pending；用户决策后 resolve 并切换到下一条 pending。per ADR-0077 D2。
+
 ### 上下文压缩
 
 - **Context Compaction (上下文压缩)** — 当 Conversation 的消息历史长度达到预设阈值时，自动将早前消息压缩为摘要，以控制 token 消耗的机制。支持手动触发（用户点击压缩按钮）和自动触发（达阈值后静默压缩）。
@@ -111,6 +118,7 @@
 - **Sub-Agent Delegation (子任务委派)** — 主 agent 调 `delegate_task` 触发。Dispatcher 按 `agent_name` 查找对应 SubAgentConfig → 实例化新 `Agent`(注入 `allowedTools` 子集,**排除 `delegate_task` 本身**防止递归, V1 决议)→ 跑 `agent.prompt(task)` → 仅返回最终 assistant 文本作为 tool result content。per ADR-0049 D4/D5。_避免_：sub-agent 接收主 conv 历史(隔离失败,token 高);sub-agent 返回完整消息史(token 高,主 agent 不需要看过程);sub-agent 递归调用 `delegate_task`(V1 不允许)。
 - **Parallel Panel (并行面板)** — chat-view 在检测到 `delegate_task` toolCall 触发时挂载的 UI 容器，按 toolCallId 渲染 N 列 sub-agent live streaming（每列 = 一个 sub-agent 的 status badge + markdown streaming）。`tool_execution_end` 后所有列保留 + 状态变 "completed"，用户可折叠整组。per ADR-0049 D8。
 - **Sub-Agent Stream Entry (子代理流条目)** — `sub-agents-stream.store.ts` Solid store 的 entry shape：`{ toolCallId, subAgentId, subAgentName, events, status: "running" | "completed" | "error", startedAt, completedAt?, finalText?, error? }`。Key = `toolCallId`（一个 toolCall = 一个 sub-agent 流）。LRU 清理（暂定 50 条）。per ADR-0049 D7。
+- **Thinking Level (思考强度)** — 主 Agent 的 per-run 临时态配置 `thinkingLevel: "off" | "minimal" | "low" | "medium" | "high" | "xhigh"`，传输链路 `chat-view 选择器 → sendMessage(..., thinkingLevel) → MainRuntimeRunOptions.thinkingLevel → CreateLLMRuntimeOptions.thinkingLevel → buildAgent({ thinkingLevel }) → pi Agent.initialState.thinkingLevel`。**会话内 transient**：不持久化、无 localStorage 偏好、无 Settings 全局项。**默认值跟随所选 agent 配置**（无 agent 可选时回退 `medium`）。**模型能力联动**：`ModelMeta.thinking !== true` 时 chat-view 选择器不渲染。per [ADR-0076](./adr/0076-chat-view-thinking-level-selector.md) D2 / D3 / D4。_避免_：把 thinkingLevel 持久化到 conversation 表（per-run 临时态，写库即语义污染）；不校验模型能力直接显示选择器（不支持 thinking 的模型会报错）。
 
 ### Automations (V3.2, ADR-0053)
 
