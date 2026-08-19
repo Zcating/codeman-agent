@@ -1,7 +1,7 @@
 # Phase-3-Schema E2E Parity Review
 
 **Reviewed**: `feature/phase-3-schema-005` @ `0acc7bb11ae44088e502b7a06b45c74f0e344cd7`
-**Subject**: ADR-0025 PR 3 gate — 5 file-tools `typebox → Schema.Struct + JsonSchema.fromAST` JSON Schema parity verification
+**Subject**:R 3 gate — 5 file-tools `typebox → Schema.Struct + JsonSchema.fromAST` JSON Schema parity verification
 **Date**: 2026-07-11
 **Verdict**: ⚠️ **Documentation gate complete; executable e2e gate blocked in this environment**
 
@@ -64,13 +64,13 @@ The unit parity guard in `src/shared/lib/tool-schema.test.ts:51` through `src/sh
 
 ### Execution status
 
-The e2e baseline is blocked by local environment setup before tests run. The failure is unrelated to ADR-0025 schema parity and occurs in `e2e/global-setup-warm.ts` when checking for the local Electron binary.
+The e2e baseline is blocked by local environment setup before tests run. The failure is unrelated to schema parity and occurs in `e2e/global-setup-warm.ts` when checking for the local Electron binary.
 
 ---
 
 ## Cross-references
 
-- ADR-0025 PR 3 migration target: `typebox → Schema.Struct + JsonSchema.fromAST` for file-tool schemas.
+-R 3 migration target: `typebox → Schema.Struct + JsonSchema.fromAST` for file-tool schemas.
 - `src/features/file-tools/lib/file-tools.ts:81`: `ReadFileSchema`.
 - `src/features/file-tools/lib/file-tools.ts:87`: `WriteFileSchema`.
 - `src/features/file-tools/lib/file-tools.ts:94`: `EditFileSchema`.

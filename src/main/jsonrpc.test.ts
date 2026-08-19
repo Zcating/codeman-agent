@@ -91,7 +91,7 @@ describe("JsonRpcConnection", () => {
     const err = await p.catch((e: unknown) => e);
     expect(err).toBeInstanceOf(JsonRpcTimeoutError);
     expect(err).toMatchObject({ method: "slow", timeoutMs: 20 });
-    conn.close(); 
+    conn.close();
   });
 
 

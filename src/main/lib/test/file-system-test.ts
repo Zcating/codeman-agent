@@ -1,5 +1,5 @@
 /**
- * PR-α (ADR-0058) 测试基础：memfs 版 `Layer<FileSystem.FileSystem>`。
+ * PR-α  测试基础：memfs 版 `Layer<FileSystem.FileSystem>`。
  *
  * D3 决策：测试环境用 memfs 虚拟文件系统，避免 vitest 里加载原生 node:fs
  * 的 native ABI（better-sqlite3 / @electron/rebuild 与 Electron 版本不匹配）

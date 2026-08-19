@@ -14,7 +14,7 @@ import { Database } from "../../../renderer/src/shared/lib/errors.js";
 import { toWorkspace } from "./mappers.js";
 
 /**
- * PR-δ (ADR-0058) C3: randomUUID 包装为 Effect.sync，统一 id 生成走 Effect 通道。
+ * PR-δ  C3: randomUUID 包装为 Effect.sync，统一 id 生成走 Effect 通道。
  */
 const makeId = Effect.sync(() => randomUUID());
 

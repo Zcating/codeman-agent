@@ -1,7 +1,7 @@
 /**
  * src/main/features/automations/scheduler.ts
  *
- * PR-γ (ADR-0058): AutomationScheduler class → `createAutomationScheduler()`
+ * PR-γ : AutomationScheduler class → `createAutomationScheduler()`
  * factory 形式。singleton `getInstance()` 移除；改为调用方通过工厂创建实例，
  * 由 index.ts 持有单例（per boot path）。
  *

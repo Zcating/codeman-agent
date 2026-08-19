@@ -1,4 +1,4 @@
-// PR-α (ADR-0058) — file-system-node 测试
+// PR-α  — file-system-node 测试
 // 用真实临时目录 + @effect/vitest 的 it.effect；不 mock node:fs/promises。
 import { describe, it, expect, beforeEach, afterEach } from "@effect/vitest";
 import { Effect } from "effect";

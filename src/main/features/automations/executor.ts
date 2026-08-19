@@ -1,4 +1,3 @@
-// ADR-0053 TC — executor.ts (Main 端)
 // Executes LLM and Script actions for automations
 import { Effect } from "effect";
 import { BrowserWindow, ipcMain } from "electron";
@@ -134,7 +133,7 @@ export function executeScriptAction(
   },
   _executionId: string,
 ): Effect.Effect<ExecutionOutcome, InvalidConfig | Unknown> {
-  // V1 does not support javascript script actions per ADR-0053 D10
+  // V1 does not support javascript script actions per
   if (action.language === "javascript") {
     return Effect.fail(new InvalidConfig({ message: "V1 does not support javascript script action" }));
   }

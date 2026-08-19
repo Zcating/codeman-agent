@@ -224,7 +224,7 @@ describe("ChatSidebar (PR 2)", () => {
     expect(F.mockNavigate).toHaveBeenCalledWith({ to: "/plugins/mcp" });
   });
 
-  it("onMenuGroupSelect is NOT wired (MenuGroup click must NOT navigate — ADR-0023 D7-CS)", () => {
+  it("onMenuGroupSelect is NOT wired (MenuGroup click must NOT navigate —S)", () => {
     render(() => <ChatSidebar />);
     expect(F.capturedProps?.onMenuGroupSelect).toBeUndefined();
   });
@@ -405,7 +405,7 @@ describe("ChatSidebar (PR 2)", () => {
           {
             id: "mcp",
             route: { path: "/plugins/mcp", label: "MCP" },
-            sidebar: { icon: "Cable", order: 1, visible: true }, 
+            sidebar: { icon: "Cable", order: 1, visible: true },
           },
         ],
         [
@@ -413,7 +413,7 @@ describe("ChatSidebar (PR 2)", () => {
           {
             id: "skills",
             route: { path: "/plugins/skills", label: "Skills" },
-            sidebar: { icon: "WandSparkles", order: 2, visible: true }, 
+            sidebar: { icon: "WandSparkles", order: 2, visible: true },
           },
         ],
       ]);
@@ -457,7 +457,7 @@ describe("ChatSidebar (PR 2)", () => {
       const opts = F.capturedProps!.options;
       const pluginChildren = opts[0].children;
       expect(pluginChildren.find((c: any) => c.value === "hidden-plugin")).toBeUndefined();
-      expect(pluginChildren.length).toBe(1); 
+      expect(pluginChildren.length).toBe(1);
 
       F.getPluginMetadata = originalGetPluginMetadata;
     });

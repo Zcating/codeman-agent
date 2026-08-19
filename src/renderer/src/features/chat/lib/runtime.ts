@@ -303,7 +303,7 @@ export function createAgentRuntime(_options: CreateAgentRuntimeOptions = {}): Ag
         const mcpTools = buildMcpTools(mcpAllTools$());
         const baseTools = [...fileTools, webfetchTool, runCommandTool, ...mcpTools, loadSkillTool];
 
-        // Build tool registry Map for delegate_task tool (sub-agents can use run_command per ADR-0049 D10)
+        // Build tool registry Map for delegate_task tool (sub-agents can use run_command per)
         const toolRegistry = new Map<string, AgentTool>(
           baseTools.map((t) => [t.name, t]),
         );

@@ -1,7 +1,6 @@
 /**
  * db/mod.test.ts
  *
- * ADR-0046 D3 测试策略：
  * - 使用 provideService 注入 fake SqliteClient
  * - 直接测试 applyMigrationsEffect（不通过 Layer.launch，避免 scoped timeout）
  */

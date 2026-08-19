@@ -1,4 +1,4 @@
--- D8-W: workspaces moves from Settings JSON to SQLite (ADR-0023 D8-W)
+-- D8-W: workspaces moves from Settings JSON to SQLite
 -- Cascade: deleting workspace CASCADE-deletes all conversations with that workspace_id
 
 CREATE TABLE IF NOT EXISTS workspaces (

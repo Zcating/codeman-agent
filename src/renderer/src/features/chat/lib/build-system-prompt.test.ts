@@ -314,10 +314,10 @@ describe("buildSystemPrompt", () => {
     expect(staticIdx).toBeLessThan(dynamicAIdx);
   });
 
-  // ── Test 9: full section ordering (ADR-0051 D1) ───────────────────────────────
+  // ── Test 9: full section ordering  ───────────────────────────────
   // Order: identity < tools < guidelines < workspace段(含cwd footer) < projectInstructions < skills < userDefault
 
-  it("9. full input → sections appear in fixed order per ADR-0051 D1", () => {
+  it("9. full input → sections appear in fixed order per1", () => {
     const snippets: readonly ToolSnippet[] = [
       { name: "read_file", summary: "Read a file." },
     ];

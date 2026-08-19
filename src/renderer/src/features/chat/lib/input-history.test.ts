@@ -109,15 +109,15 @@ describe("recordEntry", () => {
 
   it("连续相同内容 → 不变（Q3a=II dedup）", () => {
     expect(recordEntry(["hello"], "hello")).toEqual(["hello"]);
-    expect(recordEntry(["hello"], "  hello  ")).toEqual(["hello"]); 
+    expect(recordEntry(["hello"], "  hello  ")).toEqual(["hello"]);
   });
 
   it("超过 MAX_ENTRIES → FIFO 淘汰最旧", () => {
     const initial = Array.from({ length: 100 }, (_, i) => `e${i}`);
     const result = recordEntry(initial, "new");
     expect(result.length).toBe(INPUT_HISTORY_MAX_ENTRIES);
-    expect(result[0]).toBe("new"); 
-    expect(result[99]).toBe("e98"); 
+    expect(result[0]).toBe("new");
+    expect(result[99]).toBe("e98");
   });
 
   it("正好 100 条 + 新条目 → 长仍是 100", () => {
@@ -125,7 +125,7 @@ describe("recordEntry", () => {
     const result = recordEntry(initial, "new");
     expect(result).toHaveLength(100);
     expect(result[0]).toBe("new");
-    expect(result[1]).toBe("e0"); 
+    expect(result[1]).toBe("e0");
   });
 
   it("99 条 + 新条目 → 长变 100,不淘汰", () => {
@@ -139,8 +139,8 @@ describe("recordEntry", () => {
   it("不修改输入数组（pure）", () => {
     const initial = ["a", "b"];
     const result = recordEntry(initial, "c");
-    expect(initial).toEqual(["a", "b"]); 
-    expect(result).not.toBe(initial); 
+    expect(initial).toEqual(["a", "b"]);
+    expect(result).not.toBe(initial);
     expect(result).toEqual(["c", "a", "b"]);
   });
 

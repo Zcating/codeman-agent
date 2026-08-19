@@ -1,4 +1,3 @@
-// ADR-0053 TB — db.ts (SQLite DAO for automation_executions)
 import { Effect } from "effect";
 import Database from "better-sqlite3";
 import { Database as DatabaseError } from "../../../renderer/src/shared/lib/errors";

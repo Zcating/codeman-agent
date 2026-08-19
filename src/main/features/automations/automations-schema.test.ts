@@ -1,4 +1,3 @@
-// ADR-0053 T0 — automations-schema 测试
 import { describe, it, expect } from "@effect/vitest";
 import { Effect } from "effect";
 import { parseAutomationRule } from "./automations-schema";

@@ -316,7 +316,7 @@ describe("CodemanSidebar (PR 2)", () => {
           label: "Plugins",
           value: "plugins",
           children: [
-            { label: "Flat", value: "flat" }, 
+            { label: "Flat", value: "flat" },
           ],
         },
       ];
@@ -494,7 +494,7 @@ describe("CodemanSidebar (PR 2)", () => {
           label: "Project",
           value: "proj",
           children: [
-            { label: "FlatMenu", value: "flat-menu" }, 
+            { label: "FlatMenu", value: "flat-menu" },
             {
               label: "PopulatedGroup",
               value: "pop-group",
@@ -654,7 +654,6 @@ describe("CodemanSidebar (PR 2)", () => {
     });
 
     it("exactly one data-scroll-region in the two-column shell (sole scroll contract)", () => {
-      // ADR-0039: 主栏内恰好一个滚动区。两栏 shell 本身（sidebar + inset）不应
       // 出现第二个滚动区；多个滚动区 = V2.9 双滚动条回归，零个 = V2.10 无滚动回归。
       const { container } = renderSidebar({ children: <div>Hello</div> });
       const regions = container.querySelectorAll("[data-scroll-region]");

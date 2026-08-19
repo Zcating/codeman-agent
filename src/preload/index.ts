@@ -140,14 +140,12 @@ export interface CodemanApi {
   readonly automationsGetExecution: (args: { id: string }) => Promise<AutomationExecution>;
   readonly automationsRunMissed: (args: { id: AutomationId }) => Promise<void>;
 
-  // ADR-0060 — bridge subscription for main→renderer LLM execution requests.
   // Renderer-side listener cannot import `electron` directly (browser context
   // has no `ipcRenderer`); this bridge mirrors `onStreamChunk` semantics.
   readonly automationsExecuteLlm: (
     handler: (request: LlmExecuteRequest) => void | Promise<void>,
   ) => () => void;
 
-  // ADR-0060 — fire-and-forget back-channel for renderer→main LLM result.
   // Main side awaits this on `automations:execute-llm-result` (see executor.ts).
   readonly automationsSendLlmResult: (payload: LlmResultPayload) => void;
 }
@@ -229,7 +227,7 @@ const codeman: CodemanApiExposed = {
   subAgentsDelete: (args) => ipcRenderer.invoke("subAgents:delete", args),
   subAgentsSetEnabled: (args) => ipcRenderer.invoke("subAgents:setEnabled", args),
 
-  // Automations (ADR-0053 D7)
+  // Automations
   automationsList: () => ipcRenderer.invoke("automations:list"),
   automationsCreate: (rule) => ipcRenderer.invoke("automations:create", rule),
   automationsUpdate: (rule) => ipcRenderer.invoke("automations:update", rule),
@@ -240,7 +238,6 @@ const codeman: CodemanApiExposed = {
   automationsGetExecution: (args) => ipcRenderer.invoke("automations:get-execution", args),
   automationsRunMissed: (args) => ipcRenderer.invoke("automations:run-missed", args),
 
-  // ADR-0060 — preload owns the IPC subscription so renderer never imports `electron`.
   // Wraps handler in ipcRenderer's listener signature and returns an unsubscribe fn
   // for parity with `onStreamChunk` (cleanup pattern, idempotent re-subscribe safe).
   automationsExecuteLlm: (handler) => {

@@ -80,7 +80,7 @@ git stash pop
 ### `0003_workspaces.sql` schema
 
 ```sql
--- D8-W: workspaces moves from Settings JSON to SQLite (ADR-0023 D8-W2)
+-- D8-W: workspaces moves from Settings JSON to SQLite
 -- Cascade: deleting workspace CASCADE-deletes all conversations with that workspace_id
 
 CREATE TABLE workspaces (
@@ -267,7 +267,7 @@ export interface CodemanDialog {
 ### Verification
 
 - [ ] `vp run test` — dialog unit tests pass
-- [ ] codeman-dialog is prop-driven (no feature store dependency, per ADR-0022 D3)
+- [ ] codeman-dialog is prop-driven (no feature store dependency, per)
 
 ---
 
@@ -275,7 +275,7 @@ export interface CodemanDialog {
 
 **Goal**: Atomic rename `conversations.store.ts → chat.store.ts` + add workspace CRUD methods + update all imports.
 
-**CRITICAL**: This MUST be a single atomic commit per ADR-0023 D4-N pattern. All imports updated in same commit.
+**CRITICAL**: This MUST be a single atomic commit per pattern. All imports updated in same commit.
 
 ### Files
 
@@ -297,7 +297,7 @@ export interface CodemanDialog {
 
 ### chat.store.ts workspace additions (D8-W7 API)
 
-**Design principle (per ADR-0016 D4 + CONTEXT.md "Bridge")**: chat.store exposes **Effect-returning methods**, not async/Promise. UI consumers bridge via `Effect.runPromiseExit(...)` + `Exit.match`.
+**Design principle (per + CONTEXT.md "Bridge")**: chat.store exposes **Effect-returning methods**, not async/Promise. UI consumers bridge via `Effect.runPromiseExit(...)` + `Exit.match`.
 
 ```ts
 // addWorkspace: pickWorkspace → deriveLabel → service.add → setStore
@@ -338,7 +338,7 @@ const handleRenameClick = async (id: string, newLabel: string) => {
 };
 ```
 
-The same pattern applies to `removeWorkspace` and `addWorkspace`. UI never directly imports `WorkspaceService` or calls IPC — chat.store is the single bridge per ADR-0016 D4.
+The same pattern applies to `removeWorkspace` and `addWorkspace`. UI never directly imports `WorkspaceService` or calls IPC — chat.store is the single bridge per4.
 
 ### Verification
 
@@ -521,7 +521,7 @@ git rm src/features/chat/stores/conversations.store.ts \
 
 git commit -m "feat(workspace): D8-W workspace chat-ownership migration
 
-- workspace data moves from Settings JSON to SQLite (ADR-0023 D8-W)
+- workspace data moves from Settings JSON to SQLite
 - chat.store.ts (renamed from conversations.store.ts) owns workspace CRUD
 - WorkspaceService Effect Context.Tag wraps 4 new Tauri commands
 - enabled field removed from Workspace; root_path immutable after creation

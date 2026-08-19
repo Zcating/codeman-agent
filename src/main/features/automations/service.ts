@@ -1,7 +1,7 @@
 /**
  * src/main/features/automations/service.ts
  *
- * PR-γ (ADR-0058): service.ts 业务层 — 编排 scheduler / config / db。
+ * PR-γ : service.ts 业务层 — 编排 scheduler / config / db。
  *
  * 与原实现的差异：
  * - readConfigSafe / writeConfigSafe 的 catchTag("InvalidConfig") 改为

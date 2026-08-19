@@ -179,9 +179,9 @@ describe("mock-server HTTP — POST /mock/anthropic/v1/messages", () => {
       body: JSON.stringify({
         model: "m",
         messages: [
-          { role: "user", content: "hello" },           
-          { role: "assistant", content: "world" },      
-          { role: "user", content: "follow-up" },       
+          { role: "user", content: "hello" },
+          { role: "assistant", content: "world" },
+          { role: "user", content: "follow-up" },
         ],
       }),
     });

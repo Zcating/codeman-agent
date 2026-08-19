@@ -5,7 +5,7 @@ import {
   type Settings,
 } from "./settings-schema";
 
-// V15 without enabled - ADR-0050 D4
+// V15 without enabled -
 const V15: Settings = {
   schemaVersion: "1.5",
   providers: [
@@ -100,8 +100,7 @@ describe("T4a — src/main/settings-schema.ts", () => {
       expect(r.defaultLlmProviderId).toBe("minimax");
     });
 
-    // ADR-0050 D4: legacy enabled field should be stripped during sanitize
-    it("strips legacy enabled field from providers (ADR-0050 D4)", () => {
+    it("strips legacy enabled field from providers ", () => {
       // Use type assertion to simulate legacy data with enabled field
       const legacyWithEnabled = {
         ...V15,
@@ -116,8 +115,7 @@ describe("T4a — src/main/settings-schema.ts", () => {
       expect(r.providers[0]).not.toHaveProperty("enabled");
     });
 
-    // ADR-0050 D4: new comment field should be preserved when present
-    it("preserves comment field when present (ADR-0050 D4)", () => {
+    it("preserves comment field when present ", () => {
       const withComment: Settings = {
         ...V15,
         providers: [

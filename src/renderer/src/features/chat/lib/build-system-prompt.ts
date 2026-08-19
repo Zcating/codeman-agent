@@ -1,5 +1,4 @@
 // src/renderer/src/features/chat/lib/build-system-prompt.ts
-// ADR-0051 — 纯函数分节组装器
 
 export interface ToolSnippet {
   name: string;
@@ -70,7 +69,7 @@ Do NOT infer the id from user messages, folder names, or any other context — u
 const CWD_FOOTER = "Current working directory";
 
 /**
- * 按 ADR-0051 D1 固定顺序组装系统提示词。
+ * 按 固定顺序组装系统提示词。
  * 空节静默跳过；节间 `\n\n` 分隔；guidelines Set 去重；
  * dynamicToolSnippets 超过 120 字符截断（加 `…`）。
  */

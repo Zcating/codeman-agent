@@ -358,7 +358,7 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
 
     const sendBtn = container.querySelector("[data-testid='codex-send']") as HTMLButtonElement;
     expect(sendBtn).toBeDisabled();
-    fireEvent.click(sendBtn); 
+    fireEvent.click(sendBtn);
     expect(createConversation).not.toHaveBeenCalled();
     expect(sendMessage).not.toHaveBeenCalled();
   });
@@ -372,7 +372,7 @@ describe("HomeAgentForm — workspace pre-selection logic", () => {
     const { container } = render(() => <HomeAgentForm />);
 
     const sendBtn = container.querySelector("[data-testid='codex-send']") as HTMLButtonElement;
-    expect(sendBtn).toBeDisabled(); 
+    expect(sendBtn).toBeDisabled();
     fireEvent.click(sendBtn);
     expect(createConversation).not.toHaveBeenCalled();
     expect(sendMessage).not.toHaveBeenCalled();
@@ -430,7 +430,7 @@ describe("HomeAgentForm — new layout + Action slot + LLM picker (T4.2)", () =>
     mockIsOpen = false;
     sharedOnValueChanges = [];
     mockWorkspaces.current.length = 0;
-    mockSelectedWsId.current = "ws-1"; 
+    mockSelectedWsId.current = "ws-1";
     const { appStore } = await import("@codeman-frontend/shared/stores/app.store");
     appStore.state.value.providers = [
       {

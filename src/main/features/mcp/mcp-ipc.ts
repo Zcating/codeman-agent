@@ -1,7 +1,7 @@
 /**
  * src/main/features/mcp/mcp-ipc.ts
  *
- * PR-γ (ADR-0058): McpManager class → factory。
+ * PR-γ : McpManager class → factory。
  * 工厂方法中 Effect-returning 的部分（restart / setEnabled）通过 runMain
  * 桥接回 Promise，保持 IPC handler 签名兼容。
  */

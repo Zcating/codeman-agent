@@ -570,7 +570,7 @@ describe("run() — message_update 边界情况", () => {
     });
 });
 
-describe("run() — turn_end 事件 (per-turn done, ADR-0028)", () => {
+describe("run() — turn_end 事件 (per-turn done,)", () => {
     it("turn_end 含 toolCall block 时 done 事件带 tool_calls (per-turn scope)", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
@@ -1144,7 +1144,7 @@ describe("run() — message_update non-delta assistantMessageEvent types", () =>
 });
 
 
-describe("run() — turn_end typed extraction (per-turn, ADR-0028)", () => {
+describe("run() — turn_end typed extraction (per-turn,)", () => {
     it("turn_end with AssistantMessage.text block → done.content extracted", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
@@ -1408,7 +1408,7 @@ describe("run() — turn_end typed extraction (per-turn, ADR-0028)", () => {
     });
 });
 
-describe("run() — G30: per-turn done emission (Bubble Boundary, ADR-0028)", () => {
+describe("run() — G30: per-turn done emission (Bubble Boundary,)", () => {
     it("G30a: turn_end with single assistant message → 1 done event with extracted content/thinking/toolCalls", async () => {
         const { Agent } = await import("@earendil-works/pi-agent-core");
         const mockedAgent = vi.mocked(Agent);
@@ -1572,8 +1572,8 @@ describe("run() — G30: per-turn done emission (Bubble Boundary, ADR-0028)", ()
             expect(doneEvents[0]!.message.toolCalls![0]!.name).toBe("search_files");
 
             expect(doneEvents[1]!.message.content).toBe("Found 50 files.");
-            expect(doneEvents[1]!.message.thinking).toBeNull(); 
-            expect(doneEvents[1]!.message.toolCalls).toBeNull(); 
+            expect(doneEvents[1]!.message.thinking).toBeNull();
+            expect(doneEvents[1]!.message.toolCalls).toBeNull();
         } finally {
             mockedAgent.mockImplementation(originalImpl as never);
         }
@@ -1612,7 +1612,7 @@ describe("run() — G30: per-turn done emission (Bubble Boundary, ADR-0028)", ()
 
             await new Promise((resolve) => setTimeout(resolve, 20));
             const doneEvents = events.filter((e) => e.type === "done");
-            expect(doneEvents).toHaveLength(0); 
+            expect(doneEvents).toHaveLength(0);
         } finally {
             mockedAgent.mockImplementation(originalImpl as never);
         }

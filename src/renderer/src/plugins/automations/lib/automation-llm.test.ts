@@ -1,4 +1,3 @@
-// ADR-0060 — automation-llm.test.ts
 // Tests the renderer-side automations LLM listener (formerly main-listener.test.ts).
 // Mocks `window.codeman` bridge instead of `electron` because the IPC
 // subscription now lives in preload.
@@ -44,7 +43,7 @@ const mockAppStore = {
 };
 Object.defineProperty(window, "__appStore", { value: mockAppStore, writable: true });
 
-// Bridge mock — mirrors the new preload surface (ADR-0060).
+// Bridge mock — mirrors the new preload surface .
 // Captures handlers so tests can invoke them, and tracks result-posts.
 const bridgeHandlers: Array<(req: LlmExecuteRequest) => void | Promise<void>> = [];
 const mockSubscription = vi.fn((handler) => {

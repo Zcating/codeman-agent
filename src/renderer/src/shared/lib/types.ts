@@ -59,14 +59,14 @@ export interface SystemPromptSettings {
   userCanEdit: boolean;
 }
 export interface ConversationSettings {
-  autoArchiveAfterDays: number; 
-  maxHistory: number; 
+  autoArchiveAfterDays: number;
+  maxHistory: number;
 }
 
 export interface Workspace {
   id: string;
   label: string;
-  rootPath: string; 
+  rootPath: string;
   createdAt: number;
 }
 

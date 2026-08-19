@@ -8,7 +8,7 @@ export type RunCommandResult =
 
 // signal param removed: IPC invoke doesn't natively pass AbortSignal; V1 uses timeout-only cancel.
 // AbortController-based cancel (with per-command Map<commandId, AbortController>) will be wired in V2
-// when streaming partial results are implemented per ADR-0048 Known Limitations.
+// when streaming partial results are implemented pernown Limitations.
 export interface ExecuteCommandInput {
   command: string;
   cwd?: string;

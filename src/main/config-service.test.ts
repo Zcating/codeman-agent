@@ -48,7 +48,7 @@ describe("readMockServerConfig — defaults (empty env)", () => {
     expect(cfg.port).toBe(50000);
     expect(cfg.streamDelayMs).toBe(1);
     expect(cfg.deltaSize).toBe(1);
-    expect(cfg.host).toBe("127.0.0.1"); 
+    expect(cfg.host).toBe("127.0.0.1");
     expect(warnings).toEqual([]);
   });
 });
@@ -182,7 +182,7 @@ describe("readMockServerConfig — isProduction", () => {
 
   it("NODE_ENV=staging (or any non-production) → false (严格 === 比较)", () => {
     expect(readMockServerConfig(readerFromMap({ NODE_ENV: "staging" })).isProduction).toBe(false);
-    expect(readMockServerConfig(readerFromMap({ NODE_ENV: "PRODUCTION" })).isProduction).toBe(false); 
+    expect(readMockServerConfig(readerFromMap({ NODE_ENV: "PRODUCTION" })).isProduction).toBe(false);
   });
 });
 

@@ -1,7 +1,7 @@
 /**
  * src/main/features/automations/automations-config.ts
  *
- * PR-γ (ADR-0058): automations 配置文件 IO。
+ * PR-γ : automations 配置文件 IO。
  * 读/写/存在性三件套全部走 src/main/lib/json-config.ts 抽象。
  *
  * 行为契约（与 PR-γ 之前一致）：
@@ -10,7 +10,7 @@
  * - 文件存在但 schema 校验失败 → Effect.fail(InvalidConfig)
  *
  * 错误统一走 AppBackendError.InvalidConfig（来自 src/main/lib/errors.ts），
- * 不再依赖 renderer/src/shared/lib/errors.ts（ADR-0057 D1 物理分离）。
+ * 不再依赖 renderer/src/shared/lib/errors.ts。
  */
 import { Effect, Schema } from "effect";
 import { app } from "electron";

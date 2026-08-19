@@ -1,7 +1,7 @@
 /**
  * src/main/features/skills/lib/skill-loader.ts
  *
- * PR-δ (ADR-0058): fs/path 调用走 FileSystem.FileSystem / Path.Path service。
+ * PR-δ : fs/path 调用走 FileSystem.FileSystem / Path.Path service。
  *
  * 与原实现的差异：
  * - `readdir` + Dirent 过滤：改用 `fs.readDirectory` 拿 string[]，再逐个

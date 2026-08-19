@@ -1,7 +1,7 @@
 /**
  * src/main/features/mcp/mcp-manager.ts
  *
- * PR-γ (ADR-0058): McpManager class → `createMcpManager()` factory 形式。
+ * PR-γ : McpManager class → `createMcpManager()` factory 形式。
  * 配置相关方法（startAll / restart / setEnabled）改为 Effect-returning，
  * R 通道要求 FileSystem.FileSystem | Path.Path。读 config 失败按
  * "config 读不出 → 视为空配置" 容错（startAll）或映射为 AppBackendError。

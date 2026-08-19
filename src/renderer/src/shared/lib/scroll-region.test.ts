@@ -25,7 +25,7 @@ function makeRegion(opts: { overflow: boolean; testid?: string }): HTMLDivElemen
   return el;
 }
 
-describe("scroll-region 断言模块 (ADR-0039)", () => {
+describe("scroll-region 断言模块 ", () => {
   afterEach(() => {
     document.body.replaceChildren();
   });

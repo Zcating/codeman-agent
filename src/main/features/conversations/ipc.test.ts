@@ -1,7 +1,6 @@
 /**
  * conversations/ipc.test.ts
  *
- * ADR-0046 D3 测试策略：
  * - vi.mock("./data") 后测 handler wiring
  * - 频道注册齐全、args 转发、返回值透传、错误传播
  * - 保留现有断言骨架（频道列表、返回形状）

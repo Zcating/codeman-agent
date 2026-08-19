@@ -1,4 +1,3 @@
-// ADR-0053 TC — ipc.ts (Main 端)
 // IPC handlers for automations — delegates to service.ts
 import { ipcMain } from "electron";
 import { runMain } from "../../runtime.js";

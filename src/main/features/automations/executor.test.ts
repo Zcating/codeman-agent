@@ -1,4 +1,3 @@
-// ADR-0053 TC — executor.test.ts
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Effect } from "effect";
 import type { AutomationRule } from "../../../shared/lib/automation-types";

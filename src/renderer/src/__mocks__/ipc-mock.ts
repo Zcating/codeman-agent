@@ -490,7 +490,6 @@ function buildCodemanMock(): Record<string, unknown> {
   codeman.setLoginItem = () => Promise.resolve();
   codeman.getLogPath = () => Promise.resolve("/tmp/codeman.log");
   codeman.onStreamChunk = () => () => {};
-  // ADR-0060 — bridge stubs so renderer tests can install `window.codeman`
   // and access the new bridge without throwing. Real subscription/result
   // capture is set up locally in automation-llm.test.ts.
   codeman.automationsExecuteLlm = () => () => {};

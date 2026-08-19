@@ -10,7 +10,7 @@ import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messag
 import { parseModelsApiResponse } from "@codeman-frontend/shared/lib/parse-models-api-response";
 import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 
-// V1 限制:UI 不消费 cost / maxTokens / vision input,hardcode 占位(per ADR-0047 Consequences)
+// V1 限制:UI 不消费 cost / maxTokens / vision input,hardcode 占位(peronsequences)
 const V1_ZERO_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } as const;
 const V1_MAX_TOKENS = 8192;
 const V1_INPUT_MODALITIES: ("image" | "text")[] = ["text"];

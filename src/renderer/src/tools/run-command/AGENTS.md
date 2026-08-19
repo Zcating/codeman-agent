@@ -1,6 +1,6 @@
 # run_command — Shell 命令执行工具
 
-`tools/` 是 6+1 白名单（ADR-0010 经 ADR-0038 扩展）的新成员，与 `features/` 同级，存放 LLM-facing AgentTool 定义。每个 `tools/<name>/` 根级仅允许 `index.ts` + `AGENTS.md`，文件扁平不允许嵌套子目录。
+`tools/` 是 6+1 白名单的新成员，与 `features/` 同级，存放 LLM-facing AgentTool 定义。每个 `tools/<name>/` 根级仅允许 `index.ts` + `AGENTS.md`，文件扁平不允许嵌套子目录。
 
 ## 文件清单
 

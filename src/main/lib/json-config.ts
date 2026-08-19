@@ -1,7 +1,7 @@
 /**
  * src/main/lib/json-config.ts
  *
- * PR-γ (ADR-0058): JSON 配置文件 IO 抽象。
+ * PR-γ : JSON 配置文件 IO 抽象。
  *
  * 消除 mcp-config.ts + automations-config.ts 90% 重复的 read/write/exists
  * 三件套；统一错误映射到 AppBackendError（InvalidConfig / Unknown）。

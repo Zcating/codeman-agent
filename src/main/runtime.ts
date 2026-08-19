@@ -6,9 +6,9 @@ import { NodeFileSystemLive } from "./lib/file-system-node.js";
 /**
  * MainLive — src/main 的顶层 Effect Layer。
  *
- * PR-3 (ADR-0046): DbLive 提供 SqlClient + SqliteClient + 迁移执行。
+ * PR-3 : DbLive 提供 SqlClient + SqliteClient + 迁移执行。
  *
- * PR-α (ADR-0058): 挂载 NodeFileSystemLive 与 NodePath.layer，使所有
+ * PR-α : 挂载 NodeFileSystemLive 与 NodePath.layer，使所有
  * `Effect.gen(... yield* FileSystem.FileSystem ...)` /
  * `yield* Path.Path` 调用无须在 MainLive 之外补 service。
  *
@@ -18,7 +18,7 @@ import { NodeFileSystemLive } from "./lib/file-system-node.js";
  *   详见 src/main/lib/file-system-node.ts。
  * - `NodePath` 走 `@effect/platform-node/NodePath` submodule 而非 barrel，
  *   避免触发 NodeClusterHttp → @effect/cluster HttpLayerRouter peer dep
- *   mismatch (ADR-0058 D5)。
+ *   mismatch 。
  *
  * 顶层 R 收敛：DbLive（PR-δ 后 MigrationsLive 也 Layer.provide(NodeFileSystemLive)）
  * + NodeFileSystemLive（R=never）+ NodePath.layer（R=never）→ R=never。

@@ -13,7 +13,7 @@ import { SqliteClient } from "@effect/sql-sqlite-node/SqliteClient";
 import { Database } from "../../../renderer/src/shared/lib/errors.js";
 
 /**
- * PR-δ (ADR-0058) C3: randomUUID 包装为 Effect.sync，统一 id 生成走 Effect 通道。
+ * PR-δ  C3: randomUUID 包装为 Effect.sync，统一 id 生成走 Effect 通道。
  * scrape-registry.ts / cq-data-store.ts 保留 sync 调用（D7）。
  */
 const makeId = Effect.sync(() => randomUUID());

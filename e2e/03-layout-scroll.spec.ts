@@ -1,5 +1,5 @@
 
-// 03 — Layout contract: 页面级 ScrollArea 统一滚动模型 (ADR-0039)
+// 03 — Layout contract: 页面级 ScrollArea 统一滚动模型
 //
 // 守卫三个历史回归：
 //   - V2.9  (2bf2d7d): SidebarInset overflow-y-auto → chat 页双滚动条 + 工具栏滚走

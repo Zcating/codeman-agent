@@ -87,7 +87,7 @@ describe("writeFileTool", () => {
   });
 
   it("happy path returns void with success message", async () => {
-    mockState.resolved = undefined; 
+    mockState.resolved = undefined;
 
     const result = await writeFileTool.execute("c1", {
       workspaceId: "ws1",
@@ -344,7 +344,7 @@ import { workspaceIdField } from "@codeman-frontend/tools/file-ops";
 
 const wrap = Schema.Struct({ workspaceId: workspaceIdField });
 
-describe("workspaceIdField — single source of truth (Phase-3 review + ADR-0013.1)", () => {
+describe("workspaceIdField — single source of truth (Phase-3 review +)", () => {
   it("decodeUnknown: present string value parses Right", () => {
     const out = Schema.decodeUnknownEither(wrap)({ workspaceId: "ws-1" });
     expect(out._tag).toBe("Right");

@@ -1,4 +1,4 @@
-// Provider preset for settings provider library (ADR-0050 D1).
+// Provider preset for settings provider library .
 //
 // 数据来自 models.dev（本地 .repos/models.dev），由 scripts/extract-providers.mjs
 // 生成 providers.json（勿手改该文件）。providers.json 校验失败时回退到 FALLBACK_PRESETS。
@@ -7,7 +7,7 @@ import providersJson from "./providers.json";
 import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 
 /**
- * Provider preset for settings provider library (ADR-0050 D1).
+ * Provider preset for settings provider library .
  * 数据由 scripts/extract-providers.mjs 从 models.dev 提取。
  */
 export interface ProviderPreset {

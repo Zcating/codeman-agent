@@ -1,7 +1,6 @@
 /**
  * workspaces/ipc.ts
  *
- * ADR-0046 D3: 接线到 data.ts Effect 函数，经 runMain 边界执行。
  * 删 db dep，删 better-sqlite3 import，删 try/catch wrap
  *（错误映射已在 data.ts 完成，行为等价）。
  */

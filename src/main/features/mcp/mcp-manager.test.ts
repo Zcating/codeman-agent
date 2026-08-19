@@ -1,7 +1,7 @@
 /**
  * src/main/features/mcp/mcp-manager.test.ts
  *
- * PR-γ (ADR-0058): McpManager class → `createMcpManager()` factory。
+ * PR-γ : McpManager class → `createMcpManager()` factory。
  * config mocks 改为 Effect-returning（与 readMcpConfig / writeMcpConfig
  * 新签名对齐）。
  */

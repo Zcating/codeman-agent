@@ -380,7 +380,7 @@ describe("sendMessage — G4: 调用 runtime.run({ context, provider })", () => 
       expect(runSpy).toHaveBeenCalledTimes(1);
       const opts = runSpy.mock.calls[0][0] as { context: Message[]; provider: ProviderConfig };
       expect(opts.provider).not.toBe(defaultProvider);
-      // System prompt is now assembled via buildSystemPrompt (ADR-0051)
+      // System prompt is now assembled via buildSystemPrompt
       expect(opts.provider.systemPrompt).toContain("You are an AI coding assistant");
       expect(opts.provider.systemPrompt).toContain("## Available tools");
       expect(opts.provider.systemPrompt).toContain("## Guidelines");
@@ -421,7 +421,7 @@ describe("sendMessage — G4: 调用 runtime.run({ context, provider })", () => 
       await Effect.runPromise(sendMessage("c1", "hello", defaultProvider));
       const opts = runSpy.mock.calls[0][0] as { provider: ProviderConfig };
       expect(opts.provider).not.toBe(defaultProvider);
-      // System prompt is assembled via buildSystemPrompt (ADR-0051)
+      // System prompt is assembled via buildSystemPrompt
       expect(opts.provider.systemPrompt).toContain("You are an AI coding assistant");
       expect(opts.provider.systemPrompt).toContain("## Available tools");
       expect(opts.provider.systemPrompt).toContain("## Guidelines");
@@ -774,7 +774,7 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
         { type: "token", content: "Reading the file now." },
         { type: "tool_call", toolCall: readFileToolCall },
         { type: "tool_result", toolCallId: "tc-read-1", result: "# Tauri + Solid" },
-        { type: "thinking", content: "calling read_file" }, 
+        { type: "thinking", content: "calling read_file" },
         { type: "token", content: "(mock) Script complete." },
         {
           type: "done",
@@ -784,7 +784,7 @@ describe("sendMessage — G9: 处理 done event → 替换 stub content + 设置
             role: "assistant",
             content: "(mock) Script complete.",
             thinking: "calling read_file",
-            toolCalls: [readFileToolCall], 
+            toolCalls: [readFileToolCall],
             toolResults: [
               {
                 toolCallId: "tc-read-1",
@@ -867,7 +867,7 @@ describe("sendMessage — G29: Bubble Boundary — 1 user input → N assistant 
             role: "assistant",
             content: "(mock) Script complete.",
             thinking: "Done.",
-            toolCalls: null, 
+            toolCalls: null,
             toolResults: null,
             model: "mock-default",
             inputTokens: null,
@@ -974,7 +974,7 @@ describe("sendMessage — G29: Bubble Boundary — 1 user input → N assistant 
 
       const msgs = store.byId["c1"]?.messages ?? [];
 
-      expect(msgs.length).toBe(4); 
+      expect(msgs.length).toBe(4);
       expect(msgs[0]?.role).toBe("user");
       expect(msgs[1]?.role).toBe("assistant");
       expect(msgs[1]?.toolCalls?.[0]?.name).toBe("read_file");
@@ -1580,7 +1580,7 @@ describe("per-conv runtime isolation — streamingMessageId per conv independenc
   });
 });
 
-describe("sendMessage — projectInstructions caching (ADR-0051)", () => {
+describe("sendMessage — projectInstructions caching ", () => {
   beforeEach(() => {
     fileApiReadFileCalls.length = 0;
   });

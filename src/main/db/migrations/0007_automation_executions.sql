@@ -1,4 +1,3 @@
--- ADR-0053 D8: automation_executions table for persisting scheduled automation runs
 CREATE TABLE automation_executions (
   id TEXT PRIMARY KEY,
   rule_id TEXT NOT NULL,

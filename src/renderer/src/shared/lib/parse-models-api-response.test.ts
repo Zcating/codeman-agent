@@ -63,7 +63,7 @@ describe("parseModelsApiResponse", () => {
     const response = {
       data: [
         { id: "m1", name: "M1", context_window: 128_000 },
-        { id: "m2", name: "M2" }, 
+        { id: "m2", name: "M2" },
       ],
     };
     const models = parseModelsApiResponse(response);

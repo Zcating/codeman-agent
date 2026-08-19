@@ -1,7 +1,6 @@
 /**
  * conversations/ipc.ts
  *
- * ADR-0046 D3: 接线到 data.ts Effect 函数，经 runMain 边界执行。
  * 删 db dep，删 better-sqlite3 import。
  */
 

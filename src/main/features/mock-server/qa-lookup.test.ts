@@ -24,7 +24,7 @@ describe("lookupQaAnswer — substring match", () => {
     const result = lookupQaAnswer(table, "abcdef");
     expect(result._tag).toBe("Right");
     if (result._tag === "Right") {
-      expect(result.right.turns[0].text).toBe("match-ab"); 
+      expect(result.right.turns[0].text).toBe("match-ab");
     }
   });
 

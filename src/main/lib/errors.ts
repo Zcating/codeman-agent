@@ -1,7 +1,7 @@
 /**
  * AppBackendError — Electron Main 端的 typed-error 命名空间。
  *
- * 设计要点（ADR-0058 PR-β D6 + ADR-0025 错误模型继承）：
+ * 设计要点（ADR-0058 PR-β D6 + 错误模型继承）：
  * - `_tag` 字段名与字面值与 renderer 端 `src/renderer/src/shared/lib/errors.ts`
  *   的 AppError 完全一致，便于 IPC 跨进程序列化后 renderer decoder 复用。
  * - IPC 边界 (`src/main/lib/sandbox-handler.ts`) 走 `Error(JSON.stringify({kind: _tag, message}))`
@@ -15,7 +15,7 @@
  *   命名空间单一来源）。
  *
  * 为什么不直接 import renderer 端的 errors.ts：
- * - ADR-0057 D1 物理分离原则：main 不能依赖 renderer 的运行时模块。
+ * - 物理分离原则：main 不能依赖 renderer 的运行时模块。
  * - 仅 tag 名 + field 字段镜像即可；运行时不需要共享 class instance。
  */
 import { Schema } from "effect";
@@ -102,7 +102,7 @@ export class JsonRpcTimeoutError extends Schema.TaggedError<JsonRpcTimeoutError>
  *
  * 与 renderer 端 `AppError` 镜像；IPC 序列化层（sandbox-handler）只透传
  * `_tag` + `message`，main 端扩展字段（path / workspaceLabel / field / cause
- * 等）不出 IPC（per ADR-0058 D6 保守映射）。
+ * 等）不出 IPC（per 保守映射）。
  */
 export const AppBackendError = {
   NotFound,

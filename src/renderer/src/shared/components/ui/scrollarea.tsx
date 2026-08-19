@@ -15,7 +15,6 @@ export interface ScrollAreaProps extends ArkScrollAreaRootProps {
   children?: JSX.Element;
   "data-testid"?: string;
   /**
-   * ADR-0039 滚动契约标记。落在 Viewport（真正的滚动元素）上，而非 Root：
    * Root 只是定位壳（relative overflow-hidden），zag 在 Viewport 上注入
    * overflow:auto，scrollHeight/clientHeight 语义属于 Viewport。
    */

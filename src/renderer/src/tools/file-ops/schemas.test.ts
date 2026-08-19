@@ -15,7 +15,7 @@ describe("FilePathSchema (ADR-0025 PR 4)", () => {
 
   it("type guard: FilePath is distinct from string at compile time", () => {
     const p: FilePath = FilePathSchema.make("/abs/path");
-    const s: string = p; 
+    const s: string = p;
     expect(typeof s).toBe("string");
   });
 });

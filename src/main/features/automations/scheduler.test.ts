@@ -1,7 +1,7 @@
 /**
  * src/main/features/automations/scheduler.test.ts
  *
- * PR-γ (ADR-0058): AutomationScheduler class → `createAutomationScheduler()` factory。
+ * PR-γ : AutomationScheduler class → `createAutomationScheduler()` factory。
  * `AutomationScheduler.getInstance()` 移除；测试现在通过 factory 创建实例。
  *
  * config / db / executor mocks 改为 Effect-returning 形式（与新签名对齐）。

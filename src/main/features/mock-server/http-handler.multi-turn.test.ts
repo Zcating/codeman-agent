@@ -130,7 +130,7 @@ describe("mock-server HTTP — POST /mock/anthropic/v1/messages", () => {
     expect(body).toContain("All done.");
     expect(body).toContain('"text":"S"');
     expect(body).toContain('"text":"."');
-    expect(body).toContain('"stop_reason":"end_turn"'); 
+    expect(body).toContain('"stop_reason":"end_turn"');
     expect(body).not.toContain('"type":"tool_use"');
     expect(body).not.toContain("Reading the file.");
     expect(body).not.toContain("Searching.");

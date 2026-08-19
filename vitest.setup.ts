@@ -1,6 +1,6 @@
 //! vitest global setup — runs before all test files.
 //!
-//! 集中 mock 调用(per 项目约定 ADR-0020 + 用户决策):
+//! 集中 mock 调用(per 项目约定 + 用户决策):
 //!
 //! **不在本文件 mock 的模块**:
 //!
@@ -9,7 +9,7 @@
 //!   "Store 测试" 段)。全局 mock 会让 `createStore` 返回 plain proxy,无法与真 Solid
 //!   signal/effect 兼容,导致 `conversations.store.test.ts` 26 个测试全部 `TypeError`。
 //!   妥协:6 个 settings/shared 测试文件**内联** 28 行 `vi.mock("solid-js/store", () => {...})`,
-//!   不进 setup。详见 ADR-0020 § "Why not 全局 mock solid-js/store`。
+//!   不进 setup。详见 § "Why not 全局 mock solid-js/store`。
 
 import "@testing-library/jest-dom";
 

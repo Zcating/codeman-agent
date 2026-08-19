@@ -29,7 +29,7 @@ export function findScrollRegions(root: ParentNode = document.body): HTMLElement
 
 /**
  * 活动滚动区 = scrollHeight 明显大于 clientHeight（内容真实溢出、滚动有意义）。
- * 「恰好一个活动滚动区」是 ADR-0039 的核心不变量：
+ * 「恰好一个活动滚动区」是 的核心不变量：
  *   - 2 个 → V2.9 双滚动条回归
  *   - 0 个 → V2.10 无滚动通道回归
  */

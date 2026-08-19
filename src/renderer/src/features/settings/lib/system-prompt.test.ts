@@ -38,7 +38,7 @@ import {
   updateDefaultSystemPrompt,
 } from "@codeman-frontend/features/settings/lib/system-prompt";
 
-describe("system-prompt (ADR-0015)", () => {
+describe("system-prompt ", () => {
   beforeEach(async () => {
     _resetAppStoreForTest();
     mockState.settings = {

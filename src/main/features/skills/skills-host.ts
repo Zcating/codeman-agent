@@ -1,7 +1,7 @@
 /**
  * src/main/features/skills/skills-host.ts
  *
- * PR-δ (ADR-0058): fs/path 调用全部走 FileSystem.FileSystem / Path.Path service。
+ * PR-δ : fs/path 调用全部走 FileSystem.FileSystem / Path.Path service。
  *
  * 与原实现的差异：
  * - listSkills / readSkillFile / ensurePreinstalledSkills 改为 Effect-returning，

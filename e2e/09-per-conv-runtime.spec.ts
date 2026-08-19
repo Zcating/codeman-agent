@@ -7,10 +7,10 @@ import { useMockProvider } from "./mock-provider";
 const SLOW_DELAY_MS = 500;
 void SLOW_DELAY_MS;
 
-const TEXT_A = "Hello from conv A"; 
-const TEXT_B = "Hello from conv B"; 
+const TEXT_A = "Hello from conv A";
+const TEXT_B = "Hello from conv B";
 
-test.describe("09 — Per-conv runtime isolation (ADR-0019)", () => {
+test.describe("09 — Per-conv runtime isolation ", () => {
   test.beforeAll(async ({ tauriEnv }) => {
     const { page } = tauriEnv;
     await page.goto("/");

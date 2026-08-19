@@ -1,4 +1,4 @@
--- 0005_compaction_entries.sql — 压缩 entries 持久化底座 (已 superseded by 0006 DROP + ADR-0075)。
+-- 0005_compaction_entries.sql — 压缩 entries 持久化底座 (已 superseded by 0006 DROP +)。
 -- 存储对话压缩操作的元数据，用于 context 压缩生命周期管理。
 
 CREATE TABLE compaction_entries (

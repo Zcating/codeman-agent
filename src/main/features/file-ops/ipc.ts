@@ -1,10 +1,9 @@
 /**
  * file-ops/ipc.ts
  *
- * ADR-0046 D3: getWorkspaceById 移到 data.ts，handler 经 runMain 执行。
  * 删 db dep，删 better-sqlite3 import。
  *
- * PR-δ (ADR-0058): fs 调用全部走 FileSystem.FileSystem service。
+ * PR-δ : fs 调用全部走 FileSystem.FileSystem service。
  * - editFile / deleteFile / readFile / writeFile handler：走
  *   file-sandbox.ts 的 Effect-returning API（PR-β 已迁移），runMain 桥接。
  * - searchFiles handler 内部的 searchFilesInWorkspace / walkDir 改用

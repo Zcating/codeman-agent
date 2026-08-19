@@ -315,7 +315,7 @@ describe("SidebarMenuSub nesting — seam 8", () => {
     expect(screen.getByText("Conv 1")).toBeInTheDocument();
     expect(screen.getByText("Conv 2")).toBeInTheDocument();
     const subItems = document.querySelectorAll("li");
-    expect(subItems.length).toBeGreaterThanOrEqual(3); 
+    expect(subItems.length).toBeGreaterThanOrEqual(3);
   });
 
   it("SidebarMenuButton exposes 'group/row' so descendants can use group-hover/row:", () => {

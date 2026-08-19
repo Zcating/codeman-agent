@@ -1,4 +1,3 @@
-// ADR-0053 D1 — AutomationRule 类型定义(Minimal T0 foundation)
 // 本文件为主端与渲染端共用,无 Effect 依赖
 
 /**
@@ -63,7 +62,7 @@ export interface AutomationRule {
 export type TriggerKind = "scheduled" | "manual" | "missed-replay";
 
 /**
- * Automation execution status — IPC type (camelCase per ADR-0026)
+ * Automation execution status — IPC type (camelCase per)
  */
 export type AutomationExecutionStatus =
   | "pending"
@@ -75,7 +74,7 @@ export type AutomationExecutionStatus =
   | "missed";
 
 /**
- * Automation execution record — IPC type (camelCase per ADR-0026)
+ * Automation execution record — IPC type (camelCase per)
  * Used across IPC boundary between main, preload, and renderer
  */
 export interface AutomationExecution {
@@ -94,7 +93,6 @@ export interface AutomationExecution {
 }
 
 // ---------------------------------------------------------------------------
-// ADR-0060 — payload shapes for the automations LLM bridge (main ↔ renderer).
 // Wire contract lives in shared so preload (src/preload/index.ts) and the
 // renderer-side type mirror (src/renderer/src/shared/apis/invoke.api.ts) both
 // derive from one source of truth.

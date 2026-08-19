@@ -1,4 +1,3 @@
-// ADR-0060 — automation-llm.ts (Renderer 端)
 // Pure LLM execution logic for the automations pipeline. Replaces the
 // structurally-broken `main-listener.ts` which imported `electron` directly
 // from the renderer (browser context has no `ipcRenderer`).
@@ -45,7 +44,7 @@ export async function executeLlmInRenderer(action: LlmActionPayload): Promise<Ll
     return { status: "error", error: `Provider ${action.providerId} not found` };
   }
 
-  // Build synthetic SubAgentConfig for automation LLM execution (per ADR-0049 D4)
+  // Build synthetic SubAgentConfig for automation LLM execution (per)
   // Automation LLM actions are self-contained with no tools (allowedTools: [])
   const subAgentConfig: SubAgentConfig = {
     id: "automation-llm",

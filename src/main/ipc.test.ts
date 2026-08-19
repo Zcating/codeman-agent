@@ -99,7 +99,6 @@ const EXPECTED_CHANNELS = [
   "subAgents:delete",
   "subAgents:setEnabled",
   "runCommand",
-  // ADR-0053 TC — automations
   "automations:list",
   "automations:create",
   "automations:update",
@@ -143,7 +142,7 @@ describe("ipc.ts barrel", () => {
     registerIpcHandlers({ getMainWindow: () => fakeWin as any });
 
     const automationChannels = EXPECTED_CHANNELS.filter((c) => c.startsWith("automations:"));
-    expect(automationChannels.length).toBeGreaterThan(0); // sanity: the ADR-0053 channels exist
+    expect(automationChannels.length).toBeGreaterThan(0); // sanity: the channels exist
     for (const ch of automationChannels) {
       expect(seen).toContain(ch);
     }

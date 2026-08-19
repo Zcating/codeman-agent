@@ -72,8 +72,8 @@ describe("IPC Mock - V1.5+ Schema", () => {
       const result = await invoke("updateSettings", { newSettings: newSettings });
 
       expect((result as any).theme).toBe("light");
-      expect((result as any).userLanguage).toBe("en"); 
-      expect((result as any).providers).toHaveLength(1); 
+      expect((result as any).userLanguage).toBe("en");
+      expect((result as any).providers).toHaveLength(1);
     });
 
     it("always sets schemaVersion to 1.5", async () => {

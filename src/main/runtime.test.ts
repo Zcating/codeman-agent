@@ -1,5 +1,5 @@
 /**
- * PR-α (ADR-0058) 验证：MainLive 顶层 R 收敛为 never，且
+ * PR-α  验证：MainLive 顶层 R 收敛为 never，且
  * DbLive + NodeFileSystemLive + NodePath.layer 可组合。
  *
  * 测试目标：

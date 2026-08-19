@@ -10,7 +10,7 @@ describe("WorkspaceIdSchema (ADR-0025 PR 4)", () => {
 
   it("schema is brand-distinct from plain string (type-level)", () => {
     const id: WorkspaceId = WorkspaceIdSchema.make("ws-xyz");
-    const s: string = id; 
+    const s: string = id;
     expect(typeof s).toBe("string");
   });
 

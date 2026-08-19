@@ -1,7 +1,6 @@
 /**
  * src/main/features/automations/service.test.ts
  *
- * ADR-0059 D5: TDD safety net — lock behavior of all 9 Effect.gen functions
  * in service.ts before wrapping to Effect.fn (commit #7).
  *
  * Test pattern: vitest + Effect.runPromise with TestLayer (NodeFileSystemLive + NodePath.layer).

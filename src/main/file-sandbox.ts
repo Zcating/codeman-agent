@@ -1,7 +1,7 @@
 /**
  * src/main/file-sandbox.ts
  *
- * PR-β (ADR-0058): 全面 Effect-TS 化，迁移到 FileSystem / Path service。
+ * PR-β : 全面 Effect-TS 化，迁移到 FileSystem / Path service。
  *
  * 行为契约（保持向后兼容）：
  * - validatePathInWorkspace / validatePathForWrite 返回 canonical realpath，
@@ -10,7 +10,7 @@
  * - readFileInWorkspace / writeFileInWorkspace 复用前两个验证 + 走 service。
  * - writeFileInWorkspace 保持原子写：tmp + rename，失败清理 tmp。
  *
- * 错误模型（ADR-0058 D6）：
+ * 错误模型：
  * - PlatformError SystemError reason NotFound → AppBackendError.NotFound
  * - 其他 PlatformError SystemError → AppBackendError.Unknown
  * - SandboxViolation 走 AppBackendError.SandboxViolation（与 renderer 镜像）
@@ -59,7 +59,7 @@ const checkBlockedPatterns = (
 };
 
 // ---------------------------------------------------------------------------
-// PlatformError → AppBackendError 映射（保守映射，per ADR-0058 D6）
+// PlatformError → AppBackendError 映射（保守映射，per6）
 // ---------------------------------------------------------------------------
 
 const mapPlatformError = (

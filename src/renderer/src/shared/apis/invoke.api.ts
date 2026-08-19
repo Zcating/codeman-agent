@@ -135,7 +135,7 @@ export interface CodemanApi {
   readonly subAgentsDelete: (args: { id: string }) => Promise<void>;
   readonly subAgentsSetEnabled: (args: { id: string; enabled: boolean }) => Promise<SubAgentConfig>;
 
-  // Automations (ADR-0053 D7)
+  // Automations
   readonly automationsList: () => Promise<readonly AutomationRule[]>;
   readonly automationsCreate: (rule: AutomationRule) => Promise<AutomationRule>;
   readonly automationsUpdate: (rule: AutomationRule) => Promise<AutomationRule>;
@@ -150,13 +150,11 @@ export interface CodemanApi {
   readonly automationsGetExecution: (args: { id: string }) => Promise<AutomationExecution>;
   readonly automationsRunMissed: (args: { id: AutomationId }) => Promise<void>;
 
-  // ADR-0060 — bridge subscription for main→renderer LLM execution requests.
   // See `src/preload/index.ts` for the same shape; renderer must not import `electron` directly.
   readonly automationsExecuteLlm: (
     handler: (request: LlmExecuteRequest) => void | Promise<void>,
   ) => () => void;
 
-  // ADR-0060 — fire-and-forget back-channel for renderer→main LLM result.
   readonly automationsSendLlmResult: (payload: LlmResultPayload) => void;
 }
 

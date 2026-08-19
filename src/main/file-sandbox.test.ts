@@ -1,7 +1,7 @@
 /**
  * src/main/file-sandbox.test.ts
  *
- * PR-β (ADR-0058): 测试改为 it.layer(TestLayer) + Effect.gen，注入
+ * PR-β : 测试改为 it.layer(TestLayer) + Effect.gen，注入
  * NodeFileSystemLive + NodePath.layer 而非直调 node:fs/promises。
  *
  * 用 it.layer 把 TestLayer 注入到所有嵌套 it.effect 中，自动提供

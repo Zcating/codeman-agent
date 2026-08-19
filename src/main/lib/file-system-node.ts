@@ -1,5 +1,5 @@
 /**
- * PR-α (ADR-0058) 基础：手写 `Layer<FileSystem.FileSystem>`，包装 `node:fs/promises`。
+ * PR-α  基础：手写 `Layer<FileSystem.FileSystem>`，包装 `node:fs/promises`。
  *
  * 为什么手写而不是直接用 @effect/platform-node 的 `NodeFileSystem.layer`：
  * - @effect/platform-node-shared@0.61.1 里的 `SystemError` 是箭头函数而非 class，

@@ -1,7 +1,7 @@
 /**
  * src/main/features/skills/lib/skill-loader.test.ts
  *
- * PR-δ (ADR-0058): scanSkillsDir / loadSkillContent 改为 Effect-returning，
+ * PR-δ : scanSkillsDir / loadSkillContent 改为 Effect-returning，
  * 走 TestLayer（NodeFileSystemLive + NodePath.layer）注入 FileSystem / Path。
  *
  * 测试场景（与 PR-δ 前一致）：

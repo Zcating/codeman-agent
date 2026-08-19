@@ -61,10 +61,10 @@ Produce a structured review with these sections (skip empty ones):
    - API key / secret leaks
 5. **Style** (this project's conventions):
    - `as any` / `@ts-ignore` (forbidden — flag as Critical)
-   - BEM class names (forbidden — use Tailwind utility classes per ADR-0006)
+   - BEM class names (forbidden — use Tailwind utility classes per)
    - Inline `<style>` blocks (forbidden — use `@theme` tokens)
    - `createSignal` outside `stores/` (forbidden — must live in `src/features/<feature>/stores/`)
-   - Direct IPC in components (forbidden — go through Store per ADR-0016 D4)
+   - Direct IPC in components (forbidden — go through Store per)
 
 ## Process
 

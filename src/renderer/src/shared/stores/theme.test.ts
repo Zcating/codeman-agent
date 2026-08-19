@@ -28,7 +28,7 @@ describe("startThemeSync — .dark 类应用", () => {
   beforeEach(() => {
     _resetThemeSync();
     document.documentElement.classList.remove("dark");
-    mockTheme = "dark"; 
+    mockTheme = "dark";
   });
 
   it("theme='dark' → 向 documentElement 添加 .dark 类", async () => {
@@ -39,7 +39,7 @@ describe("startThemeSync — .dark 类应用", () => {
   });
 
   it("theme='light' → 从 documentElement 移除 .dark 类", async () => {
-    document.documentElement.classList.add("dark"); 
+    document.documentElement.classList.add("dark");
     mockTheme = "light";
     startThemeSync();
     await new Promise((r) => setTimeout(r, 10));
@@ -83,7 +83,7 @@ describe("startThemeSync — .dark 类应用", () => {
   });
 
   it("theme='system' + prefers-color-scheme:light → 移除 .dark 类", async () => {
-    document.documentElement.classList.add("dark"); 
+    document.documentElement.classList.add("dark");
 
     Object.defineProperty(window, "matchMedia", {
       writable: true,
@@ -142,7 +142,7 @@ describe("startThemeSync — .dark 类应用", () => {
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockReturnValue({
-        matches: false, 
+        matches: false,
         media: "(prefers-color-scheme: dark)",
         addEventListener: (_: string, listener: (e: MediaQueryListEvent) => void) => {
           listenerRegistry.push(listener);
@@ -163,14 +163,14 @@ describe("startThemeSync — .dark 类应用", () => {
   });
 
   it("system theme change matches=false → 移除 .dark 类并更新 theme$", async () => {
-    document.documentElement.classList.add("dark"); 
+    document.documentElement.classList.add("dark");
 
     const listenerRegistry: Array<(e: MediaQueryListEvent) => void> = [];
 
     Object.defineProperty(window, "matchMedia", {
       writable: true,
       value: vi.fn().mockReturnValue({
-        matches: true, 
+        matches: true,
         media: "(prefers-color-scheme: dark)",
         addEventListener: (_: string, listener: (e: MediaQueryListEvent) => void) => {
           listenerRegistry.push(listener);
@@ -254,8 +254,8 @@ describe("startThemeSync — .dark 类应用", () => {
   });
 
   it("_resetThemeSync no-op when already reset → 不抛异常", () => {
-    _resetThemeSync(); 
-    _resetThemeSync(); 
+    _resetThemeSync();
+    _resetThemeSync();
     expect(() => _resetThemeSync()).not.toThrow();
   });
 

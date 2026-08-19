@@ -5,13 +5,13 @@
  * MigrationsLive: 应用 .sql 迁移文件
  * DbLive = Layer.mergeAll(SqliteLive, MigrationsLive)
  *
- * PR-δ (ADR-0058): applyMigrationsEffect 内部 fs 调用改经 FileSystem service。
+ * PR-δ : applyMigrationsEffect 内部 fs 调用改经 FileSystem service。
  * MigrationsLive 用 Layer.provide(NodeFileSystemLive) 注入 FileSystem，
  * R 收敛为 never，MigrationsLive 顶层不再泄漏 FileSystem 依赖。
  *
  * migrationsDir() 仍 sync（boot path, pre-runtime，无 service context），
  * fileURLToPath 保留 node:url import，existsSync 保留用于 boot path 探针
- * （见 ADR-0058 PR-δ C2）。
+ * （见R-δ C2）。
  */
 import { join, dirname } from "node:path";
 import { existsSync } from "node:fs";

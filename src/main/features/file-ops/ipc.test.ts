@@ -1,7 +1,6 @@
 /**
  * file-ops/ipc.test.ts
  *
- * ADR-0046 D3 测试策略：
  * - vi.mock("./data") 后测 handler wiring
  * - 保留 applyEdit 纯函数测试
  */

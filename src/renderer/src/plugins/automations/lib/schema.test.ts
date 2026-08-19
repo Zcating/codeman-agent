@@ -1,4 +1,3 @@
-// ADR-0053 T0 — renderer-side schema 测试 (mirror of main-side)
 import { describe, it, expect } from "@effect/vitest";
 import { Effect } from "effect";
 import { parseAutomationRule } from "./schema";

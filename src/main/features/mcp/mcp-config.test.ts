@@ -1,7 +1,7 @@
 /**
  * src/main/features/mcp/mcp-config.test.ts
  *
- * PR-γ (ADR-0058): 测试走 TestLayer（NodeFileSystemLive + NodePath.layer）。
+ * PR-γ : 测试走 TestLayer（NodeFileSystemLive + NodePath.layer）。
  *
  * 注：vi.mock 被 hoist 到所有 import 之上。引用顶层 const 即使已经声明也会
  * 触发 vitest 的 "no top level variables inside" 安全检查。解决方案：把

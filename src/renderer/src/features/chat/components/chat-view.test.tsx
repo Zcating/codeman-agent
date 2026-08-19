@@ -603,19 +603,19 @@ describe("ChatView", () => {
   });
 
 
-  it("Bug B (ADR-0029 D5): inline error banner 已移除", () => {
+  it("Bug B : inline error banner 已移除", () => {
     const { container } = render(() => <ChatView convId="conv-err" />);
     const banner = container.querySelector('[data-testid="chat-error-banner"]');
-    expect(banner).toBeNull(); 
+    expect(banner).toBeNull();
   });
 
-  it("Bug B (ADR-0029 D5): lastError = null / undefined 时不渲染 banner", () => {
+  it("Bug B : lastError = null / undefined 时不渲染 banner", () => {
     const { container } = render(() => <ChatView convId="conv-1" />);
     const banner = container.querySelector('[data-testid="chat-error-banner"]');
     expect(banner).toBeNull();
   });
 
-  it("Bug B (ADR-0029 D5): lastError 非空 → codemanToast.error 被调 (runtime error 通知)", async () => {
+  it("Bug B : lastError 非空 → codemanToast.error 被调 (runtime error 通知)", async () => {
     mockCodemanToast.error.mockClear();
     render(() => <ChatView convId="conv-err" />);
     await vi.waitFor(() => {
@@ -933,7 +933,7 @@ describe("ChatView ringInfo contextWindow three-layer lookup", () => {
               },
             ],
             modelsEndpoint: "https://api.minimaxi.com/anthropic/v1/models",
-            contextWindow: 200_000, 
+            contextWindow: 200_000,
           },
         },
       ],
@@ -964,7 +964,7 @@ describe("ChatView ringInfo contextWindow three-layer lookup", () => {
         toolCalls: null,
         toolResults: null,
         model: "gpt-4o",
-        inputTokens: null, 
+        inputTokens: null,
         outputTokens: null,
         createdAt: 1710000001,
       },
@@ -1102,10 +1102,10 @@ describe("ChatView keyboard/focus regression (seam 4)", () => {
 
 
 // ============================================================
-// ParallelPanel integration at chat-view level (ADR-0049 D8)
+// ParallelPanel integration at chat-view level
 // ============================================================
 
-describe("ChatView parallel-panel (ADR-0049 D8)", () => {
+describe("ChatView parallel-panel ", () => {
   afterEach(() => {
     cleanup();
   });

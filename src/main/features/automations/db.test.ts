@@ -1,4 +1,3 @@
-// ADR-0053 TB — db.test.ts (DAO unit tests with in-memory SQLite)
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Effect } from "effect";
 

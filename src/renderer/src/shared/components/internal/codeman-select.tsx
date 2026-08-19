@@ -16,7 +16,7 @@ export interface CodemanSelectProps {
   disabled?: boolean;
   "aria-label"?: string;
   "data-testid"?: string;
-  children?: JSX.Element; 
+  children?: JSX.Element;
 }
 
 export const CodemanSelect: Component<CodemanSelectProps> = (props) => {

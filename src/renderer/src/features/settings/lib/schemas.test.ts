@@ -51,7 +51,7 @@ describe("settings schemas (ADR-0025 PR 4)", () => {
   });
 });
 
-describe("ProviderSchema decodes camelCase fields (ADR-0047 D1)", () => {
+describe("ProviderSchema decodes camelCase fields ", () => {
   it("decodes a Provider with camelCase fields matching types.ts Provider interface", () => {
     const camelProvider = {
       id: "minimax",

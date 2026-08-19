@@ -373,7 +373,7 @@ describe("toPiMessages()", () => {
   });
 });
 
-describe("toPiMessages() — G32: assistant.toolResults (ADR-0028)", () => {
+describe("toPiMessages() — G32: assistant.toolResults ", () => {
   it("assistant with toolResults:[{tc1}] → AssistantMessage + 1 ToolResultMessage", () => {
     const result = toPiMessages(
       [
@@ -391,7 +391,7 @@ describe("toPiMessages() — G32: assistant.toolResults (ADR-0028)", () => {
     expect(result[1].role).toBe("toolResult");
     const trMsg = result[1] as ToolResultMessage;
     expect(trMsg.toolCallId).toBe("tc1");
-    expect(trMsg.toolName).toBe("read_file"); 
+    expect(trMsg.toolName).toBe("read_file");
     expect(trMsg.content).toEqual([{ type: "text", text: "file content" }]);
   });
 

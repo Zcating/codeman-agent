@@ -1,4 +1,3 @@
-// ADR-0053 T0 — renderer-side schema mirror (与 main 端一致,用于表单校验)
 import { Effect, Schema } from "effect";
 
 // ---------------------------------------------------------------------------
@@ -52,7 +51,6 @@ const LlmActionSchema = Schema.Struct({
   userPrompt: Schema.String,
   providerId: Schema.String,
   modelId: Schema.String,
-  // ADR-0053 T8: range [30_000, 1_800_000]
   timeoutMs: Schema.Number.pipe(Schema.between(30_000, 1_800_000)),
 });
 
@@ -61,7 +59,6 @@ const ScriptActionSchema = Schema.Struct({
   language: Schema.Union(Schema.Literal("shell"), Schema.Literal("javascript")),
   source: Schema.String,
   workspaceId: Schema.String,
-  // ADR-0053 T13: range [5_000, 1_800_000]
   timeoutMs: Schema.Number.pipe(Schema.between(5_000, 1_800_000)),
 });
 
@@ -74,7 +71,7 @@ export const AutomationActionSchema = Schema.Union(
 // AutomationRule — 完整结构
 // ---------------------------------------------------------------------------
 export const AutomationRuleSchema = Schema.Struct({
-  id: Schema.String, // AutomationId = string per ADR-0053 D1
+  id: Schema.String, // AutomationId = string per
   name: Schema.String,
   enabled: Schema.Boolean,
   schedule: AutomationScheduleSchema,
