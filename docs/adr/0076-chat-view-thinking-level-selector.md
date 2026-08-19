@@ -1,4 +1,4 @@
-# ADR-0076 — Chat-View Thinking Level Selector (per-run transient)
+# — Chat-View Thinking Level Selector (per-run transient)
 
 **Status**: accepted · **Date**: 2026-08-17
 

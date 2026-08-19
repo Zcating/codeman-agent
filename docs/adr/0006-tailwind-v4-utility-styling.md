@@ -104,6 +104,6 @@ codeman-agent 的前端处于 V0 widget → V1 chat agent 的过渡中,样式现
 
 - Tailwind v4 docs: https://tailwindcss.com/docs
 - `@tailwindcss/vite` plugin: https://tailwindcss.com/docs/installation/using-vite
-- ADR-0001 (Tauri 2 + Solid.js 栈决策)
-- ADR-0003 (Effect-TS 逻辑层,跟 utility-only 视觉层的边界)
+- (Tauri 2 + Solid.js 栈决策)
+- (Effect-TS 逻辑层,跟 utility-only 视觉层的边界)
 - `CONTEXT.md` → "Styling" 段 (Utility Class / Theme / Style Token 词条)

@@ -3,15 +3,15 @@
 - **Status**: accepted
 - **Date**: 2026-08-02
 - **Scope**: `src/renderer/src/features/settings/**` + `src/renderer/src/features/chat/lib/{runtime,build-model,anthropic-transport,pi-provider-adapter}.ts` + `src/renderer/src/features/chat/stores/chat.store.ts` + `src/main/features/settings/state.ts` + `src/renderer/src/shared/stores/app.store.ts` + `src/renderer/src/shared/lib/types.ts` + `src/renderer/src/shared/apis/provider.api.ts` + `docs/adr/0043-...md` (D4 标记的 pre-existing 设计债关闭)
-- **Supersedes**: 无(per ADR-0002 锁的"runtime 路径"决定从"绕开 PI provider 抽象"变为"沿 PI `createProvider()`");在 ADR-0012 / 0015 / 0016 / 0029 基础上的**收敛**,不是逆转
+- **Supersedes**: 无(per 锁的"runtime 路径"决定从"绕开 PI provider 抽象"变为"沿 PI `createProvider()`");在 / 0015 / 0016 / 0029 基础上的**收敛**,不是逆转
 - **Related**:
-  - [ADR-0002](./0002-pi-mono-agent-runtime.md) — pi-mono 选型来源
-  - [ADR-0011](./0011-anthropic-messages-only.md) — `apiType: "anthropic-messages"` 锁单值
-  - [ADR-0012](./0012-unified-provider-schema.md) — `Provider.llm` shape
-  - [ADR-0015](./0015-app-store-and-key-simplification.md) — `Provider.apiKey` 明文落 settings.json
-  - [ADR-0016](./0016-app-store-refresh-models.md) — `Default Model Invariant`
-  - [ADR-0029](./0029-form-mode-for-home-and-chat-input.md) — ProviderCard 走 TanStack Form
-  - [ADR-0043](./0043-settings-schema-move-to-features.md) — D4 标记 renderer schema 重复为已知设计债(本 ADR 关闭)
+  -  — pi-mono 选型来源
+  -  — `apiType: "anthropic-messages"` 锁单值
+  -  — `Provider.llm` shape
+  -  — `Provider.apiKey` 明文落 settings.json
+  -  — `Default Model Invariant`
+  -  — ProviderCard 走 TanStack Form
+  -  — D4 标记 renderer schema 重复为已知设计债(本 ADR 关闭)
   - [CONTEXT.md](../../CONTEXT.md) — `Provider` / `Provider.llm` / `Default Model Invariant` / `App Store` 词汇表
 
 ## Context
@@ -20,7 +20,7 @@
 
 `src/renderer/src/features/chat/lib/runtime.ts` 当前走法:
 
-1. `Provider` config from `appStore.state.value.providers[]` (camelCase shape, per ADR-0012)
+1. `Provider` config from `appStore.state.value.providers[]` (camelCase shape, per)
 2. 手工构造 `ProviderConfig` flat shape (`runtime.ts:93`,`ProviderConfig = { apiKey?, baseUrl, defaultModel, systemPrompt, tools, workspaceId?, enabledSkills? }`)
 3. `buildModel(provider, modelId)` (`build-model.ts:11`) 构造 PI `Model<"anthropic-messages">` 静态 shape
 4. `new Agent({ model, tools, systemPrompt, streamFn: anthropicStream, getApiKey: async () => provider.apiKey })` (`runtime.ts:322-337`)
@@ -47,7 +47,7 @@ Schema.Struct({
 })
 ```
 
-`src/renderer/src/shared/lib/types.ts` 实际 `Provider` shape(camelCase,per CONTEXT.md / ADR-0012):
+`src/renderer/src/shared/lib/types.ts` 实际 `Provider` shape(camelCase,per CONTEXT.md /):
 
 ```ts
 interface ProviderLlm {
@@ -78,7 +78,7 @@ ADR-0016 D2 不变量 `Provider.llm.defaultModel ∈ Provider.llm.models[].id �
 
 ## Decision
 
-### D1 — Schema 统一为 camelCase(关闭 ADR-0043 D4 已知设计债)
+### D1 — Schema 统一为 camelCase(关闭 已知设计债)
 
 **`src/renderer/src/features/settings/lib/schemas.ts` 改 camelCase 字段名**,与 `src/renderer/src/shared/lib/types.ts` 对齐:
 
@@ -102,7 +102,7 @@ ADR-0016 D2 不变量 `Provider.llm.defaultModel ∈ Provider.llm.models[].id �
 | `schema_version` | `schemaVersion` |
 | `llm_providers` | `llmProviders` (legacy) |
 
-**JSON on-disk 格式保持 camelCase**(per ADR-0024 D10 已定 wire format = camelCase;`SettingsState.load/save` 不做任何转换,直接 read/write camelCase)。
+**JSON on-disk 格式保持 camelCase**(per 已定 wire format = camelCase;`SettingsState.load/save` 不做任何转换,直接 read/write camelCase)。
 
 **保留 helper**:`withMessage`, `BaseUrlSchema`, `ModelSchema`, `ApiKeySchema`(已 camelCase)。
 
@@ -116,11 +116,11 @@ ADR-0016 D2 不变量 `Provider.llm.defaultModel ∈ Provider.llm.models[].id �
 
 - wire format 已是 camelCase(ADR-0024 D10:V3.1 起新写盘 / 新读盘全 camel,含一次性 `migrateV15SnakeToCamel()` 迁移存量 snake 文件)
 - 应用未正式上线,无真实用户 settings.json 需要保持 snake_case 兼容;转换层是无谓复杂度(违反简单优先)
-- ADR-0024 D10 明确拒绝过「wire snake + IPC 层 bridge」(其 Rejected (a))——本 D1 不复活该方案
+- 明确拒绝过「wire snake + IPC 层 bridge」(其 Rejected (a))——本 D1 不复活该方案
 
 **拒绝**:
 - A. 在 renderer schema 内部做 snake_case ↔ camelCase 转换:违反 simple 优先(双重映射)
-- B. 把 main schema 也改 snake_case:破坏 ADR-0016 D2 已立的 camelCase runtime 形状 + ADR-0024 D10 的 camelCase wire
+- B. 把 main schema 也改 snake_case:破坏 已立的 camelCase runtime 形状 + 的 camelCase wire
 - C. 跨进程共享 schema(`src/shared/schema`):架构变更,需独立 ADR;不绑本 PR
 
 ### D2 — `Default Model Invariant` 集中化
@@ -322,8 +322,8 @@ export const anthropicStream: StreamFn = (model, context, options) =>
 
 | # | Commit | 文件 | 依赖 | 估时 |
 | --- | --- | --- | --- | --- |
-| 1 | `A. refactor(settings): unify schema to camelCase (ADR-0047 D1)` | `schemas.ts` + `state.ts` + `types.ts` + 2 测试 | 无 | 2-3d |
-| 2 | `B. refactor(settings): centralize default-model invariant (ADR-0047 D2)` | `provider-invariant.ts`(新)+ `app.store.ts` + `add-provider-dialog.tsx` + main 端 `state.ts` 复制 + 5 测试 | A 不依赖(独立)| 1d |
+| 1 | `A. refactor(settings): unify schema to camelCase ` | `schemas.ts` + `state.ts` + `types.ts` + 2 测试 | 无 | 2-3d |
+| 2 | `B. refactor(settings): centralize default-model invariant ` | `provider-invariant.ts`(新)+ `app.store.ts` + `add-provider-dialog.tsx` + main 端 `state.ts` 复制 + 5 测试 | A 不依赖(独立)| 1d |
 | 3 | `C+D. refactor(chat): migrate to PI createProvider() (ADR-0047 D3+D4)` | `pi-provider-adapter.ts`(新)+ `anthropic-stream-fn.ts`(新)+ `runtime.ts` + `chat.store.ts` + `home.tsx` + `chat-view.tsx` + 删 `build-model.ts` + 删 `anthropic-transport.ts` + 4+1 测试 | A + B | 3-4d(修正:收敛版,保留 Agent) |
 
 **实施顺序**:串行(A → B → C+D)。A 和 B 改动文件集无交集,**理论上可并行**(`run_in_background=true` 派发 2 个 subagent),但**实际**为简化协调,先 A 后 B;若 A 失败 B 自动 rebase 重跑。
@@ -358,7 +358,7 @@ private save(): void {
 
 - `sanitize()` 走 `Schema.decode(SettingStruct)`,`SettingStruct` 是 camelCase;on-disk 直接存 camelCase,无 decode 失败问题。
 - on-disk snake_case 的「历史兼容旧 V1.x settings.json」理由不成立:应用未正式上线,无真实用户数据;ADR-0024 D10 已用一次性 `migrateV15SnakeToCamel()` 处理存量 snake 文件,且明确拒绝「wire snake + IPC bridge」方案。
-- 若未来需兼容旧 snake 文件,应走 ADR-0024 D10 的 migration 管线(load 入口一次迁移),而非每次 load/save 都做转换。
+- 若未来需兼容旧 snake 文件,应走 的 migration 管线(load 入口一次迁移),而非每次 load/save 都做转换。
 
 **测试**:
 - `state.test.ts` 已有覆盖(load 空文件 / 写盘 round-trip 等)
@@ -369,8 +369,8 @@ private save(): void {
 
 | 选 | 描述 | 选 / 不选 |
 | --- | --- | --- |
-| 1 | renderer schema 改 camelCase + IPC 边界显式转换(本 ADR) | **选** — 关闭 ADR-0043 D4 设计债,简单直接 |
-| 2 | main schema 也改 snake_case | 不选 — 破坏 ADR-0016 D2 已立的 camelCase runtime |
+| 1 | renderer schema 改 camelCase + IPC 边界显式转换(本 ADR) | **选** — 关闭 设计债,简单直接 |
+| 2 | main schema 也改 snake_case | 不选 — 破坏 已立的 camelCase runtime |
 | 3 | 跨进程共享 schema(`src/shared/schema`) | 不选 — 架构变更,需独立 ADR;不绑本 PR |
 
 ### B 候选(Invariant 集中化)3 选
@@ -417,12 +417,12 @@ private save(): void {
 
 ### 不变
 
-- ADR-0002 (pi-mono 选型) — upstream 由 `@mariozechner/pi-ai` 名字看是 pi-mono,实际是 earendil fork v0.80.3(per D4 校正);但 **API 形态与 pi-mono 兼容**(同是 pi-ai 0.80.x 线)
-- ADR-0011 (anthropic-messages only) — `apiType: "anthropic-messages"` 锁单值不变,`anthropicMessagesApi()` 硬编码
-- ADR-0012 (Unified Provider schema) — `Provider.llm` shape 不变;只是 runtime 侧加 `pi-provider-adapter` 层
-- ADR-0015 (app-store + 明文 key) — `Provider.apiKey` 仍明文落 settings.json,`apiKeyAuth.resolve` 透传
-- ADR-0016 (refreshProviderModels + invariant) — 不变量词条保留;**D2 是它的强化**(集中化),不逆转
-- ADR-0029 (Form mode) — ProviderCard 走 TanStack Form 不变
+- (pi-mono 选型) — upstream 由 `@mariozechner/pi-ai` 名字看是 pi-mono,实际是 earendil fork v0.80.3(per D4 校正);但 **API 形态与 pi-mono 兼容**(同是 pi-ai 0.80.x 线)
+- (anthropic-messages only) — `apiType: "anthropic-messages"` 锁单值不变,`anthropicMessagesApi()` 硬编码
+- (Unified Provider schema) — `Provider.llm` shape 不变;只是 runtime 侧加 `pi-provider-adapter` 层
+- (app-store + 明文 key) — `Provider.apiKey` 仍明文落 settings.json,`apiKeyAuth.resolve` 透传
+- (refreshProviderModels + invariant) — 不变量词条保留;**D2 是它的强化**(集中化),不逆转
+- (Form mode) — ProviderCard 走 TanStack Form 不变
 - IPC contracts (channel 名 + 参数类型)— 完全不变(renderer 内部重构)
 - `add-provider-dialog` 老 signal + onSubmit 范式 — 不动(per /work-work Must NOT)
 - e2e spec 设置路径 — 不动
@@ -432,7 +432,7 @@ private save(): void {
 - **R1**: `pi-provider-adapter.ts` 100L 是新模块,需 TDD 严格红绿重构;`buildModel` 删前必须有等价 PI Model 输出测试(防"功能回归")
 - **R2**: `anthropicMessagesApi()` 立即加载 SDK,bundle size +50KB(估);若超 600KB 阈值需改用 `.lazy` 后缀
 - **R3**: `ModelMeta` → `Model<"anthropic-messages">` mapper 的 `provider` 字段必须填 user provider id(per `modelMetaToPiModel` 的 `.with({ provider })`);漏填 PI 内部路由失败
-- **R4**: `SettingsState` load/save 不做字段名转换,on-disk 即 camelCase(ADR-0024 D10);性能无转换开销
+- **R4**: `SettingsState` load/save 不做字段名转换,on-disk 即 camelCase;性能无转换开销
 - **R5**: `enforceDefaultModelInvariant` 是 fallback 而非 throw,用户编辑 `defaultModel` 后 save 之前会"自动跳"到 `models[0]`,可能让用户困惑(为何我改完点 Save 字段没保存);**ADR 章节记录行为**(per /work-work Must NOT 解除);V2+ 加 UI warning
 
 ## Verification
@@ -471,8 +471,8 @@ vp run dev
 3 atomic commit on `refactor/setting-provider-pi-route` worktree branch:
 
 ```
-1. refactor(settings): unify schema to camelCase (ADR-0047 D1)
-2. refactor(settings): centralize default-model invariant (ADR-0047 D2)
+1. refactor(settings): unify schema to camelCase
+2. refactor(settings): centralize default-model invariant
 3. refactor(chat): migrate to PI createProvider() (ADR-0047 D3+D4)
 ```
 
@@ -480,7 +480,7 @@ merge to master 用 `--no-ff`(per AGENTS.md)。
 
 ## References
 
-- [ADR-0002](./0002-pi-mono-agent-runtime.md) / [ADR-0011](./0011-anthropic-messages-only.md) / [ADR-0012](./0012-unified-provider-schema.md) / [ADR-0015](./0015-app-store-and-key-simplification.md) / [ADR-0016](./0016-app-store-refresh-models.md) / [ADR-0029](./0029-form-mode-for-home-and-chat-input.md) / [ADR-0043](./0043-settings-schema-move-to-features.md)
+-  /  /  /  /  /  /
 - `@earendil-works/pi-ai@0.80.3` `dist/models.d.ts` (CreateProviderOptions / Provider / createProvider) + `dist/auth/types.d.ts` (ProviderAuth / ApiKeyAuth) — 实测
 - `@earendil-works/pi-ai@0.80.3` README — Custom Providers / createProvider() / API Implementations 章节
 - `node_modules/.pnpm/@earendil-works+pi-ai@0.80.3_ws@8.21.0_zod@4.4.3/node_modules/@earendil-works/pi-ai/dist/` — API 实证

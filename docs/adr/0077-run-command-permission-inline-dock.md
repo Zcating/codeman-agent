@@ -1,4 +1,4 @@
-# ADR-0077 — Run-Command Permission: Inline ChatView Dock
+# — Run-Command Permission: Inline ChatView Dock
 
 **Status**: accepted · **Date**: 2026-08-17
 

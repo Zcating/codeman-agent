@@ -88,7 +88,7 @@
 
 ## References
 
-- ADR-0003 (Effect-TS 逻辑层)
+- (Effect-TS 逻辑层)
 - tauri-plugin-log 2.x 官方文档：<https://v2.tauri.app/plugin/logging/>
 - `src-tauri/src/lib.rs` (plugin builder)
 - `src-tauri/src/state.rs::fetch_provider` (本次修改点)

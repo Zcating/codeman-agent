@@ -45,10 +45,10 @@ glob 过滤过的路径列表**,不需要再检查扩展名 / 文件类型。
 2. **冗余类型检测**:staged glob 已经分流,regex 是 noise
 3. **CI 路径不友好**: 后端开发者改 `*.rs` 不该触发前端 typecheck;拆分后门禁独立
 
-### D2.前端门禁 = `scripts/precommit.mjs`(per ADR-0020 D7)
+### D2.前端门禁 = `scripts/precommit.mjs`(per)
 
 收到 `*.{ts,tsx,mjs}` 文件:
-1. **typecheck**(全项目,跟 staged 文件无关——per ADR-0020)
+1. **typecheck**(全项目,跟 staged 文件无关——per)
 2. **`vitest related <staged>`**——跑 staged 文件 import graph 内的测试
 3. **`--coverage --coverage.include=<src>` × N**——coverage scope 缩到 staged 源文件
 4. **perFile 90% statements** 阈值(`vite.config.ts::test.coverage.thresholds`)
@@ -190,7 +190,7 @@ perFile 阈值失去意义。未在 report 中的文件 = 没测试 → fail。
 | --- | --- |
 | `docs/adr/0021-precommit-gate-architecture.md` | 本 ADR(新增) |
 | `vite.config.ts` | 新增 `"*.rs": "node scripts/precommit-rust.mjs"` staged glob + 注释 |
-| `scripts/precommit.mjs` | 不变(per ADR-0020 D7) |
+| `scripts/precommit.mjs` | 不变(per) |
 | `scripts/precommit-rust.mjs` | 新建 — 后端门禁(clippy + test + coverage + check) |
 | `scripts/check-rust-coverage.mjs` | 新建 — perFile 90% lines 阈值(JSON 解析) |
 | `package.json` | 新增 3 个 script:`tauri:lint` / `tauri:coverage` / `tauri:coverage:check` |
@@ -205,8 +205,8 @@ perFile 阈值失去意义。未在 report 中的文件 = 没测试 → fail。
 
 ## References
 
-- ADR-0020 § D1-D7:test helpers 提取 + 前端 perFile coverage gate(本 ADR 互补)
-- ADR-0003 § Effect-TS 逻辑层:Rust ↔ TypeScript IPC contract 同步
+- § D1-D7:test helpers 提取 + 前端 perFile coverage gate(本 ADR 互补)
+- § Effect-TS 逻辑层:Rust ↔ TypeScript IPC contract 同步
 - `src-tauri/AGENTS.md` § "测试":`cargo test` 已存在的 pattern
 - `cargo-llvm-cov` 文档:JSON output format + `--fail-under-lines` 限制
 - vp-staged 文档:glob match + args forwarding
