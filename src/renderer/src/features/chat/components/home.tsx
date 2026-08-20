@@ -1,12 +1,11 @@
 
 import { createMemo, createEffect, Show, type JSX } from "solid-js";
 import { Send } from "lucide-solid";
-import { Effect, Exit } from "effect";
 import { useNavigate } from "@tanstack/solid-router";
 import { createForm } from "@tanstack/solid-form";
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
 import { formatAppError } from "@codeman-frontend/shared/lib/format-app-error";
-import { effectSchema, firstErrorMessage } from "@codeman-frontend/shared/lib/effect-schema-adapter";
+import { firstErrorMessage } from "@codeman-frontend/shared/lib/effect-schema-adapter";
 import { Button } from "@codeman-frontend/shared/components/ui/button";
 import { CodemanSelect } from "@codeman-frontend/shared/components/internal/codeman-select";
 import { CodemanGroupSelect } from "@codeman-frontend/shared/components/internal/codeman-group-select";
@@ -23,19 +22,11 @@ import {
   homeSelectedProviderId$,
   homeSelectedModelId$,
 } from "@codeman-frontend/features/chat/stores/chat.store";
-import type { ProviderConfig } from "@codeman-frontend/core/llm/runtime";
-import { buildEnabledProviders } from "@codeman-frontend/core/llm/build-enabled-providers";
 import {
   handleArrowUpField,
   handleArrowDownField,
   recordInputEntry,
 } from "@codeman-frontend/features/chat/stores/input-history.store";
-import {
-  ModelIdFieldSchema,
-  WorkspaceIdFieldSchema,
-  HomeFormSchema,
-  type HomeFormValue,
-} from "@codeman-frontend/core/llm/schemas";
 import { skillsManifests$ } from "@codeman-frontend/features/skills/stores/skills.store";
 import type { SkillManifest } from "@codeman-frontend/shared/lib/types";
 
@@ -44,9 +35,9 @@ function LlmPicker(props: {
   onChange: (modelId: string) => void;
 }): JSX.Element {
   const groups = createMemo(() =>
-    buildEnabledProviders(appStore.state.value.providers ?? []).map((p) => ({
+    (appStore.state.value.providers ?? []).map((p) => ({
       label: p.label,
-      options: p.models.map((m) => ({ label: m.label, value: m.id })),
+      options: (p.llm?.models ?? []).map((m) => ({ label: m.label, value: m.id })),
     }))
   );
 
@@ -77,14 +68,15 @@ interface HomeWorkspaceItem {
   rootPath: string;
 }
 
+const toHomeWorkspaceItem = (w: unknown): HomeWorkspaceItem => {
+  const obj = w as { id: string; label: string; rootPath: string };
+  return { id: obj.id, label: obj.label, rootPath: obj.rootPath };
+};
+
 export function HomeAgentForm(): JSX.Element {
   const workspaces = createMemo((): HomeWorkspaceItem[] => {
     const list = workspaces$() ?? [];
-    return list.map((w) => ({
-      id: w.id,
-      label: w.label,
-      rootPath: w.rootPath,
-    }));
+    return list.map(toHomeWorkspaceItem);
   });
 
   const wsCount = createMemo(() => workspaces().length);
@@ -98,10 +90,6 @@ export function HomeAgentForm(): JSX.Element {
       draft: "",
       modelId: initialModelId(),
       workspaceId: initialWorkspaceId(),
-    } satisfies HomeFormValue,
-    validators: {
-      onMount: effectSchema(HomeFormSchema),
-      onChange: effectSchema(HomeFormSchema),
     },
     onSubmit: async ({ value }) => {
       const text = value.draft.trim();
@@ -109,30 +97,25 @@ export function HomeAgentForm(): JSX.Element {
 
       const providerId = homeSelectedProviderId$() ?? appStore.state.value.defaultLlmProviderId;
       const providerConfig = appStore.state.value.providers?.find((p) => p.id === providerId);
-      const provider: ProviderConfig = {
-        id: providerConfig?.id ?? "",
-        models: providerConfig?.llm?.models ?? [],
-        apiKey: providerConfig?.apiKey,
-        baseUrl: providerConfig?.llm?.baseUrl ?? "",
-        defaultModel: homeSelectedModelId$() ?? providerConfig?.llm?.defaultModel ?? "auto",
-        systemPrompt: appStore.state.value.systemPrompt?.default ?? "",
-        tools: [],
-      };
+      const modelId = homeSelectedModelId$() ?? providerConfig?.llm?.defaultModel ?? "auto";
 
-      const exit = await Effect.runPromiseExit(
-        createConversation(wsId, text.slice(0, 30)),
-      );
-      if (Exit.isFailure(exit)) {
-        codemanToast.error(formatAppError(exit.cause));
+      let convId: string;
+      try {
+        convId = await createConversation(wsId, text.slice(0, 30));
+      } catch (err) {
+        codemanToast.error(formatAppError(err));
         return;
       }
-      const convId = exit.value;
 
       form.reset({ draft: "", modelId: value.modelId, workspaceId: value.workspaceId });
       recordInputEntry(text);
       navigate({ to: "/conversation/$convId", params: { convId } });
 
-      void Effect.runPromiseExit(sendMessage(convId, text, provider));
+      try {
+        await sendMessage(convId, text, providerId ?? "", modelId);
+      } catch (err) {
+        codemanToast.error(formatAppError(err));
+      }
     },
   }));
 
@@ -173,7 +156,6 @@ export function HomeAgentForm(): JSX.Element {
           <span class="text-xs font-medium text-muted-foreground whitespace-nowrap">当前工作区</span>
           <form.Field
             name="workspaceId"
-            validators={{ onBlur: effectSchema(WorkspaceIdFieldSchema) }}
           >
             {(field) => (
               <div class="w-[200px]">
@@ -193,15 +175,17 @@ export function HomeAgentForm(): JSX.Element {
                     data-testid="workspace-select-add-btn"
                     class="w-full px-3 py-2 text-left text-sm hover:bg-accent"
                     onClick={async () => {
-                      const exit = await Effect.runPromiseExit(addWorkspace());
-                      if (Exit.isFailure(exit)) {
-                        codemanToast.error(formatAppError(exit.cause));
+                      let ws: { id: string } | null | unknown;
+                      try {
+                        ws = await addWorkspace();
+                      } catch (err) {
+                        codemanToast.error(formatAppError(err));
                         return;
                       }
-                      const ws = exit.value as { id: string } | null;
                       if (!ws) {return;}
-                      field().handleChange(ws.id);
-                      setSelectedWorkspaceId(ws.id);
+                      const wsObj = ws as { id: string };
+                      field().handleChange(wsObj.id);
+                      setSelectedWorkspaceId(wsObj.id);
                     }}
                   >
                     + Add new workspace…
@@ -270,7 +254,6 @@ export function HomeAgentForm(): JSX.Element {
           <div class="flex items-center gap-2 px-3 pb-2.5 pt-1">
             <form.Field
               name="modelId"
-              validators={{ onBlur: effectSchema(ModelIdFieldSchema) }}
             >
               {(field) => (
                 <LlmPicker
@@ -278,8 +261,8 @@ export function HomeAgentForm(): JSX.Element {
                   onChange={(modelId) => {
                     field().handleChange(modelId);
                     const providers = appStore.state.value.providers ?? [];
-                    const provider = buildEnabledProviders(providers).find((p) =>
-                      p.models.some((m) => m.id === modelId),
+                    const provider = providers.find((p) =>
+                      p.llm?.models?.some((m) => m.id === modelId),
                     );
                     if (provider) {
                       selectHomeModel(provider.id, modelId);
@@ -317,14 +300,14 @@ export function HomeAgentForm(): JSX.Element {
 
 function initialModelId(): string {
   const providers = appStore.state.value.providers ?? [];
-  const enabled = buildEnabledProviders(providers);
+  const enabled = providers;
   const providerId = appStore.state.value.defaultLlmProviderId;
   const provider = enabled.find((p) => p.id === providerId) ?? enabled[0];
   if (!provider) {return "";}
   const raw = providers.find((p) => p.id === provider.id);
   const defaultModel = raw?.llm?.defaultModel;
-  if (defaultModel && provider.models.some((m) => m.id === defaultModel)) {
+  if (defaultModel && provider.llm?.models?.some((m) => m.id === defaultModel)) {
     return defaultModel;
   }
-  return provider.models[0]?.id ?? "";
+  return provider.llm?.models?.[0]?.id ?? "";
 }

@@ -9,6 +9,7 @@ import type {
   McpToolEntry,
 } from "@codeman-frontend/shared/lib/types";
 import type { SubAgentConfig } from "@codeman-frontend/shared/lib/sub-agent-schema";
+import type { PiApi } from "./pi-api";
 import type {
   AutomationRule,
   AutomationId,
@@ -141,6 +142,8 @@ export interface CodemanApi {
   readonly automationsSendLlmResult: (payload: LlmResultPayload) => void;
 
   readonly piRuntime: PiRuntimeApi;
+  readonly pi: PiApi;
+  readonly onPiEvent: (handler: (event: unknown) => void) => () => void;
 }
 
 export type CodemanApiExposed = CodemanApi &
@@ -233,6 +236,27 @@ const codeman: CodemanApiExposed = {
     getSettings: () => ipcRenderer.invoke("pi:get-settings"),
     setSetting: (key, value) =>
       ipcRenderer.invoke("pi:set-setting", { key, value }),
+  },
+
+  pi: {
+    createSession: (opts?: { cwd?: string }) =>
+      ipcRenderer.invoke("pi:create-session", opts),
+    prompt: (opts: { sessionId: string; text: string; thinkingLevel?: string }) =>
+      ipcRenderer.invoke("pi:prompt", opts),
+    abort: (sessionId: string) =>
+      ipcRenderer.invoke("pi:abort", { sessionId }),
+    openSession: (path: string) =>
+      ipcRenderer.invoke("pi:open-session", { path }),
+    listSessions: (opts?: { cwd?: string }) =>
+      ipcRenderer.invoke("pi:list-sessions", opts),
+    closeSession: (sessionId: string) =>
+      ipcRenderer.invoke("pi:close-session", { sessionId }),
+  },
+
+  onPiEvent: (handler: (event: unknown) => void) => {
+    const listener = (_e: unknown, event: unknown) => handler(event);
+    ipcRenderer.on("pi:event", listener);
+    return () => ipcRenderer.off("pi:event", listener);
   },
 };
 
