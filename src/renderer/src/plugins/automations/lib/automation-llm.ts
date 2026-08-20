@@ -7,7 +7,6 @@
 
 import { createSubAgent, type ToolRegistry } from "@codeman-frontend/features/multi-agents/lib/sub-agent-factory";
 import type { SubAgentConfig } from "@codeman-frontend/shared/lib/sub-agent-schema";
-import type { ProviderConfig } from "@codeman-frontend/core/llm/runtime";
 import type { ModelMeta } from "@codeman-frontend/shared/lib/types";
 import type {
   LlmActionPayload,

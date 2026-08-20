@@ -1,7 +1,6 @@
 import { Schema } from "effect";
 import type { AgentTool, AgentEvent } from "@earendil-works/pi-agent-core";
 import type { SubAgentConfig, SubAgentId } from "@codeman-frontend/shared/lib/sub-agent-schema";
-import type { ProviderConfig } from "@codeman-frontend/core/llm/runtime";
 import { createMultiAgentRunner, type ToolRegistry } from "@codeman-frontend/core/tools/delegate-task/multi-agent-runner";
 import { toToolParameters } from "@codeman-frontend/shared/lib/tool-schema";
 
