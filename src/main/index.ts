@@ -1,7 +1,7 @@
 
 import "dotenv/config";
 
-import { app, BrowserWindow, Menu, protocol, net } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, protocol, net } from "electron";
 import { join, sep, normalize } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Cause, Effect, Exit, Scope } from "effect";
@@ -16,6 +16,7 @@ import { registerSkillsIpc } from "./features/skills/ipc";
 import { createMcpManager } from "./features/mcp/mcp-manager";
 import { registerMcpIpcHandlers } from "./features/mcp/mcp-ipc";
 import { createAutomationScheduler } from "./features/automations/scheduler";
+import { PiRuntime, registerPiIpcHandlers } from "./pi-runtime/index.js";
 
 const WORKER = process.env.CODEMAN_TEST_WORKER ?? "";
 
@@ -164,6 +165,9 @@ app.whenReady().then(() => {
         yield* Effect.addFinalizer(() => Effect.sync(() => scheduler.stop()));
 
         mainWindow = createMainWindow();
+
+        PiRuntime.getInstance().init({});
+        registerPiIpcHandlers(ipcMain, mainWindow);
 
         // 保持 scope 存活直到 before-quit 显式 close
         yield* Effect.never;
