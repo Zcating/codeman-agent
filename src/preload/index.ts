@@ -1,8 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   Settings,
-  Conversation,
-  Message,
   Provider,
   FileMatch,
   SkillManifest,
@@ -34,30 +32,6 @@ export interface CodemanApi {
   readonly getSettings: () => Promise<Settings>;
   readonly updateSettings: (args: { newSettings: unknown }) => Promise<Settings>;
   readonly clearAllHistory: () => Promise<void>;
-
-  readonly listConversations: (args: { includeArchived: boolean }) => Promise<Conversation[]>;
-  readonly getConversation: (args: { id: string }) => Promise<Conversation>;
-  readonly createConversation: (args: {
-    title: string;
-    systemPrompt: string | null;
-  }) => Promise<Conversation>;
-  readonly archiveConversation: (args: { id: string }) => Promise<void>;
-  readonly deleteConversation: (args: { id: string }) => Promise<void>;
-  readonly renameConversation: (args: { id: string; title: string }) => Promise<void>;
-
-  readonly listMessages: (args: { conversationId: string }) => Promise<Message[]>;
-  readonly appendMessage: (args: {
-    conversationId: string;
-    role: string;
-    content: string;
-    thinking?: string | null;
-    toolCalls?: string;
-    toolResults?: string;
-    model?: string | null;
-    inputTokens?: number;
-    outputTokens?: number;
-  }) => Promise<Message>;
-  readonly searchMessages: (args: { query: string; limit: number }) => Promise<Message[]>;
 
   readonly deleteProvider: (args: { id: string }) => Promise<Provider[]>;
 
@@ -143,17 +117,6 @@ const codeman: CodemanApiExposed = {
   getSettings: () => ipcRenderer.invoke("getSettings"),
   updateSettings: (args) => ipcRenderer.invoke("updateSettings", args),
   clearAllHistory: () => ipcRenderer.invoke("clearAllHistory"),
-
-  listConversations: (args) => ipcRenderer.invoke("listConversations", args),
-  getConversation: (args) => ipcRenderer.invoke("getConversation", args),
-  createConversation: (args) => ipcRenderer.invoke("createConversation", args),
-  archiveConversation: (args) => ipcRenderer.invoke("archiveConversation", args),
-  deleteConversation: (args) => ipcRenderer.invoke("deleteConversation", args),
-  renameConversation: (args) => ipcRenderer.invoke("renameConversation", args),
-
-  listMessages: (args) => ipcRenderer.invoke("listMessages", args),
-  appendMessage: (args) => ipcRenderer.invoke("appendMessage", args),
-  searchMessages: (args) => ipcRenderer.invoke("searchMessages", args),
 
   deleteProvider: (args) => ipcRenderer.invoke("deleteProvider", args),
 

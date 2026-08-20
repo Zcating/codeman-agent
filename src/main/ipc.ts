@@ -1,7 +1,6 @@
 import { app, BrowserWindow } from "electron";
 import { join } from "node:path";
 
-import { registerConversationsIpc } from "./features/conversations/ipc.js";
 import { registerSettingsIpc } from "./features/settings/ipc.js";
 import { SettingsState } from "./features/settings/state.js";
 import { registerSystemIpc } from "./features/system/ipc.js";
@@ -18,7 +17,6 @@ export function registerIpcHandlers(_deps: {
   settingsState.load();
 
   registerSettingsIpc({ settings: settingsState });
-  registerConversationsIpc();
   registerSystemIpc();
   registerWebfetchIpc({ cancelMap });
   registerAutomationIpc();
