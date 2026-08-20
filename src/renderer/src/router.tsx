@@ -15,6 +15,7 @@ import { AdvancedSection } from "@codeman-frontend/features/settings/routes/sect
 import { SkillsSection } from "@codeman-frontend/features/settings/routes/sections/skills-section";
 import { McpSection } from "@codeman-frontend/features/settings/routes/sections/mcp-section";
 import { SettingsTab as MultiAgentsSettingsTab } from "@codeman-frontend/features/multi-agents/components/settings-tab";
+import { AutomationsSettingsTab } from "@codeman-frontend/plugins/automations/components/settings-tab";
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -85,6 +86,12 @@ const toolsMultiAgentsRoute = createRoute({
   component: MultiAgentsSettingsTab,
 });
 
+const toolsAutomationsRoute = createRoute({
+  getParentRoute: () => chatLayoutRoute,
+  path: "/tools/automations",
+  component: AutomationsSettingsTab,
+});
+
 const pluginsSkillsRoute = createRoute({
   getParentRoute: () => chatLayoutRoute,
   path: "/plugins/skills",
@@ -106,6 +113,14 @@ const pluginsMultiAgentsRoute = createRoute({
   path: "/plugins/multi-agents",
   beforeLoad: () => {
     throw redirect({ to: "/tools/multi-agents", replace: true });
+  },
+});
+
+const pluginsAutomationsRoute = createRoute({
+  getParentRoute: () => chatLayoutRoute,
+  path: "/plugins/automations",
+  beforeLoad: () => {
+    throw redirect({ to: "/tools/automations", replace: true });
   },
 });
 
@@ -162,7 +177,7 @@ const settingsMcpRoute = createRoute({
 });
 
 export const routeTree = rootRoute.addChildren([
-  chatLayoutRoute.addChildren([homeRoute, conversationRoute, toolsSkillsRoute, toolsMcpRoute, toolsMultiAgentsRoute, pluginsSkillsRoute, pluginsMcpRoute, pluginsMultiAgentsRoute]),
+  chatLayoutRoute.addChildren([homeRoute, conversationRoute, toolsSkillsRoute, toolsMcpRoute, toolsMultiAgentsRoute, toolsAutomationsRoute, pluginsSkillsRoute, pluginsMcpRoute, pluginsMultiAgentsRoute, pluginsAutomationsRoute]),
   settingsLayoutRoute.addChildren([
     settingsLlmRoute,
     settingsAppRoute,
