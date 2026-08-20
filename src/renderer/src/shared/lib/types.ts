@@ -63,13 +63,6 @@ export interface ConversationSettings {
   maxHistory: number;
 }
 
-export interface Workspace {
-  id: string;
-  label: string;
-  rootPath: string;
-  createdAt: number;
-}
-
 export interface FileMatch {
   path: string;
   lineNumber: number | null;
@@ -81,7 +74,6 @@ export interface Conversation {
   id: string;
   title: string;
   systemPrompt: string | null;
-  workspaceId: string;
   createdAt: number;
   updatedAt: number;
   archivedAt: number | null;

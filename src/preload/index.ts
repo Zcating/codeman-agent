@@ -4,7 +4,6 @@ import type {
   Conversation,
   Message,
   Provider,
-  Workspace,
   FileMatch,
   SkillManifest,
   McpServerInfo,
@@ -40,7 +39,6 @@ export interface CodemanApi {
   readonly getConversation: (args: { id: string }) => Promise<Conversation>;
   readonly createConversation: (args: {
     title: string;
-    workspaceId: string;
     systemPrompt: string | null;
   }) => Promise<Conversation>;
   readonly archiveConversation: (args: { id: string }) => Promise<void>;
@@ -60,12 +58,6 @@ export interface CodemanApi {
     outputTokens?: number;
   }) => Promise<Message>;
   readonly searchMessages: (args: { query: string; limit: number }) => Promise<Message[]>;
-
-  readonly listWorkspaces: () => Promise<Workspace[]>;
-  readonly addWorkspace: (args: { label: string; rootPath: string }) => Promise<Workspace>;
-  readonly renameWorkspace: (args: { id: string; label: string }) => Promise<void>;
-  readonly deleteWorkspace: (args: { id: string }) => Promise<void>;
-  readonly pickWorkspacePath: () => Promise<string | null>;
 
   readonly deleteProvider: (args: { id: string }) => Promise<Provider[]>;
 
@@ -162,12 +154,6 @@ const codeman: CodemanApiExposed = {
   listMessages: (args) => ipcRenderer.invoke("listMessages", args),
   appendMessage: (args) => ipcRenderer.invoke("appendMessage", args),
   searchMessages: (args) => ipcRenderer.invoke("searchMessages", args),
-
-  listWorkspaces: () => ipcRenderer.invoke("listWorkspaces"),
-  addWorkspace: (args) => ipcRenderer.invoke("addWorkspace", args),
-  renameWorkspace: (args) => ipcRenderer.invoke("renameWorkspace", args),
-  deleteWorkspace: (args) => ipcRenderer.invoke("deleteWorkspace", args),
-  pickWorkspacePath: () => ipcRenderer.invoke("pickWorkspacePath"),
 
   deleteProvider: (args) => ipcRenderer.invoke("deleteProvider", args),
 

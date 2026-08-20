@@ -7,7 +7,6 @@ import { SettingsState } from "./features/settings/state.js";
 import { registerSystemIpc } from "./features/system/ipc.js";
 import { CancelMap } from "./features/webfetch/cancel-map.js";
 import { registerWebfetchIpc } from "./features/webfetch/ipc.js";
-import { registerWorkspacesIpc } from "./features/workspaces/ipc.js";
 import { registerAutomationIpc } from "./features/automations/ipc.js";
 
 const settingsState = new SettingsState(join(app.getPath("userData"), "settings.json"));
@@ -20,7 +19,6 @@ export function registerIpcHandlers(_deps: {
 
   registerSettingsIpc({ settings: settingsState });
   registerConversationsIpc();
-  registerWorkspacesIpc();
   registerSystemIpc();
   registerWebfetchIpc({ cancelMap });
   registerAutomationIpc();
