@@ -27,33 +27,6 @@ vi.mock("electron", () => ({
   shell: fakeShell,
 }));
 
-// db 层为 Effect Layer（DbLive），无需 mock ./db/mod
-
-vi.mock("./mcp-host", () => ({
-  McpStdioServer: vi.fn().mockImplementation(function () {
-    return {
-      start: vi.fn().mockResolvedValue(undefined),
-      stop: vi.fn().mockResolvedValue(undefined),
-      getConfig: () => ({ name: "mock", command: "echo", args: [], enabled: false }),
-      getStatus: () => ({ kind: "disabled" as const }),
-      listTools: () => [],
-      callTool: vi.fn().mockResolvedValue({ content: [], isError: false }),
-    };
-  }),
-}));
-
-vi.mock("./mcp-config", () => ({
-  readMcpConfig: vi.fn().mockReturnValue({
-    _tag: "Some",
-    value: { version: 1, servers: [] },
-  }),
-  MCP_CONFIG_PATH: "/tmp/.agents/mcp_servers.json",
-}));
-
-vi.mock("./features/webfetch/index", () => ({
-  fetchSafe: vi.fn(),
-}));
-
 const EXPECTED_CHANNELS = [
   "getSettings",
   "updateSettings",
@@ -83,14 +56,6 @@ const EXPECTED_CHANNELS = [
   "openExternal",
   "getLogPath",
   "abortRequest",
-  "webfetch:fetch",
-  "mcp:list-servers",
-  "mcp:get-tools",
-  "mcp:get-all-tools",
-  "mcp:enable",
-  "mcp:restart",
-  "mcp:call-tool",
-  "mcp:open-config-dir",
   "skillsScan",
   "skillsLoad",
   "subAgents:list",
@@ -116,13 +81,10 @@ describe("ipc.ts barrel", () => {
     fakeWin.webContents.send.mockClear();
   });
 
-  it("registers all 53 expected ipcMain.handle channels", async () => {
+  it("registers all expected ipcMain.handle channels", async () => {
     const { registerIpcHandlers } = await import("./ipc.js");
-    const { createMcpManager } = await import("./features/mcp/mcp-manager.js");
-    const { registerMcpIpcHandlers } = await import("./features/mcp/mcp-ipc.js");
     const { registerSkillsIpc } = await import("./features/skills/ipc.js");
     registerIpcHandlers({ getMainWindow: () => fakeWin as any });
-    registerMcpIpcHandlers(createMcpManager());
     registerSkillsIpc();
     const channels = fakeIpcMain.handle.mock.calls.map((c) => c[0]);
     expect(channels).toEqual(expect.arrayContaining(EXPECTED_CHANNELS));
@@ -130,9 +92,6 @@ describe("ipc.ts barrel", () => {
   });
 
   it("registers all automation channels via registerIpcHandlers (boot must not re-register)", async () => {
-    // Regression for boot crash: "Attempted to register a second handler for 'automations:list'".
-    // registerIpcHandlers() is the SINGLE source of truth for automations:* channels.
-    // boot (src/main/index.ts) must NOT call registerAutomationIpc() separately.
     const seen: string[] = [];
     fakeIpcMain.handle.mockImplementation((channel: string) => {
       seen.push(channel);
@@ -142,12 +101,11 @@ describe("ipc.ts barrel", () => {
     registerIpcHandlers({ getMainWindow: () => fakeWin as any });
 
     const automationChannels = EXPECTED_CHANNELS.filter((c) => c.startsWith("automations:"));
-    expect(automationChannels.length).toBeGreaterThan(0); // sanity: the channels exist
+    expect(automationChannels.length).toBeGreaterThan(0);
     for (const ch of automationChannels) {
       expect(seen).toContain(ch);
     }
 
-    // Restore default mock for other tests
     fakeIpcMain.handle.mockReset();
   });
 

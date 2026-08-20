@@ -11,8 +11,8 @@
  * 测试场景：
  * 1-3. validatePathInWorkspace happy path（文件 / 嵌套文件 / workspace 根）
  * 4-5. ENOENT → AppBackendError.NotFound（validatePathInWorkspace + validatePathForWrite 父目录）
- * 6-7. sandbox violation（父目录外 / ../ 逃逸）→ SandboxViolation
- * 8-9. blocked patterns（Windows long-path prefix / NTFS alternate data stream）→ SandboxViolation
+ * 6-7. sandbox violation（父目录外 / ../ 逃逸）→ SessionPermission
+ * 8-9. blocked patterns（Windows long-path prefix / NTFS alternate data stream）→ SessionPermission
  * 10. readFileInWorkspace — 读 UTF-8
  * 11. writeFileInWorkspace — 原子写 + 验证
  * 12. writeFileInWorkspace — 成功路径无残留 .tmp 文件
@@ -141,7 +141,7 @@ describe("file-sandbox", () => {
         const failure = yield* validatePathInWorkspace(file, workspace).pipe(
           Effect.flip,
         );
-        expect(failure._tag).toBe("SandboxViolation");
+        expect(failure._tag).toBe("SessionPermission");
         yield* cleanupWorkspace(workspace);
         yield* cleanupWorkspace(otherDir);
       }),
@@ -157,7 +157,7 @@ describe("file-sandbox", () => {
         const failure = yield* validatePathInWorkspace(escapeFile, workspace).pipe(
           Effect.flip,
         );
-        expect(failure._tag).toBe("SandboxViolation");
+        expect(failure._tag).toBe("SessionPermission");
         yield* cleanupWorkspace(workspace);
         yield* cleanupWorkspace(pathSvc.dirname(escapeFile));
       }),
@@ -166,7 +166,7 @@ describe("file-sandbox", () => {
 
   it.layer(TestLayer)("blocked patterns", ($it) => {
     $it.effect(
-      "rejects Windows long-path prefix as SandboxViolation",
+      "rejects Windows long-path prefix as SessionPermission",
       () =>
         Effect.gen(function* () {
           const workspace = yield* makeWorkspace;
@@ -174,8 +174,8 @@ describe("file-sandbox", () => {
             "\\\\?\\C:\\foo",
             workspace,
           ).pipe(Effect.flip);
-          expect(failure._tag).toBe("SandboxViolation");
-          if (failure._tag === "SandboxViolation") {
+          expect(failure._tag).toBe("SessionPermission");
+          if (failure._tag === "SessionPermission") {
             expect(failure.message).toMatch(
               /long-path|alternate data stream|not allowed/i,
             );
@@ -185,7 +185,7 @@ describe("file-sandbox", () => {
     );
 
     $it.effect(
-      "rejects NTFS alternate data stream as SandboxViolation",
+      "rejects NTFS alternate data stream as SessionPermission",
       () =>
         Effect.gen(function* () {
           const workspace = yield* makeWorkspace;
@@ -193,8 +193,8 @@ describe("file-sandbox", () => {
             "C:\\file.txt::data",
             workspace,
           ).pipe(Effect.flip);
-          expect(failure._tag).toBe("SandboxViolation");
-          if (failure._tag === "SandboxViolation") {
+          expect(failure._tag).toBe("SessionPermission");
+          if (failure._tag === "SessionPermission") {
             expect(failure.message).toMatch(
               /long-path|alternate data stream|not allowed/i,
             );

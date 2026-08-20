@@ -1,6 +1,5 @@
 import type { AgentTool, AgentEvent } from "@earendil-works/pi-agent-core";
 import type { SubAgentConfig, SubAgentId } from "@codeman-frontend/shared/lib/sub-agent-schema";
-import type { ProviderConfig } from "@codeman-frontend/core/llm/runtime";
 import { createSubAgent } from "@codeman-frontend/features/multi-agents/lib/sub-agent-factory";
 
 export type ToolRegistry = Map<string, AgentTool>;

@@ -2,9 +2,7 @@
 import { Effect } from "effect";
 import { BrowserWindow, ipcMain } from "electron";
 import { spawn } from "node:child_process";
-import { listWorkspaces } from "../workspaces/data.js";
-import { runMain } from "../../runtime.js";
-import { Unknown, InvalidConfig } from "../../../renderer/src/shared/lib/errors";
+import { Unknown, InvalidConfig } from "../../lib/errors.js";
 import type { AutomationRule, TriggerKind } from "../../../shared/lib/automation-types";
 
 // ---------------------------------------------------------------------------
@@ -139,35 +137,20 @@ export function executeScriptAction(
   }
 
   return Effect.async((resolve) => {
-    // Resolve workspace path from workspaceId via runMain to strip SqliteClient context
-    runMain(listWorkspaces())
-      .then((workspaces: any[]) => {
-        const workspace = workspaces.find((w: any) => w.id === action.workspaceId);
-        if (!workspace) {
-          resolve(Effect.succeed({
-            status: "error" as const,
-            error: `Workspace ${action.workspaceId} not found`,
-          }));
-          return;
-        }
-        const workspaceRoot = workspace.rootPath;
+    const cwd = process.cwd();
 
-        // Execute via spawn
-        const timeoutMs = action.timeoutMs ?? 300_000;
-        const isWindows = process.platform === "win32";
+    // Execute via spawn
+    const timeoutMs = action.timeoutMs ?? 300_000;
+    const isWindows = process.platform === "win32";
 
-        const command =
-          action.language === "shell"
-            ? action.source
-            : `node -e "${action.source.replace(/"/g, '\\"')}"`;
+    const command =
+      action.language === "shell"
+        ? action.source
+        : `node -e "${action.source.replace(/"/g, '\\"')}"`;
 
-        executeCommandSpawn({ command, cwd: workspaceRoot, timeoutMs, isWindows })
-          .then((result) => resolve(Effect.succeed(result)))
-          .catch((e) => resolve(Effect.fail(new Unknown({ message: String(e) }))));
-      })
-      .catch((e: unknown) => {
-        resolve(Effect.fail(new Unknown({ message: String(e) })));
-      });
+    executeCommandSpawn({ command, cwd, timeoutMs, isWindows })
+      .then((result) => resolve(Effect.succeed(result)))
+      .catch((e) => resolve(Effect.fail(new Unknown({ message: String(e) }))));
   });
 }
 

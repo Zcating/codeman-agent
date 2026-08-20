@@ -1,7 +1,7 @@
 
 import "dotenv/config";
 
-import { app, BrowserWindow, Menu, protocol, net } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, protocol, net } from "electron";
 import { join, sep, normalize } from "node:path";
 import { pathToFileURL } from "node:url";
 import { Cause, Effect, Exit, Scope } from "effect";
@@ -13,9 +13,9 @@ import { loadQaTable } from "./features/mock-server/qa-loader";
 import { startMockServer } from "./features/mock-server";
 import { ensurePreinstalledSkills } from "./features/skills/skills-host";
 import { registerSkillsIpc } from "./features/skills/ipc";
-import { createMcpManager } from "./features/mcp/mcp-manager";
-import { registerMcpIpcHandlers } from "./features/mcp/mcp-ipc";
+
 import { createAutomationScheduler } from "./features/automations/scheduler";
+import { PiRuntime, registerPiIpcHandlers } from "./pi-runtime/index.js";
 
 const WORKER = process.env.CODEMAN_TEST_WORKER ?? "";
 
@@ -139,16 +139,6 @@ app.whenReady().then(() => {
           ),
         );
 
-        const mcpManager = createMcpManager();
-        registerMcpIpcHandlers(mcpManager);
-        // mcp 资源 finalizer 挂进 mainScope
-        yield* Effect.addFinalizer(() => Effect.promise(() => mcpManager.stopAll()));
-        yield* mcpManager.startAll().pipe(
-          Effect.catchAllCause((cause) =>
-            Effect.sync(() => logger.error("[mcp] startAll failed:", Cause.pretty(cause))),
-          ),
-        );
-
         // NOTE: registerAutomationIpc() is called inside registerIpcHandlers() (per
         // src/main/ipc.ts:32). Calling it again here caused an Electron "Attempted
         // to register a second handler" boot failure — fixed by removing the
@@ -164,6 +154,9 @@ app.whenReady().then(() => {
         yield* Effect.addFinalizer(() => Effect.sync(() => scheduler.stop()));
 
         mainWindow = createMainWindow();
+
+        PiRuntime.getInstance().init({});
+        registerPiIpcHandlers(ipcMain, mainWindow);
 
         // 保持 scope 存活直到 before-quit 显式 close
         yield* Effect.never;

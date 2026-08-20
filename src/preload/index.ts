@@ -1,10 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   Settings,
-  Conversation,
-  Message,
   Provider,
-  Workspace,
   FileMatch,
   SkillManifest,
   McpServerInfo,
@@ -12,6 +9,7 @@ import type {
   McpToolEntry,
 } from "@codeman-frontend/shared/lib/types";
 import type { SubAgentConfig } from "@codeman-frontend/shared/lib/sub-agent-schema";
+import type { PiApi } from "./pi-api";
 import type {
   AutomationRule,
   AutomationId,
@@ -31,41 +29,49 @@ export interface StreamSubscription {
   readonly onStreamChunk: (handler: (evt: unknown) => void) => () => void;
 }
 
+export interface PiProvider {
+  id: string;
+  label: string;
+  baseUrl: string;
+  defaultModel: string;
+  models: PiModel[];
+}
+
+export interface PiModel {
+  id: string;
+  label: string;
+  contextWindow?: number;
+  thinking: boolean;
+}
+
+export interface PiUserSettings {
+  theme?: "light" | "dark" | "system";
+  userLanguage?: "zh" | "en" | "auto";
+  startAtLogin?: boolean;
+  contextFiles?: string[];
+  systemPrompt?: {
+    default: string;
+    userCanEdit: boolean;
+  };
+  window?: {
+    rememberPosition: boolean;
+    rememberSize: boolean;
+    defaultSize: { width: number; height: number };
+    minSize: { width: number; height: number };
+  };
+}
+
+export interface PiRuntimeApi {
+  readonly listProviders: () => Promise<PiProvider[]>;
+  readonly setApiKey: (providerId: string, apiKey: string) => Promise<void>;
+  readonly getSettings: () => Promise<PiUserSettings>;
+  readonly setSetting: (key: string, value: unknown) => Promise<void>;
+}
+
 export interface CodemanApi {
   readonly getSettings: () => Promise<Settings>;
   readonly updateSettings: (args: { newSettings: unknown }) => Promise<Settings>;
   readonly clearAllHistory: () => Promise<void>;
-
-  readonly listConversations: (args: { includeArchived: boolean }) => Promise<Conversation[]>;
-  readonly getConversation: (args: { id: string }) => Promise<Conversation>;
-  readonly createConversation: (args: {
-    title: string;
-    workspaceId: string;
-    systemPrompt: string | null;
-  }) => Promise<Conversation>;
-  readonly archiveConversation: (args: { id: string }) => Promise<void>;
-  readonly deleteConversation: (args: { id: string }) => Promise<void>;
-  readonly renameConversation: (args: { id: string; title: string }) => Promise<void>;
-
-  readonly listMessages: (args: { conversationId: string }) => Promise<Message[]>;
-  readonly appendMessage: (args: {
-    conversationId: string;
-    role: string;
-    content: string;
-    thinking?: string | null;
-    toolCalls?: string;
-    toolResults?: string;
-    model?: string | null;
-    inputTokens?: number;
-    outputTokens?: number;
-  }) => Promise<Message>;
-  readonly searchMessages: (args: { query: string; limit: number }) => Promise<Message[]>;
-
-  readonly listWorkspaces: () => Promise<Workspace[]>;
-  readonly addWorkspace: (args: { label: string; rootPath: string }) => Promise<Workspace>;
-  readonly renameWorkspace: (args: { id: string; label: string }) => Promise<void>;
-  readonly deleteWorkspace: (args: { id: string }) => Promise<void>;
-  readonly pickWorkspacePath: () => Promise<string | null>;
 
   readonly deleteProvider: (args: { id: string }) => Promise<Provider[]>;
 
@@ -103,29 +109,18 @@ export interface CodemanApi {
   readonly mcpCallTool: (args: { serverName: string; toolName: string; args: unknown }) => Promise<unknown>;
   readonly mcpOpenConfigDir: () => Promise<void>;
 
-  // Webfetch (SSRF-guarded HTTP fetch)
   readonly webfetch: (args: { url: string; timeout?: number }) => Promise<{
     status: number;
     contentType: string;
     body: ArrayBuffer;
   }>;
 
-  // Run command
-  readonly runCommand: (args: { command: string; cwd?: string; timeoutMs?: number }) => Promise<unknown>;
-  readonly runCommandAssess: (args: { command: string; cwd?: string }) => Promise<{ risk: any; requestID?: string }>;
-  readonly runCommandExecute: (args: { command: string; cwd?: string; timeoutMs?: number }) => Promise<unknown>;
-  readonly runCommandReply: (args: { requestID: string; reply: "once" | "always" | "reject" }) => Promise<{ ok: boolean }>;
-  readonly onPermissionAsked: (handler: (request: any) => void) => () => void;
-  readonly onPermissionReplied: (handler: (payload: any) => void) => () => void;
-
-  // Sub-Agents
   readonly subAgentsList: () => Promise<readonly SubAgentConfig[]>;
   readonly subAgentsAdd: (config: SubAgentConfig) => Promise<SubAgentConfig>;
   readonly subAgentsUpdate: (args: { id: string; patch: Partial<SubAgentConfig> }) => Promise<SubAgentConfig>;
   readonly subAgentsDelete: (args: { id: string }) => Promise<void>;
   readonly subAgentsSetEnabled: (args: { id: string; enabled: boolean }) => Promise<SubAgentConfig>;
 
-  // Automations
   readonly automationsList: () => Promise<readonly AutomationRule[]>;
   readonly automationsCreate: (rule: AutomationRule) => Promise<AutomationRule>;
   readonly automationsUpdate: (rule: AutomationRule) => Promise<AutomationRule>;
@@ -140,14 +135,15 @@ export interface CodemanApi {
   readonly automationsGetExecution: (args: { id: string }) => Promise<AutomationExecution>;
   readonly automationsRunMissed: (args: { id: AutomationId }) => Promise<void>;
 
-  // Renderer-side listener cannot import `electron` directly (browser context
-  // has no `ipcRenderer`); this bridge mirrors `onStreamChunk` semantics.
   readonly automationsExecuteLlm: (
     handler: (request: LlmExecuteRequest) => void | Promise<void>,
   ) => () => void;
 
-  // Main side awaits this on `automations:execute-llm-result` (see executor.ts).
   readonly automationsSendLlmResult: (payload: LlmResultPayload) => void;
+
+  readonly piRuntime: PiRuntimeApi;
+  readonly pi: PiApi;
+  readonly onPiEvent: (handler: (event: unknown) => void) => () => void;
 }
 
 export type CodemanApiExposed = CodemanApi &
@@ -159,23 +155,6 @@ const codeman: CodemanApiExposed = {
   getSettings: () => ipcRenderer.invoke("getSettings"),
   updateSettings: (args) => ipcRenderer.invoke("updateSettings", args),
   clearAllHistory: () => ipcRenderer.invoke("clearAllHistory"),
-
-  listConversations: (args) => ipcRenderer.invoke("listConversations", args),
-  getConversation: (args) => ipcRenderer.invoke("getConversation", args),
-  createConversation: (args) => ipcRenderer.invoke("createConversation", args),
-  archiveConversation: (args) => ipcRenderer.invoke("archiveConversation", args),
-  deleteConversation: (args) => ipcRenderer.invoke("deleteConversation", args),
-  renameConversation: (args) => ipcRenderer.invoke("renameConversation", args),
-
-  listMessages: (args) => ipcRenderer.invoke("listMessages", args),
-  appendMessage: (args) => ipcRenderer.invoke("appendMessage", args),
-  searchMessages: (args) => ipcRenderer.invoke("searchMessages", args),
-
-  listWorkspaces: () => ipcRenderer.invoke("listWorkspaces"),
-  addWorkspace: (args) => ipcRenderer.invoke("addWorkspace", args),
-  renameWorkspace: (args) => ipcRenderer.invoke("renameWorkspace", args),
-  deleteWorkspace: (args) => ipcRenderer.invoke("deleteWorkspace", args),
-  pickWorkspacePath: () => ipcRenderer.invoke("pickWorkspacePath"),
 
   deleteProvider: (args) => ipcRenderer.invoke("deleteProvider", args),
 
@@ -204,22 +183,6 @@ const codeman: CodemanApiExposed = {
   mcpOpenConfigDir: () => ipcRenderer.invoke("mcp:open-config-dir"),
 
   webfetch: (args) => ipcRenderer.invoke("webfetch:fetch", args),
-
-  runCommand: (args) => ipcRenderer.invoke("runCommand", args),
-
-  runCommandAssess: (args) => ipcRenderer.invoke("runCommandAssess", args),
-  runCommandExecute: (args) => ipcRenderer.invoke("runCommandExecute", args),
-  runCommandReply: (args) => ipcRenderer.invoke("runCommandReply", args),
-  onPermissionAsked: (handler) => {
-    const listener = (_e: unknown, payload: unknown) => handler(payload);
-    ipcRenderer.on("runCommand:permission:asked", listener);
-    return () => ipcRenderer.off("runCommand:permission:asked", listener);
-  },
-  onPermissionReplied: (handler) => {
-    const listener = (_e: unknown, payload: unknown) => handler(payload);
-    ipcRenderer.on("runCommand:permission:replied", listener);
-    return () => ipcRenderer.off("runCommand:permission:replied", listener);
-  },
 
   subAgentsList: () => ipcRenderer.invoke("subAgents:list"),
   subAgentsAdd: (config) => ipcRenderer.invoke("subAgents:add", config),
@@ -265,6 +228,36 @@ const codeman: CodemanApiExposed = {
   },
 
   invoke: (channel, args) => ipcRenderer.invoke(channel, args ?? {}),
+
+  piRuntime: {
+    listProviders: () => ipcRenderer.invoke("pi:list-providers"),
+    setApiKey: (providerId, apiKey) =>
+      ipcRenderer.invoke("pi:set-api-key", { providerId, apiKey }),
+    getSettings: () => ipcRenderer.invoke("pi:get-settings"),
+    setSetting: (key, value) =>
+      ipcRenderer.invoke("pi:set-setting", { key, value }),
+  },
+
+  pi: {
+    createSession: (opts?: { cwd?: string }) =>
+      ipcRenderer.invoke("pi:create-session", opts),
+    prompt: (opts: { sessionId: string; text: string; thinkingLevel?: string }) =>
+      ipcRenderer.invoke("pi:prompt", opts),
+    abort: (sessionId: string) =>
+      ipcRenderer.invoke("pi:abort", { sessionId }),
+    openSession: (path: string) =>
+      ipcRenderer.invoke("pi:open-session", { path }),
+    listSessions: (opts?: { cwd?: string }) =>
+      ipcRenderer.invoke("pi:list-sessions", opts),
+    closeSession: (sessionId: string) =>
+      ipcRenderer.invoke("pi:close-session", { sessionId }),
+  },
+
+  onPiEvent: (handler: (event: unknown) => void) => {
+    const listener = (_e: unknown, event: unknown) => handler(event);
+    ipcRenderer.on("pi:event", listener);
+    return () => ipcRenderer.off("pi:event", listener);
+  },
 };
 
 contextBridge.exposeInMainWorld("codeman", codeman);

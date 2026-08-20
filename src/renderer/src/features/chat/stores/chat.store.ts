@@ -1,53 +1,40 @@
-
 import { createSignal, type Accessor } from "solid-js";
-import { createStore, produce } from "solid-js/store";
-
-import { Effect, Stream } from "effect";
-import type { Conversation, Message, SkillManifest, Workspace } from "@codeman-frontend/shared/lib/types";
+import { createStore } from "solid-js/store";
 import { logger } from "@codeman-frontend/shared/lib/logger";
-import type { AppError } from "@codeman-frontend/shared/lib/errors";
-import {
-  createAgentRuntime,
-  type AgentRuntime,
-  type RuntimeEvent,
-  type ProviderConfig,
-} from "@codeman-frontend/core/llm/runtime";
-import {
-  ConversationApi,
-  ConversationApiLive,
-  MessageApi,
-  MessageApiLive,
-  FileApiLive,
-} from "@codeman-frontend/shared/apis";
-import {
-  WorkspaceService,
-  WorkspaceServiceLive,
-} from "@codeman-frontend/shared/lib/workspace-service";
-import { deriveLabelFromPath } from "@codeman-frontend/shared/lib/derive-label-from-path";
-import { appStore } from "@codeman-frontend/shared/stores/app.store";
-import { skillsManifests$ } from "@codeman-frontend/features/skills/stores/skills.store";
-import {
-  doCompact,
-  pruneOldToolOutputs,
-  type DoCompactDeps,
-} from "@codeman-frontend/features/chat/lib/compaction";
 import type { ThinkingLevel } from "@codeman-frontend/shared/lib/sub-agent-schema";
-import {
-  buildSystemPrompt,
-  DEFAULT_IDENTITY,
-  DEFAULT_GUIDELINES,
-} from "@codeman-frontend/core/llm/build-system-prompt";
-import { loadProjectInstructions } from "@codeman-frontend/features/chat/lib/workspace-project-instructions";
-import { formatSkillsManifestSection } from "@codeman-frontend/features/skills/lib/skill-injector";
-import { mcpAllTools$ } from "@codeman-frontend/features/mcp/stores/store";
-import type { PermissionRequest } from "@codeman-frontend/features/chat/components/permission-bar";
+import type { Message, ToolCall, ToolResult } from "@codeman-frontend/shared/lib/types";
 
+declare global {
+  interface Window {
+    codeman: {
+      pi: {
+        createSession: (opts?: { cwd?: string }) => Promise<{ sessionId: string; sessionFile: string }>;
+        prompt: (opts: { sessionId: string; text: string; thinkingLevel?: ThinkingLevel }) => Promise<{ ok: boolean }>;
+        abort: (sessionId: string) => Promise<{ ok: boolean }>;
+        openSession: (path: string) => Promise<{ sessionId: string }>;
+        listSessions: (opts?: { cwd?: string }) => Promise<readonly { sessionId: string; sessionFile?: string; cwd?: string; createdAt?: number }[]>;
+        closeSession: (sessionId: string) => Promise<{ ok: boolean }>;
+      };
+      onPiEvent: (handler: (event: unknown) => void) => () => void;
+    };
+  }
+}
+
+interface PiEvent {
+  type: "token" | "thinking" | "tool_call" | "tool_result" | "done" | "message_stop" | "error";
+  sessionId?: string;
+  content?: string;
+  toolCall?: ToolCall;
+  toolCallId?: string;
+  result?: unknown;
+  error?: { message: string };
+  message?: Message;
+}
 
 export interface ConversationState {
   id: string;
   title: string;
   systemPrompt: string | null;
-  workspaceId: string;
   createdAt: number;
   updatedAt: number;
   archivedAt: number | null;
@@ -55,59 +42,36 @@ export interface ConversationState {
   streamingMessageId: string | null;
   isAgentActive: boolean;
   lastError: string | null;
-  runtime: AgentRuntime;
-
-  /** AGENTS.md content, loaded once per session */
-  projectInstructions: string | null;
-
-  /** Session-level provider/model selection (transient, not persisted). null = use global settings default. */
+  sessionId: string | null;
   sessionProviderId?: string | null;
   sessionModelId?: string | null;
 }
 
-
 const [store, setStore] = createStore<{
   byId: Record<string, ConversationState>;
-  workspaces: Workspace[];
 }>({
   byId: {},
-  workspaces: [],
 });
 
 export { store, setStore };
 
-
 const [conversations, setConversationsSignal] = createSignal<ConversationState[]>([]);
 export const conversations$: Accessor<ConversationState[]> = conversations;
 
+const [workspaces, setWorkspacesSignal] = createSignal<unknown[]>([]);
+export const workspaces$: Accessor<unknown[]> = workspaces;
 
-const [workspaces, setWorkspacesSignal] = createSignal<Workspace[]>([]);
-export const workspaces$: Accessor<Workspace[]> = workspaces;
-
-const [selectedWorkspaceId, setSelectedWorkspaceIdSignal] = createSignal<string | null>(null);
+const [selectedWorkspaceId] = createSignal<string | null>(null);
 export const selectedWorkspaceId$: Accessor<string | null> = selectedWorkspaceId;
 
-export function setSelectedWorkspaceId(id: string | null): void {
-  setSelectedWorkspaceIdSignal(id);
+export function setSelectedWorkspaceId(_id: string | null): void {
 }
 
-const [pendingPermissions, setPendingPermissions] = createSignal<PermissionRequest[]>([]);
-export const pendingPermissions$: Accessor<PermissionRequest[]> = pendingPermissions;
-export function addPendingPermission(req: PermissionRequest): void {
-  setPendingPermissions((p) => [...p, req]);
-}
-export function resolvePendingPermission(requestID: string): void {
-  setPendingPermissions((p) => p.filter((r) => r.requestID !== requestID));
-}
-
-
-export function setupConvState(conv: Conversation, history: Message[]): ConversationState {
-  const runtime = createAgentRuntime({});
+export function setupConvState(conv: { id: string; title: string; systemPrompt: string | null; createdAt: number; updatedAt: number; archivedAt: number | null }, history: Message[]): ConversationState {
   const cs: ConversationState = {
     id: conv.id,
     title: conv.title,
     systemPrompt: conv.systemPrompt,
-    workspaceId: conv.workspaceId,
     createdAt: conv.createdAt,
     updatedAt: conv.updatedAt,
     archivedAt: conv.archivedAt,
@@ -115,22 +79,18 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
     streamingMessageId: null,
     isAgentActive: false,
     lastError: null,
-    runtime,
-    projectInstructions: null,
+    sessionId: null,
   };
   setStore("byId", conv.id, cs);
   setConversationsSignal(Object.values(store.byId));
-
   return cs;
 }
-
 
 export function setConvModel(convId: string, providerId: string | null, modelId: string | null): void {
   if (!store.byId[convId]) { return; }
   setStore("byId", convId, "sessionProviderId", providerId);
   setStore("byId", convId, "sessionModelId", modelId);
 }
-
 
 const [homeSelectedProviderId, setHomeSelectedProviderIdSignal] = createSignal<string | null>(null);
 export const homeSelectedProviderId$: Accessor<string | null> = homeSelectedProviderId;
@@ -143,171 +103,73 @@ export function selectHomeModel(providerId: string, modelId: string): void {
   setHomeSelectedModelIdSignal(modelId);
 }
 
+let piEventUnsubscribe: (() => void) | null = null;
 
-const persistUserMessage = Effect.fn(
-  function* (msg: Message) {
-    const svc = yield* MessageApi;
-    yield* svc.append({
-      conversationId: msg.conversationId,
-      role: msg.role,
-      content: msg.content,
-    });
-  },
-  Effect.provide(MessageApiLive),
-);
-
-const persistAssistantMessage = Effect.fn(
-  function* (msg: Message) {
-    const svc = yield* MessageApi;
-    yield* svc.append({
-      conversationId: msg.conversationId,
-      role: msg.role,
-      content: msg.content,
-      thinking: msg.thinking ?? undefined,
-      toolCalls: msg.toolCalls ? JSON.stringify(msg.toolCalls) : undefined,
-      toolResults: msg.toolResults ? JSON.stringify(msg.toolResults) : undefined,
-      model: msg.model ?? undefined,
-    });
-  },
-  Effect.provide(MessageApiLive),
-);
-
-
-export const sendMessage = Effect.fn(
-  function* (convId: string, content: string, provider: ProviderConfig, thinkingLevel?: ThinkingLevel) {
-    const cs = store.byId[convId];
-    if (!cs) {
-      return;
-    }
-
-    const userMsg: Message = {
-      id: crypto.randomUUID(),
-      conversationId: convId,
-      role: "user",
-      content,
-      thinking: null,
-      toolCalls: null,
-      toolResults: null,
-      model: null,
-      inputTokens: null,
-      outputTokens: null,
-      createdAt: Date.now(),
-    };
-    setStore("byId", convId, "messages", (msgs) => [...msgs, userMsg]);
-    yield* persistUserMessage(userMsg);
-
-    const settings = appStore.state.value;
-    const convState = store.byId[convId];
-    if (!convState) { return; }
-
-    const sessionProviderId = convState.sessionProviderId ?? settings.defaultLlmProviderId;
-    const sessionModelId = convState.sessionModelId ?? provider.defaultModel;
-    const sessionProviders = settings.providers ?? [];
-    const sessionProviderConfig = sessionProviders.find((p) => p.id === sessionProviderId);
-
-    if (settings.compaction.prune) {
-      const pruned = pruneOldToolOutputs(convState.messages);
-      if (pruned.prunedCount > 0) {
-        setStore("byId", convId, "messages", () => [...pruned.messages]);
-        logger.info(`[chat.store] pruned ${pruned.prunedCount} tool outputs, freed ~${pruned.freedTokens} tokens`);
-      }
-    }
-
-    if (settings.compaction.enabled) {
-      const contextWindow = sessionProviderConfig?.llm?.contextWindow ?? 128000;
-      const model = sessionModelId;
-      const messages = convState.messages;
-      const budget = contextWindow - settings.compaction.reserveTokens;
-
-      const compactDeps: DoCompactDeps = {
-        callSummarize: async (_prompt: string) => ({ ok: false, reason: "not_implemented" }),
-        writeSuccessPair: async () => {},
-      };
-
-      const compactResult = yield* Effect.tryPromise(() =>
-        doCompact(convId, {
-          conversationId: convId,
-          model,
-          messages,
-          budget,
-          tailTurns: settings.compaction.tailTurns,
-          previousSummary: null,
-          auto: true,
-          contextWindow,
-          reserveTokens: settings.compaction.reserveTokens,
-        }, compactDeps),
-      );
-
-      if ("reason" in compactResult) {
-        logger.info("[chat.store] auto-compaction skipped:", compactResult.reason);
-      }
-    }
-
-    const context = transformContextForLlm(store.byId[convId]!.messages);
-
-    setStore("byId", convId, "isAgentActive", true);
-
-    const enabledNames = appStore.state.value.enabledSkills ?? [];
-    const enabledSkills: readonly SkillManifest[] = skillsManifests$().filter(
-      (m) => enabledNames.includes(m.name),
+function ensurePiEventListener(): void {
+  if (piEventUnsubscribe) { return; }
+  piEventUnsubscribe = window.codeman.onPiEvent((raw) => {
+    const evt = raw as PiEvent;
+    if (!evt.sessionId) { return; }
+    const convId = Object.keys(store.byId).find(
+      (id) => store.byId[id]?.sessionId === evt.sessionId,
     );
+    if (!convId) { return; }
+    handleEvent(convId, evt);
+  });
+}
 
-    const workspace = cs.workspaceId ? workspaces$().find((w) => w.id === cs.workspaceId) : null;
+export async function sendMessage(
+  convId: string,
+  content: string,
+  _providerId: string,
+  _modelId: string,
+  thinkingLevel?: ThinkingLevel,
+): Promise<void> {
+  const cs = store.byId[convId];
+  if (!cs) { return; }
 
-    if (cs.projectInstructions === null && workspace) {
-      const loaded = yield* loadProjectInstructions(cs.workspaceId).pipe(
-        Effect.provide(FileApiLive),
-      );
-      setStore("byId", convId, "projectInstructions", loaded);
-    }
+  const userMsg: Message = {
+    id: crypto.randomUUID(),
+    conversationId: convId,
+    role: "user",
+    content,
+    thinking: null,
+    toolCalls: null,
+    toolResults: null,
+    model: null,
+    inputTokens: null,
+    outputTokens: null,
+    createdAt: Date.now(),
+  };
+  setStore("byId", convId, "messages", (msgs) => [...msgs, userMsg]);
 
-    const dynamicToolSnippets: readonly string[] = mcpAllTools$().map((t) => t.description);
+  setStore("byId", convId, "isAgentActive", true);
+  setConversationsSignal(Object.values(store.byId));
 
-    const workspaceSection = workspace
-      ? { workspaceId: cs.workspaceId, rootPath: workspace.rootPath }
-      : undefined;
+  try {
+    ensurePiEventListener();
 
-    const finalSystemPrompt = buildSystemPrompt({
-      identity: DEFAULT_IDENTITY,
-      staticToolSnippets: cs.runtime.snippets,
-      dynamicToolSnippets: dynamicToolSnippets.length > 0 ? dynamicToolSnippets : undefined,
-      guidelines: DEFAULT_GUIDELINES,
-      workspace: workspaceSection,
-      projectInstructions: cs.projectInstructions ?? undefined,
-      skillsSection: formatSkillsManifestSection(enabledSkills),
-      userDefault: appStore.state.value.systemPrompt.default,
-      conversationOverride: cs.systemPrompt ?? undefined,
+    const { sessionId } = await window.codeman.pi.createSession({});
+    setStore("byId", convId, "sessionId", sessionId);
+
+    await window.codeman.pi.prompt({
+      sessionId,
+      text: content,
+      thinkingLevel,
     });
+  } catch (err) {
+    logger.error("[chat.store] sendMessage failure:", err);
+    setStore("byId", convId, "isAgentActive", false);
+    setStore("byId", convId, "lastError", err instanceof Error ? err.message : String(err));
+    setConversationsSignal(Object.values(store.byId));
+  }
+}
 
-    const augmentedProvider: ProviderConfig = {
-      ...provider,
-      id: sessionProviderId ?? provider.id,
-      defaultModel: sessionModelId,
-      workspaceId: cs.workspaceId || undefined,
-      enabledSkills,
-      systemPrompt: finalSystemPrompt,
-    };
-
-    const stream = cs.runtime.run({ context, provider: augmentedProvider, thinkingLevel });
-    yield* Stream.runForEach(stream, (evt) =>
-      Effect.sync(() => handleEvent(convId, evt)),
-    ).pipe(Effect.scoped);
-  },
-  Effect.catchAll((err) =>
-    Effect.sync(() => {
-      logger.error("[chat.store] sendMessage stream failure:", err);
-    }),
-  ),
-);
-
-
-function handleEvent(convId: string, evt: RuntimeEvent): void {
+function handleEvent(convId: string, evt: PiEvent): void {
   switch (evt.type) {
     case "token": {
       const cs = store.byId[convId];
-      if (!cs) {
-        return;
-      }
+      if (!cs) { return; }
       let stubId = cs.streamingMessageId;
       if (!stubId) {
         stubId = crypto.randomUUID();
@@ -336,16 +198,14 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       }
       setStore("byId", convId, "messages", (msgs) =>
         msgs.map((m) =>
-          m.id === stubId ? { ...m, content: (m.content ?? "") + evt.content } : m,
+          m.id === stubId ? { ...m, content: (m.content ?? "") + (evt.content ?? "") } : m,
         ),
       );
       break;
     }
     case "thinking": {
       const cs = store.byId[convId];
-      if (!cs) {
-        return;
-      }
+      if (!cs) { return; }
       let stubId = cs.streamingMessageId;
       if (!stubId) {
         stubId = crypto.randomUUID();
@@ -374,48 +234,49 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       }
       setStore("byId", convId, "messages", (msgs) =>
         msgs.map((m) =>
-          m.id === stubId ? { ...m, thinking: (m.thinking ?? "") + evt.content } : m,
+          m.id === stubId ? { ...m, thinking: (m.thinking ?? "") + (evt.content ?? "") } : m,
         ),
       );
       break;
     }
-    case "tool_call":
+    case "tool_call": {
+      if (!evt.toolCall) { break; }
       setStore("byId", convId, "messages", (msgs) =>
         msgs.map((m) => {
-          if (m.id !== store.byId[convId]?.streamingMessageId) {
-            return m;
-          }
-          return { ...m, toolCalls: [...(m.toolCalls ?? []), evt.toolCall] };
+          if (m.id !== store.byId[convId]?.streamingMessageId) { return m; }
+          const existing = m.toolCalls ?? [];
+          return { ...m, toolCalls: [...existing, evt.toolCall as ToolCall] };
         }),
       );
       break;
-    case "tool_result":
+    }
+    case "tool_result": {
+      if (!evt.toolCallId) { break; }
+      const newResult: ToolResult = {
+        toolCallId: evt.toolCallId,
+        result: evt.result,
+        error: evt.error?.message ?? null,
+      };
       setStore("byId", convId, "messages", (msgs) =>
         msgs.map((m) => {
-          if (m.id !== store.byId[convId]?.streamingMessageId) {
-            return m;
-          }
-          return {
-            ...m,
-            toolResults: [
-              ...(m.toolResults ?? []),
-              { toolCallId: evt.toolCallId, result: evt.result, error: evt.error ?? null },
-            ],
-          };
+          if (m.id !== store.byId[convId]?.streamingMessageId) { return m; }
+          const existing = m.toolResults ?? [];
+          return { ...m, toolResults: [...existing, newResult] };
         }),
       );
       break;
+    }
     case "done": {
       const stubId = store.byId[convId]?.streamingMessageId;
-      if (stubId) {
+      if (stubId && evt.message) {
         setStore("byId", convId, "messages", (msgs) =>
-          msgs.map((m) => (m.id === stubId ? { ...evt.message, id: stubId } : m)),
+          msgs.map((m) => (m.id === stubId ? { ...evt.message!, id: stubId } : m)),
         );
         logger.debug(
           "[chat.store/diag] done replace stub: stubId=" + stubId +
-          " content.length=" + (evt.message.content ?? "").length,
+          " content.length=" + (evt.message?.content ?? "").length,
         );
-      } else {
+      } else if (evt.message) {
         const msgs = store.byId[convId]?.messages ?? [];
         let lastAsstIdx = -1;
         for (let i = msgs.length - 1; i >= 0; i--) {
@@ -432,7 +293,7 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
             logger.debug("[chat.store/diag] done skip empty duplicate: lastAsstIdx=" + lastAsstIdx);
           } else {
             setStore("byId", convId, "messages", (msgs) =>
-              msgs.map((m, i) => (i === lastAsstIdx ? { ...evt.message, id: m.id } : m)),
+              msgs.map((m, i) => (i === lastAsstIdx ? { ...evt.message!, id: m.id } : m)),
             );
             logger.debug(
               "[chat.store/diag] done replace last asst (no stubId): idx=" + lastAsstIdx +
@@ -440,17 +301,14 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
             );
           }
         } else {
-          setStore("byId", convId, "messages", (msgs) => [...msgs, evt.message]);
+          setStore("byId", convId, "messages", (msgs) => [...msgs, evt.message!]);
           logger.debug(
-            "[chat.store/diag] done append (no stubId, no asst to replace): new msgId=" + evt.message.id,
+            "[chat.store/diag] done append (no stubId, no asst to replace): new msgId=" + evt.message!.id,
           );
         }
       }
       setStore("byId", convId, "streamingMessageId", null);
       setConversationsSignal(Object.values(store.byId));
-      Effect.runPromise(persistAssistantMessage({ ...evt.message, conversationId: convId })).catch((err) =>
-        logger.error("[chat.store] persistAssistantMessage failed:", err),
-      );
       break;
     }
     case "message_stop": {
@@ -459,197 +317,102 @@ function handleEvent(convId: string, evt: RuntimeEvent): void {
       setConversationsSignal(Object.values(store.byId));
       break;
     }
-    case "error":
+    case "error": {
       logger.error("[chat.store] runtime error:", evt.error);
       setStore("byId", convId, "streamingMessageId", null);
       setStore("byId", convId, "isAgentActive", false);
-      setStore("byId", convId, "lastError", evt.error.message);
+      setStore("byId", convId, "lastError", evt.error?.message ?? "unknown error");
       setConversationsSignal(Object.values(store.byId));
       break;
+    }
   }
 }
 
-
-export function cancel(convId: string): void {
+export async function abortStream(convId: string): Promise<void> {
   const cs = store.byId[convId];
-  if (!cs) { return; }
-  cs.runtime.cancel();
+  if (!cs || !cs.sessionId) { return; }
+  try {
+    await window.codeman.pi.abort(cs.sessionId);
+  } catch (err) {
+    logger.error("[chat.store] abort failure:", err);
+  }
   setStore("byId", convId, "streamingMessageId", null);
   setStore("byId", convId, "isAgentActive", false);
   setConversationsSignal(Object.values(store.byId));
 }
 
-
-export const archiveConversation = Effect.fn(
-  function* (convId: string) {
-    cancel(convId);
-    const svc = yield* ConversationApi;
-    yield* svc.archive(convId);
-    setStore("byId", produce(prev => { delete prev[convId]; }));
-    setConversationsSignal(Object.values(store.byId));
-  },
-  Effect.provide(ConversationApiLive),
-);
-
-
-export const deleteConversation = Effect.fn(
-  function* (convId: string) {
-    cancel(convId);
-    const svc = yield* ConversationApi;
-    yield* svc.delete(convId);
-    setStore("byId", produce(prev => { delete prev[convId]; }));
-    setConversationsSignal(Object.values(store.byId));
-  },
-  Effect.provide(ConversationApiLive),
-);
-
-
-export const renameConversation = Effect.fn(
-  function* (convId: string, newTitle: string) {
-    const svc = yield* ConversationApi;
-    yield* svc.rename(convId, newTitle);
-    setStore("byId", produce(prev => { prev[convId].title = newTitle; }));
-    setConversationsSignal(Object.values(store.byId));
-  },
-  Effect.provide(ConversationApiLive),
-);
-
-
-export const loadConversations = Effect.fn(
-  function* (includeArchived: boolean = false) {
-    const svc = yield* ConversationApi;
-    const convs = yield* svc.list(includeArchived);
-    for (const conv of convs) {
-      const msgSvc = yield* MessageApi;
-      const history = yield* msgSvc.list(conv.id);
-      setupConvState(conv, history);
-    }
-  },
-  Effect.provide(ConversationApiLive),
-  Effect.provide(MessageApiLive),
-);
-
-
-export const createConversation = Effect.fn(
-  function* (workspaceId: string, title: string, systemPrompt?: string) {
-    const svc = yield* ConversationApi;
-    const conv = yield* svc.create(title, systemPrompt ?? null, workspaceId);
-    setupConvState(conv, []);
-    return conv.id;
-  },
-  Effect.provide(ConversationApiLive),
-);
-
-export function createAndSendConversation(
-  workspaceId: string,
-  title: string,
-  firstMessage: string,
-  provider: ProviderConfig,
-): Effect.Effect<void, AppError, never> {
-  return Effect.gen(function* () {
-    const convId = yield* createConversation(workspaceId, title);
-    yield* sendMessage(convId, firstMessage, provider);
-  });
+export async function cancel(convId: string): Promise<void> {
+  return abortStream(convId);
 }
 
+export async function archiveConversation(convId: string): Promise<void> {
+  cancel(convId);
+}
 
-export const pickWorkspacePath = Effect.fn(
-  function* () {
-    const svc = yield* WorkspaceService;
-    return yield* svc.pickPath();
-  },
-  Effect.provide(WorkspaceServiceLive),
-);
+export async function deleteConversation(convId: string): Promise<void> {
+  cancel(convId);
+}
 
-export const loadWorkspaces = Effect.fn(
-  function* () {
-    const svc = yield* WorkspaceService;
-    const result = yield* svc.list();
-    setStore("workspaces", result);
-    setWorkspacesSignal(Object.values(store.workspaces));
-    if (selectedWorkspaceId() === null && result.length === 1) {
-      setSelectedWorkspaceIdSignal(result[0].id);
-    }
-  },
-  Effect.provide(WorkspaceServiceLive),
-);
+export async function renameConversation(convId: string, newTitle: string): Promise<void> {
+  if (!store.byId[convId]) { return; }
+  setStore("byId", convId, "title", newTitle);
+  setConversationsSignal(Object.values(store.byId));
+}
 
-export const addWorkspace = Effect.fn(
-  function* () {
-    const rootPath = yield* pickWorkspacePath();
-    if (rootPath === null) { return null; }
-    const label = deriveLabelFromPath(rootPath);
-    const svc = yield* WorkspaceService;
-    const result = yield* svc.add(label, rootPath);
-    setStore("workspaces", (ws) => [...ws, result]);
-    setWorkspacesSignal(Object.values(store.workspaces));
-    setSelectedWorkspaceIdSignal(result.id);
-    return result;
-  },
-  Effect.provide(WorkspaceServiceLive),
-);
+export async function loadConversations(_includeArchived: boolean = false): Promise<void> {
+}
 
-export const removeWorkspace = Effect.fn(
-  function* (id: string) {
-    const svc = yield* WorkspaceService;
-    yield* svc.remove(id);
-    setStore("workspaces", (ws) => ws.filter((w) => w.id !== id));
-    setWorkspacesSignal(Object.values(store.workspaces));
-    if (selectedWorkspaceId() === id) { setSelectedWorkspaceIdSignal(null); }
-  },
-  Effect.provide(WorkspaceServiceLive),
-);
-
-export const renameWorkspace = Effect.fn(
-  function* (id: string, label: string) {
-    const svc = yield* WorkspaceService;
-    yield* svc.rename(id, label);
-    setStore("workspaces", (ws) => ws.map((w) => (w.id === id ? { ...w, label } : w)));
-    setWorkspacesSignal(Object.values(store.workspaces));
-  },
-  Effect.provide(WorkspaceServiceLive),
-);
-
-function transformContextForLlm(messages: readonly Message[]): Message[] {
-  if (messages.length === 0) return messages.slice();
-
-  let lastSummary: string | undefined;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i]!;
-    const parts = m.parts ?? [];
-    const compactionPart = parts.find((p) => p.kind === "compaction");
-    if (compactionPart && compactionPart.kind === "compaction") {
-      lastSummary = compactionPart.summary;
-    }
-    if (
-      m.role === "assistant" &&
-      m.mode === "compaction" &&
-      m.summary === true &&
-      !m.error &&
-      m.content.length > 0
-    ) {
-      lastSummary = m.content;
-    }
-    if (lastSummary) break;
-  }
-
-  if (!lastSummary) return messages.slice();
-
-  const summaryMsg: Message = {
-    id: "synthetic-summary-" + Date.now(),
-    conversationId: messages[0]?.conversationId ?? "",
-    role: "assistant",
-    content: lastSummary,
-    thinking: null,
-    toolCalls: null,
-    toolResults: null,
-    model: null,
-    inputTokens: null,
-    outputTokens: null,
-    createdAt: Date.now(),
-    mode: "compaction",
-    summary: true,
+export async function createConversation(
+  _workspaceId: string,
+  title: string,
+  _systemPrompt?: string,
+): Promise<string> {
+  const id = crypto.randomUUID();
+  const now = Date.now();
+  const cs: ConversationState = {
+    id,
+    title,
+    systemPrompt: _systemPrompt ?? null,
+    createdAt: now,
+    updatedAt: now,
+    archivedAt: null,
+    messages: [],
+    streamingMessageId: null,
+    isAgentActive: false,
+    lastError: null,
+    sessionId: null,
   };
+  setStore("byId", id, cs);
+  setConversationsSignal(Object.values(store.byId));
+  return id;
+}
 
-  return [summaryMsg, ...messages.slice()];
+export async function createAndSendConversation(
+  _workspaceId: string,
+  title: string,
+  firstMessage: string,
+  providerId: string,
+  modelId: string,
+  thinkingLevel?: ThinkingLevel,
+): Promise<void> {
+  const convId = await createConversation(_workspaceId, title);
+  await sendMessage(convId, firstMessage, providerId, modelId, thinkingLevel);
+}
+
+export async function pickWorkspacePath(): Promise<string | null> {
+  return null;
+}
+
+export async function loadWorkspaces(): Promise<void> {
+  setWorkspacesSignal([]);
+}
+
+export async function addWorkspace(): Promise<unknown> {
+  return null;
+}
+
+export async function removeWorkspace(_id: string): Promise<void> {
+}
+
+export async function renameWorkspace(_id: string, _label: string): Promise<void> {
 }

@@ -1,4 +1,3 @@
-export { ProviderCard } from "@codeman-frontend/features/settings/components/provider-card";
 export {
   getDefaultSystemPrompt,
   getUserCanEdit,

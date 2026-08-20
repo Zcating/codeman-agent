@@ -17,8 +17,7 @@
 import * as FileSystem from "@effect/platform/FileSystem";
 import { Effect } from "effect";
 import * as SqliteNS from "@effect/sql-sqlite-node/SqliteClient";
-import { AppBackendError } from "../../lib/errors.js";
-import { Database } from "../../../renderer/src/shared/lib/errors";
+import { AppBackendError, Database } from "../../lib/errors.js";
 import { readAutomationsConfig } from "./automations-config";
 import { insertExecution, listExecutions, updateExecutionCompletion } from "./db";
 import { executeAction } from "./executor";
