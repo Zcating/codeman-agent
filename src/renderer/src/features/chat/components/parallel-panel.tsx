@@ -1,9 +1,9 @@
 import { For, Show, createMemo, type JSX } from "solid-js";
 import { SubAgentStream } from "./sub-agent-stream";
-import type { SubAgentStreamEntry } from "../stores/sub-agents-stream.store";
+import type { DelegateStreamEntry } from "../stores/delegate-streams.store";
 
 interface ParallelPanelProps {
-  entries: SubAgentStreamEntry[];
+  entries: DelegateStreamEntry[];
 }
 
 export function ParallelPanel(props: ParallelPanelProps): JSX.Element {

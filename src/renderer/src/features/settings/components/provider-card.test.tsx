@@ -426,7 +426,7 @@ describe("ProviderCard — baseUrl dev badge", () => {
         onDelete={vi.fn()}
       />
     ));
-    expect(screen.getByText("(dev)")).toBeInTheDocument();
+    expect(screen.getByText("dev")).toBeInTheDocument();
   });
 });
 

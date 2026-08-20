@@ -34,6 +34,7 @@ import {
 import { Effect, Layer, Option, Sink, Stream } from "effect";
 import type { Stats } from "node:fs";
 import * as fs from "node:fs/promises";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const MODULE = "FileSystem";
 
@@ -200,3 +201,30 @@ export const NodeFileSystemLive: Layer.Layer<
   stream: (_path, _options) => Stream.fail(notImplemented("stream")),
   sink: (_path, _options) => Sink.fail(notImplemented("sink")),
 });
+
+export const nodeFileSystem: FileSystem.FileSystem & {
+  checkExists(path: string): Effect.Effect<boolean, PlatformError>;
+  readTextFile(path: string): Effect.Effect<string, PlatformError>;
+  writeTextFile(path: string, content: string): Effect.Effect<void, PlatformError>;
+} = {
+  ...impl,
+  stream: (_path: string, _options: unknown) => Stream.fail(notImplemented("stream")),
+  sink: (_path: string, _options: unknown) => Sink.fail(notImplemented("sink")),
+  checkExists: (path: string): Effect.Effect<boolean, PlatformError> =>
+    Effect.try({
+      try: () => existsSync(path),
+      catch: (e: unknown) => makePlatformError("checkExists", e as NodeJS.ErrnoException, path),
+    }),
+  readTextFile: (path: string): Effect.Effect<string, PlatformError> =>
+    Effect.try({
+      try: () => readFileSync(path, "utf-8"),
+      catch: (e: unknown) => makePlatformError("readTextFile", e as NodeJS.ErrnoException, path),
+    }),
+  writeTextFile: (path: string, content: string): Effect.Effect<void, PlatformError> =>
+    Effect.try({
+      try: () => {
+        writeFileSync(path, content, "utf-8");
+      },
+      catch: (e: unknown) => makePlatformError("writeTextFile", e as NodeJS.ErrnoException, path),
+    }),
+};

@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@solidjs/testing-library";
 import { ParallelPanel } from "./parallel-panel";
-import type { SubAgentStreamEntry } from "../stores/sub-agents-stream.store";
+import type { DelegateStreamEntry } from "../stores/delegate-streams.store";
 
 function makeEntry(
   toolCallId: string,
-  subAgentName: string,
+  agentName: string,
   status: "running" | "completed" | "error",
-): SubAgentStreamEntry {
+): DelegateStreamEntry {
   return {
     toolCallId,
-    subAgentId: `sa-${toolCallId}`,
-    subAgentName,
+    agentId: `sa-${toolCallId}`,
+    agentName,
     events: [],
     status,
     startedAt: Date.now(),
@@ -26,20 +26,19 @@ function makeEntry(
 describe("ParallelPanel", () => {
   describe("grid layout", () => {
     it("renders 1 column when given 1 entry", () => {
-      const entries: SubAgentStreamEntry[] = [makeEntry("tc-1", "Researcher", "running")];
+      const entries: DelegateStreamEntry[] = [makeEntry("tc-1", "Researcher", "running")];
 
       render(() => <ParallelPanel entries={entries} />);
 
       const panel = screen.getByTestId("parallel-panel");
       expect(panel).toBeInTheDocument();
 
-      // Should have 1 sub-agent column
       const columns = screen.getAllByTestId(/^sub-agent-stream-/);
       expect(columns).toHaveLength(1);
     });
 
     it("renders 3 columns when given 3 entries", () => {
-      const entries: SubAgentStreamEntry[] = [
+      const entries: DelegateStreamEntry[] = [
         makeEntry("tc-1", "Researcher", "running"),
         makeEntry("tc-2", "Coder", "running"),
         makeEntry("tc-3", "Reviewer", "running"),
@@ -54,7 +53,7 @@ describe("ParallelPanel", () => {
 
   describe("renders correct entry statuses", () => {
     it("shows running spinner for running entries", () => {
-      const entries: SubAgentStreamEntry[] = [makeEntry("tc-1", "Researcher", "running")];
+      const entries: DelegateStreamEntry[] = [makeEntry("tc-1", "Researcher", "running")];
 
       render(() => <ParallelPanel entries={entries} />);
 
@@ -62,7 +61,7 @@ describe("ParallelPanel", () => {
     });
 
     it("shows completed badge for completed entries", () => {
-      const entries: SubAgentStreamEntry[] = [makeEntry("tc-1", "Researcher", "completed")];
+      const entries: DelegateStreamEntry[] = [makeEntry("tc-1", "Researcher", "completed")];
 
       render(() => <ParallelPanel entries={entries} />);
 

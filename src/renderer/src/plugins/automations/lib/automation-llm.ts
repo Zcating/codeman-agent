@@ -14,6 +14,8 @@ import type {
   LlmExecuteRequest,
   LlmResultPayload,
 } from "@codeman-frontend/shared/apis";
+import { Effect } from "effect";
+import { ProviderApi, ProviderApiLive } from "@codeman-frontend/shared/apis";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,10 +38,10 @@ interface LlmExecuteResult {
 /**
  * Run an LLM action inside the renderer using the user's configured provider.
  * Pure: depends only on `createSubAgent` (mocked in tests) and
- * `getProviderConfig()` (reads `window.__appStore`).
+ * `getProviderConfig()` (reads providers via ProviderApi).
  */
 export async function executeLlmInRenderer(action: LlmActionPayload): Promise<LlmExecuteResult> {
-  const providerConfig = getProviderConfig(action.providerId);
+  const providerConfig = await getProviderConfig(action.providerId);
   if (!providerConfig) {
     return { status: "error", error: `Provider ${action.providerId} not found` };
   }
@@ -83,22 +85,18 @@ export async function executeLlmInRenderer(action: LlmActionPayload): Promise<Ll
   }
 }
 
-/**
- * Resolve provider config from the renderer's appStore global. The global is
- * set up by preload; in tests it is installed via `Object.defineProperty(window, ...)`.
- */
-export function getProviderConfig(providerId: string): ProviderConfig | null {
-  // Access appStore via window global (set up by preload)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const appStore = (window as any).__appStore;
-  if (!appStore) {
-    return null;
-  }
+export async function getProviderConfig(providerId: string): Promise<ProviderConfig | null> {
+  const providers = await Effect.runPromise(
+    Effect.gen(function* () {
+      const api = yield* ProviderApi;
+      return yield* api.list();
+    }).pipe(
+      Effect.provide(ProviderApiLive),
+      Effect.catchAll(() => Effect.succeed([])),
+    ),
+  );
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const settings = appStore.value;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const provider = settings.providers?.find((p: any) => p.id === providerId);
+  const provider = providers.find((p) => p.id === providerId);
   if (!provider) {
     return null;
   }

@@ -110,12 +110,6 @@ vi.mock("../stores/chat.store", () => ({
         streamingMessageId: null,
         isAgentActive: false,
         runtime: { run: vi.fn(), cancel: vi.fn() },
-        compactionEntries: [] as Array<{
-          id: string; conversationId: string; summary: string;
-          model: string; tokensBefore: number; kind: "auto" | "manual";
-          createdAt: number; firstKeptMessageId: string;
-        }>,
-        compactionStatus: { _tag: "idle" } as { _tag: "idle" },
       },
       "conv-err": {
         id: "conv-err",
@@ -129,12 +123,6 @@ vi.mock("../stores/chat.store", () => ({
         isAgentActive: false,
         lastError: "AnthropicTransport: 缺 apiKey",
         runtime: { run: vi.fn(), cancel: vi.fn() },
-        compactionEntries: [] as Array<{
-          id: string; conversationId: string; summary: string;
-          model: string; tokensBefore: number; kind: "auto" | "manual";
-          createdAt: number; firstKeptMessageId: string;
-        }>,
-        compactionStatus: { _tag: "idle" } as { _tag: "idle" },
       },
     },
   },
@@ -241,18 +229,18 @@ vi.mock(import("@codeman-frontend/core/llm/runtime"), async (importOriginal) => 
   };
 });
 
-vi.mock("@codeman-frontend/features/multi-agents/stores/sub-agents-stream.store", () => {
+vi.mock("@codeman-frontend/features/chat/stores/delegate-streams.store", () => {
   let byToolCall: Record<string, unknown> = {};
   return {
-    subAgentsStreamStore: {
+    delegateStreamsStore: {
       state: {
         get byToolCall() { return byToolCall; },
       },
       actions: {
-        recordStart: vi.fn((toolCallId: string, subAgentId: string, subAgentName: string) => {
+        recordStart: vi.fn((toolCallId: string, agentId: string, agentName: string) => {
           byToolCall = {
             ...byToolCall,
-            [toolCallId]: { toolCallId, subAgentId, subAgentName, events: [], status: "running", startedAt: Date.now() },
+            [toolCallId]: { toolCallId, agentId, agentName, events: [], status: "running", startedAt: Date.now() },
           };
         }),
         appendEvent: vi.fn(),
@@ -265,7 +253,7 @@ vi.mock("@codeman-frontend/features/multi-agents/stores/sub-agents-stream.store"
   };
 });
 
-vi.mock("@codeman-frontend/features/multi-agents/components/parallel-panel", () => ({
+vi.mock("@codeman-frontend/features/chat/components/parallel-panel", () => ({
   ParallelPanel: (props: { entries: unknown[] }) =>
     props.entries.length > 0
       ? <div data-testid="parallel-panel">ParallelPanel({props.entries.length})</div>
@@ -983,32 +971,6 @@ describe("ChatView ringInfo contextWindow three-layer lookup", () => {
 // Compaction UI seams (T4)
 // ============================================================
 
-describe("ChatView compaction interleaved rendering (seam 2)", () => {
-  afterEach(() => cleanup());
-
-  // Note: vi.mock replaces the module with a plain object (no Solid.js reactivity).
-  // Mutating mockStore.byId["conv-1"].compactionEntries after render does NOT
-  // trigger re-renders in Solid.js. Pre-populating the mock for entry-positive
-  // cases is done via a separate mock override in each test.
-
-  it("无 entry 时不渲染 marker, 只渲染 messages(行为与 T1 之前一致)", async () => {
-    // The mock already has compactionEntries: [] — no markers should appear
-    const { container } = render(() => <ChatView convId="conv-1" />);
-    const markers = container.querySelectorAll('[data-testid="compaction-marker"]');
-    expect(markers.length).toBe(0);
-    // 不强求 div.mb-3 数量(MessageBubble 内部可能在不同 role 下用不同结构);
-    // 关键不变量:存在至少 1 个 bubble,证明 messages 仍在渲染。
-    const bubbles = container.querySelectorAll("div.mb-3");
-    expect(bubbles.length).toBeGreaterThanOrEqual(1);
-  });
-
-  // These tests verify the interleaving logic but require reactive store mutations
-  // which vi.mock doesn't support. Skipped with explanation — component logic is
-  // verified by visual QA and manual testing.
-  it.skip("compaction-marker 出现在第二条 message 之后 — requires vi.mock reactivity fix", () => {});
-  it.skip("多 entries 全部按 createdAt ASC 插入到正确位置 — requires vi.mock reactivity fix", () => {});
-});
-
 describe("ChatView compaction via usage ring (seam 3)", () => {
   afterEach(() => cleanup());
 
@@ -1046,10 +1008,6 @@ describe("ChatView compaction via usage ring (seam 3)", () => {
   // and compactNow is tested in chat.store.compaction.test.ts.
   it.skip("点击按钮 → compactNow(convId) 被调一次 — requires Effect monad spy support", () => {});
 
-  // The createEffect for compaction failure requires reactive store mutations which
-  // vi.mock doesn't support. Skipped — compactNow failure is tested in
-  // chat.store.compaction.test.ts.
-  it.skip("compactionStatus.failure !== undefined → codemanToast.error 被调 — requires reactive store", () => {});
 });
 
 describe("ChatView keyboard/focus regression (seam 4)", () => {
@@ -1110,20 +1068,19 @@ describe("ChatView parallel-panel ", () => {
     cleanup();
   });
 
-  it("ParallelPanel NOT rendered when subAgentsStreamStore is empty", async () => {
-    const { subAgentsStreamStore } = await import("@codeman-frontend/features/multi-agents/stores/sub-agents-stream.store");
-    // Reset store to empty
-    subAgentsStreamStore.actions._resetForTest();
+  it("ParallelPanel NOT rendered when delegateStreamsStore is empty", async () => {
+    const { delegateStreamsStore } = await import("@codeman-frontend/features/chat/stores/delegate-streams.store");
+    delegateStreamsStore.actions._resetForTest();
     const { container } = render(() => <ChatView convId="conv-1" />);
     const panel = container.querySelector('[data-testid="parallel-panel"]');
     expect(panel).toBeNull();
   });
 
-  it("ParallelPanel rendered when subAgentsStreamStore has delegate_task entries", async () => {
-    const { subAgentsStreamStore } = await import("@codeman-frontend/features/multi-agents/stores/sub-agents-stream.store");
+  it("ParallelPanel rendered when delegateStreamsStore has delegate_task entries", async () => {
+    const { delegateStreamsStore } = await import("@codeman-frontend/features/chat/stores/delegate-streams.store");
     // Simulate a delegate_task entry in the store
-    subAgentsStreamStore.actions._resetForTest();
-    subAgentsStreamStore.actions.recordStart("tc-delegate-1", "agent-001", "Researcher");
+    delegateStreamsStore.actions._resetForTest();
+    delegateStreamsStore.actions.recordStart("tc-delegate-1", "agent-001", "Researcher");
     const { container } = render(() => <ChatView convId="conv-1" />);
     const panel = container.querySelector('[data-testid="parallel-panel"]');
     expect(panel).not.toBeNull();
@@ -1131,10 +1088,10 @@ describe("ChatView parallel-panel ", () => {
   });
 
   it("ParallelPanel shows correct count when multiple delegate_task entries exist", async () => {
-    const { subAgentsStreamStore } = await import("@codeman-frontend/features/multi-agents/stores/sub-agents-stream.store");
-    subAgentsStreamStore.actions._resetForTest();
-    subAgentsStreamStore.actions.recordStart("tc-delegate-1", "agent-001", "Researcher");
-    subAgentsStreamStore.actions.recordStart("tc-delegate-2", "agent-002", "Coder");
+    const { delegateStreamsStore } = await import("@codeman-frontend/features/chat/stores/delegate-streams.store");
+    delegateStreamsStore.actions._resetForTest();
+    delegateStreamsStore.actions.recordStart("tc-delegate-1", "agent-001", "Researcher");
+    delegateStreamsStore.actions.recordStart("tc-delegate-2", "agent-002", "Coder");
     const { container } = render(() => <ChatView convId="conv-1" />);
     const panel = container.querySelector('[data-testid="parallel-panel"]');
     expect(panel).not.toBeNull();

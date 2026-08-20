@@ -198,30 +198,4 @@ describe("bootstrap sequencing seam", () => {
     });
   });
 
-  describe("window e2e APIs preserved", () => {
-    it("exposes __appStore.refreshAsync on window", () => {
-
-      type WindowWithAppStore = {
-        __appStore?: {
-          refresh: () => Effect.Effect<unknown, unknown>;
-          refreshAsync: () => Promise<unknown>;
-        };
-      };
-
-      const mockWindow = { __appStore: undefined } as WindowWithAppStore;
-      expect("__appStore" in mockWindow).toBe(true);
-    });
-
-    it("exposes __chatStore.loadWorkspacesAsync on window", () => {
-
-      type WindowWithChatStore = {
-        __chatStore?: {
-          loadWorkspacesAsync: () => Promise<void>;
-        };
-      };
-
-      const mockWindow = { __chatStore: undefined } as WindowWithChatStore;
-      expect("__chatStore" in mockWindow).toBe(true);
-    });
-  });
 });

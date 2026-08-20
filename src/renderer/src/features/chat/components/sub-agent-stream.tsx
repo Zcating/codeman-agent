@@ -1,10 +1,10 @@
 import { Show, createMemo, type JSX } from "solid-js";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-solid";
 import { renderMarkdown } from "@codeman-frontend/features/chat/lib/markdown";
-import type { SubAgentStreamEntry } from "../stores/sub-agents-stream.store";
+import type { DelegateStreamEntry } from "../stores/delegate-streams.store";
 
 interface SubAgentStreamProps {
-  entry: SubAgentStreamEntry;
+  entry: DelegateStreamEntry;
 }
 
 export function SubAgentStream(props: SubAgentStreamProps): JSX.Element {
@@ -62,7 +62,7 @@ export function SubAgentStream(props: SubAgentStreamProps): JSX.Element {
       {/* Header */}
       <div class="flex items-center justify-between gap-2 px-3 py-2 border-b border-border bg-muted/30">
         <span class="text-sm font-medium text-foreground truncate">
-          {props.entry.subAgentName}
+          {props.entry.agentName}
         </span>
         {statusBadge()}
       </div>

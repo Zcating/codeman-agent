@@ -80,8 +80,6 @@
 
 ## codeman-agent — 项目知识库
 
-> **AI Agent 协作入口**。读 `CONTEXT.md` 拿词汇表，读 ADR 拿决策。
-
 **生成时间:** 2026-06-14
 **Commit:** (TBD)
 **分支:** `master`
@@ -111,20 +109,6 @@
 | Lint / Format | oxlint + oxfmt | `^1.71.0` / `^0.56.0` |
 | 包管理 | pnpm（通过 `vp` / vite-plus CLI 调用脚本） | `pnpm@11.5.3` / `vp 0.1.24` |
 
-### 目录布局
-
-```txt
-codeman-agent/
-├── src/
-│   ├── main/                      # Electron 主进程（原 electron/main/）
-│   ├── preload/                   # Electron preload（原 electron/preload/）
-│   ├── renderer/                  # 前端 SPA（原 src/）
-│   ├── resources/                 # Skills 捆绑包（原 electron/resources/）
-│   └── assets/                    # QA 数据等（原 electron/assets/）
-├── docs/adr/                      # ADR
-├── (mocks 改在 src/renderer/__mocks__/ — 详见 src/renderer/AGENTS.md)
-└── docs/                          # 治理文档（translation-rules 等）
-```
 
 ### 命令
 

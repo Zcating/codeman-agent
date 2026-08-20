@@ -6,8 +6,8 @@ import { MessageBubble } from "@codeman-frontend/features/chat/components/messag
 import { PermissionBar } from "@codeman-frontend/features/chat/components/permission-bar";
 import { store, sendMessage, cancel, pendingPermissions$, addPendingPermission, resolvePendingPermission, setConvModel } from "@codeman-frontend/features/chat/stores/chat.store";
 import { doCompact, type DoCompactDeps } from "@codeman-frontend/features/chat/lib/compaction";
-import { ParallelPanel } from "@codeman-frontend/features/multi-agents/components/parallel-panel";
-import { subAgentsStreamStore } from "@codeman-frontend/features/multi-agents/stores/sub-agents-stream.store";
+import { ParallelPanel } from "@codeman-frontend/features/chat/components/parallel-panel";
+import { delegateStreamsStore } from "@codeman-frontend/features/chat/stores/delegate-streams.store";
 import {
   ContextRing,
   computeUsedTokensEst,
@@ -268,7 +268,7 @@ export function ChatView(props: { convId?: string }): JSX.Element {
 
   // All parallel panel entries (from sub-agent stream store) — rendered below message list
   const allParallelPanelEntries = createMemo(() =>
-    Object.values(subAgentsStreamStore.state.byToolCall),
+    Object.values(delegateStreamsStore.state.byToolCall),
   );
 
   createEffect(() => {

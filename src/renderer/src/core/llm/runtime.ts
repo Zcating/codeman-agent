@@ -21,7 +21,7 @@ import { validateProvider } from "@codeman-frontend/core/llm/runtime-validate-pr
 import { extractToolErrorText } from "@codeman-frontend/core/llm/runtime-tool-error";
 import { toPiMessages } from "@codeman-frontend/core/llm/runtime-to-pi-messages";
 import { subAgentsStore } from "@codeman-frontend/features/multi-agents/stores/sub-agents.store";
-import { subAgentsStreamStore } from "@codeman-frontend/features/multi-agents/stores/sub-agents-stream.store";
+import { delegateStreamsStore } from "@codeman-frontend/features/chat/stores/delegate-streams.store";
 import { deriveToolSnippets } from "@codeman-frontend/core/llm/build-tool-snippets";
 import type { ToolSnippet } from "@codeman-frontend/core/llm/build-system-prompt";
 
@@ -267,16 +267,16 @@ export function createAgentRuntime(_options: CreateAgentRuntimeOptions = {}): Ag
         const onStreamEvent = (event: AgentEvent, toolCallId: string, subAgentId: string): void => {
           if (event.type === "agent_start") {
             const config = enabledSubAgents.find((c) => c.id === subAgentId);
-            subAgentsStreamStore.actions.recordStart(toolCallId, subAgentId, config?.name ?? "Unknown");
+            delegateStreamsStore.actions.recordStart(toolCallId, subAgentId, config?.name ?? "Unknown");
           } else if (event.type === "message_update") {
-            subAgentsStreamStore.actions.appendEvent(toolCallId, event);
+            delegateStreamsStore.actions.appendEvent(toolCallId, event);
           } else if (event.type === "agent_end") {
             const endEvent = event as { type: "agent_end"; finalText?: string; usage?: { inputTokens: number; outputTokens: number }; isError?: boolean; error?: string };
             if (endEvent.isError || endEvent.error) {
-              subAgentsStreamStore.actions.recordError(toolCallId, endEvent.error ?? "sub-agent error");
+              delegateStreamsStore.actions.recordError(toolCallId, endEvent.error ?? "sub-agent error");
             } else {
               const finalText = endEvent.finalText ?? "";
-              subAgentsStreamStore.actions.recordComplete(toolCallId, finalText, endEvent.usage);
+              delegateStreamsStore.actions.recordComplete(toolCallId, finalText, endEvent.usage);
             }
           }
         };

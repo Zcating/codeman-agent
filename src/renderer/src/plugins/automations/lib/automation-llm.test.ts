@@ -2,6 +2,7 @@
 // Mocks `window.codeman` bridge instead of `electron` because the IPC
 // subscription now lives in preload.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { Effect, Layer } from "effect";
 import {
   setupAutomationMainListener,
   cleanupAutomationMainListener,
@@ -23,25 +24,39 @@ vi.mock("@codeman-frontend/features/multi-agents/lib/sub-agent-factory", () => (
   ToolRegistry: Map,
 }));
 
-// Mock window.__appStore
-const mockAppStore = {
-  value: {
-    providers: [
-      {
-        id: "test-provider",
-        apiKey: "test-key",
-        llm: {
-          baseUrl: "https://api.test.com/v1/messages",
-          defaultModel: "test-model",
-          models: [
-            { id: "test-model", label: "Test Model", contextWindow: 200_000, thinking: false, deprecated: false },
-          ],
-        },
-      },
-    ],
+const mockProviders = [
+  {
+    id: "test-provider",
+    label: "Test Provider",
+    apiKey: "test-key",
+    llm: {
+      defaultModel: "test-model",
+      baseUrl: "https://api.test.com/v1/messages",
+      apiType: "anthropic-messages" as const,
+      contextWindow: 200_000,
+      models: [
+        { id: "test-model", label: "Test Model", contextWindow: 200_000, thinking: false, deprecated: false },
+      ],
+      modelsEndpoint: "",
+    },
   },
-};
-Object.defineProperty(window, "__appStore", { value: mockAppStore, writable: true });
+];
+
+vi.mock("@codeman-frontend/shared/apis/provider.api", async () => {
+  const actual = await vi.importActual<typeof import("@codeman-frontend/shared/apis/provider.api")>(
+    "@codeman-frontend/shared/apis/provider.api",
+  );
+  return {
+    ...actual,
+    ProviderApiLive: Layer.succeed(actual.ProviderApi, {
+      list: vi.fn(() => Effect.succeed(mockProviders)),
+      get: vi.fn(),
+      getModels: vi.fn(),
+      fetchModels: vi.fn(),
+      delete: vi.fn(),
+    }),
+  };
+});
 
 // Bridge mock — mirrors the new preload surface .
 // Captures handlers so tests can invoke them, and tracks result-posts.

@@ -4,10 +4,10 @@ import type { AgentEvent } from "@earendil-works/pi-agent-core";
 
 const MAX_LRU_SIZE = 50;
 
-export interface SubAgentStreamEntry {
+export interface DelegateStreamEntry {
   toolCallId: string;
-  subAgentId: SubAgentId;
-  subAgentName: string;
+  agentId: SubAgentId;
+  agentName: string;
   events: AgentEvent[];
   status: "running" | "completed" | "error";
   startedAt: number;
@@ -18,7 +18,7 @@ export interface SubAgentStreamEntry {
 }
 
 interface StreamState {
-  byToolCall: Record<string, SubAgentStreamEntry>;
+  byToolCall: Record<string, DelegateStreamEntry>;
 }
 
 const [state, setState] = createStore<StreamState>({ byToolCall: {} });
@@ -41,18 +41,18 @@ function evictOldestCompleted(): void {
   }
 }
 
-export const subAgentsStreamStore = {
+export const delegateStreamsStore = {
   state,
 
   actions: {
-    recordStart(toolCallId: string, subAgentId: SubAgentId, subAgentName: string): void {
+    recordStart(toolCallId: string, agentId: SubAgentId, agentName: string): void {
       setState((s) => ({
         byToolCall: {
           ...s.byToolCall,
           [toolCallId]: {
             toolCallId,
-            subAgentId,
-            subAgentName,
+            agentId,
+            agentName,
             events: [],
             status: "running",
             startedAt: Date.now(),

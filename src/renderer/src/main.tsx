@@ -33,39 +33,6 @@ function bootstrap(): void {
     ]),
   );
 
-  type WindowWithAppStore = {
-    __appStore?: {
-      refresh: () => Effect.Effect<unknown, unknown>;
-      refreshAsync: () => Promise<unknown>;
-    };
-    __chatStore?: {
-      loadWorkspacesAsync: () => Promise<void>;
-    };
-  };
-  (window as unknown as WindowWithAppStore).__appStore = {
-    refresh: () => appStore.refresh(),
-    refreshAsync: () =>
-      Effect.runPromiseExit(appStore.refresh() as Effect.Effect<unknown, unknown>).then(
-        (exit) => {
-          if (Exit.isFailure(exit)) {
-            throw new Error("appStore.refresh failed");
-          }
-          return exit.value;
-        },
-      ),
-  };
-
-  (window as unknown as WindowWithAppStore).__chatStore = {
-    loadWorkspacesAsync: () =>
-      Effect.runPromiseExit(chatStore.loadWorkspaces() as Effect.Effect<void>).then(
-        (exit) => {
-          if (Exit.isFailure(exit)) {
-            throw new Error("chatStore.loadWorkspaces failed");
-          }
-        },
-      ),
-  };
-
   initPromise.then((exit) => {
     if (Exit.isFailure(exit)) {
       logger.error(

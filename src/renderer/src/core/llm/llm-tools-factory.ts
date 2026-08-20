@@ -5,8 +5,8 @@ import { loadSkillTool } from "@codeman-frontend/core/tools/load-skill-tool";
 import { buildMcpTools } from "@codeman-frontend/core/tools/mcp-tool";
 import {
   buildDelegateTaskTool,
-  type ToolRegistry,
 } from "@codeman-frontend/core/tools/delegate-task-tool";
+import type { ToolRegistry } from "@codeman-frontend/core/tools/delegate-task/multi-agent-runner";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { McpToolEntry } from "@codeman-frontend/shared/lib/types";
 import type { SubAgentConfig } from "@codeman-frontend/shared/lib/sub-agent-schema";

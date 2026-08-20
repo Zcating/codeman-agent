@@ -60,6 +60,7 @@ lcov.info
 .claude/
 .playwright-mcp/
 .playwright-cli/
+opencode.json
 
 # Worktrees
 .worktrees/

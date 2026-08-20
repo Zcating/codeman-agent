@@ -2,10 +2,8 @@ import { Schema } from "effect";
 import type { AgentTool, AgentEvent } from "@earendil-works/pi-agent-core";
 import type { SubAgentConfig, SubAgentId } from "@codeman-frontend/shared/lib/sub-agent-schema";
 import type { ProviderConfig } from "@codeman-frontend/core/llm/runtime";
-import { createSubAgent } from "@codeman-frontend/features/multi-agents/lib/sub-agent-factory";
+import { createMultiAgentRunner, type ToolRegistry } from "@codeman-frontend/core/tools/delegate-task/multi-agent-runner";
 import { toToolParameters } from "@codeman-frontend/shared/lib/tool-schema";
-
-export type ToolRegistry = Map<string, AgentTool>;
 
 const DelegateTaskParamsSchema = Schema.Struct({
   agent_name: Schema.String,
@@ -23,8 +21,14 @@ export function buildDelegateTaskTool(
   toolRegistry: ToolRegistry,
   onStreamEvent: (event: AgentEvent, toolCallId: string, subAgentId: SubAgentId) => void,
 ): AgentTool {
-  const configByName = new Map(enabledConfigs.map((c) => [c.name, c]));
   const descriptionList = enabledConfigs.map((c) => `- ${c.name}: ${c.description}`).join("\n");
+
+  const runner = createMultiAgentRunner({
+    configs: enabledConfigs,
+    baseProvider,
+    toolRegistry,
+    onStreamEvent,
+  });
 
   return {
     label: "delegate_task",
@@ -38,41 +42,7 @@ export function buildDelegateTaskTool(
     executionMode: "parallel" as const,
     execute: async (toolCallId, rawParams, _signal) => {
       const params = rawParams as DelegateTaskParams;
-      const config = configByName.get(params.agent_name);
-      if (!config) {
-        throw new Error(
-          `Unknown sub-agent "${params.agent_name}". Available: ${[...configByName.keys()].join(", ")}`,
-        );
-      }
-      const subAgent = createSubAgent(config, baseProvider, toolRegistry);
-      const unsubscribe = subAgent.subscribe((event) => {
-        onStreamEvent(event, toolCallId, config.id);
-      });
-      try {
-        // Note: subAgent.prompt returns Promise<void> in the real API.
-        // The mock returns an AssistantMessage-like object directly for testing.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await (subAgent.prompt(params.task) as any);
-        if (result.stopReason === "error") {
-          throw new Error(result.errorMessage ?? "sub-agent error");
-        }
-        const finalText = result.content
-          .filter((c): c is { type: "text"; text: string } => c.type === "text")
-          .map((c) => c.text)
-          .join("\n");
-        return {
-          content: [{ type: "text" as const, text: finalText }],
-          details: {
-            subAgentId: config.id,
-            subAgentName: config.name,
-            model: config.modelId,
-            usage: result.usage,
-          },
-        };
-      } finally {
-        unsubscribe();
-        await subAgent.abort();
-      }
+      return runner.runTask(toolCallId, params);
     },
   };
 }

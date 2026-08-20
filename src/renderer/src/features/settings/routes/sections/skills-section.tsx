@@ -1,4 +1,5 @@
-import { Show, For, type JSX } from "solid-js";
+import { Show, type JSX } from "solid-js";
+import { FlatList } from "@codeman-frontend/shared/components/internal/flat-list";
 import { appStore } from "@codeman-frontend/shared/stores/app.store";
 import { settingsSaver } from "@codeman-frontend/features/settings/lib/settings-saver";
 import { skillsManifests$ } from "@codeman-frontend/features/skills/stores/skills.store";
@@ -47,56 +48,62 @@ export function SkillsSection(): JSX.Element {
               No skills found.
             </p>
             <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-              Skills are scanned during application startup from{' '}
+              Skills are scanned during application startup from{" "}
               <code>~/.agents/skills/</code>.
             </p>
           </div>
         }
       >
-        <ul class="space-y-2" data-testid="skills-list">
-          <For each={skillsManifests$()}>
-            {(skill) => (
-              <li
-                class="flex items-start gap-3 rounded-lg border border-zinc-200 dark:border-zinc-700 p-3"
-                data-testid={`skill-item-${skill.name}`}
-              >
-                <CodemanCheckbox
-                  value={isEnabled(skill.name)}
-                  onChange={(v) => toggleSkill(skill.name, v)}
-                  aria-label={`Enable ${skill.name}`}
-                  data-testid={`skill-toggle-${skill.name}`}
-                />
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2">
-                    <code class="text-sm font-mono font-medium text-zinc-900 dark:text-zinc-100">
-                      {skill.name}
-                    </code>
-                    <span
-                      class={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-md ${
-                        skill.source === "preinstalled"
-                          ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                          : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                      }`}
-                    >
-                      {isEnabled(skill.name) ? (
-                        <CheckCircle2 class="h-3 w-3" aria-hidden="true" />
-                      ) : (
-                        <XCircle class="h-3 w-3" aria-hidden="true" />
-                      )}
-                      <span>{formatSource(skill.source)}</span>
-                    </span>
+        <div class="space-y-2">
+          <FlatList
+            data-testid="skills-list"
+            options={skillsManifests$().map((s) => ({ value: s.name }))}
+            renderItem={(item) => {
+              const skill = skillsManifests$().find((s) => s.name === item.value);
+              if (!skill) return null;
+              return (
+                <li
+                  class="flex items-start gap-3 rounded-lg border border-zinc-200 dark:border-zinc-700 p-3"
+                  data-testid={`skill-item-${skill.name}`}
+                >
+                  <CodemanCheckbox
+                    value={isEnabled(skill.name)}
+                    onChange={(v) => toggleSkill(skill.name, v)}
+                    aria-label={`Enable ${skill.name}`}
+                    data-testid={`skill-toggle-${skill.name}`}
+                  />
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                      <code class="text-sm font-mono font-medium text-zinc-900 dark:text-zinc-100">
+                        {skill.name}
+                      </code>
+                      <span
+                        class={`inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-md ${
+                          skill.source === "preinstalled"
+                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                            : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                        }`}
+                      >
+                        {isEnabled(skill.name) ? (
+                          <CheckCircle2 class="h-3 w-3" aria-hidden="true" />
+                        ) : (
+                          <XCircle class="h-3 w-3" aria-hidden="true" />
+                        )}
+                        <span>{formatSource(skill.source)}</span>
+                      </span>
+                    </div>
+                    <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                      {skill.description}
+                    </p>
+                    <p class="mt-1 text-xs text-zinc-400 dark:text-zinc-600 font-mono truncate">
+                      {skill.path}
+                    </p>
                   </div>
-                  <p class="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
-                    {skill.description}
-                  </p>
-                  <p class="mt-1 text-xs text-zinc-400 dark:text-zinc-600 font-mono truncate">
-                    {skill.path}
-                  </p>
-                </div>
-              </li>
-            )}
-          </For>
-        </ul>
+                </li>
+              );
+            }}
+          />
+        </div>
       </Show>
     </ScrollArea>
   );

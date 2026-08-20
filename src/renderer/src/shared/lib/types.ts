@@ -179,17 +179,6 @@ export interface McpToolEntry {
   inputSchema: unknown;
 }
 
-export interface CompactionEntry {
-  id: string;
-  conversationId: string;
-  summary: string;
-  model: string;
-  tokensBefore: number;
-  kind: "auto" | "manual";
-  createdAt: number;
-  firstKeptMessageId: string;
-}
-
 export type ToolPartState =
   | { status: "pending" }
   | { status: "running"; startedAt: number }

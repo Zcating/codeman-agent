@@ -8,6 +8,7 @@ import { CodemanInput } from "@codeman-frontend/shared/components/internal/codem
 import { CodemanCheckbox } from "@codeman-frontend/shared/components/internal/codeman-checkbox";
 import { CodemanSelect } from "@codeman-frontend/shared/components/internal/codeman-select";
 import { Separator } from "@codeman-frontend/shared/components/ui/separator";
+import { StatusBadge } from "@codeman-frontend/shared/components/internal/status-badge";
 import {
   BaseUrlSchema,
   ApiKeySchema,
@@ -244,12 +245,7 @@ export function ProviderCard(props: ProviderCardProps) {
           <div class="flex flex-row items-center gap-2">
             <span class="text-sm font-medium truncate">{labelDisplay()}</span>
             <Show when={isDev()}>
-              <span
-                data-testid="provider-dev-badge"
-                class="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 shrink-0"
-              >
-                (dev)
-              </span>
+              <StatusBadge tone="warning" label="dev" data-testid="provider-dev-badge" />
             </Show>
           </div>
         </div>

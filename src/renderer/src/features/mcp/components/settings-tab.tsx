@@ -1,4 +1,4 @@
-import { For, Show, type JSX } from "solid-js";
+import { Show, type JSX } from "solid-js";
 import { Effect } from "effect";
 import {
   FolderOpen,
@@ -6,7 +6,6 @@ import {
   RefreshCw,
   Server,
 } from "lucide-solid";
-import { cn } from "@codeman-frontend/shared/lib/cn";
 import { Button } from "@codeman-frontend/shared/components/ui/button";
 import {
   mcpServers$,
@@ -16,6 +15,8 @@ import {
   restart,
   openConfigDir,
 } from "@codeman-frontend/features/mcp/stores/store";
+import { FlatList } from "@codeman-frontend/shared/components/internal/flat-list";
+import { StatusBadge } from "@codeman-frontend/shared/components/internal/status-badge";
 import type { McpServerStatus, McpServerInfo } from "@codeman-frontend/shared/lib/types";
 
 
@@ -27,53 +28,6 @@ const STATUS_LABEL: Record<McpServerStatus["kind"], string> = {
   protocol_error: "Protocol Error",
   crashed: "Crashed",
 };
-
-function StatusPill(props: { status: McpServerStatus }): JSX.Element {
-  const isError = (): boolean =>
-    props.status.kind === "spawn_failed" ||
-    props.status.kind === "protocol_error" ||
-    props.status.kind === "crashed";
-
-  const isConnected = (): boolean => props.status.kind === "connected";
-  const isStarting = (): boolean => props.status.kind === "starting";
-
-  return (
-    <span
-      class={cn(
-        "inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full font-medium",
-        isError()
-          ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
-          : isConnected()
-            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
-            : isStarting()
-              ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
-              : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
-      )}
-      data-testid="mcp-status-pill"
-    >
-      <span
-        class={cn(
-          "h-1.5 w-1.5 rounded-full",
-          isError()
-            ? "bg-red-500"
-            : isConnected()
-              ? "bg-green-500"
-              : isStarting()
-                ? "bg-yellow-500"
-                : "bg-zinc-400",
-        )}
-        aria-hidden="true"
-      />
-      {STATUS_LABEL[props.status.kind]}
-      {props.status.kind === "spawn_failed" ||
-      props.status.kind === "protocol_error" ||
-      props.status.kind === "crashed"
-        ? `: ${(props.status as { error: string }).error}`
-        : null}
-    </span>
-  );
-}
-
 
 interface ServerRowProps {
   server: McpServerInfo;
@@ -103,7 +57,27 @@ function ServerRow(props: ServerRowProps): JSX.Element {
             <code class="text-sm font-mono font-medium text-zinc-900 dark:text-zinc-100 truncate min-w-0">
               {props.server.config.name}
             </code>
-            <StatusPill status={props.server.status} />
+            <StatusBadge
+              tone={
+                props.server.status.kind === "disabled"
+                  ? "neutral"
+                  : props.server.status.kind === "starting"
+                    ? "info"
+                    : props.server.status.kind === "connected"
+                      ? "success"
+                      : "destructive"
+              }
+              label={
+                (props.server.status.kind === "spawn_failed" ||
+                props.server.status.kind === "protocol_error" ||
+                props.server.status.kind === "crashed")
+                  ? `${STATUS_LABEL[props.server.status.kind]}: ${(props.server.status as { error: string }).error}`
+                  : STATUS_LABEL[props.server.status.kind]
+              }
+              dot
+              size="md"
+              data-testid="mcp-status-pill"
+            />
           </div>
           <div class="flex items-center gap-1 shrink-0">
             <Button
@@ -213,11 +187,16 @@ export function McpSettingsTab(props: McpSettingsTabProps): JSX.Element {
           </div>
         }
       >
-        <ul class="space-y-2" data-testid="mcp-servers-list">
-          <For each={mcpServers$()}>
-            {(server) => <ServerRow server={server} />}
-          </For>
-        </ul>
+        <div class="space-y-2">
+          <FlatList
+            data-testid="mcp-servers-list"
+            options={mcpServers$().map((s) => ({ value: s.config.name }))}
+            renderItem={(item) => {
+              const server = mcpServers$().find((s) => s.config.name === item.value);
+              return server ? <ServerRow server={server} /> : null;
+            }}
+          />
+        </div>
       </Show>
 
       <Show when={mcpAllTools$().length > 0}>
@@ -225,28 +204,34 @@ export function McpSettingsTab(props: McpSettingsTabProps): JSX.Element {
           <p class="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
             Available Tools ({mcpAllTools$().length})
           </p>
-          <ul class="space-y-2" data-testid="mcp-tools-list">
-            <For each={mcpAllTools$()}>
-              {(tool) => (
-                <li class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
-                  <div class="flex items-center gap-2 min-w-0">
-                    <code
-                      class="font-mono text-xs text-primary-600 dark:text-primary-400 truncate min-w-0 flex-1"
-                      title={tool.agentName}
-                    >
-                      {tool.agentName}
-                    </code>
-                    <span class="shrink-0 rounded bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-500 dark:text-zinc-400">
-                      {tool.serverName}
-                    </span>
-                  </div>
-                  <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-500 break-words">
-                    {tool.description}
-                  </p>
-                </li>
-              )}
-            </For>
-          </ul>
+          <div class="space-y-2">
+            <FlatList
+              data-testid="mcp-tools-list"
+              options={mcpAllTools$().map((t) => ({ value: t.agentName }))}
+              renderItem={(item) => {
+                const tool = mcpAllTools$().find((t) => t.agentName === item.value);
+                if (!tool) return null;
+                return (
+                  <li class="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <code
+                        class="font-mono text-xs text-primary-600 dark:text-primary-400 truncate min-w-0 flex-1"
+                        title={tool.agentName}
+                      >
+                        {tool.agentName}
+                      </code>
+                      <span class="shrink-0 rounded bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-500 dark:text-zinc-400">
+                        {tool.serverName}
+                      </span>
+                    </div>
+                    <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-500 break-words">
+                      {tool.description}
+                    </p>
+                  </li>
+                );
+              }}
+            />
+          </div>
         </div>
       </Show>
     </>
