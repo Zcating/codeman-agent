@@ -35,8 +35,9 @@
   },
   "dependencies": {
     "@ark-ui/solid": "^5.37.1",
-    "@earendil-works/pi-agent-core": "0.80.3",
-    "@earendil-works/pi-ai": "0.80.3",
+    "@earendil-works/pi-agent-core": "0.84.2",
+    "@earendil-works/pi-ai": "0.84.2",
+    "@earendil-works/pi-coding-agent": "0.84.2",
     "@effect/experimental": "0.60.0",
     "@effect/platform": "^0.75.4",
     "@effect/platform-browser": "^0.75.0",
