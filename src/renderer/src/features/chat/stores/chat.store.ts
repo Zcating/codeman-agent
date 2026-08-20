@@ -17,7 +17,6 @@ import {
   ConversationApiLive,
   MessageApi,
   MessageApiLive,
-  FileApiLive,
 } from "@codeman-frontend/shared/apis";
 import {
   WorkspaceService,
@@ -32,14 +31,6 @@ import {
   type DoCompactDeps,
 } from "@codeman-frontend/features/chat/lib/compaction";
 import type { ThinkingLevel } from "@codeman-frontend/shared/lib/sub-agent-schema";
-import {
-  buildSystemPrompt,
-  DEFAULT_IDENTITY,
-  DEFAULT_GUIDELINES,
-} from "@codeman-frontend/core/llm/build-system-prompt";
-import { loadProjectInstructions } from "@codeman-frontend/features/chat/lib/workspace-project-instructions";
-import { formatSkillsManifestSection } from "@codeman-frontend/features/skills/lib/skill-injector";
-import { mcpAllTools$ } from "@codeman-frontend/features/mcp/stores/store";
 
 
 export interface ConversationState {
@@ -55,9 +46,6 @@ export interface ConversationState {
   isAgentActive: boolean;
   lastError: string | null;
   runtime: AgentRuntime;
-
-  /** AGENTS.md content, loaded once per session */
-  projectInstructions: string | null;
 
   /** Session-level provider/model selection (transient, not persisted). null = use global settings default. */
   sessionProviderId?: string | null;
@@ -106,7 +94,6 @@ export function setupConvState(conv: Conversation, history: Message[]): Conversa
     isAgentActive: false,
     lastError: null,
     runtime,
-    projectInstructions: null,
   };
   setStore("byId", conv.id, cs);
   setConversationsSignal(Object.values(store.byId));
@@ -242,40 +229,12 @@ export const sendMessage = Effect.fn(
       (m) => enabledNames.includes(m.name),
     );
 
-    const workspace = cs.workspaceId ? workspaces$().find((w) => w.id === cs.workspaceId) : null;
-
-    if (cs.projectInstructions === null && workspace) {
-      const loaded = yield* loadProjectInstructions(cs.workspaceId).pipe(
-        Effect.provide(FileApiLive),
-      );
-      setStore("byId", convId, "projectInstructions", loaded);
-    }
-
-    const dynamicToolSnippets: readonly string[] = mcpAllTools$().map((t) => t.description);
-
-    const workspaceSection = workspace
-      ? { workspaceId: cs.workspaceId, rootPath: workspace.rootPath }
-      : undefined;
-
-    const finalSystemPrompt = buildSystemPrompt({
-      identity: DEFAULT_IDENTITY,
-      staticToolSnippets: cs.runtime.snippets,
-      dynamicToolSnippets: dynamicToolSnippets.length > 0 ? dynamicToolSnippets : undefined,
-      guidelines: DEFAULT_GUIDELINES,
-      workspace: workspaceSection,
-      projectInstructions: cs.projectInstructions ?? undefined,
-      skillsSection: formatSkillsManifestSection(enabledSkills),
-      userDefault: appStore.state.value.systemPrompt.default,
-      conversationOverride: cs.systemPrompt ?? undefined,
-    });
-
     const augmentedProvider: ProviderConfig = {
       ...provider,
       id: sessionProviderId ?? provider.id,
       defaultModel: sessionModelId,
       workspaceId: cs.workspaceId || undefined,
       enabledSkills,
-      systemPrompt: finalSystemPrompt,
     };
 
     const stream = cs.runtime.run({ context, provider: augmentedProvider, thinkingLevel });

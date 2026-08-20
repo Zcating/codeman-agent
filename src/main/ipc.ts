@@ -3,7 +3,6 @@ import { join } from "node:path";
 
 import { registerSettingsIpc } from "./features/settings/ipc.js";
 import { SettingsState } from "./features/settings/state.js";
-import { registerSystemIpc } from "./features/system/ipc.js";
 import { CancelMap } from "./features/webfetch/cancel-map.js";
 import { registerWebfetchIpc } from "./features/webfetch/ipc.js";
 import { registerAutomationIpc } from "./features/automations/ipc.js";
@@ -17,7 +16,6 @@ export function registerIpcHandlers(_deps: {
   settingsState.load();
 
   registerSettingsIpc({ settings: settingsState });
-  registerSystemIpc();
   registerWebfetchIpc({ cancelMap });
   registerAutomationIpc();
 }
