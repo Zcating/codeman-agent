@@ -40,7 +40,6 @@ import {
 import { loadProjectInstructions } from "@codeman-frontend/features/chat/lib/workspace-project-instructions";
 import { formatSkillsManifestSection } from "@codeman-frontend/features/skills/lib/skill-injector";
 import { mcpAllTools$ } from "@codeman-frontend/features/mcp/stores/store";
-import type { PermissionRequest } from "@codeman-frontend/features/chat/components/permission-bar";
 
 
 export interface ConversationState {
@@ -89,15 +88,6 @@ export const selectedWorkspaceId$: Accessor<string | null> = selectedWorkspaceId
 
 export function setSelectedWorkspaceId(id: string | null): void {
   setSelectedWorkspaceIdSignal(id);
-}
-
-const [pendingPermissions, setPendingPermissions] = createSignal<PermissionRequest[]>([]);
-export const pendingPermissions$: Accessor<PermissionRequest[]> = pendingPermissions;
-export function addPendingPermission(req: PermissionRequest): void {
-  setPendingPermissions((p) => [...p, req]);
-}
-export function resolvePendingPermission(requestID: string): void {
-  setPendingPermissions((p) => p.filter((r) => r.requestID !== requestID));
 }
 
 
