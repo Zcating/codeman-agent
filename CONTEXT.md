@@ -81,10 +81,10 @@ Windows 桌面 AI 编码 agent（基于 Electron + Solid.js + TypeScript），�
 ### Schema 与错误模型
 
 - **Schema (`effect/Schema`)** — V4 `effect` 包内置的 schema/validation 模块。V3 `Schema.Struct` + `Schema.TaggedError` 模式保留并扩展。V4 `toToolParameters()` helper 保留（pi 的 `defineTool().parameters` 仍需 typebox `TSchema`）。_避免_：zod、valibot（与 Effect 生态割裂）。
-- **AppError (`AppError` 基类)** — V4 `Schema.TaggedError` 基类，位于 `src/shared/lib/errors.ts`。V3 7 个保留子类 + V4 17 个 pi 错误映射子类 = 共 **18 个子类**（详见 ADR 0009）。_避免_：Error（标准库名）、自定义 Error 基类。
-- **AppError 子类清单（V4）** — 18 个子类：
+- **AppError (`AppError` 基类)** — V4 `Schema.TaggedError` 基类，位于 `src/shared/lib/errors.ts`。V3 7 个保留子类 + V4 19 个 pi 错误映射子类 = 共 **26 个子类**（详见 ADR 0009）。_避免_：Error（标准库名）、自定义 Error 基类。
+- **AppError 子类清单（V4）** — 26 个子类：
   - V3 保留（7）：`NotFound / Unauthorized / Network / InvalidConfig / Database / ToolCall / Unknown`
-  - V4 新增（17）：`ModelProvider / ModelAuth / ModelRateLimit / ModelContextLength / ModelTimeout / ModelProtocol / SessionNotFound / SessionPermission / SessionFilesystem / ToolExecute / ToolArgument / ToolUnavailable / Compaction / ExtensionLoad / CredentialStore / ResourceLoad / PiRuntime`
+  - V4 新增（19）：`ModelProvider / ModelAuth / ModelRateLimit / ModelContextLength / ModelTimeout / ModelProtocol / SessionNotFound / SessionPermission / SessionFilesystem / ToolExecute / ToolArgument / ToolUnavailable / Compaction / ExtensionLoad / CredentialStore / ResourceLoad / PiRuntime / Webfetch / McpClient`
   - V3 删除（1）：`SandboxViolation`（per ADR 0003 sandbox 删除）
 - **Pi Error Classifier (pi 错误分类器)** — V4 `PiError.classify(err)` 归一化分类 pi 错误（基于 `err.constructor.name` 或 `err._tag`）。位于 `src/main/pi-runtime/error-classifier.ts`。_避免_：error normalizer（impl 细节）。
 - **Pi Error to AppError Mapper (错误映射层)** — V4 `src/main/pi-runtime/error-mapper.ts`，把分类后的 pi 错误映射为对应 AppError 子类。**IPC 边界错误传递的唯一出口**。_避免_：error translator、exception bridge。
@@ -135,13 +135,13 @@ PiCodingAgent (headless SDK)
         │
 Pi Runtime (main process)
   ├─ PiRuntime 单例 (src/main/pi-runtime/)
-  ├─ Custom Tools: webfetch (SSRF-protected)
   ├─ Built-in Tools: read / write / edit / bash / grep / find / ls
   └─ Extensions:
        ├─ codeman-agent-extension (system prompt sections + identity)
-       ├─ Pi Skills System (Agent Skills standard)
-       ├─ Pi Subagent Extension (delegate_task)
-       └─ Pi MCP Extension (JSON-RPC stdio client)
+       ├─ skills-extension (Agent Skills standard, ~/.agents/skills/)
+       ├─ subagent-extension (delegate_task via pi ExtensionAPI)
+       ├─ mcp-extension (JSON-RPC stdio client, ~/.agents/mcp_servers.json)
+       └─ webfetch (SSRF-protected, via pi defineTool)
         ↑
         │ IPC bridge (webContents.send + ipcMain.handle)
         │
@@ -194,7 +194,7 @@ V4 启动时以下决策已**不可逆**（回滚需大量代码改动）：
 - 删 Provider.billing 子对象 + 计费工具（per ADR 0011）
 - 删 60+ V3 provider preset 硬编码清单（per ADR 0008）
 - 运行时整体迁 main process（per ADR 0002）—— V3 renderer 自建 runtime 删除
-- 错误模型扩展到 18 个子类（per ADR 0009）
+- 错误模型扩展到 26 个子类（per ADR 0009）
 
 详见 `docs/adr/0001`（V4 总纲）的 Reversibility 章节。
 
@@ -219,4 +219,4 @@ V4 起，**避免**以下反模式（基于 V4 决策）：
 
 ---
 
-V4 CONTEXT.md last updated: 2026-08-20（grilled 14 步决策 + 重生成 ADR 0001–0012）
+V4 CONTEXT.md last updated: 2026-08-20（C12 最终更新: billing 清理 + AppError 26 子类 + extensions 更新）

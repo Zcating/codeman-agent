@@ -6,14 +6,13 @@ product
 
 ## Users
 
-中文独立开发者与效率玩家。在 Windows 桌面长时间工作,把"快提词"和"看计费"当成肌肉记忆;预期延迟以毫秒计,反感任何"AI 工具"的居中紫色欢迎卡、emoji 弹雨、营销腔。常驻显示器右下角或第二屏,作为终端 / IDE / 浏览器之外的"第四个面板"出现。
+中文独立开发者与效率玩家。在 Windows 桌面长时间工作,把"快提词"当成肌肉记忆;预期延迟以毫秒计,反感任何"AI 工具"的居中紫色欢迎卡、emoji 弹雨、营销腔。常驻显示器右下角或第二屏,作为终端 / IDE / 浏览器之外的"第四个面板"出现。
 
 ## Product Purpose
 
 codeman-agent 是 Windows 原生 AI Agent 桌面应用。V1 唯一交付:
 
 - 单 Tauri 主窗口内提供 LLM 流式对话(Markdown 渲染,工具调用可视化)
-- 内置 2 个计费工具(`get_balance` / `get_plan_quota`),让用户随时核对余额
 - 会话持久化到 SQLite(FTS5 全文搜索)+ Windows Credential Manager 管 API key
 - 三态主题(light / dark / system),默认跟系统
 
@@ -43,6 +42,10 @@ codeman-agent 是 Windows 原生 AI Agent 桌面应用。V1 唯一交付:
 3. **Theme-integrity over theme-decor**: violet 主色以 token 形式贯穿,light/dark 一致,不大块铺面;状态色靠 border + bg 而不是饱和度。
 4. **Trust the user**: 不解释功能、不堆 emoji 提示、不堆 success 弹窗;出错时只 console.error,UI 静默。
 5. **CJK-first**: Noto Sans SC 与 Inter 同权,中英文混排节奏跟 JetBrains Mono 工具调用卡片配对协调;行高 / 字距按 CJK 优化。
+
+## V4 Runtime
+
+V4 运行时基于 `@earendil-works/pi-coding-agent` (≥ 0.84.x)。V4 无 workspace 沙箱 / permission 模型——工具以当前用户权限直接执行。V4 会话存储为 JSONL 文件于 `cwd/.pi/sessions/`，V3 SQLite conversations 不迁移。V4 Provider 配置由 pi ModelRuntime 管理（`auth.json`），V3 electron-store settings.json providers schema 已删除。
 
 ## Accessibility & Inclusion
 
