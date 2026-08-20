@@ -39,4 +39,38 @@ export function registerPiIpcHandlers(ipcMain: IpcMain, mainWindow: BrowserWindo
   ipcMain.handle("pi:close-session", async (_event, _args: { sessionId: string }) => {
     return { ok: true };
   });
+
+  ipcMain.handle("pi:list-providers", async () => {
+    const mr = runtime.getModelRuntime();
+    return mr.getProviders();
+  });
+
+  ipcMain.handle("pi:set-api-key", async (_event, args: { providerId: string; apiKey: string }) => {
+    const mr = runtime.getModelRuntime();
+    await mr.setRuntimeApiKey(args.providerId, args.apiKey);
+    return { ok: true };
+  });
+
+  ipcMain.handle("pi:get-settings", async () => {
+    const sm = runtime.getSettingsManager();
+    return sm.getGlobalSettings();
+  });
+
+  ipcMain.handle("pi:set-setting", async (_event, args: { key: string; value: unknown }) => {
+    const sm = runtime.getSettingsManager();
+    switch (args.key) {
+      case "theme":
+        sm.setTheme(args.value as string);
+        break;
+      case "defaultProvider":
+        sm.setDefaultProvider(args.value as string);
+        break;
+      case "defaultModel":
+        sm.setDefaultModel(args.value as string);
+        break;
+      default:
+        break;
+    }
+    return { ok: true };
+  });
 }

@@ -28,6 +28,45 @@ export interface StreamSubscription {
   readonly onStreamChunk: (handler: (evt: unknown) => void) => () => void;
 }
 
+export interface PiProvider {
+  id: string;
+  label: string;
+  baseUrl: string;
+  defaultModel: string;
+  models: PiModel[];
+}
+
+export interface PiModel {
+  id: string;
+  label: string;
+  contextWindow?: number;
+  thinking: boolean;
+}
+
+export interface PiUserSettings {
+  theme?: "light" | "dark" | "system";
+  userLanguage?: "zh" | "en" | "auto";
+  startAtLogin?: boolean;
+  contextFiles?: string[];
+  systemPrompt?: {
+    default: string;
+    userCanEdit: boolean;
+  };
+  window?: {
+    rememberPosition: boolean;
+    rememberSize: boolean;
+    defaultSize: { width: number; height: number };
+    minSize: { width: number; height: number };
+  };
+}
+
+export interface PiRuntimeApi {
+  readonly listProviders: () => Promise<PiProvider[]>;
+  readonly setApiKey: (providerId: string, apiKey: string) => Promise<void>;
+  readonly getSettings: () => Promise<PiUserSettings>;
+  readonly setSetting: (key: string, value: unknown) => Promise<void>;
+}
+
 export interface CodemanApi {
   readonly getSettings: () => Promise<Settings>;
   readonly updateSettings: (args: { newSettings: unknown }) => Promise<Settings>;
@@ -69,21 +108,18 @@ export interface CodemanApi {
   readonly mcpCallTool: (args: { serverName: string; toolName: string; args: unknown }) => Promise<unknown>;
   readonly mcpOpenConfigDir: () => Promise<void>;
 
-  // Webfetch (SSRF-guarded HTTP fetch)
   readonly webfetch: (args: { url: string; timeout?: number }) => Promise<{
     status: number;
     contentType: string;
     body: ArrayBuffer;
   }>;
 
-  // Sub-Agents
   readonly subAgentsList: () => Promise<readonly SubAgentConfig[]>;
   readonly subAgentsAdd: (config: SubAgentConfig) => Promise<SubAgentConfig>;
   readonly subAgentsUpdate: (args: { id: string; patch: Partial<SubAgentConfig> }) => Promise<SubAgentConfig>;
   readonly subAgentsDelete: (args: { id: string }) => Promise<void>;
   readonly subAgentsSetEnabled: (args: { id: string; enabled: boolean }) => Promise<SubAgentConfig>;
 
-  // Automations
   readonly automationsList: () => Promise<readonly AutomationRule[]>;
   readonly automationsCreate: (rule: AutomationRule) => Promise<AutomationRule>;
   readonly automationsUpdate: (rule: AutomationRule) => Promise<AutomationRule>;
@@ -98,14 +134,13 @@ export interface CodemanApi {
   readonly automationsGetExecution: (args: { id: string }) => Promise<AutomationExecution>;
   readonly automationsRunMissed: (args: { id: AutomationId }) => Promise<void>;
 
-  // Renderer-side listener cannot import `electron` directly (browser context
-  // has no `ipcRenderer`); this bridge mirrors `onStreamChunk` semantics.
   readonly automationsExecuteLlm: (
     handler: (request: LlmExecuteRequest) => void | Promise<void>,
   ) => () => void;
 
-  // Main side awaits this on `automations:execute-llm-result` (see executor.ts).
   readonly automationsSendLlmResult: (payload: LlmResultPayload) => void;
+
+  readonly piRuntime: PiRuntimeApi;
 }
 
 export type CodemanApiExposed = CodemanApi &
@@ -190,6 +225,15 @@ const codeman: CodemanApiExposed = {
   },
 
   invoke: (channel, args) => ipcRenderer.invoke(channel, args ?? {}),
+
+  piRuntime: {
+    listProviders: () => ipcRenderer.invoke("pi:list-providers"),
+    setApiKey: (providerId, apiKey) =>
+      ipcRenderer.invoke("pi:set-api-key", { providerId, apiKey }),
+    getSettings: () => ipcRenderer.invoke("pi:get-settings"),
+    setSetting: (key, value) =>
+      ipcRenderer.invoke("pi:set-setting", { key, value }),
+  },
 };
 
 contextBridge.exposeInMainWorld("codeman", codeman);

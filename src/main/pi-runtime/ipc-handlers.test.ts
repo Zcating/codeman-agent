@@ -35,7 +35,7 @@ describe("ipc-handlers", () => {
   });
 
   describe("registerPiIpcHandlers", () => {
-    it("registers 6 expected IPC channels", () => {
+    it("registers 10 expected IPC channels", () => {
       registerPiIpcHandlers(mockIpcMain as any, mockWindow);
 
       const channels = mockIpcMain.handle.mock.calls.map((c: unknown[]) => c[0]);
@@ -45,7 +45,11 @@ describe("ipc-handlers", () => {
       expect(channels).toContain("pi:open-session");
       expect(channels).toContain("pi:list-sessions");
       expect(channels).toContain("pi:close-session");
-      expect(channels.length).toBe(6);
+      expect(channels).toContain("pi:list-providers");
+      expect(channels).toContain("pi:set-api-key");
+      expect(channels).toContain("pi:get-settings");
+      expect(channels).toContain("pi:set-setting");
+      expect(channels.length).toBe(10);
     });
   });
 });

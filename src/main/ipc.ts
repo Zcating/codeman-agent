@@ -1,21 +1,14 @@
-import { app, BrowserWindow } from "electron";
-import { join } from "node:path";
+import { BrowserWindow } from "electron";
 
-import { registerSettingsIpc } from "./features/settings/ipc.js";
-import { SettingsState } from "./features/settings/state.js";
 import { CancelMap } from "./features/webfetch/cancel-map.js";
 import { registerWebfetchIpc } from "./features/webfetch/ipc.js";
 import { registerAutomationIpc } from "./features/automations/ipc.js";
 
-const settingsState = new SettingsState(join(app.getPath("userData"), "settings.json"));
 const cancelMap = new CancelMap();
 
 export function registerIpcHandlers(_deps: {
   getMainWindow: () => BrowserWindow | null;
 }): void {
-  settingsState.load();
-
-  registerSettingsIpc({ settings: settingsState });
   registerWebfetchIpc({ cancelMap });
   registerAutomationIpc();
 }
