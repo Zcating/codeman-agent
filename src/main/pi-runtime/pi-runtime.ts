@@ -1,5 +1,18 @@
 import type { AgentSession, CreateAgentSessionOptions, SessionManager, ModelRuntime, SettingsManager } from "@earendil-works/pi-coding-agent";
-import { createAgentSession, ModelRuntime as ModelRuntimeClass, SessionManager as SessionManagerClass, SettingsManager as SettingsManagerClass } from "@earendil-works/pi-coding-agent";
+import {
+  createAgentSession,
+  DefaultResourceLoader,
+  ModelRuntime as ModelRuntimeClass,
+  SessionManager as SessionManagerClass,
+  SettingsManager as SettingsManagerClass,
+  getAgentDir,
+} from "@earendil-works/pi-coding-agent";
+
+import { webfetchTool } from "./tools/webfetch";
+import skillsExtension from "./extensions/skills-extension";
+import subagentExtension from "./extensions/subagent-extension";
+import mcpExtension from "./extensions/mcp-extension";
+import codemanAgentExtension from "./extensions/codeman-agent-extension";
 
 export interface PiRuntimeInitOptions {
   cwd?: string;
@@ -13,6 +26,7 @@ export class PiRuntime {
   private _modelRuntime: ModelRuntime | null = null;
   private _settingsManager: SettingsManager | null = null;
   private _initialized = false;
+  private _resourceLoader: DefaultResourceLoader | null = null;
 
   static getInstance(): PiRuntime {
     if (PiRuntime._instance === null) {
@@ -26,6 +40,7 @@ export class PiRuntime {
     this._modelRuntime = null;
     this._settingsManager = null;
     this._initialized = false;
+    this._resourceLoader = null;
     PiRuntime._instance = null;
   }
 
@@ -35,11 +50,25 @@ export class PiRuntime {
     }
 
     const cwd = options.cwd ?? process.cwd();
-    const agentDir = options.agentDir;
+    const agentDir = options.agentDir ?? getAgentDir();
 
     this._modelRuntime = await ModelRuntimeClass.create();
     this._sessionManager = SessionManagerClass.create(cwd, agentDir);
     this._settingsManager = SettingsManagerClass.create(cwd, agentDir);
+
+    const loader = new DefaultResourceLoader({
+      cwd,
+      agentDir,
+      settingsManager: this._settingsManager!,
+      extensionFactories: [
+        skillsExtension,
+        subagentExtension,
+        mcpExtension,
+        codemanAgentExtension,
+      ],
+    });
+    await loader.reload();
+    this._resourceLoader = loader;
 
     this._initialized = true;
   }
@@ -77,12 +106,16 @@ export class PiRuntime {
     const sessionManager = options.sessionManager ?? this._sessionManager!;
     const modelRuntime = options.modelRuntime ?? this._modelRuntime!;
     const settingsManager = options.settingsManager ?? this._settingsManager!;
+    const resourceLoader = this._resourceLoader!;
 
     const result = await createAgentSession({
       cwd: options.cwd ?? this._sessionManager!.getCwd(),
       sessionManager,
       modelRuntime,
       settingsManager,
+      resourceLoader,
+      customTools: [webfetchTool],
+      tools: ["read", "bash", "edit", "write", "grep", "find", "ls", "webfetch"],
       ...options,
     });
 

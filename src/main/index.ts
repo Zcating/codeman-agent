@@ -13,8 +13,7 @@ import { loadQaTable } from "./features/mock-server/qa-loader";
 import { startMockServer } from "./features/mock-server";
 import { ensurePreinstalledSkills } from "./features/skills/skills-host";
 import { registerSkillsIpc } from "./features/skills/ipc";
-import { createMcpManager } from "./features/mcp/mcp-manager";
-import { registerMcpIpcHandlers } from "./features/mcp/mcp-ipc";
+
 import { createAutomationScheduler } from "./features/automations/scheduler";
 import { PiRuntime, registerPiIpcHandlers } from "./pi-runtime/index.js";
 
@@ -137,16 +136,6 @@ app.whenReady().then(() => {
             Effect.catchAllCause((cause) =>
               Effect.sync(() => logger.error("[skills-host] ensurePreinstalledSkills failed:", Cause.pretty(cause))),
             ),
-          ),
-        );
-
-        const mcpManager = createMcpManager();
-        registerMcpIpcHandlers(mcpManager);
-        // mcp 资源 finalizer 挂进 mainScope
-        yield* Effect.addFinalizer(() => Effect.promise(() => mcpManager.stopAll()));
-        yield* mcpManager.startAll().pipe(
-          Effect.catchAllCause((cause) =>
-            Effect.sync(() => logger.error("[mcp] startAll failed:", Cause.pretty(cause))),
           ),
         );
 
