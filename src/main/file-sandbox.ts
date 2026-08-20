@@ -44,14 +44,13 @@ const BLOCKED_PATH_PATTERNS: RegExp[] = [
 
 const checkBlockedPatterns = (
   inputPath: string,
-  workspaceRoot: string,
+  _workspaceRoot: string,
 ): AppBackendErrorT | null => {
   for (const re of BLOCKED_PATH_PATTERNS) {
     if (re.test(inputPath)) {
-      return new AppBackendError.SandboxViolation({
+      return new AppBackendError.SessionPermission({
         message: "Long-path prefix or NTFS alternate data stream not allowed",
         path: inputPath,
-        workspaceLabel: workspaceRoot,
       });
     }
   }
@@ -158,9 +157,9 @@ export const validatePathForWrite = Effect.fn("validatePathForWrite")(
     const candidate = pathSvc.join(realParent, pathSvc.basename(absolutePath));
     if (!isInside(candidate, realRoot, pathSvc.sep)) {
       return yield* Effect.fail(
-        new AppBackendError.SandboxViolation({
+        new AppBackendError.SessionPermission({
+          message: `path ${candidate} is outside workspace ${realRoot}`,
           path: candidate,
-          workspaceLabel: realRoot,
         }),
       );
     }
@@ -200,9 +199,9 @@ export const validatePathInWorkspace = Effect.fn("validatePathInWorkspace")(
 
     if (!isInside(real, realRoot, pathSvc.sep)) {
       return yield* Effect.fail(
-        new AppBackendError.SandboxViolation({
+        new AppBackendError.SessionPermission({
+          message: `path ${real} is outside workspace ${realRoot}`,
           path: real,
-          workspaceLabel: realRoot,
         }),
       );
     }
